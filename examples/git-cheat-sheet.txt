@@ -38,4 +38,59 @@ Writing objects: 100% (8/8), 321.05 KiB, done.
 Total 8 (delta 2), reused 0 (delta 0)
 To https://github.com/bmazin/ARCONS-pipeline.git
    e62bfb6..3f3138d  master -> master
-mac-119562:examples stoughto$ 
+mac-119562:examples stoughto$
+
+=====================================================
+
+To grab something from the repository that you do not alrieady have,
+one way is to hit the button in the upper right corner of the github
+app (Mac) which will sync you up (share local commits on the server
+ and retrieve changes from others)
+
+e.g. I now have Chris' 'examples' directory in the tree structure
+under ARCONS-pipeline in my local directory ~
+
+I modified git-cheat-sheet.txt and now I want to commit the changes.
+First, check which files have been changed with
+
+> git status
+
+antipodes:examples Danica$ git status
+# On branch master
+#
+# Initial commit
+#
+# Untracked files:
+#   (use "git add <file>..." to include in what will be committed)
+#
+#       .git-cheat-sheet.txt.swp
+#       README.txt
+#       git-cheat-sheet.txt
+#       simple-xray/
+nothing added to commit but untracked files present (use "git add" to track)
+
+
+You can check the actual changes with
+
+> git diff
+
+Add any files/folders that were created (and possibly even just modified
+ by you; see 'git status' output).
+
+> git add git-cheat-sheet.txt
+
+Then commit your changes to your local repository with:
+
+> git commit
+
+antipodes:examples Danica$ git commit git-cheat-sheet.txt
+[master (root-commit) 781079f] Danica added more helpful commands and comments 07/24/2012
+ 1 file changed, 78 insertions(+)
+ create mode 100644 git-cheat-sheet.txt
+
+
+And finally update to the local repository:
+
+> git push
+
+ 
