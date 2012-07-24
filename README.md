@@ -6,8 +6,10 @@ This repository contains the code to analyze data from the ARCONS array.
 
 Required external software components:
 
-Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.php)
-PyEphem (http://rhodesmill.org/pyephem/)
+Python (versions 2.6 and 2.7 appear to work so far) and the following python modules (youcan check if you have them with help('modules') within the (i)python interpreter 
+Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.php) 
+PyEphem (http://rhodesmill.org/pyephem/) 
+PyTables
 
 
 Recommended external software components:
@@ -17,9 +19,10 @@ Aptana Studio 3 (http://www.aptana.com/products/studio3/download)
 
 General purpose:
 
-/headers contains standard definitions
-/params contains files that provide inputs to the pipeline
-/utils contains commonly used functions
+/headers contains standard definitions 
+/params contains files that provide inputs to the pipeline 
+/utils contains commonly used functions 
+/examples contains simple examples to show how to use the software
 
 
 Pipeline components:
