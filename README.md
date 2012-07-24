@@ -3,19 +3,27 @@ ARCONS-pipeline
 
 This repository contains the code to analyze data from the ARCONS array.  
 
+
 Required external software components:
+
 Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.php)
 PyEphem (http://rhodesmill.org/pyephem/)
 
+
 Recommended external software components:
+
 Aptana Studio 3 (http://www.aptana.com/products/studio3/download)
 
+
 General purpose:
+
 /headers contains standard definitions
 /params contains files that provide inputs to the pipeline
 /utils contains commonly used functions
 
+
 Pipeline components:
+
 /cosmic contains a module for cosmic ray cleaning
 /wavelengthcal contains a module to do wavelength calibration 
 /flatcal contains a module for normalizing the QE as a function of wavelength between pixels
