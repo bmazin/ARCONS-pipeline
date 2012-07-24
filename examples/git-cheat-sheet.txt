@@ -93,4 +93,15 @@ And finally update to the local repository:
 
 > git push
 
+antipodes:examples Danica$ git push
+Counting objects: 7, done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 1.69 KiB, done.
+Total 4 (delta 1), reused 0 (delta 0)
+To https://github.com/bmazin/ARCONS-pipeline
+   e44c549..8920a32  master -> master
+
+
+
  
