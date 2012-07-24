@@ -1,0 +1,64 @@
+import tables
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Simple program to read in one HDF5 file.  This program is customized for an old array
+# that was used to take x-ray data.
+# It creates a file simple-xray.png which is plots two histograms.
+# The histograms are of the difference between the peak value and the values before it and after it.
+
+# These values are the raw 12-bit integers.
+
+fid = tables.openFile('xray_sq2_20120620-162847.h5',mode='r')
+
+#There are 4 detecters connected to the 4 sides of a square
+nw=fid.root.r0.p0.t1340234928#northwest detector
+sw=fid.root.r0.p1.t1340234928
+ne=fid.root.r1.p0.t1340234928
+se=fid.root.r1.p1.t1340234928 #noise resonator at 0 atten
+
+timeVals = [[],[],[],[]]
+peakVals = [[],[],[],[]]
+normPeakVals = [[],[],[],[]]
+
+resonators=[nw,sw,ne,se]
+sumCh = 0
+sumPackets = 0
+pulseMask = int(12*'1',2)#bitmask of 12 ones
+timeMask = int(20*'1',2)#bitmask of 20 ones
+
+listBefore = []
+listAt = []
+listAfter = []
+for iRes,res in enumerate(resonators):
+        print "iRes=",iRes
+	for sec in res:
+		for packet in sec:
+			packet = int(packet)
+			#The old data packet has three 12-bit values
+			#containing successive data points around a
+			#peak.
+
+			atPeak = packet>>32 & pulseMask
+                        listAt.append(atPeak)
+
+			beforePeak = (packet>>44 & pulseMask) - atPeak
+                        listBefore.append(beforePeak)
+
+			afterPeak = (packet >> 20 & pulseMask) - atPeak
+                        listAfter.append(afterPeak)
+
+
+nBin = 100
+bins = np.arange(nBin+1)
+nBefore,bins = np.histogram(listBefore,bins)
+nAfter,bins = np.histogram(listAfter,bins)
+
+plt.clf()
+plt.semilogy(bins[:nBin], nBefore, label="peak value - before value")
+plt.semilogy(bins[:nBin], nAfter, label="peak value - after value")
+plt.xlabel("delta value from atPeak")
+plt.ylabel("dN")
+plt.legend()
+plt.savefig("simple-xray.png")
+
