@@ -14,7 +14,7 @@ PyEphem (http://rhodesmill.org/pyephem/)
 
 (you can check if you have them with help('modules') within the (i)python interpreter)
 
-PyTables (see http://www.tumblr.com/tagged/pytables and instructions therein for Mac) 
+If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
 
