@@ -6,6 +6,7 @@ This repository contains the code to analyze data from the ARCONS array.
 ***
 
 Required external software components:
+---------------------
 
 Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.php)
  
@@ -16,12 +17,14 @@ PyEphem (http://rhodesmill.org/pyephem/)
 ***
 
 Recommended external software components:
+---------------------
 
 Aptana Studio 3 (http://www.aptana.com/products/studio3/download)
 
 ***
 
 General purpose:
+---------------------
 
 /headers contains standard definitions 
 
@@ -33,6 +36,7 @@ General purpose:
 
 
 Pipeline components:
+---------------------
 
 /cosmic contains a module for cosmic ray cleaning
 
@@ -55,3 +59,7 @@ Pipeline components:
 /beammap contains tools for creating, viewing, and modifying beam maps 
 
 Each directory contains a /test subdirectory, where code to test the module will be stored.
+
+***
+
+This document uses the markdown syntax, see http://daringfireball.net/projects/markdown/
