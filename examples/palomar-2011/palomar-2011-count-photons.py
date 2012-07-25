@@ -8,7 +8,7 @@
 # Example use:
 # 
 # $ export MKID_DATA_DIR=/Volumes/data/Palomar2011/Pal20110728
-# python palomar-2011.py obs_20110729-151443.h5
+# python palomar-2011-count-photons.py obs_20110729-151443.h5
 
 import sys, os
 import tables
