@@ -129,6 +129,10 @@ class StartQt4(QMainWindow):
 		
 		self.scalex=self.imagex/self.nxpix
 		self.scaley=self.imagey/self.nypix
+		if self.nxpix > self.nypix:
+			self.scaley = self.scaley * (self.nypix/self.nxpix)
+		else:
+			self.scalex = self.scalex * (self.nxpix/self.nypix)
 		
 		self.bad_pix = []
 		tempbmap = reshape(bmap,self.nxpix*self.nypix)
@@ -223,7 +227,7 @@ class StartQt4(QMainWindow):
 		self.nypix = shape(bmap)[1]
 		
 		self.scalex=self.imagex/self.nxpix
-		self.scaley=(self.imagey/self.nypix)*(self.nypix/self.nxpix)
+		self.scaley=self.imagey/self.nypix
 		if self.nxpix > self.nypix:
 			self.scaley = self.scaley * (self.nypix/self.nxpix)
 		else:
