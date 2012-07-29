@@ -12,7 +12,9 @@ Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.p
  
 PyEphem (http://rhodesmill.org/pyephem/) 
 
-(you can check if you have them with help('modules') within the (i)python interpreter 
+(you can check if you have them with help('modules') within the (i)python interpreter)
+
+If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
 
