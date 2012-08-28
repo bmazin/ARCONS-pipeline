@@ -45,9 +45,14 @@ class StartQt4(QMainWindow):
 		#self.nypix = 32
 		#self.total_pix = self.nxpix*self.nypix
 		
-		self.imagex = self.ui.tv_image.width()
-		self.imagey = self.ui.tv_image.height()
+		#self.imagex = self.ui.tv_image.width()
+		#self.imagey = self.ui.tv_image.height()
 		
+		self.imagex = 308
+		self.imagey = 322
+
+		self.position = self.ui.tv_image.pos()
+
 		self.Emin = 0.92 #eV corresponds to 1350 nm
 		self.Emax = 3.18 #eV corresponds to 390 nm (changed from original 4.2 ev)
 		self.bintype = "wavelength"
@@ -122,17 +127,17 @@ class StartQt4(QMainWindow):
 		print "Generating beam image"
 		h5file = openFile(str(self.datafile), mode = "r")
 		bmap = h5file.root.beammap.beamimage.read()
-		bmap = rot90(bmap,3)
+		#bmap = rot90(bmap,2)
 		
-		self.nxpix = shape(bmap)[0]
-		self.nypix = shape(bmap)[1]
+		self.nxpix = shape(bmap)[1]
+		self.nypix = shape(bmap)[0]
 		
-		self.scalex=self.imagex/self.nxpix
-		self.scaley=self.imagey/self.nypix
-		if self.nxpix > self.nypix:
-			self.scaley = self.scaley * (self.nypix/self.nxpix)
-		else:
-			self.scalex = self.scalex * (self.nxpix/self.nypix)
+		self.scalex=float(self.imagex/float(self.nxpix))
+		self.scaley=float(self.imagey/float(self.nypix))
+		#if self.nxpix > self.nypix:
+		#	self.scaley = self.scaley * float(self.nypix/float(self.nxpix))
+		#else:
+		#	self.scalex = self.scalex * float(self.nxpix/float(self.nypix))
 		
 		self.bad_pix = []
 		tempbmap = reshape(bmap,self.nxpix*self.nypix)
@@ -222,16 +227,17 @@ class StartQt4(QMainWindow):
 		
 		h5file = openFile(str(self.datafile), 'r')
 		bmap = h5file.root.beammap.beamimage.read()
-		bmap = rot90(bmap,3)
-		self.nxpix = shape(bmap)[0]
-		self.nypix = shape(bmap)[1]
-		
-		self.scalex=self.imagex/self.nxpix
-		self.scaley=self.imagey/self.nypix
-		if self.nxpix > self.nypix:
-			self.scaley = self.scaley * (self.nypix/self.nxpix)
-		else:
-			self.scalex = self.scalex * (self.nxpix/self.nypix)
+		#bmap = rot90(bmap,2)
+		self.nxpix = shape(bmap)[1]
+		self.nypix = shape(bmap)[0]
+
+		self.scalex=float(self.imagex/float(self.nxpix))
+		self.scaley=float(self.imagey/float(self.nypix))
+
+		#if self.nxpix > self.nypix:
+		#	self.scaley = self.scaley * float(self.nypix/float(self.nxpix))
+		#else:
+		#	self.scalex = self.scalex * float(self.nxpix/float(self.nypix))
 		
 		all_photons = []
 		for j in range(self.nxpix*self.nypix):
@@ -239,34 +245,34 @@ class StartQt4(QMainWindow):
 		
 		
 		if self.dark_subtraction == True:
-			darkrate = zeros((self.nxpix,self.nypix))
+			darkrate = zeros((self.nypix,self.nxpix))
 			darkh5 = openFile(str(self.darkfile), 'r')
 			darkbmap = darkh5.root.beammap.beamimage.read()
-			darkbmap = rot90(darkbmap,3)
+			#darkbmap = rot90(darkbmap,2)
 			
 		if self.sky_subtraction == True:
-			skyrate = zeros((self.nxpix,self.nypix))
+			skyrate = zeros((self.nypix,self.nxpix))
 			skyh5 = openFile(str(self.skyfile), 'r')
 			skybmap = skyh5.root.beammap.beamimage.read()
-			skybmap = rot90(skybmap,3)
+			#skybmap = rot90(skybmap,2)
 
 		totalhist = zeros((self.ui.nbins.value()))
 
 		h5file = openFile(str(self.datafile), 'r')
 		bmap = h5file.root.beammap.beamimage.read()
-		bmap = rot90(bmap,3)
+		#bmap = rot90(bmap,2)
 		
 		#print "(0,0)", str(bmap[0][0])
 		#print "(0,31)", str(bmap[0][31])
 		#print "(31,0)", str(bmap[31][0])
 		#print "(31,31)", str(bmap[31][31])
 		
-		counts = zeros((self.nxpix,self.nypix))
+		counts = zeros((self.nypix,self.nxpix))
 		
 		bins = range(self.ui.nbins.value()+1)
 		
-		for i in xrange(self.nxpix):
-			for j in xrange(self.nypix):
+		for i in xrange(self.nypix):
+			for j in xrange(self.nxpix):
 				#if i*32+j in self.histogram_pixel:
 					if bmap[i][j] == '':
 						counts[i][j]=0
@@ -432,6 +438,10 @@ class StartQt4(QMainWindow):
 	def display_image(self):
 		#search directory for image
 		self.imagefile = "./TV_frame.png"
+		
+		self.ui.tv_image.setGeometry(self.position.x(), self.position.y()-8, self.scalex*(self.nxpix)+4, self.scaley*(self.nypix)+4)
+		#print self.nxpix
+		#print self.nypix
 		#convert to pixmap
 		if isfile(self.imagefile):
 			pix = self.makepixmap(self.imagefile, scalex=self.scalex, scaley=self.scaley)
@@ -443,14 +453,14 @@ class StartQt4(QMainWindow):
 			if self.ui.bad_pix.isChecked() == True:
 				for bp in self.bad_pix:
 					x = bp%(self.nxpix)
-					y = (self.nypix -1) - bp/(self.nxpix)
-					self.scene.addLine(self.scalex*x,self.scaley*y,self.scale*x+(self.scalex-1),self.scaley*y+(self.scaley-1),Qt.red)
-					self.scene.addLine(self.scalex*x,self.scaley*y+(self.scaley-1),self.scalex*x+(self.scalex-1),self.scaley*y,Qt.red)
+					y = (self.nypix-1) - bp/(self.nxpix)
+					self.scene.addLine(self.scalex*x,self.scaley*y,self.scale*x+(self.scalex),self.scaley*y+(self.scaley),Qt.red)
+					self.scene.addLine(self.scalex*x,self.scaley*y+(self.scaley),self.scalex*x+(self.scalex),self.scaley*y,Qt.red)
 			if self.histogram_pixel != []:
 				for p in self.histogram_pixel:
 					x = p%(self.nxpix)
-					y = (self.nypix - 1) - p/(self.nxpix)					
-					self.scene.addRect(self.scalex*(x),self.scaley*(y),(self.scalex-1),(self.scaley-1), Qt.blue) # both x10 since image plot is 320x320 pixels
+					y = (self.nypix-1) - p/self.nxpix					
+					self.scene.addRect(self.scalex*(x),self.scaley*(y),(self.scalex),(self.scaley), Qt.blue)
 					
 			self.ui.tv_image.setScene(self.scene)
 			self.ui.tv_image.show()
@@ -482,15 +492,15 @@ class StartQt4(QMainWindow):
 	def start_pixel_select(self,event):
 		#Mouse press returns x,y position of first pixel to be used in spectra
 		self.startrawx,self.startrawy = event.pos().x(), event.pos().y()
-		self.startpx = self.startrawx/self.scalex
-		self.startpy = (self.nxpix-1)-self.startrawy/self.scaley
+		self.startpx = int(self.startrawx/self.scalex)
+		self.startpy = int((self.nypix) - self.startrawy/self.scaley)
 		self.startpix = self.nxpix*self.startpy+self.startpx
 	
 	def end_pixel_select(self,event):
 		#Mouse release returns x,y position of last pixel to be used in spectra
 		self.endrawx,self.endrawy = event.pos().x(), event.pos().y()
-		self.endpx = self.endrawx/self.scalex
-		self.endpy = (self.nxpix-1)-self.endrawy/self.scaley
+		self.endpx = int(self.endrawx/self.scalex)
+		self.endpy = int((self.nypix) - self.endrawy/self.scaley)
 		self.endpix = self.nxpix*self.endpy+self.endpx
 		self.pixel_list()
 		
@@ -567,29 +577,29 @@ class StartQt4(QMainWindow):
 			
 			h5file = openFile(str(self.datafile), 'r')
 			bmap = h5file.root.beammap.beamimage.read()
-			bmap = rot90(bmap,3)
+			#bmap = rot90(bmap,2)
 			
 			all_photons = []
 			for j in range(self.nxpix*self.nypix):
 				all_photons.append([])
 			
 			if self.dark_subtraction == True:
-				darkrate = zeros((self.nxpix,self.nypix))
+				darkrate = zeros((self.nypix,self.nxpix))
 
 				darkh5 = openFile(str(self.darkfile), 'r')
 				darkbmap = darkh5.root.beammap.beamimage.read()
-				darkbmap = rot90(darkbmap,3)
+				#darkbmap = rot90(darkbmap,2)
 				
 			if self.sky_subtraction == True:
-				skyrate = zeros((self.nxpix,self.nypix))
+				skyrate = zeros((self.nypix,self.nxpix))
 
 				skyh5 = openFile(str(self.skyfile), 'r')
 				skybmap = skyh5.root.beammap.beamimage.read()
-				skybmap = rot90(skybmap,3)
+				#skybmap = rot90(skybmap,2)
 
 			totalhist = zeros((self.ui.nbins.value()))
 	
-			counts = zeros((self.nxpix,self.nypix))
+			counts = zeros((self.nypix,self.nxpix))
 			
 			bins = range(self.ui.nbins.value()+1)
 			
