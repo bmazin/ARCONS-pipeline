@@ -123,6 +123,7 @@ class StartQt4(QMainWindow):
 		self.savefile = QFileDialog.getSaveFileName(parent=None, caption=QString(str("Save File")), directory = ".")
 		os.rename(self.imfile, self.savefile)		
 		
+
 	def display_obs_time(self):
 		
 		try:
@@ -165,7 +166,7 @@ class StartQt4(QMainWindow):
 						return
 					except NoSuchNodeError:
 						continue
-			print "unable to find any pixels with data. Check beammap is present"
+					print "unable to find any pixels with data. Check beammap is present"
 
 	def display_header(self):
 		h5file = openFile(str(self.datafile), mode = "r")
