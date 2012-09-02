@@ -124,38 +124,48 @@ class StartQt4(QMainWindow):
 		os.rename(self.imfile, self.savefile)		
 		
 	def display_obs_time(self):
-		print "Generating beam image"
-		h5file = openFile(str(self.datafile), mode = "r")
-		bmap = h5file.root.beammap.beamimage.read()
-		#bmap = rot90(bmap,2)
 		
-		self.nxpix = shape(bmap)[1]
-		self.nypix = shape(bmap)[0]
-		
-		self.scalex=float(self.imagex/float(self.nxpix))
-		self.scaley=float(self.imagey/float(self.nypix))
-		#if self.nxpix > self.nypix:
-		#	self.scaley = self.scaley * float(self.nypix/float(self.nxpix))
-		#else:
-		#	self.scalex = self.scalex * float(self.nxpix/float(self.nypix))
-		
-		self.bad_pix = []
-		tempbmap = reshape(bmap,self.nxpix*self.nypix)
-		for i in range(self.nxpix*self.nypix):
-			if len(concatenate(h5file.root._f_getChild(tempbmap[i])[:])) == 0:
-				self.bad_pix.append(i)
-				
-		for i in range(self.nxpix):
-			for j in range(self.nypix):
-					try:
-						photons= h5file.root._f_getChild(bmap[i][j]).read()
-						obstime = len(photons)
-						self.ui.obstime_lcd.display(obstime)
-						self.ui.endtime_spinbox.setValue(obstime)
-						return
-					except NoSuchNodeError:
-						continue
-		print "unable to find any pixels with data. Check beammap"
+		try:
+			h5file = openFile(str(self.datafile), mode = "r")
+			htable = h5file.root.header.header.read()
+			obstime = htable["exptime"]
+			self.ui.obstime_lcd.display(obstime)
+			self.ui.endtime_spinbox.setValue(obstime)
+			h5file.close()
+		except:
+			print "Unable to load Header, checking beammap"
+			h5file = openFile(str(self.datafile), mode = "r")
+			bmap = h5file.root.beammap.beamimage.read()
+			#bmap = rot90(bmap,2)
+			h5file.close()
+			
+			self.nxpix = shape(bmap)[1]
+			self.nypix = shape(bmap)[0]
+			
+			self.scalex=float(self.imagex/float(self.nxpix))
+			self.scaley=float(self.imagey/float(self.nypix))
+			#if self.nxpix > self.nypix:
+			#	self.scaley = self.scaley * float(self.nypix/float(self.nxpix))
+			#else:
+			#	self.scalex = self.scalex * float(self.nxpix/float(self.nypix))
+			
+			self.bad_pix = []
+			tempbmap = reshape(bmap,self.nxpix*self.nypix)
+			for i in range(self.nxpix*self.nypix):
+				if len(concatenate(h5file.root._f_getChild(tempbmap[i])[:])) == 0:
+					self.bad_pix.append(i)
+					
+			for i in range(self.nxpix):
+				for j in range(self.nypix):
+						try:
+							photons= h5file.root._f_getChild(bmap[i][j]).read()
+							obstime = len(photons)
+							self.ui.obstime_lcd.display(obstime)
+							self.ui.endtime_spinbox.setValue(obstime)
+							return
+						except NoSuchNodeError:
+							continue
+			print "unable to find any pixels with data. Check beammap is present"
 
 	def display_header(self):
 		h5file = openFile(str(self.datafile), mode = "r")
