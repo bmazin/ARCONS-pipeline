@@ -78,7 +78,7 @@ class StartQt4(QMainWindow):
 		
 		self.ui.histogram_plot.canvas.xtitle = "Pulse Heights"
 		self.ui.histogram_plot.canvas.format_labels()
-		QObject.connect(self.ui.plot_pushButton, SIGNAL("clicked()"), self.plot_histogram)
+		QObject.connect(self.ui.plot_pushButton, SIGNAL("clicked()"), self.make_plots)
 		
 		#button signals
 		QObject.connect(self.ui.mode_buttonGroup, SIGNAL("buttonClicked(int)"), self.set_pix_select_mode)
@@ -426,7 +426,16 @@ class StartQt4(QMainWindow):
 		self.display_image()
 			
 		if len(self.histogram_pixel) != 0:
+			self.make_plots()
+			
+	def make_plots(self):
+		if self.ui.histogram_radio.isChecked():
 			self.plot_histogram()
+		elif self.ui.timestream_radio.isChecked():
+			self.plot_timestream()
+		else:
+			print "Please select plot type"
+			pass
 		
 	def time_up(self):
 		ti = self.ui.starttime_spinbox.value()
@@ -574,7 +583,117 @@ class StartQt4(QMainWindow):
 		#if self.observing == False:
 			#self.image_thread.update_spectrum(self.bindir)
 		self.display_image()
-		self.plot_histogram()
+		self.make_plots()
+	
+	def plot_timestream(self):
+		self.set_dark_sub()
+		self.set_sky_sub()
+		self.set_flat_sub()
+		
+		if self.histogram_pixel != []:
+			
+			nphot=0
+			
+			ti = self.ui.starttime_spinbox.value()
+			tf = self.ui.endtime_spinbox.value()
+			
+			if ti>tf:
+				copyti = ti
+				ti=tf
+				tf=copyti
+				print "WARNING: selected ti > tf. They were switched for you."
+			
+			counts = zeros(tf-ti)
+			subtracted = zeros(tf-ti)
+			timesteps = xrange(ti,tf)
+			
+			h5file = openFile(str(self.datafile), 'r')
+			bmap = h5file.root.beammap.beamimage.read()
+			#bmap = rot90(bmap,2)
+			
+			if self.dark_subtraction == True:
+				darkrate = zeros((self.nypix,self.nxpix))
+				darkh5 = openFile(str(self.darkfile), 'r')
+				darkbmap = darkh5.root.beammap.beamimage.read()
+				#darkbmap = rot90(darkbmap,2)
+				
+			if self.sky_subtraction == True:
+				skyrate = zeros((self.nypix,self.nxpix))
+				skyh5 = openFile(str(self.skyfile), 'r')
+				skybmap = skyh5.root.beammap.beamimage.read()
+				#skybmap = rot90(skybmap,2)
+			
+			for t in xrange(tf-ti):
+				for i in xrange(self.nypix):
+					for j in xrange(self.nxpix):
+						if i*self.nxpix+j in self.histogram_pixel:
+							
+							self.ui.pixelpath.setText(str(bmap[i][j]))
+							
+							if bmap[i][j] == '':
+								subtracted[t] += 0
+								continue
+							try:
+								counts[t] += len(h5file.root._f_getChild(bmap[i][j])[ti+t])
+	
+								if self.dark_subtraction == True:
+									dtime = float(len(darkh5.root._f_getChild(darkbmap[i][j])))
+									darkcounts= len(concatenate(darkh5.root._f_getChild(darkbmap[i][j])[:]))
+									darkrate= darkcounts/dtime
+									if darkcounts==0:
+										subtracted[t] = counts[t]
+									else:
+										subtracted[t] = counts[t]-darkrate
+								else:
+									subtracted[t] = counts[t]
+									
+								for p in range(len(subtracted)):
+									if subtracted[p]<0:
+										subtracted[p]=0
+									
+								if self.sky_subtraction == True:
+									if self.dark_subtraction != True:
+										stime = float(len(skyh5.root._f_getChild(skybmap[i][j])))
+										skycounts = len(concatenate(skyh5.root._f_getChild(skybmap[i][j])[:]))
+										skyrate = skycounts/stime
+										
+										if skycounts==0:
+											pass
+										else:
+											subtracted[t] = subtracted[t]-skyrate
+										
+									else:
+										stime = float(len(skyh5.root._f_getChild(skybmap[i][j])))
+										skycounts = len(concatenate(skyh5.root._f_getChild(skybmap[i][j])[:]))
+										skyrate = skycounts/stime
+										
+										if skycounts==0:
+											pass
+										else:
+											subtracted[t] = subtracted[t] - (skyrate-darkrate)
+								else:
+									pass
+								
+								counts[t] = int(subtracted[t])
+								if counts[t]<0:
+									counts[t]=0
+					
+							except NoSuchNodeError:
+								counts[t]=0
+			
+			print "plotting timestream of ", tf-ti, " seconds"
+			self.ui.countlabel.setText(str(sum(counts)))
+			self.ui.histogram_plot.canvas.ax.clear()
+			#if self.plot_type == "point":
+				#photon_hist = histogram(new_photons, bins = nbins, range = (min(new_photons), max(new_photons)))
+				#self.ui.histogram_plot.canvas.ax.plot(photon_hist[1][1:],photon_hist[0],'o')
+			#else:
+				#self.ui.histogram_plot.canvas.ax.hist(new_photons, bins = nbins, range = (min(new_photons),max(new_photons)), histtype='bar')
+			self.ui.histogram_plot.canvas.ax.plot(timesteps,counts)
+			
+			#self.ui.histogram_plot.canvas.format_labels()
+			self.ui.histogram_plot.canvas.draw()
+			print "done"
 	
 	def plot_histogram(self):		
 		self.set_dark_sub()
