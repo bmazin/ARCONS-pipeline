@@ -70,6 +70,10 @@ class StartQt4(QMainWindow):
 		self.darkfile = ""
 		self.skyfile = ""
 
+		self.beammapfile = os.environ['BEAMMAP_PATH']#"beamimage.h5"
+		#load beam map from default beammap directory
+		self.loadbeammap()
+		
 		#use mouse to select pixel from tv_image, also triggers a new spectrum to be displayed
 		self.ui.tv_image.mousePressEvent = self.start_pixel_select
 		self.ui.tv_image.mouseReleaseEvent = self.end_pixel_select
@@ -89,9 +93,18 @@ class StartQt4(QMainWindow):
 		QObject.connect(self.ui.time_down, SIGNAL("clicked()"), self.time_down)
 		QObject.connect(self.ui.choosedark,SIGNAL("clicked()"), self.choosedark)
 		QObject.connect(self.ui.choosesky,SIGNAL("clicked()"), self.choosesky)
+		QObject.connect(self.ui.histogram_radio, SIGNAL("toggled(bool)"), self.resize_window)
 		#QObject.connect(self.ui.satpercent, SIGNAL("valueChanged(double)"), self.make_image)
 		
 	#open dialog to select data path
+
+	def resize_window(self):
+		#if spectrum options button is clicked resize window to show/hide options
+		if self.ui.histogram_radio.isChecked():
+			self.resize(850,1060)
+		else:
+			self.resize(850,750)
+	
 	def file_dialog(self):
 		self.newdatafile = QFileDialog.getOpenFileName(parent=None, caption=QString(str("Choose Obs File")),directory = ".",filter=QString(str("H5 (*.h5)")))
 		if len(self.newdatafile)!=0:
@@ -108,6 +121,7 @@ class StartQt4(QMainWindow):
 			self.ui.histogram_plot.canvas.draw()
 			self.display_obs_time()
 			self.display_header()
+			self.get_ut()
 		
 	def choosedark(self):
 		self.darkfile = QFileDialog.getOpenFileName(parent=None, caption=QString(str("Choose Dark File")),directory = ".",filter=QString(str("H5 (*.h5)")))
@@ -123,16 +137,42 @@ class StartQt4(QMainWindow):
 		self.savefile = QFileDialog.getSaveFileName(parent=None, caption=QString(str("Save File")), directory = ".")
 		os.rename(self.imfile, self.savefile)		
 		
+	def get_ut(self):
+		#try:
+			h5file = openFile(str(self.datafile), mode = "r")
+			htable = h5file.root.header.header.read()
+			h5address = h5file.root.beammap.beamimage.read()[0][0]
+			h5time = int(h5address.split('t')[1])
+
+			self.ut = int(htable["ut"])
+			
+			if self.ut != h5time:
+				self.ut = h5time
+			
+			h5file.close()
+			
+			for i in xrange(self.nypix):
+				for j in xrange(self.nxpix):
+					head = str(self.bmap[i][j])
+					if head.split('t')[0] == '':
+						self.bmap[i][j] = head + 't' + str(self.ut)
+					else:
+						self.bmap[i][j] = head.split('t')[0] + 't' + str(self.ut)
+			print "Pixel addresses updated in beammap"
+		#except:
+			#print "Unable to get UT from header. Beammap will not have correct time in pixel strings"
 
 	def display_obs_time(self):
-		
 		try:
 			h5file = openFile(str(self.datafile), mode = "r")
 			htable = h5file.root.header.header.read()
-			obstime = htable["exptime"]
+			obstime = int(htable["exptime"])
 			self.ui.obstime_lcd.display(obstime)
 			self.ui.endtime_spinbox.setValue(obstime)
 			h5file.close()
+			self.ui.increment.setMaximum(obstime)
+			self.ui.endtime_spinbox.setMaximum(obstime)
+			self.ui.starttime_spinbox.setMaximum(obstime-1)
 		except:
 			print "Unable to load Header, checking beammap"
 			h5file = openFile(str(self.datafile), mode = "r")
@@ -163,6 +203,9 @@ class StartQt4(QMainWindow):
 						obstime = len(photons)
 						self.ui.obstime_lcd.display(obstime)
 						self.ui.endtime_spinbox.setValue(obstime)
+						self.ui.increment.setMaximum(obstime)
+						self.ui.endtimespinbox.setMaximum(obstime)
+						self.ui.starttimespinbox.setMaximum(obstime-1)
 						return
 					except NoSuchNodeError:
 						continue
@@ -182,6 +225,20 @@ class StartQt4(QMainWindow):
 			self.ui.header_info.clear()
 			self.ui.header_info.append('No header info')
 		h5file.close()
+		
+	def loadbeammap(self):
+		bmfile = openFile(self.beammapfile, 'r')
+		#read beammap in to memory to create beam image
+		self.bmap = bmfile.root.beammap.beamimage.read()
+		#print self.bmap[0][0]
+		self.nxpix = shape(self.bmap)[1]
+		self.nypix = shape(self.bmap)[0]
+		#print self.nxpix
+		#print self.nypix
+		#self.bmap = rot90(self.bmap)
+		#self.bmap = flipud(self.bmap)
+		bmfile.close()
+		print "Beammap loaded from " +str(self.beammapfile)
 	
 	def set_dark_sub(self):
 		#Use radio button to set if we want sky subtraction to be on or off
@@ -215,6 +272,9 @@ class StartQt4(QMainWindow):
 		return darray		
 	
 	def make_image(self):
+		
+		bmap = self.bmap
+		
 		self.set_dark_sub()
 		#self.set_image_color()
 		self.set_flat_sub()
@@ -237,7 +297,8 @@ class StartQt4(QMainWindow):
 			print "WARNING: selected ti > tf. They were switched for you."
 		
 		h5file = openFile(str(self.datafile), 'r')
-		bmap = h5file.root.beammap.beamimage.read()
+
+		#bmap = h5file.root.beammap.beamimage.read()
 		#bmap = rot90(bmap,2)
 		self.nxpix = shape(bmap)[1]
 		self.nypix = shape(bmap)[0]
@@ -267,157 +328,86 @@ class StartQt4(QMainWindow):
 			skybmap = skyh5.root.beammap.beamimage.read()
 			#skybmap = rot90(skybmap,2)
 
-		totalhist = zeros((self.ui.nbins.value()))
-
-		h5file = openFile(str(self.datafile), 'r')
-		bmap = h5file.root.beammap.beamimage.read()
-		#bmap = rot90(bmap,2)
-		
-		#print "(0,0)", str(bmap[0][0])
-		#print "(0,31)", str(bmap[0][31])
-		#print "(31,0)", str(bmap[31][0])
-		#print "(31,31)", str(bmap[31][31])
+		#for now set dark and sky bmaps to same as observation beammap.  Should usually be the case
+		skybmap = self.bmap
+		darkbmap = self.bmap
 		
 		counts = zeros((self.nypix,self.nxpix))
 		
-		bins = range(self.ui.nbins.value()+1)
-		
 		for i in xrange(self.nypix):
 			for j in xrange(self.nxpix):
-				#if i*32+j in self.histogram_pixel:
 					if bmap[i][j] == '':
 						counts[i][j]=0
-						subtracted = zeros((self.ui.nbins.value()))
 						continue
 					try:
-						#etime = len(h5file.root._f_getChild(bmap[i][j]))
-						photons= concatenate(h5file.root._f_getChild(bmap[i][j])[ti:tf])
-						#obsheights = right_shift(photons,32)%4096
-						parabheights= right_shift(photons,44)%4096
-						npparabheights = array(parabheights, dtype=float)
-						baseline= right_shift(photons,20)%4096
-						npbaseline = array(baseline, dtype=float)
-						obsheights = npbaseline-npparabheights
-						#obsheights = baseline						
-						#obsheights = parabheights
-
-						if len(obsheights)==0:
-							counts[i][j]=0
-							continue
-						else:
-							obshist,bins = histogram(obsheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-						#print bins
+						photons = concatenate(h5file.root._f_getChild(bmap[i][j])[ti:tf])
+						counts[i][j]=len(photons)
 						
-						#print bins
 						if self.dark_subtraction == True:
 							dtime = float(len(darkh5.root._f_getChild(darkbmap[i][j])))
 							photons= concatenate(darkh5.root._f_getChild(darkbmap[i][j])[:])
-							darkheights= right_shift(photons,32)%4096
+							darkcounts = len(photons)
+							#darkheights= right_shift(photons,32)%4096
 							
-							if len(darkheights)==0:
-								subtracted = obshist
-								darkhist = zeros((self.ui.nbins.value()))
+							if darkcounts==0:
+								pass
 							else:
-								darkhist,bins = histogram(darkheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-								subtracted = obshist-(darkhist*(tf-ti)/float(dtime))
+								counts[i][j] -= (darkcounts*(tf-ti)/float(dtime))
 								#print "dark subtracted..."
 						else:
-							subtracted = obshist
+							pass
 						
-						for p in range(len(subtracted)):
-							if subtracted[p]<0:
-								subtracted[p]=0
+						if counts[i][j]<0:
+							counts[i][j]=0
 						
 						if self.sky_subtraction == True:
 							if self.dark_subtraction != True:
 								stime = float(len(skyh5.root._f_getChild(skybmap[i][j])))
 								photons= concatenate(skyh5.root._f_getChild(skybmap[i][j])[:])
-								skyheights= right_shift(photons,32)%4096
-								
-								if len(skyheights)==0:
+								skycounts = len(photons)
+								if skycounts==0:
 									pass
 								else:
-									skyhist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-									skysubtracted = skyhist
-									#print skysubtracted
-									
-									for p in range(len(skysubtracted)):
-										if skysubtracted[p] <0:
-											skysubtracted[p]=0
-									
-									subtracted -= (skysubtracted*(tf-ti)/float(stime))
-									#print "sky subtracted..."
+									counts[i][j] -= (skycounts*(tf-ti)/float(stime))
 							else:
 								stime = float(len(skyh5.root._f_getChild(skybmap[i][j])))
 								photons= concatenate(skyh5.root._f_getChild(skybmap[i][j])[:])
-								skyheights= right_shift(photons,32)%4096
-								
-								if len(skyheights)==0:
+								skycounts = len(photons)
+								if skycounts==0:
 									pass
 								else:
-									skyhist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-									skysubtracted = skyhist-(darkhist*(stime)/float(dtime))
+									skycounts -= (darkcounts*(stime)/float(dtime))
 									#print skysubtracted
-									
-									for p in range(len(skysubtracted)):
-										if skysubtracted[p] <0:
-											skysubtracted[p]=0
-									
-									subtracted -= (skysubtracted*(tf-ti)/float(stime))
-									#print "sky subtracted..."
+									if skycounts <0:
+										skycounts=0
+									counts[i][j] -= (skycounts*(tf-ti)/float(stime))
 						else:
 							pass
 						
-						for p in range(len(subtracted)):
-							if subtracted[p]<0:
-								subtracted[p]=0
-						counts[i][j] = sum(subtracted)
+						if counts[i][j]<0:
+							counts[i][j]=0
 						
 					except NoSuchNodeError:
 						counts[i][j]=0
-						subtracted = zeros((self.ui.nbins.value()))
-					
-					for p in range(len(subtracted)):
-						if subtracted[p]<0:
-							subtracted[p]=0
-						
-					if counts[i][j]<0:
-						counts[i][j]=0
-			
+
 					#totalhist += subtracted
 					nphot += counts[i][j]
 	
 		photon_count = counts
 		im = photon_count
 		
-		#histogram equalization on image
-		#nbr_bins = 256
-		#imhist,bins = histogram(im, nbr_bins, normed=True)
-		#cdf = imhist.cumsum() #cumulative dist func
-		#cdf = 255*cdf/cdf[-1] #normalize
-		#photon_count = interp(im, bins[:-1],cdf)
-		
-		#photon_count = im.reshape(32,32)
-		
-		#if self.ui.darksub_checkbox.isChecked() == True and self.darkfile!="":
-			#print "subtracting dark rate"
-			#photon_count -= ((self.tf-self.ti)*(self.darkrate))
-		
-		#for n in range(32):
-			#for m in range(32):
-				#if photon_count[n][m] < 0:
-					#photon_count[n][m] = 0
-		
 		photon_count = flipud(photon_count)
-		
-		indices = sort(reshape(photon_count,self.nxpix*self.nypix))
-		#print indices
-		brightest = int(self.ui.satpercent.value()*(self.nxpix*self.nypix))
-		#print brightest
-		self.vmax = indices[(-1*brightest)]
-		print self.vmax
+		if self.ui.man_contrast.isChecked():
+			self.vmax = self.ui.vmax.value()
+			self.vmin = self.ui.vmin.value()
+		else:
+			indices = sort(reshape(photon_count,self.nxpix*self.nypix))
+			brightest = int((self.ui.satpercent.value()/100.0)*(self.nxpix*self.nypix))
+			self.vmax = indices[(-1*brightest)]
+			self.vmin = 0
+			
 		fig = plt.figure(figsize=(0.01*self.nxpix,0.01*self.nypix), dpi=100, frameon=False)
-		im = plt.figimage(photon_count, cmap='gray', vmax = self.vmax)
+		im = plt.figimage(photon_count, cmap='gray', vmin = self.vmin, vmax = self.vmax)
 			
 		self.imfile = "TV_frame.png"
 		plt.savefig(self.imfile, pad_inches=0)
@@ -440,8 +430,8 @@ class StartQt4(QMainWindow):
 	def time_up(self):
 		ti = self.ui.starttime_spinbox.value()
 		tf = self.ui.endtime_spinbox.value()
-		ti += 1
-		tf += 1
+		ti += self.ui.increment.value()
+		tf += self.ui.increment.value()
 		self.ui.starttime_spinbox.setValue(ti)
 		self.ui.endtime_spinbox.setValue(tf)
 		self.make_image()
@@ -449,8 +439,8 @@ class StartQt4(QMainWindow):
 	def time_down(self):
 		ti = self.ui.starttime_spinbox.value()
 		tf = self.ui.endtime_spinbox.value()
-		ti -= 1
-		tf -= 1
+		ti -= self.ui.increment.value()
+		tf -= self.ui.increment.value()
 		self.ui.starttime_spinbox.setValue(ti)
 		self.ui.endtime_spinbox.setValue(tf)
 		self.make_image()
@@ -608,8 +598,10 @@ class StartQt4(QMainWindow):
 			timesteps = xrange(ti,tf)
 			
 			h5file = openFile(str(self.datafile), 'r')
-			bmap = h5file.root.beammap.beamimage.read()
+			#bmap = h5file.root.beammap.beamimage.read()
 			#bmap = rot90(bmap,2)
+			
+			bmap = self.bmap
 			
 			if self.dark_subtraction == True:
 				darkrate = zeros((self.nypix,self.nxpix))
@@ -622,6 +614,8 @@ class StartQt4(QMainWindow):
 				skyh5 = openFile(str(self.skyfile), 'r')
 				skybmap = skyh5.root.beammap.beamimage.read()
 				#skybmap = rot90(skybmap,2)
+			
+			darkbmap = self.bmap
 			
 			for t in xrange(tf-ti):
 				for i in xrange(self.nypix):
@@ -714,8 +708,10 @@ class StartQt4(QMainWindow):
 				print "WARNING: selected ti > tf. They were switched for you."
 			
 			h5file = openFile(str(self.datafile), 'r')
-			bmap = h5file.root.beammap.beamimage.read()
+			#bmap = h5file.root.beammap.beamimage.read()
 			#bmap = rot90(bmap,2)
+			
+			bmap = self.bmap
 			
 			all_photons = []
 			for j in range(self.nxpix*self.nypix):
@@ -735,7 +731,10 @@ class StartQt4(QMainWindow):
 				skybmap = skyh5.root.beammap.beamimage.read()
 				#skybmap = rot90(skybmap,2)
 
-			totalhist = zeros((self.ui.nbins.value()))
+			darkbbmap = self.bmap
+			
+			totalhist1 = zeros((self.ui.nbins.value()))
+			totalhist2 = zeros((self.ui.nbins.value()))
 	
 			counts = zeros((self.nypix,self.nxpix))
 			
@@ -749,25 +748,45 @@ class StartQt4(QMainWindow):
 						
 						if bmap[i][j] == '':
 							counts[i][j]=0
-							subtracted = zeros((self.ui.nbins.value()))
+							subtracted1 = zeros((self.ui.nbins.value()))
+							subtracted2 = zeros((self.ui.nbins.value()))
 							continue
 						try:
 							#etime = len(h5file.root._f_getChild(bmap[i][j]))
 							photons= concatenate(h5file.root._f_getChild(bmap[i][j])[ti:tf])
-							#obsheights= right_shift(photons,32)%4096
+							peakheights= right_shift(photons,32)%4096
 							parabheights= right_shift(photons,44)%4096
-							npparabheights = array(parabheights, dtype=float)
+							#npparabheights = array(parabheights, dtype=float)
 							baseline= right_shift(photons,20)%4096
-							npbaseline = array(baseline, dtype=float)
-							obsheights = npbaseline-npparabheights
+							#npbaseline = array(baseline, dtype=float)
+							#obsheights = npbaseline-npparabheights
 							#obsheights = baseline
-							#obsheights = parabheights
+							
+							if self.ui.topplot.currentText() == "Parabola Fit":
+								obs1heights = array(parabheights,dtype=float)
+							elif self.ui.topplot.currentText() == "Baseline":
+								obs1heights = array(baseline,dtype=float)
+							else:
+								obs1heights = array(peakheights,dtype=float)
+							
+							if self.ui.bottomplot.currentText() == "Parabola Fit":
+								obs2heights = array(parabheights,dtype=float)
+							elif self.ui.bottomplot.currentText() == "Peak Height":
+								obs2heights = array(peakheights,dtype=float)
+							else:
+								obs2heights = array(baseline,dtype=float)
+							
+							if self.ui.checkBox.isChecked():
+								obs1heights -= array(baseline,dtype=float)
+							if self.ui.checkBox_2.isChecked():
+								obs2heights -= array(baseline,dtype=float)
 
-							if len(obsheights)==0:
+							if len(obs1heights)==0:
 								counts[i][j]=0
 								continue
 							else:
-								obshist,bins = histogram(obsheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
+								obs1hist,bins = histogram(obs1heights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+								obs2hist,bins = histogram(obs2heights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
 							#print bins
 							if self.dark_subtraction == True:
 								dtime = float(len(darkh5.root._f_getChild(darkbmap[i][j])))
@@ -775,17 +794,25 @@ class StartQt4(QMainWindow):
 								darkheights= right_shift(photons,32)%4096
 							
 								if len(darkheights)==0:
-									subtracted = obshist
-									darkhist = zeros((self.ui.nbins.value()))
+									subtracted1 = obs1hist
+									subtracted2 = obs2hist
+									dark1hist = zeros((self.ui.nbins.value()))
+									dark2hist = zeros((self.ui.nbins.value()))
 								else:
-									darkhist,bins = histogram(darkheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-									subtracted = obshist-(darkhist*(tf-ti)/float(dtime))
+									dark1hist,bins = histogram(darkheights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+									subtracted1 = obs1hist-(dark1hist*(tf-ti)/float(dtime))
+									dark2hist,bins = histogram(darkheights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+									subtracted2 = obs2hist-(dark2hist*(tf-ti)/float(dtime))
 							else:
-								subtracted=obshist
+								subtracted1=obs1hist
+								subtracted2=obs2hist
 								
-							for p in range(len(subtracted)):
-								if subtracted[p]<0:
-									subtracted[p]=0
+							for p in range(len(subtracted1)):
+								if subtracted1[p]<0:
+									subtracted1[p]=0
+							for p in range(len(subtracted2)):
+								if subtracted2[p]<0:
+									subtracted2[p]=0
 								
 							if self.sky_subtraction == True:
 								if self.dark_subtraction != True:
@@ -796,14 +823,20 @@ class StartQt4(QMainWindow):
 									if len(skyheights)==0:
 										pass
 									else:
-										skyhist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-										skysubtracted = skyhist
+										sky1hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+										skysubtracted1 = sky1hist
+										sky2hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+										skysubtracted2 = sky2hist
 										
-										for p in range(len(skysubtracted)):
-											if skysubtracted[p] <0:
-												skysubtracted[p]=0
+										for p in range(len(skysubtracted1)):
+											if skysubtracted1[p] <0:
+												skysubtracted1[p]=0
+										for p in range(len(skysubtracted2)):
+											if skysubtracted2[p] <0:
+												skysubtracted2[p]=0
 										
-										subtracted = subtracted-(skysubtracted*(tf-ti)/float(stime))
+										subtracted1 = subtracted1-(skysubtracted1*(tf-ti)/float(stime))
+										subtracted2 = subtracted2-(skysubtracted2*(tf-ti)/float(stime))
 								else:
 									stime = float(len(skyh5.root._f_getChild(skybmap[i][j])))
 									photons = concatenate(skyh5.root._f_getChild(skybmap[i][j])[:])
@@ -812,112 +845,59 @@ class StartQt4(QMainWindow):
 									if len(skyheights)==0:
 										pass
 									else:
-										skyhist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obsheights.min(),obsheights.max()))
-										skysubtracted = skyhist-(darkhist*(stime)/float(dtime))
+										sky1hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+										skysubtracted1 = sky1hist-(dark1hist*(stime)/float(dtime))
+										sky2hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+										skysubtracted2 = sky2hist-(dark2hist*(stime)/float(dtime))
 										
-										for p in range(len(skysubtracted)):
-											if skysubtracted[p] <0:
-												skysubtracted[p]=0
+										for p in range(len(skysubtracted1)):
+											if skysubtracted1[p] <0:
+												skysubtracted1[p]=0
+										for p in range(len(skysubtracted2)):
+											if skysubtracted2[p] <0:
+												skysubtracted2[p]=0
 										
-										subtracted = subtracted-(skysubtracted*(tf-ti)/float(stime))
+										subtracted1 = subtracted1-(skysubtracted1*(tf-ti)/float(stime))
+										subtracted2 = subtracted2-(skysubtracted2*(tf-ti)/float(stime))
 							else:
 								pass
 							
-							counts[i][j] = sum(subtracted)
+							counts[i][j] = sum(subtracted1)
 							if counts[i][j]<0:
 								counts[i][j]=0
 				
 						except NoSuchNodeError:
 							counts[i][j]=0
-							subtracted = zeros((self.ui.nbins.value()))
+							subtracted1 = zeros((self.ui.nbins.value()))
+							subtracted2 = zeros((self.ui.nbins.value()))
 						
-						for p in range(len(subtracted)):
-							if subtracted[p]<0:
-								subtracted[p]=0
+						for p in range(len(subtracted1)):
+							if subtracted1[p]<0:
+								subtracted1[p]=0
+						for p in range(len(subtracted2)):
+							if subtracted2[p]<0:
+								subtracted2[p]=0
 						
-						totalhist += subtracted
+						totalhist1 += subtracted1
+						totalhist2 += subtracted2
 						nphot += counts[i][j]
 			
 			print "plotting histogram of ", nphot, " pulse heights"
 			self.ui.countlabel.setText(str(nphot))
 			nbins = self.ui.nbins.value()
 			self.ui.histogram_plot.canvas.ax.clear()
+			self.ui.histogram_plot_2.canvas.ax.clear()
 			#if self.plot_type == "point":
 				#photon_hist = histogram(new_photons, bins = nbins, range = (min(new_photons), max(new_photons)))
 				#self.ui.histogram_plot.canvas.ax.plot(photon_hist[1][1:],photon_hist[0],'o')
 			#else:
 				#self.ui.histogram_plot.canvas.ax.hist(new_photons, bins = nbins, range = (min(new_photons),max(new_photons)), histtype='bar')
-			self.ui.histogram_plot.canvas.ax.bar(bins[:-1],totalhist, width=(bins[1]-bins[0]), bottom=0)
-			
+			self.ui.histogram_plot.canvas.ax.bar(bins[:-1],totalhist1, width=(bins[1]-bins[0]), bottom=0)
+			self.ui.histogram_plot_2.canvas.ax.bar(bins[:-1],totalhist2, width=(bins[1]-bins[0]), bottom=0)
 			#self.ui.histogram_plot.canvas.format_labels()
 			self.ui.histogram_plot.canvas.draw()
+			self.ui.histogram_plot_2.canvas.draw()
 			print "done"
-		#except ValueError:
-			#self.ui.histogram_plot.canvas.ax.clear()
-			#self.ui.histogram_plot.canvas.format_labels()
-			#self.ui.histogram_plot.canvas.draw()
-		#except NoSuchNodeError:
-			#print "file has no data"
-	
-	#def display_spectra(self, pixel, bins, counts, SNR):
-		#plots spectra directly from bin file data passed from image thread
-		#self.ui.spectra_plot.canvas.ax.clear()
-		#self.ui.pixel_no_lcd.display(pixel)
-		#self.ui.integrated_snr_lcd.display(SNR)
-		#self.ui.spectra_plot.canvas.ax.plot(bins,counts,'o')
-		#self.ui.spectra_plot.canvas.format_labels()
-		#self.ui.spectra_plot.canvas.draw()
-		
-	#Data generation in dataSim.py and organization in dataBin.py, and image generation is in own thread that stays in this gui application.	
-	#image_Worker retrieves and opens organized files, saves to local arrays, storing as cumulative arrays 
-	#if we are in an observation, and makes quicklook images and spectra from these local arrays.
-	'''
-	def subtract_sky(self, meds):
-		#Sky subtraction works by taking the median of counts over all pixels in every energy slice
-		#and subtracting that number from each pixel's count total.  Since there are generally 8 to 9 times more
-		#sky pixels than object pixels this median should come from a sky pixel and can be used as 
-		#a good representation of sky counts at that energy
-		#subtract each bins median values from each pixel in that bin
-		self.C0[:] = [x-int(meds[0]) for x in self.C0]
-		self.C1[:] = [x-int(meds[1]) for x in self.C1]
-		self.C2[:] = [x-int(meds[2]) for x in self.C2]
-		self.C3[:] = [x-int(meds[3]) for x in self.C3]
-		self.C4[:] = [x-int(meds[4]) for x in self.C4]
-		self.C5[:] = [x-int(meds[5]) for x in self.C5]
-		self.C6[:] = [x-int(meds[6]) for x in self.C6]
-		self.C7[:] = [x-int(meds[7]) for x in self.C7]
-		self.C8[:] = [x-int(meds[8]) for x in self.C8]
-		self.C9[:] = [x-int(meds[9]) for x in self.C9]
-		'''
-	def calc_mean_energy(self):
-		for p in range(self.nxpix*self.nypix):
-			self.me[p] = ((self.C0[p]*self.E0 + self.C1[p]*self.E1 + self.C2[p]*self.E2 + self.C3[p]*self.E3 \
-						+ self.C4[p]*self.E4 + self.C5[p]*self.E5 + self.C6[p]*self.E6 + self.C7[p]*self.E7 \
-						+ self.C8[p]*self.E8 + self.C9[p]*self.E9) /self.pc[p])
-		if self.bintype == "wavelength":
-			self.me[:] = [h*c/e for e in self.me]
-			'''
-	def calculate_SNR(self, totalcounts, medians, npix):
-		total_signal = 0
-		total_n = 0
-		self.integrated_SNR = 0
-		self.SNR = [0,0,0,0,0,0,0,0,0,0]
-		for i in range(len(medians)):
-			if self.sky_subtraction == True:
-				signal = totalcounts[i]
-				noise = npix*medians[i]
-			else:
-				signal = totalcounts[i]-npix*medians[i]
-				noise = npix*medians[i]
-			if signal < 0:
-				signal = 0
-			if noise == 0:
-				noise = 1 #pretty much only happens when a bin has no photons in it at all
-			total_signal += signal
-			total_n += noise
-			self.SNR[i] = signal/(sqrt(noise))
-		self.integrated_SNR = total_signal/(sqrt(total_n))
-	'''
 
 	def closeEvent(self, event=None):
 		if isfile(self.imagefile):
