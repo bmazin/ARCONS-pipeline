@@ -135,7 +135,10 @@ for roachno in xrange(0,number_of_roaches):
             for i in range(len(xsweep)):
                 data[i][:] = h5file_x[i].root._f_getChild(pn[i]).read()
             for j in xrange(0,exptime_x[0]):
-                map.crx_median[pixelno][j] = np.median([len(data[0][j]), len(data[1][j]), len(data[2][j]), len(data[3][j]), len(data[4][j]), len(data[5][j])])
+                median_array = []
+                for i in range(len(xsweep)):
+                    median_array.append(len(data[i][j]))
+                map.crx_median[pixelno][j] = np.median(median_array)
                 for i in range(len(xsweep)):
                     map.crx[i][pixelno][j] = len(data[i][j])
         except:
@@ -150,7 +153,10 @@ for roachno in xrange(0,number_of_roaches):
             for i in range(len(ysweep)):
                 data[i][:] = h5file_y[i].root._f_getChild(pn[i]).read()
             for j in xrange(exptime_y[0]):
-                map.cry_median[pixelno][j] = np.median([len(data[0][j]), len(data[1][j]), len(data[2][j]), len(data[3][j]), len(data[4][j]), len(data[5][j])])
+                median_array = []
+                for i in range(len(ysweep)):
+                    median_array.append(len(data[i][j]))
+                map.cry_median[pixelno][j] = np.median(median_array)
                 for i in range(len(ysweep)):
                     map.cry[i][pixelno][j] = len(data[i][j])
         except:
