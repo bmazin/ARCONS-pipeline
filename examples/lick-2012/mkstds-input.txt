@@ -1,0 +1,50 @@
+ 47839  HR 2456 15 S Mon        O7              (07)            07 (V)
+214680  HR 8622 10 Lac          09 V            09 V            09 V
+ 36512  HR 1855 upsilon Ori     BO V            BO V            BO V
+ 37128  HR 1903 epsilon Ori     BO I            BO Ia           BO Ia (BO Ia)
+ 41117  HR 2135 chi-2 Ori       B2 I            B2 Ia           B2 Ia (B2 Ia)
+206165  HR 8279 9 Cep           B2 I            B2 Ib           (B2 Ib)
+120315  HR 5191 eta UMa         B3 V(n)         B3 V            B3 V
+ 32630  HR 1641 eta Aur         B3 V            B3 V            B3 V
+ 53138  HR 2653 omicron2 CMa    B3 I            B3 Ia           B3 Ia (B3 Iab)
+ 58350  HR 2827 eta CMa         B5 I            B5 Ia           B5 Ia (B5 Ia)
+ 34085  HR 1713 beta Ori        B8 Ia           B8 Ia           B8 Ia
+103287  HR 4554 gamma UMa       AO V            AO V            AO V
+172167  HR 7001 alpha Lyr       AO V            AO V            AO V (AO Va)
+ 87737  HR 3975 eta Leo         AO Ib           AO Ib           (AO Ib)
+ 21389  HR 1040 +58 607         AO Ia           AO Ia           (AO Ia)
+197345  HR 7924 alpha Cyg       A2 Ia           A2 Ia           A2 Ia (A2 Ia)
+216956  HR 8728 alpha PsA       A3 V            A3 V            A3 V
+ 89025  HR 4031 zeta Leo        FO III          FO III          FO III (FO III)
+ 36673  HR 1865 alpha Lep       FO Ib           FO Ib           FO Ib (FO Ib)
+113139  HR 4931 78 UMa          F2 V            F2 V            F2 V (F2 V)
+ 20902  HR 1017 alpha Per       F5 Ib           F5 Ib           F5 Ib (F5 Ib)
+ 30652  HP 1543 pi-3 Ori        F6 V            F6 V            F6 V
+194093  HR 7796 gamma Cyg       F8 Ib           F8 Ib           (F8 Ib)(WWM)
+ 54605  HR 2693 delta CMa       F8 la           F8 Ia           (F8 Ia)(WWM)
+109358  HR 4785 beta CVn        GO V            GO V            GO V (PCK)
+121370  HR 5235 eta Boo         GO IV           GO IV           (GO IV)(PCK)
+204867  HR 8232 beta Aqr        GO Ib           GO Ib           GO Ib(PCK) (GO Ib)
+ 20630  HR 996  kappa Cet       G5 V            G5 V            (G5 V)
+161797  HR 6623 mu Her          G5 IV           G5 IV           G5 IV(G5 IV) note
+206859  HR 8313 9 Peg           G5 Ib           G5 Ib           G5 Ib
+101501  HR 4496 61 UMa          G8 V            G8 V            (G8 V)
+188512  HR 7602 beta Aql        G8 IV           G8 IV           G8 IV
+ 62345  HR 2985 kappa Gem       G8 III          G8 III          G8 IIIa
+113226  HR 4932 epsilon Vir     G8 III          (G8III)         G8 IIIab (G8 III)
+ 48329  HR 2473 epsilon Gem     G8 Ib           G8 Ib           G8 Ib
+185144  HR 7462 sigma Dra       KO V            KO V            KO V
+ 62509  HR 2990 beta Gem        KO III          K0 III          KO IIIb
+197989  HR 7949 epsilon Cyg     KO III          K0 III          KO- III
+222404  HR 8974 gamma Cep       K1 IV           K1 IV           K1 IV  see notes
+ 22049  HR 1084 epsilon Eri     K2 V            K2 V            (K2 V)
+ 12929  HR 617  alpha Ari       (K2III)         K2 III          K2 IIIab
+153210  HR 6299 kappa Oph       K2 III          K2 III          K2 III
+127665  HR 5429 rho Boo         K3 III          K3 III          K3 III
+ 31398  HR 1577 iota Aur        K3 II           K3 II           K3 II
+201091  HR 8085 61 Cyg A        K5 V            K5 V            K5 V
+164058  HR 6705 gamma Dra       K5 III          K5 III          K5 III
+  6860  HR 337  beta And        M0 III          M0 III          M0 IIIa
+  1013  HR 45   chi Peg         M2 III          M2 III          M2+ III(M2 III)
+ 39801  HR 2061 alpha Ori       M2 Ib           M2 Iab          M1-M2 Ia-Ib
+206936  HR 8316 mu Cep          M2 Ia           M2 Ia           M2 Ia

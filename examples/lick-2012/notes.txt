@@ -1,0 +1,10 @@
+Get the astrogrid framework running according to http://www.astrogrid.org/wiki/Install/StepByStep
+
+I installed the RO package from here: http://pypi.python.org/pypi/RO/2.9.3#downloads
+
+sesame.py gets ra,dec from a name
+
+http://www.astro.utoronto.ca/~garrison/mkstds.html is the input for the table
+
+
+

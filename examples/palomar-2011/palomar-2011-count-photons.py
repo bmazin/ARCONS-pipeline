@@ -12,7 +12,7 @@
 
 import sys, os
 import tables
-print sys.argv
+
 if (len(sys.argv) < 2):
     print "Usage:  ",sys.argv[0]," hdf5FileName"
     sys.exit(1)

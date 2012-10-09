@@ -1,0 +1,25 @@
+So you made some new files.  Here is how to share them.
+
+
+1.  To add everything in the current directory:
+
+git add .
+
+2.  Then commit it to your "local" repository for safe keeping
+
+git commit -a
+
+note that this will open an editor, probably vim unless you changed a
+preference.  In the editor there is a list of what files it will
+commit.  Hit "i" to insert text, describe the changes, and then "esc
+esc wq" to write the file and quit the editor.
+
+3.  Synchronize with the web site.  This is where you get to see if
+there are conflicts with what other people have checked in.  If there
+are conflicts, then you have work to do.  Good luck.  But if you get
+the message "Already up-to-date." then you are good to go.  At the
+very least, there were no other changes, or if there are, then there
+are no conflicts with your changes.
+
+4.  Push the results of your work for the rest of us to see.
+

@@ -1,0 +1,40 @@
+Example copied from 
+http://www.scipy.org/Cookbook/SWIG_NumPy_examples
+
+Modified to work with a setup.py file
+
+This is a trivial example of how to write c code that returns a numpy
+array in python.  The "ezrange" is a limited version of "arange"
+
+The source files are ezrange.h and ezrange.c.
+
+The innterface file is ezrange.i
+
+The script setup.py orchestrates the build process.  For example:
+
+$ python setup.py build
+
+makes the files
+
+ezrange.py and ezrange_wrap.c and also _ezrange.so in the
+directory build/lib.macosx-10.7-x86_64-2.7
+
+You need to move that file to the source directory:
+
+$ cp build/lib.macosx-10.7-x86_64-2.7/_ezrange.so .
+
+This is how it works:
+
+$ python
+Enthought Python Distribution -- www.enthought.com
+Version: 7.3-1 (32-bit)
+
+Python 2.7.3 |EPD 7.3-1 (32-bit)| (default, Apr 12 2012, 11:28:34) 
+[GCC 4.0.1 (Apple Inc. build 5493)] on darwin
+Type "credits", "demo" or "enthought" for more information.
+>>> import ezrange
+>>> ezrange.range(3)
+array([0, 1, 2])
+>>> 
+
+

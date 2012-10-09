@@ -1,0 +1,10 @@
+      program fitFromTxt
+      integer*2 iline
+      double precision x, y, rah, ram, ras, decd, decm, decs
+      print *, "Hello"
+      do iline = 1, 100
+        read(*,*,end=100) x, y, ray, ram, ras, decd, decm, decs
+        print *, "x=",x
+      enddo
+ 100  print *," DONE"
+      end program fitFromTxt

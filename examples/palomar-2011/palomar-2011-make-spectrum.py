@@ -40,6 +40,11 @@ if (not os.path.exists(hdf5FullFileName)):
 # open the actual file.  This might take a while
 fid = tables.openFile(hdf5FullFileName, mode='r')
 
+# get the header information
+header = fid.root.header.header
+titles = header.colnames
+info = header[0]
+
 # get the beam image.  This is a 2d array of roach board/pixel/time locations
 beamImage = fid.getNode("/beammap/beamimage")
 

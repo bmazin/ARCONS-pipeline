@@ -31,13 +31,13 @@ listBefore = []
 listAt = []
 listAfter = []
 for iRes,res in enumerate(resonators):
-        print "iRes=",iRes
+        #print "iRes=",iRes
 	for sec in res:
 		for packet in sec:
 			packet = int(packet)
 			#The old data packet has three 12-bit values
 			#containing successive data points around a
-			#peak.
+			#peak.  This is how you get at them.
 
 			atPeak = packet>>32 & pulseMask
                         listAt.append(atPeak)
@@ -55,10 +55,15 @@ nBefore,bins = np.histogram(listBefore,bins)
 nAfter,bins = np.histogram(listAfter,bins)
 
 plt.clf()
-plt.semilogy(bins[:nBin], nBefore, label="peak value - before value")
-plt.semilogy(bins[:nBin], nAfter, label="peak value - after value")
+#plt.semilogy(bins[:nBin], nBefore, label="peak value - before value")
+#plt.semilogy(bins[:nBin], nAfter, label="peak value - after value")
+
+n,bins,patches = plt.hist(listBefore, bins=100, range=(0,100), histtype='step', log='True', label='peak value - before value')
+plt.hist(listAfter, bins=100, range=(0,100), histtype='step', log='True', label='peak value - after value')
+
 plt.xlabel("delta value from atPeak")
 plt.ylabel("dN")
 plt.legend()
 plt.savefig("simple-xray.png")
 
+fid.close()
