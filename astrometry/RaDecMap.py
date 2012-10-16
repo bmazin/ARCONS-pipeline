@@ -50,6 +50,13 @@ path = '/Users/kids/desktop/RaDecMap/'
 obs_file = 'test_obs.h5'
 h5file = openFile(path + obs_file, mode = 'r')
 
+# Create the h5 output file
+out_file = 'coords_out.h5'
+h5out = openFile(path + out_file, mode = 'w')
+ragroup = h5out.createGroup('/','ra', 'RA Map of Array')
+decgroup = h5out.createGroup('/','dec', 'DEC Map of Array')
+filt1 = Filters(complevel=0, complib='blosc', fletcher32=False)   
+
 # Extract relevant header information from the h5 file
 original_lst = h5file.root.header.header.col('lst')[0]
 exptime = h5file.root.header.header.col('exptime')[0]
@@ -65,6 +72,8 @@ rotation_matrix =np.zeros((2,2))
 offsets_hypercube = np.zeros(((((grid_height,grid_width,2,exptime)))), dtype = '|S10')
 # Calculations done for each second interval
 for elapsed_time in range(exptime):
+    ra_array = h5out.createCArray(ragroup, 't%i' %elapsed_time, StringAtom(itemsize=10), (grid_height,grid_width), filters = filt1)
+    dec_array = h5out.createCArray(decgroup, 't%i' %elapsed_time, StringAtom(itemsize=10), (grid_height,grid_width), filters = filt1)
     # Find an hour angle for each frame, assume center does not move
     current_lst_seconds = original_lst_seconds + elapsed_time
     current_lst_radians = seconds_to_radians(current_lst_seconds)
@@ -81,7 +90,6 @@ for elapsed_time in range(exptime):
     y_offsets = np.zeros((grid_height,grid_width))
     rotated_x_offsets = np.zeros((grid_height,grid_width))
     rotated_y_offsets = np.zeros((grid_height,grid_width))
-    hhmmss_RA_offsets = np.zeros(((grid_height,grid_width)),dtype = '|S10')
     for y in range(grid_height):
         for x in range(grid_width):
             # Unrotated matrix elements, multiplied by plate scale
@@ -92,6 +100,7 @@ for elapsed_time in range(exptime):
             rotated_y_offsets[y][x] = rotation_matrix[1][0]*x_offsets[y][x] + rotation_matrix[1][1]*y_offsets[y][x]
             rotated_x_offsets[y][x] += centroid_RA_seconds
             rotated_y_offsets[y][x] += centroid_DEC_seconds
-            offsets_hypercube[y][x][0][elapsed_time] = seconds_to_DDMMSS(rotated_x_offsets[y][x]/15.0)
-            offsets_hypercube[y][x][1][elapsed_time] = seconds_to_DDMMSS(rotated_y_offsets[y][x])
+            ra_array[y,x] = seconds_to_DDMMSS(rotated_x_offsets[y][x]/15.0)
+            dec_array[y,x] = seconds_to_DDMMSS(rotated_y_offsets[y][x])
+            h5out.flush()
 
