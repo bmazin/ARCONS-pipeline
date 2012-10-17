@@ -1,47 +1,19 @@
 import numpy as np
 import scipy as sp
 from tables import *
+import ConfigParser
+import ephem
 
-def DDMMSS_to_seconds(hhmmss_string):
-    separator = hhmmss_string.find(':')
-    hours = float(hhmmss_string[:separator])
-    minutes_seconds = hhmmss_string[(separator+1):]
-    separator = minutes_seconds.find(':')
-    minutes = float(minutes_seconds[:separator])
-    seconds = float(minutes_seconds[(separator+1):])
-    total_arcseconds = hours*3600.0 + minutes*60.0 + seconds
-    return total_arcseconds
-
-def seconds_to_DDMMSS(arcseconds_float):
-    seconds_float = arcseconds_float
-    hours = "%02d" %(seconds_float/3600)
-    seconds_remainder = seconds_float%3600
-    minutes = "%02d" %(seconds_remainder/60)
-    seconds = "%04.1f" %(seconds_remainder%60) 
-    hhmmss = str(hours) + ':' + str(minutes) + ':' + str(seconds)
-    return hhmmss
-
-def seconds_to_radians(total_seconds):
-    total_degrees = total_seconds/3600.0
+def arcsec_to_radians(total_arcsec):
+    total_degrees = total_arcsec/3600.0
     total_radians = total_degrees*d2r
     return total_radians
 
-def calculate_hourangle(LST_radians,RA_radians):
-    HA_radians = LST_radians-RA_radians
-    return HA_radians
-
-# Set initial variables
-grid_width = 44
-grid_height = 46
-HA_offset = 19.0
-plate_scale = 1.0
-centroid_RA = '03:45:26.5'
-centroid_DEC = '17:47:53'
-
-# These 2 values should probably be found by finding the center of the gaussian in an image
-centroid_x = 22.0
-centroid_y = 23.0
-
+def radians_to_arcsec(total_radians):
+    total_degrees = total_radians*r2d
+    total_arcsec = total_degrees*3600.0
+    return total_arcsec
+    
 d2r = np.pi/180.0
 r2d = 180.0/np.pi
 
@@ -49,6 +21,31 @@ r2d = 180.0/np.pi
 path = '/Users/kids/desktop/RaDecMap/'
 obs_file = 'test_obs.h5'
 h5file = openFile(path + obs_file, mode = 'r')
+
+# Set initial variables
+ini_file = path + 'LICK2012Initialization.ini'
+Config = ConfigParser.ConfigParser()
+Config.read(ini_file)
+grid_width = Config.getint('ARRAY','GRID_WIDTH')
+grid_height = Config.getint('ARRAY','GRID_HEIGHT')
+plate_scale = Config.getfloat('ARRAY','PLATE_SCALE')
+crpix1 = Config.getfloat('ARRAY','CRPIX1')
+crpix2 = Config.getfloat('ARRAY','CRPIX2')
+HA_offset = Config.getfloat('OFFSETS','HA_OFFSET')
+centroid_RA = Config.get('OFFSETS','CENTROID_RA')
+centroid_DEC = Config.get('OFFSETS','CENTROID_DEC')
+print 'Grid Width =',grid_width
+print 'Grid Height =',grid_height
+print 'Plate Scale =',plate_scale
+print 'Center of Rotation:',crpix1,',',crpix2
+print 'Hour Angle Offset =',HA_offset
+print 'Centroid RA =',centroid_RA
+print 'Centroid Dec =',centroid_DEC
+
+
+# Open the centroid positions file
+centroids_file = 'centroid_positions.txt'
+centroid_x, centroid_y = np.loadtxt(path+centroids_file,unpack='true')
 
 # Create the h5 output file
 out_file = 'coords_out.h5'
@@ -60,23 +57,30 @@ filt1 = Filters(complevel=0, complib='blosc', fletcher32=False)
 # Extract relevant header information from the h5 file
 original_lst = h5file.root.header.header.col('lst')[0]
 exptime = h5file.root.header.header.col('exptime')[0]
+ts = h5file.root.header.header.col('unixtime')[0]
 print 'Original LST from telescope:', original_lst
 print 'Exptime:', exptime
 
 # Initial RA and LST
-centroid_RA_seconds = DDMMSS_to_seconds(centroid_RA)*15
-centroid_RA_radians = seconds_to_radians(centroid_RA_seconds)
-centroid_DEC_seconds = DDMMSS_to_seconds(centroid_DEC)
-original_lst_seconds = DDMMSS_to_seconds(original_lst)
+centroid_RA_radians = ephem.hours(centroid_RA).real
+centroid_RA_arcsec = radians_to_arcsec(centroid_RA_radians)
+
+centroid_DEC_radians = ephem.degrees(centroid_DEC).real
+centroid_DEC_arcsec = radians_to_arcsec(centroid_DEC_radians)
+
+original_lst_radians = ephem.hours(original_lst).real
+original_lst_seconds = radians_to_arcsec(original_lst_radians)/15.0
+
 rotation_matrix =np.zeros((2,2))
 offsets_hypercube = np.zeros(((((grid_height,grid_width,2,exptime)))), dtype = '|S10')
 # Calculations done for each second interval
 for elapsed_time in range(exptime):
+    # Load the image to find the star centroid        
     ra_array = h5out.createCArray(ragroup, 't%i' %elapsed_time, StringAtom(itemsize=10), (grid_height,grid_width), filters = filt1)
     dec_array = h5out.createCArray(decgroup, 't%i' %elapsed_time, StringAtom(itemsize=10), (grid_height,grid_width), filters = filt1)
     # Find an hour angle for each frame, assume center does not move
     current_lst_seconds = original_lst_seconds + elapsed_time
-    current_lst_radians = seconds_to_radians(current_lst_seconds)
+    current_lst_radians = arcsec_to_radians(current_lst_seconds*15.0)
     HA_variable = current_lst_radians - centroid_RA_radians
     HA_static = HA_offset*d2r
     HA_current = HA_variable + HA_static
@@ -93,14 +97,12 @@ for elapsed_time in range(exptime):
     for y in range(grid_height):
         for x in range(grid_width):
             # Unrotated matrix elements, multiplied by plate scale
-            x_offsets[y][x] = plate_scale*(centroid_x-x)
-            y_offsets[y][x] = plate_scale*(centroid_y-y)
+            x_offsets[y][x] = plate_scale*(crpix1-x)
+            y_offsets[y][x] = plate_scale*(crpix2-y)
             # Apply rotation by hour angle
-            rotated_x_offsets[y][x] = rotation_matrix[0][0]*x_offsets[y][x] + rotation_matrix[0][1]*y_offsets[y][x]
-            rotated_y_offsets[y][x] = rotation_matrix[1][0]*x_offsets[y][x] + rotation_matrix[1][1]*y_offsets[y][x]
-            rotated_x_offsets[y][x] += centroid_RA_seconds
-            rotated_y_offsets[y][x] += centroid_DEC_seconds
-            ra_array[y,x] = seconds_to_DDMMSS(rotated_x_offsets[y][x]/15.0)
-            dec_array[y,x] = seconds_to_DDMMSS(rotated_y_offsets[y][x])
+            rotated_x_offsets[y][x] = centroid_RA_arcsec - plate_scale*(centroid_x[elapsed_time]-crpix1) + rotation_matrix[0][0]*x_offsets[y][x] + rotation_matrix[0][1]*y_offsets[y][x]
+            rotated_y_offsets[y][x] = centroid_DEC_arcsec - plate_scale*(centroid_y[elapsed_time]-crpix2) + rotation_matrix[1][0]*x_offsets[y][x] + rotation_matrix[1][1]*y_offsets[y][x]   
+            ra_array[y,x] = str(ephem.hours(arcsec_to_radians(rotated_x_offsets[y][x])))
+            dec_array[y,x] = str(ephem.degrees(arcsec_to_radians(rotated_y_offsets[y][x])))
             h5out.flush()
 
