@@ -1,0 +1,14 @@
+Tutorial copied from www.swig.org/tutorial.html
+
+The file example.c implements three simple functions:  factorial, modulus, and time.
+
+The file example.i is the interface file.
+
+To build python extensions that do this:
+
+swig -python example.i # creates the files example.py and example_wrap.c
+
+gcc -c example.c example_wrap.c -I/opt/local/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7 # creates 
+
+
+ld -shared example.o example_wrap.o -o _example.so

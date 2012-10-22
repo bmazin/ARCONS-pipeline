@@ -25,16 +25,16 @@ def peakfit(y1,y2,y3):
 
 def makeOrLoadPklFile(hdf5FileName):
     pklFileName = hdf5FileName+".pkl"
-    if os.path.exists(pklFileName) :
-        # print("pklFileName="+pklFileName+" already exists")
-        pFile = open(pklFileName,'r')
-        nPhoton = pickle.load(pFile)
-        nDtNegative = pickle.load(pFile)
-        hgTime = pickle.load(pFile)
-        hgAt = pickle.load(pFile)
-        pixels = pickle.load(pFile)
-        pFile.close()
-        return nPhoton, nDtNegative, hgTime, hgAt, pixels
+    #if os.path.exists(pklFileName) :
+    #    # print("pklFileName="+pklFileName+" already exists")
+    #    pFile = open(pklFileName,'r')
+    #    nPhoton = pickle.load(pFile)
+    #    nDtNegative = pickle.load(pFile)
+    #    hgTime = pickle.load(pFile)
+    #    hgAt = pickle.load(pFile)
+    #    pixels = pickle.load(pFile)
+    #    pFile.close()
+    #    return nPhoton, nDtNegative, hgTime, hgAt, pixels
     # make the full file name by joining the input name to the MKID_DATA_DIR (or .)
     dataDir = os.getenv('MKID_DATA_DIR','.')
     hdf5FullFileName = os.path.join(dataDir,hdf5FileName)
@@ -59,63 +59,69 @@ def makeOrLoadPklFile(hdf5FileName):
     # Make a 2d array to hold the image
     shape = beamImage.shape
     pixels = np.zeros(shape,dtype=np.uint32)
+    hgTimes = []
+    hgAts = []
+    # count the total number of photons in the file
+    nPhoton = 0
+    nDtNegative = 0
+    for iRow in np.arange(len(beamImage)):
+        for iCol in np.arange(len(beamImage[0])):
+            if (iRow>=0 and iCol>=0):
+                pixel = beamImage[iRow][iCol]
+                secs = fid.getNode(pixel)
+                sum, thisNDtNegative, hgAt, hgTime = iterateOverPixel(secs)
+                pixels[iRow][iCol] = sum
+                hgTimes.append(hgTime)
+                hgAts.append(hgAt)
+                nDtNegative += thisNDtNegative
+                nPhoton += sum
 
+    pFile = open(pklFileName,'wb')
+    pickle.dump(nPhoton,pFile)
+    pickle.dump(nDtNegative,pFile)
+    pickle.dump(hgTimes,pFile)
+    pickle.dump(hgAts,pFile)
+    pickle.dump(pixels,pFile)
+    pFile.close()
+
+    fid.close()
+    return nPhoton, nDtNegative, hgTimes, hgAts, pixels
+
+def iterateOverPixel(secs):
     # Make a 1d array to hold the fit peak
     hgFit = np.zeros(1000+2**12, dtype=np.uint32)
     # Make a 1d array to hold the at peak values
     hgAt = np.zeros(1000+2**12, dtype=np.uint32)
     # Make a 1d array to hold the delta time distribution
     hgTime = np.zeros(2**13, dtype=np.uint32)
-
     pulseMask = int(12*'1',2)  #bitmask of 12 ones
     timeMask = int(20*'1',2)   #bitmask of 20 ones
-
-    # count the total number of photons in the file
-    nPhoton = 0
-    iRow = -1
-    nDtNegative = 0
-    for rows in beamImage:
-        iRow += 1
-        print "Begin iRow = ",iRow
-        iCol = -1
-        for pixel in rows:
-            iCol += 1
-            # so now we have a roach board/pixel/time. 
-            sum = 0
-            previousTime = -9999
-            for sec in fid.getNode(pixel):
-                for packet in sec:
-                    # here is the 64-bit number.  
-                    packet = int(packet)
-                    beforePeak = packet>>44 & pulseMask
-                    atPeak = packet>>32 & pulseMask
-                    afterPeak = packet>>20 & pulseMask
-                    peak = peakfit(beforePeak, atPeak, afterPeak)
-                    hgFit[peak] += 1
-                    hgAt[atPeak] += 1
-                    nPhoton += 1
-                    sum += 1
-                    time = packet & timeMask
-                    if (previousTime != -9999) :
-                        dt = time - previousTime
-                        if (dt < 0):
-                            nDtNegative += 1
-                        elif (dt < hgTime.size-1):
-                            hgTime[dt] += 1
-                    previousTime = time
-
-            pixels[iRow][iCol] = sum
-
-
-    pFile = open(pklFileName,'wb')
-    pickle.dump(nPhoton,pFile)
-    pickle.dump(nDtNegative,pFile)
-    pickle.dump(hgTime,pFile)
-    pickle.dump(hgAt,pFile)
-    pickle.dump(pixels,pFile)
-    pFile.close()
-
-    return nPhoton, nDtNegative, hgTime, hgAt, pixels
+    sum = 0
+    thisNDtNegative = 0
+    
+    for sec in secs:
+        previousTime = -9999
+        for packet in sec:
+            # here is the 64-bit number.  
+            packet = int(packet)
+            beforePeak = packet>>44 & pulseMask
+            atPeak = packet>>32 & pulseMask
+            afterPeak = packet>>20 & pulseMask
+            peak = peakfit(beforePeak, atPeak, afterPeak)
+            hgFit[peak] += 1
+            hgAt[atPeak] += 1
+            sum += 1
+            time = packet & timeMask
+            if (previousTime != -9999) :
+                dt = time - previousTime
+                if dt < 0:
+                    dt += 2**20
+                    if (dt < 0):
+                        thisNDtNegative += 1
+                    elif (dt < hgTime.size-1):
+                        hgTime[dt] += 1
+            previousTime = time
+    return sum, thisNDtNegative, hgTime, hgAt
 
 def makeAllPklFiles():
     dataDir = os.getenv('MKID_DATA_DIR','.')

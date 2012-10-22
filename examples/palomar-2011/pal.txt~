@@ -1,0 +1,8 @@
+Files in Palomar2011/Pal20110802
+
+beamimage.h5 -- lists physical location of pixels in the array.  This is also in the obs* files.
+
+beamimage_scan2.h5 -- is the scan that was used to create the beamimage.h5 file?
+
+obs* are observation files.
+

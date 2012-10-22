@@ -1,0 +1,4 @@
+def cpsAtLick(magIn):
+    diameter = 120.0 * 2.54 # in cm
+    area = pi * diameter*diameter
+    return area

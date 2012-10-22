@@ -1,0 +1,73 @@
+For the record...working with Seth here at Lick to get qt working with enthought python
+
+
+Downloaded and installed this qt4 from here:
+http://releases.qt-project.org/qt4/source/qt-mac-opensource-4.8.2.dmg
+
+Then got sip from here:
+http://www.riverbankcomputing.co.uk/static/Downloads/sip4/sip-4.13.3.tar.gz
+
+Untarred it, then did this, since the defaults seemed to make sense:
+
+python configure.py
+make
+sudo make install
+
+
+Now install this:
+http://www.riverbankcomputing.co.uk/static/Downloads/PyQt4/PyQt-mac-gpl-4.9.4.tar.gz
+
+after untarring, the same thing:
+python configure.py
+make
+
+but it failed......
+
+so went back to sip and did this
+
+python configure.py --arch i386
+ folllowed by make; make install
+
+then in PyQT
+python configure.py -q /usr/bin/qmake --use-arch x86_64
+
+but this does not work.
+
+So now we go back to qt and get a 32 bit version of that, since I am running the 32 bit version of python from epd
+
+http://releases.qt-project.org/qt4/source/qt-mac-opensource-4.6.4.dmg
+Installed that
+
+and it installs.  Here is the "history" trail
+
+ 668  cd ../sip-4.13.3
+  669  ls
+  670  make clean
+  671  python configure.py -q /usr/bin/qmake --arch i386
+  672  python configure.py  --arch i386
+  673  make
+  674  sudo make install
+  675  cd ../PyQt-mac-gpl-4.9.4
+  676  python configure.py -q /usr/bin/qmake --arch i386
+  677  python configure.py -q /usr/bin/qmake --use-arch i386
+  678  make
+  679  pwd
+  680  sudo make install
+  681  history
+
+BUT...this did not work, with this error:
+
+/Users/stoughto/Desktop/ARCONS-pipeline/quicklook/h5quicklook.py in <module>()
+     26 from matplotlib import pyplot as plt
+     27 from numpy import *
+---> 28 from PyQt4.QtGui import *
+     29 from PyQt4.QtCore import *
+     30 from tables import *
+
+ImportError: dlopen(/Library/Frameworks/Python.framework/Versions/7.3/lib/python2.7/site-packages/PyQt4/QtGui.so, 2): Symbol not found: __ZN13QPyTextObject16staticMetaObjectE
+  Referenced from: /Library/Frameworks/Python.framework/Versions/7.3/lib/python2.7/site-packages/PyQt4/QtGui.so
+  Expected in: flat namespace
+ in /Library/Frameworks/Python.framework/Versions/7.3/lib/python2.7/site-packages/PyQt4/QtGui.so
+
+
+

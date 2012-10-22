@@ -21,8 +21,8 @@ class PhotonList(IsDescription):
     """
     Xpix = UInt8Col()               # Xpixel the photon was recorded in, with the bottom left pixel being (0,0)
     Ypix = UInt8Col()               # Ypixel the photon was recorded in, with the bottom left pixel being (0,0)
-    RA = Float32Col()               # Offset in arcseconds in RA from the center of the image
-    Dec = Float32Col()              # Offset in arcseconds in Dec from the center of the image
+    RA = Float32Col()               # Offset in arcseconds in RA from the observation center
+    Dec = Float32Col()              # Offset in arcseconds in Dec from the observation center
     ArrivalTime = Float32Col()      # Time in seconds since the beginning of the observation
     Wavelength = Float32Col()       # Wavelength of the photon in Angstroms        
     WaveError = Flaot32Col()        # Estimated 1-sigma Wavelength error in Angstroms 

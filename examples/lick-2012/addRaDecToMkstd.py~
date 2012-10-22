@@ -1,0 +1,4 @@
+from RO import StringUtil
+
+for line in open("mkstds-input.txt"):
+    print "line=",line
