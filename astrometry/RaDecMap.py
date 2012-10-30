@@ -1,5 +1,4 @@
 import numpy as np
-import scipy as sp
 from tables import *
 import ConfigParser
 import ephem
@@ -13,42 +12,44 @@ def radians_to_arcsec(total_radians):
     total_degrees = total_radians*r2d
     total_arcsec = total_degrees*3600.0
     return total_arcsec
+
+
+centroid_RA = '03:45:26.5'
+centroid_DEC = '17:47:53'
     
 d2r = np.pi/180.0
 r2d = 180.0/np.pi
 
 # Open the h5 observation file
-path = '/Users/kids/desktop/RaDecMap/'
-obs_file = 'test_obs.h5'
+path = '/home/pszypryt/Scratchwork/'
+obs_file = 'obs_20120904-230531.h5'
 h5file = openFile(path + obs_file, mode = 'r')
 
 # Set initial variables
-ini_file = path + 'LICK2012Initialization.ini'
+ini_file = path + 'Lick2012Initialization.ini'
 Config = ConfigParser.ConfigParser()
 Config.read(ini_file)
 grid_width = Config.getint('ARRAY','GRID_WIDTH')
 grid_height = Config.getint('ARRAY','GRID_HEIGHT')
-plate_scale = Config.getfloat('ARRAY','PLATE_SCALE')
+plate_scale = Config.getfloat('ARRAY','PLTSCALE')
 crpix1 = Config.getfloat('ARRAY','CRPIX1')
 crpix2 = Config.getfloat('ARRAY','CRPIX2')
-HA_offset = Config.getfloat('OFFSETS','HA_OFFSET')
-centroid_RA = Config.get('OFFSETS','CENTROID_RA')
-centroid_DEC = Config.get('OFFSETS','CENTROID_DEC')
+HA_offset = Config.getfloat('ARRAY','INSTRUMENT_ROTATION')
 print 'Grid Width =',grid_width
 print 'Grid Height =',grid_height
 print 'Plate Scale =',plate_scale
 print 'Center of Rotation:',crpix1,',',crpix2
 print 'Hour Angle Offset =',HA_offset
-print 'Centroid RA =',centroid_RA
-print 'Centroid Dec =',centroid_DEC
 
 
 # Open the centroid positions file
-centroids_file = 'centroid_positions.txt'
+n = obs_file.find('.')
+centroid_list_identifier = obs_file[0:n]
+centroids_file = 'centroids_' + centroid_list_identifier + '.txt'
 centroid_x, centroid_y = np.loadtxt(path+centroids_file,unpack='true')
 
 # Create the h5 output file
-out_file = 'coords_out.h5'
+out_file = 'coords_' + obs_file
 h5out = openFile(path + out_file, mode = 'w')
 ragroup = h5out.createGroup('/','ra', 'RA Map of Array')
 decgroup = h5out.createGroup('/','dec', 'DEC Map of Array')
@@ -57,7 +58,11 @@ filt1 = Filters(complevel=0, complib='blosc', fletcher32=False)
 # Extract relevant header information from the h5 file
 original_lst = h5file.root.header.header.col('lst')[0]
 exptime = h5file.root.header.header.col('exptime')[0]
-ts = h5file.root.header.header.col('unixtime')[0]
+try:
+    ts = h5file.root.header.header.col('unixtime')[0]
+except KeyError:
+    print 'Using "ut" instead of "unixtime" from header'
+    ts = h5file.root.header.header.col('ut')[0]
 print 'Original LST from telescope:', original_lst
 print 'Exptime:', exptime
 
