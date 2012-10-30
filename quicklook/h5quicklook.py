@@ -146,9 +146,12 @@ class StartQt4(QMainWindow):
 			htable = h5file.root.header.header.read()
 			h5address = h5file.root.beammap.beamimage.read()[0][0]
 			h5time = int(h5address.split('t')[1])
+                        try:
+			    self.ut = int(htable["unixtime"])
+			except ValueError:
+                            print "unixtime not found, checking for deprecated ut field" 
+                            self.ut = int(htable["ut"])
 
-			self.ut = int(htable["unixtime"])
-			
 			if self.ut != h5time:
 				self.ut = h5time
 			
