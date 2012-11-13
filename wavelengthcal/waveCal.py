@@ -170,8 +170,8 @@ def wavelengthCal(paramFile):
                 pstring = beammap[i][j]
                 pixelNode = pstring.split('t')[0]
     
-                xarray.append(i)
-                yarray.append(j)
+                xarray.append(j)
+                yarray.append(i)
                 roach = int(pixelNode.split('/')[1][1:])
                 pixel = int(pixelNode.split('/')[2][1:])
 
