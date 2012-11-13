@@ -33,8 +33,9 @@ import numpy as np
 import matplotlib.pylab as plt
 import mpfit
 import smooth
+import readDict
 from utils import *
-from readDict import *
+#from readDict import *
 from fitFunctions import *
 from matplotlib.backends.backend_pdf import PdfPages
 
