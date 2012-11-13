@@ -162,13 +162,13 @@ def plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, sh
    plt.scatter(x,y,c=z,s=500,marker='s',cmap=colormap, norm=norm)
    plt.colorbar()
    plt.title(plotTitle)
-   plt.xlabel('Row')
-   plt.ylabel('Column')
+   plt.xlabel('Column Number')
+   plt.ylabel('Row Number')
 
    x = numpy.array(x)
    y = numpy.array(y)
-   plt.xlim(numpy.min(x)-1.25, numpy.max(x)-0.25)
-   plt.ylim(numpy.min(y)-1.5, numpy.max(y)-0.5)
+   plt.xlim(numpy.min(x)-1.5, numpy.max(x))#-0.25)
+   plt.ylim(numpy.min(y)-1.5, numpy.max(y)-0.25)
 
    if showMe:
       plt.show()
