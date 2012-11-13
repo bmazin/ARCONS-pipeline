@@ -7,13 +7,12 @@
 
 import sys,os
 import tables
-import pyfits
 import numpy as np
 import matplotlib.pyplot as plt
 
 class FlatCal:
     def __init__(self,flatFileName=None):
-        self.nEnergyBins = 2**12
+        self.nEnergyBins = 1000000
         if flatFileName == None:
             self.loadFactors()
         else:
@@ -24,6 +23,7 @@ class FlatCal:
     def __del__(self):
         try:
             self.flatFile.close()
+            self.calFile.close()
         except AttributeError:#flatFile was never defined
             pass
 
@@ -56,6 +56,7 @@ class FlatCal:
         beamShape = self.beamImage.shape
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
+
     def loadObsFile(self,obsFileName):
         self.obsFileName = obsFileName
         #make the full file name by joining the input name to the MKID_DATA_DIR (or . if the environment variable is not defined)
@@ -93,7 +94,7 @@ class FlatCal:
                 print iRow,iCol,
                 pixel = self.beamImage[iRow][iCol]
                 secs = self.flatFile.getNode('/'+pixel)
-                hgEnergy = self.loadSingleSpectra(secs)
+                hgEnergy = self.loadSingleSpectra(secs,iRow,iCol)
                 self.spectra[iRow,iCol,:]=hgEnergy
                 print sum(hgEnergy)
 
@@ -101,6 +102,22 @@ class FlatCal:
         self.calculateMedians()
         return self.spectra
 
+#    def applyWvlCal(self,row,col,pulseHeights):
+#        wavelengths = np.array(self.calTable[row][col][0]*pulseHeights + self.calTable[row][col][1],dtype=np.uint32)
+#        return wavelengths
+
+    def loadCalFile(self,calFileName):
+        intermediateDir = os.getenv('INTERM_PATH','.')
+        self.calFullFileName = os.path.join(intermediateDir,calFileName)
+        self.calFile = tables.openFile(self.calFullFileName,'r')
+        self.nCalCoeffs = 2
+        self.calTable = np.zeros([self.nRow,self.nCol,self.nCalCoeffs])
+        calsoln = self.calFile.root.wavecal.calsoln
+        for row in calsoln:
+            print row
+            if row['wave_flag'] == 0:
+                self.calTable[row['pixelx']][row['pixely']] = row['polyfit']
+        
     def loadSpectraFile(self):
         self.spectra = np.load('/ScienceData/intermediate/flatSpectra.npy')
 
@@ -166,7 +183,7 @@ class FlatCal:
         plt.legend(loc=2)
         plt.show()
         
-    def loadSingleSpectra(self,secs):
+    def loadSingleSpectra(self,secs,row,col):
         hgEnergy = np.zeros(self.nEnergyBins,dtype=np.uint32)
         pulseMask = int(12*'1',2) #bitmask of 12 ones
         nBitsAfterEnergy = 44
@@ -178,7 +195,10 @@ class FlatCal:
                #extract parabolaFitPeak as energy
                parabolaFitPeak = (packet >> nBitsAfterEnergy) & pulseMask
                baseline = (packet >> nBitsAfterBaseline) & pulseMask
-               hgEnergy[parabolaFitPeak-baseline] += 1
+               pulseAmplitude = parabolaFitPeak-baseline
+               if pulseAmplitude > 0:
+                   wavelength = self.applyWvlCal(row,col,pulseAmplitude)
+                   hgEnergy[wavelength] += 1
         return hgEnergy
 
     def loadWavelengthCal(self,wvlCalFile=None):
@@ -222,10 +242,13 @@ class FlatCal:
                         #extract parabolaFitPeak as energy
                         parabolaFitPeak = (packet >> nBitsAfterEnergy) & pulseMask
                         baseline = (packet >> nBitsAfterBaseline) & pulseMask
-                        flatFactor = self.flatFactors[iRow,iCol,parabolaFitPeak-baseline]
-                        secImg[iRow,iCol]+=flatFactor
-                        if (iRow == pixelR and iCol == pixelC):
-                            self.pixelCalSpectra[parabolaFitPeak-baseline]+=flatFactor
+                        pulseAmplitude = parabolaFitPeak-baseline
+                        if pulseAmplitude > 0:
+                            wavelength = self.applyWvlCal(row,col,pulseAmplitude)
+                            flatFactor = self.flatFactors[iRow,iCol,wavelength]
+                            secImg[iRow,iCol]+=flatFactor
+                            if (iRow == pixelR and iCol == pixelC):
+                                self.pixelCalSpectra[wavelength]+=flatFactor
                         
         print secImg[pixelR,pixelC]
         plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
@@ -238,8 +261,10 @@ def main():
     #cal = FlatCal('obs_20120919-131142.h5')
     cal = FlatCal()
     cal.loadFlatFile('obs_20120919-131142.h5')
+    cal.loadCalFile('calsol_20120917-072537.h5')
     cal.loadObsFile('obs_20120919-131346.h5')
-    cal.loadSpectraFile()
+    cal.loadFlatSpectra()
+    #cal.loadSpectraFile()
     cal.calculateMedians()
     cal.calculateFactors()
     cal.plotPixelFactors(17,12)
