@@ -59,7 +59,7 @@ class DriftObj(IsDescription):
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
                                                #    double precision
     
-def failure(flagnum):
+def failure(row, flagnum):
     row['wave_flag'] = flagnum
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
@@ -186,7 +186,7 @@ def wavelengthCal(paramFile):
 
                 # flag dead pixels
                 if len(photondata)==0:
-                    failure(1)
+                    failure(row, 1)
                     continue
 
                 # for each second, get the packets
