@@ -72,7 +72,7 @@ def wavelengthCal(paramFile):
     params = readDict.readDict(paramFile)
     params.readFromFile(paramFile)
 
-    infile = params['calfilelist']
+    infile = params['calfileslist']
     files2run = params['files2run']
     outdir = params['outdir']
 
