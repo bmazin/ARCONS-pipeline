@@ -115,7 +115,7 @@ def wavelengthCal(paramFile):
         rarray = []
 
         # open outfile to write parameters to
-        outfile = 'calsol' + infile.split('cal')[1]
+        outfile = 'calsol' + cal_files[k].split('cal')[1]
         try:
             h5out = tables.openFile(outdir+datedir+outfile, mode='w')
         except:
