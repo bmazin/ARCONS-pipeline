@@ -156,7 +156,7 @@ def wavelengthCal(paramFile):
         except:
             pass
         
-        pp = PdfPages(outdir+datedir+figdir+outfile.split('.')[0]+"_fits.pdf")
+        pp = PdfPages(outdir+datedir+params['figdir']+outfile.split('.')[0]+"_fits.pdf")
         matplotlib.rcParams['font.size'] = 4
         n_plots_per_page = 20
         plotcounter = 0
