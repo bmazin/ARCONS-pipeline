@@ -359,7 +359,7 @@ def wavelengthCal(paramFile):
                 redchi2gauss = chi2gauss/len(phasebins[ind_left:ind_right])
 
                 # cut on chi^2
-                chi2_cutoff = params['fwhm2sig']
+                chi2_cutoff = 1.*params['fwhm2sig']
                 if (redchi2gauss > chi2_cutoff):
                     failure(row, rarray, 2)
                     continue
