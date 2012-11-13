@@ -535,8 +535,8 @@ def wavelengthCal(paramFile):
                     continue
 
 
-            # insert row; writes to the table I/O buffer
-            row.append()
+                # insert row; writes to the table I/O buffer
+                row.append()
 
         # flush the table's I/O buffer to write the data to disk
         caltable.flush()
