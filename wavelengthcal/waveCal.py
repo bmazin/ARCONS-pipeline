@@ -514,24 +514,26 @@ def wavelengthCal(paramFile):
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
                     rarray.append(resest)
 
+                    # fits plot
+                    if (plotcounter % n_plots_per_page == 0):
+                        fig6 = plt.figure(figsize=(8.25, 10), dpi=100)
 
-            # fits plot
-            if (plotcounter % n_plots_per_page == 0):
-                fig6 = plt.figure(figsize=(8.25, 10), dpi=100)
-
-            print len(phasebins), len(gaussfit), row['wave_flag']
-            plt.subplot(5,4,plotcounter%20+1)
-            plt.plot(phasebins,n_inbin, label='raw')
-            titlestring = str(i)+', '+str(j)+' '+pstring
-            plt.title(titlestring)
-            plt.xlim(phasebins[ind_left]-50.,np.min([-50.,np.max(phasebins)]))
-            plt.ylim(0.,max_vals[-1]+60.)
-            plt.plot(phasebins, gaussfit, 'r', label='Gaussian fit1')
+                    plt.subplot(5,4,plotcounter%20+1)
+                    plt.plot(phasebins,n_inbin, label='raw')
+                    titlestring = str(i)+', '+str(j)+' '+pstring
+                    plt.title(titlestring)
+                    plt.xlim(phasebins[ind_left]-50.,np.min([-50.,np.max(phasebins)]))
+                    plt.ylim(0.,max_vals[-1]+60.)
+                    plt.plot(phasebins, gaussfit, 'r', label='Gaussian fit1')
         
-            if (((plotcounter +1) % n_plots_per_page == 0) or ((i+1 == n_rows) and (j+1 == n_cols))):
-                pp.savefig(fig6)
+                    if (((plotcounter +1) % n_plots_per_page == 0) or ((i+1 == n_rows) and (j+1 == n_cols))):
+                        pp.savefig(fig6)
             
-            plotcounter+=1
+                    plotcounter+=1
+
+                else:
+                    failure(row, rarray, 2)
+                    continue
 
 
             # insert row; writes to the table I/O buffer
