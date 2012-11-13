@@ -338,28 +338,27 @@ def wavelengthCal(paramFile):
                 sigma1 = fwhm/params['fwhm2sig']
                 sigma2 = fwhm/params['fwhm2sig']
         
-                params=[sigma1, x_offset1, amplitude1, sigma2, x_offset2, amplitude2]  # First guess at fit params
+                paramsin=[sigma1, x_offset1, amplitude1, sigma2, x_offset2, amplitude2]  # First guess at fit params
                 errs = np.sqrt(n_inbin)                         # Poisson counts 
                 errs[np.where(errs == 0.)] = 1.
                 quiet=True
 
-                parinfo = [ {'n':0,'value':params[0],'limits':[fwhm/10., fwhm*2.],             'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
-                            {'n':1,'value':params[1],'limits':[x_offset1-fwhm, x_offset1+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset blue",'error':0},
-                            {'n':2,'value':params[2],'limits':[0., 2.*amplitude1],            'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
-                            {'n':3,'value':params[3],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
-                            {'n':4,'value':params[4],'limits':[x_offset2-fwhm, x_offset2+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset red",'error':0},
-                            {'n':5,'value':params[5],'limits':[0., 2.*amplitude2],            'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0}]
+                parinfo = [ {'n':0,'value':paramsin[0],'limits':[fwhm/10., fwhm*2.],             'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
+                            {'n':1,'value':paramsin[1],'limits':[x_offset1-fwhm, x_offset1+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset blue",'error':0},
+                            {'n':2,'value':paramsin[2],'limits':[0., 2.*amplitude1],            'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
+                            {'n':3,'value':paramsin[3],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
+                            {'n':4,'value':paramsin[4],'limits':[x_offset2-fwhm, x_offset2+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset red",'error':0},
+                            {'n':5,'value':paramsin[5],'limits':[0., 2.*amplitude2],            'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0}]
 
                 fa = {'x':phasebins[ind_left:ind_right],'y':n_inbin[ind_left:ind_right],'err':errs[ind_left:ind_right]}
                 m = mpfit.mpfit(twogaussian, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
             
-                mpp = m.params                                #The fit params
+                mpp = m.paramsin                                #The fit params
                 mpperr = m.perror
                 chi2gauss = m.fnorm
                 redchi2gauss = chi2gauss/len(phasebins[ind_left:ind_right])
 
                 # cut on chi^2
-                print params['chi2_cutoff']
                 if (redchi2gauss > params['chi2_cutoff']):
                     failure(row, rarray, 2)
                     continue
@@ -375,7 +374,7 @@ def wavelengthCal(paramFile):
 
                 # Blobby, got through but cutting now...
                 if (np.abs(x_offset2 - min_locations[-1]) < sigma2) | (np.abs(x_offset1 - x_offset2) < 2 * sigma2) | (x_offset2 > min_locations[-1]):
-                    failure(2)
+                    failure(row, rarray, 2)
                     continue
 
                 gaussfit = amplitude1 * np.exp( -(pow((phasebins-x_offset1),2) / (2. * pow(sigma1,2)))) + amplitude2 * np.exp( -(pow((phasebins-x_offset2),2) / (2. * pow(sigma2,2)))) 
@@ -392,18 +391,18 @@ def wavelengthCal(paramFile):
                 y_off = 0.
                 amp = energies[0] / (pow(phaseamps[0],2))
 
-                params=[x_off, amp, y_off]  # First guess at fit params
+                paramsin=[x_off, amp, y_off]  # First guess at fit params
                 errs = np.array([1.,1.,1.])                        
                 quiet=True
 
-                parinfo = [ {'n':0,'value':params[0],'limits':[0,0],'limited':[False,False],'fixed':False,'parname':"parabola x offset",'error':0},
-                           {'n':1,'value':params[1],'limits':[0,0],'limited':[False,False],'fixed':False,'parname':"parabola amplitude",'error':0},
-                           {'n':2,'value':params[2],'limits':[0,0],'limited':[False,False],'fixed':False,'parname':"parabola y offset",'error':0}]
+                parinfo = [ {'n':0,'value':paramsin[0],'limits':[0,0],'limited':[False,False],'fixed':False,'parname':"parabola x offset",'error':0},
+                           {'n':1,'value':paramsin[1],'limits':[0,0],'limited':[False,False],'fixed':False,'parname':"parabola amplitude",'error':0},
+                           {'n':2,'value':paramsin[2],'limits':[0,0],'limited':[False,False],'fixed':False,'parname':"parabola y offset",'error':0}]
 
                 fa = {'x':phaseamps,'y':energies,'err':errs}
                 m = mpfit.mpfit(parabola, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
             
-                mpp = m.params                                #The fit params
+                mpp = m.paramsin                                #The fit params
                 mpperr = m.perror
                 chi2 = m.fnorm
                 redchi2 = chi2/len(phaseamps)
@@ -443,22 +442,22 @@ def wavelengthCal(paramFile):
                 except:
                     ind_left = ind_red + 50
         
-                params = [blue_sigma, blue_peak, blue_amp, red_sigma, red_peak, red_amp]  # First guess at fit params
+                paramsin = [blue_sigma, blue_peak, blue_amp, red_sigma, red_peak, red_amp]  # First guess at fit params
                 errs = np.sqrt(n_inbin)                         # Poisson counts 
                 errs[np.where(errs == 0.)] = 1.
                 quiet=True
 
-                parinfo = [ {'n':0,'value':params[0],'limits':[blue_sigma/2.,blue_sigma*1.5],              'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
-                           {'n':1,'value':params[1],'limits':[blue_peak-blue_sigma, blue_peak+blue_sigma],'limited':[True,True],'fixed':False,'parname':"x offset blue",'error':0},
-                           {'n':2,'value':params[2],'limits':[blue_amp/2., blue_amp*2.],                  'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
-                           {'n':3,'value':params[3],'limits':[red_sigma/2.,red_sigma*1.5],                'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
-                           {'n':4,'value':params[4],'limits':[red_peak-red_sigma, red_peak+red_sigma],    'limited':[True,True],'fixed':False,'parname':"x offset red",'error':0},
-                           {'n':5,'value':params[5],'limits':[red_amp/2., red_amp*2.],                  'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0}]
+                parinfo = [ {'n':0,'value':paramsin[0],'limits':[blue_sigma/2.,blue_sigma*1.5],              'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
+                           {'n':1,'value':paramsin[1],'limits':[blue_peak-blue_sigma, blue_peak+blue_sigma],'limited':[True,True],'fixed':False,'parname':"x offset blue",'error':0},
+                           {'n':2,'value':paramsin[2],'limits':[blue_amp/2., blue_amp*2.],                  'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
+                           {'n':3,'value':paramsin[3],'limits':[red_sigma/2.,red_sigma*1.5],                'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
+                           {'n':4,'value':paramsin[4],'limits':[red_peak-red_sigma, red_peak+red_sigma],    'limited':[True,True],'fixed':False,'parname':"x offset red",'error':0},
+                           {'n':5,'value':paramsin[5],'limits':[red_amp/2., red_amp*2.],                  'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0}]
 
                 fa = {'x':e_fromphase[ind_left:ind_right],'y':n_inbin[ind_left:ind_right],'err':errs[ind_left:ind_right]}
                 m = mpfit.mpfit(twogaussian, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
             
-                mpp = m.params                                #The fit params
+                mpp = m.paramsin                                #The fit params
                 mpperr = m.perror
                 chi2e = m.fnorm
                 redchi2e = chi2e/len(e_fromphase[ind_right:ind_left])
