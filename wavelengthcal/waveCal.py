@@ -39,7 +39,7 @@ from fitFunctions import *
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-class WaveCalSoln(IsDescription):
+class WaveCalSoln():
     roach = tables.UInt16Col()                 # ROACH board number
     pixelnum = tables.UInt16Col()              # pixel number on the roach
     pixelrow = tables.UInt16Col()              # physical x location - from beam map
@@ -51,7 +51,7 @@ class WaveCalSoln(IsDescription):
     wave_flag = tables.UInt16Col()             # flag to indicate if pixel is good (0), dead (1) or failed
                                                #    during wave cal fitting (2)
 
-class DriftObj(IsDescription):
+class DriftObj():
     pixelrow = tables.UInt16Col()              # physical x location - from beam map
     pixelcol = tables.UInt16Col()              # physical y location 
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
