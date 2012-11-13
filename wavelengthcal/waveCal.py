@@ -137,7 +137,7 @@ def wavelengthCal(paramFile):
         except:
             pass
         try:
-            h5outdrift = tables.openFile(outdir+datedir+driftdir+outfile.split('.')[0]+'_drift.h5', mode='w')
+            h5outdrift = tables.openFile(outdir+datedir+params['driftdir']+outfile.split('.')[0]+'_drift.h5', mode='w')
         except:
             pass
         driftroot = h5outdrift.root
