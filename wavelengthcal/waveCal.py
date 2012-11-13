@@ -65,7 +65,7 @@ def failure(flagnum):
     rarray.append(0.)
 
     
-def wavelengthCal(paramFile) 
+def wavelengthCal(paramFile): 
 
 
     params = readDict.readDict(paramFile)
