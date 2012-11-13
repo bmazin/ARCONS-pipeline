@@ -30,6 +30,7 @@ import sys, os
 import time
 import tables
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pylab as plt
 import mpfit
 import smooth
@@ -157,7 +158,7 @@ def wavelengthCal(paramFile):
             pass
         
         pp = PdfPages(outdir+datedir+params['figdir']+outfile.split('.')[0]+"_fits.pdf")
-        matplotlib.rcParams['font.size'] = 4
+        mpl.rcParams['font.size'] = 4
         n_plots_per_page = 20
         plotcounter = 0
 
