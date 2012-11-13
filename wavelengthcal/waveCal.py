@@ -519,7 +519,7 @@ def wavelengthCal(paramFile):
             if (plotcounter % n_plots_per_page == 0):
                 fig6 = plt.figure(figsize=(8.25, 10), dpi=100)
 
-            print len(phasebins), len(gaussfit)
+            print len(phasebins), len(gaussfit), row['wave_flag']
             plt.subplot(5,4,plotcounter%20+1)
             plt.plot(phasebins,n_inbin, label='raw')
             titlestring = str(i)+', '+str(j)+' '+pstring
