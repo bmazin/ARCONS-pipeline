@@ -86,8 +86,7 @@ def wavelengthCal(paramFile):
     else:
         if '201209' in files2run:
             for line in file_list:
-                if line.split('/')[3] == files2run:
-                    print line.strip()
+                if files2run in line.split('cal')[0]:
                     cal_files.append(line.strip())
         else:
             for line in file_list:
