@@ -353,7 +353,7 @@ def wavelengthCal(paramFile):
                 fa = {'x':phasebins[ind_left:ind_right],'y':n_inbin[ind_left:ind_right],'err':errs[ind_left:ind_right]}
                 m = mpfit.mpfit(twogaussian, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
             
-                mpp = m.paramsin                                #The fit params
+                mpp = m.params                                #The fit params
                 mpperr = m.perror
                 chi2gauss = m.fnorm
                 redchi2gauss = chi2gauss/len(phasebins[ind_left:ind_right])
@@ -402,7 +402,7 @@ def wavelengthCal(paramFile):
                 fa = {'x':phaseamps,'y':energies,'err':errs}
                 m = mpfit.mpfit(parabola, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
             
-                mpp = m.paramsin                                #The fit params
+                mpp = m.params                                #The fit params
                 mpperr = m.perror
                 chi2 = m.fnorm
                 redchi2 = chi2/len(phaseamps)
@@ -457,7 +457,7 @@ def wavelengthCal(paramFile):
                 fa = {'x':e_fromphase[ind_left:ind_right],'y':n_inbin[ind_left:ind_right],'err':errs[ind_left:ind_right]}
                 m = mpfit.mpfit(twogaussian, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
             
-                mpp = m.paramsin                                #The fit params
+                mpp = m.params                                #The fit params
                 mpperr = m.perror
                 chi2e = m.fnorm
                 redchi2e = chi2e/len(e_fromphase[ind_right:ind_left])
