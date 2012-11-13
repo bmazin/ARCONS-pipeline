@@ -59,7 +59,7 @@ class DriftObj(IsDescription):
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
                                                #    double precision
     
-def failure(row, flagnum):
+def failure(row, rarray, flagnum):
     row['wave_flag'] = flagnum
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
@@ -186,7 +186,7 @@ def wavelengthCal(paramFile):
 
                 # flag dead pixels
                 if len(photondata)==0:
-                    failure(row, 1)
+                    failure(row, rarray, 1)
                     continue
 
                 # for each second, get the packets
@@ -226,7 +226,7 @@ def wavelengthCal(paramFile):
 
 
                 if (n_cut == len(data.getNode(pstring))):
-                    failure(1)
+                    failure(row, rarray, 1)
                     continue
 
                 timestamp = np.array(timestamp,dtype=float)
@@ -241,7 +241,7 @@ def wavelengthCal(paramFile):
                 # cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
-                    failure(1)
+                    failure(row, rarray, 1)
                     continue
 
 
@@ -257,7 +257,7 @@ def wavelengthCal(paramFile):
         
                 # Cut on low number of total counts
                 if totalcts < params['low_counts_val'] * 100.:
-                    failure(1)
+                    failure(row, rarray, 1)
                     continue
     
                 # Smooth
@@ -267,7 +267,7 @@ def wavelengthCal(paramFile):
                     parab_smooth = smooth.smooth(n_inbin, windowsize, window)
                     smoothed_data = np.array(parab_smooth, dtype=float)
                 except:
-                    failure(1)
+                    failure(row, rarray, 1)
                     continue 
 
                 # Find extreema:
