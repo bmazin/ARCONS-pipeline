@@ -295,7 +295,7 @@ def wavelengthCal(paramFile):
                 for grad in gradients[:-1]:
                     count += 1
                     
-                    if ((grad > 0) & (gradients[count] < 0) & (grad != gradients[count]) & (coarse_data[count] > low_counts_val)):
+                    if ((grad > 0) & (gradients[count] < 0) & (grad != gradients[count]) & (coarse_data[count] > params['low_counts_val'])):
                         maxima_num += 1
                         max_locations.append(coarse_x[count])
                         max_vals.append(coarse_data[count])
@@ -312,14 +312,14 @@ def wavelengthCal(paramFile):
 
                 # Case too many peaks
                 if (maxima_num < 2) | (maxima_num > 3) :
-                    failure(2)
+                    failure(row, rarray, 2)
                     continue
                 if (minima_num > 3):
-                    failure(2)
+                    failure(row, rarray, 2)
                     continue
                 # Case peak cut off
                 if (min_vals[-1] == 0.):
-                    failure(2)
+                    failure(row, rarray, 2)
                     continue
 
 
