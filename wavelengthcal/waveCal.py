@@ -327,6 +327,7 @@ def wavelengthCal(paramFile):
 
                 ind_right = np.max(np.where(phasebins < min_locations[-1]))
                 ind_left = np.min(np.where(phasebins > coarse_x[0]))
+                ind_leftg = ind_left
 
                 amplitude1 = max_vals[0]
                 amplitude2 = max_vals[1]
@@ -522,7 +523,7 @@ def wavelengthCal(paramFile):
                     plt.plot(phasebins,n_inbin, label='raw')
                     titlestring = str(i)+', '+str(j)+' '+pstring
                     plt.title(titlestring)
-                    plt.xlim(phasebins[ind_left]-50.,np.min([-50.,np.max(phasebins)]))
+                    plt.xlim(phasebins[ind_leftg]-50.,np.min([-50.,np.max(phasebins)]))
                     plt.ylim(0.,max_vals[-1]+60.)
                     plt.plot(phasebins, gaussfit, 'r', label='Gaussian fit1')
         
