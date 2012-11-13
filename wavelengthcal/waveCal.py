@@ -79,7 +79,7 @@ def wavelengthCal(paramFile):
 
     cal_files = []
 
-    file_list = open(outdir+infile)
+    file_list = open(outdir+infile, 'r')
 
     if 'cal_' in files2run:
         cal_files.append(files2run)
