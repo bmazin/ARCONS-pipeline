@@ -556,7 +556,7 @@ def wavelengthCal(paramFile):
         # Plots
 
         plotArray( xarray, yarray, rarray, colormap=mpl.cm.gnuplot2, showMe=False,
-              plotFileName=outdir+datedir+figdir+outfile.split('.')[0]+'_arrayPlot.png', plotTitle='Energy Resolution')
+              plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png', plotTitle='Energy Resolution')
 
         n_res, resbins = np.histogram(rarray, 80, range = (1,12))
         binwidth = (resbins[1]-resbins[0])/2.0
@@ -565,7 +565,7 @@ def wavelengthCal(paramFile):
         ax2=fig3.add_subplot(111)
         ax2.plot(resbins[:-1],n_res)
         plt.xlabel('Energy Resolution')
-        plt.savefig(outdir+datedir+figdir+outfile.split('.')[0]+"_R_Estimates.png")
+        plt.savefig(outdir+datedir+params['figdir']+outfile.split('.')[0]+"_R_Estimates.png")
         plt.clf()
         
 
