@@ -93,7 +93,7 @@ def wavelengthCal(paramFile):
                 cal_files.append(line)
     
 
-    for k in range(len(cal_files))
+    for k in range(len(cal_files)):
 
         print 'Starting file ', cal_files[k], ' at time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
 
