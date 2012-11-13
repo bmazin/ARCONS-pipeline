@@ -359,8 +359,9 @@ def wavelengthCal(paramFile):
                 redchi2gauss = chi2gauss/len(phasebins[ind_left:ind_right])
 
                 # cut on chi^2
-                if (redchi2gauss > params['chi2_cutoff']):
-                    failure(2)
+                chi2_cutoff = params['chi2_cutoff']
+                if (redchi2gauss > chi2_cutoff):
+                    failure(row, rarray, 2)
                     continue
         
                 for r,p in enumerate(mpp):
