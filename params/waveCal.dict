@@ -19,27 +19,19 @@ ang2m = 1.e-10
 fwhm2sig = 2.35
 
 
-## Array params - old vs. new (~Aug. 2012 sci 3 gamma) array
-isSci3gamma = True
-isSci4 = False
+## Array params - ~Aug. 2012 sci 3 gamma array
 
-if (isSci3gamma | isSci4):
-    n_rows = 46
-    n_cols = 44
-    divisor = 275
-    read_freq = 550
+n_rows = 46
+n_cols = 44
+divisor = 275
+read_freq = 550
 
-    n_bits_long = 12
-    n_bits_time = 20
+n_bits_long = 12
+n_bits_time = 20
 
-    n_bits_base = 20
-    n_bits_peak = 32
-    n_bits_parab = 44 
-else:
-    n_rows = 32
-    n_cols = 32
-    divisor = 256
-    read_freq = 512
+n_bits_base = 20
+n_bits_peak = 32
+n_bits_parab = 44 
 
 pulseMask = int(n_bits_long*'1',2)   # bitmask of 12 ones
 timeMask = int(n_bits_time*'1',2)
@@ -61,12 +53,10 @@ bin_smooth = 60.    ## window size needs to be even to work
 
 low_counts_val = 5
 chi2_cutoff = 2.7
-if isSci3gamma:
-   cr_low = 30
-   cr_high = 400
-if isSci4:
-   cr_low = 0
-   cr_high = 500
+cr_low = 30
+cr_high = 400
+#cr_low = 0          # for sci 4
+#cr_high = 500
 
 
 
