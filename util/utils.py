@@ -22,7 +22,7 @@ plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe
               plotFileName='arrayPlot.png', plotTitle='')
 printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
-parsePhotonPacket(photonPacket)
+confirm(prompt,defaultResponse=True)
 
 """
 
