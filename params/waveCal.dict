@@ -1,0 +1,64 @@
+## Files and Dirs
+
+calfileslist = 'calfile_list.txt'                                     # generated with script list_calfiles.sh/list_calfiles.py 
+#files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
+files2run = '20120918'
+#files2run = 'all'
+
+#outdir = '/ScienceData/waveCalSolnFiles/'
+outdir = '/Scratch/waveCalSolnFiles/'
+figdir = 'figs/'
+driftdir = 'drift_study/'
+
+
+## Constants
+
+#h = 6.6261e-34  # J s
+h = 4.1357e-15   # eV s    
+c = 3.e8        # m/s
+ang2m = 1.e-10
+fwhm2sig = 2.35
+
+
+## Array params - ~Aug. 2012 sci 3 gamma array
+
+n_rows = 46
+n_cols = 44
+divisor = 275
+read_freq = 550
+
+n_bits_long = 12
+n_bits_time = 20
+
+n_bits_base = 20
+n_bits_peak = 32
+n_bits_parab = 44 
+
+pulseMask = int(n_bits_long*'1',2)   # bitmask of 12 ones
+timeMask = int(n_bits_time*'1',2)
+
+
+## Laser light wavelengths
+
+bluelambda = 4009.4      # Angstroms
+redlambda  = 6560.4 
+irlambda   = 9744.9
+
+
+## Parameters for finding extreema
+
+big_step = 10        
+bin_smooth = 60.    ## window size needs to be even to work
+
+## Thresholds for cutting pixels
+
+low_counts_val = 5
+chi2_cutoff = 2.7
+cr_low = 30
+cr_high = 400
+#cr_low = 0          # for sci 4
+#cr_high = 500
+
+
+
+
