@@ -185,7 +185,7 @@ def wavelengthCal(paramFile):
                 # flag dead pixels
                 if len(photondata)==0:
                     failure(row, rarray, 1)
-                    continue
+                    #continue
 
                 # for each second, get the packets
                 timeinsec = []
@@ -225,7 +225,7 @@ def wavelengthCal(paramFile):
 
                 if (n_cut == len(data.getNode(pstring))):
                     failure(row, rarray, 1)
-                    continue
+                    #continue
 
                 timestamp = np.array(timestamp,dtype=float)
                 parab_phase = np.array(parab_phase, dtype=float)
@@ -240,7 +240,7 @@ def wavelengthCal(paramFile):
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
                     failure(row, rarray, 1)
-                    continue
+                    #continue
 
 
                 ## Histogram of the phase amplitudes for each photon for pixel i,j.  0 phase sits at 0 degrees, and a
@@ -256,7 +256,7 @@ def wavelengthCal(paramFile):
                 # Cut on low number of total counts
                 if totalcts < params['low_counts_val'] * 100.:
                     failure(row, rarray, 1)
-                    continue
+                    #continue
     
                 # Smooth
                 window = 'hanning'
@@ -266,7 +266,7 @@ def wavelengthCal(paramFile):
                     smoothed_data = np.array(parab_smooth, dtype=float)
                 except:
                     failure(row, rarray, 1)
-                    continue 
+                    #continue 
 
                 # Find extreema:
                 coarse_data_len = np.floor(len(smoothed_data)/params['big_step'])
@@ -277,7 +277,12 @@ def wavelengthCal(paramFile):
                     coarse_data[l] = smoothed_data[l*params['big_step']]
                     coarse_x[l] = np.array(phasebins)[l*params['big_step']]
 
-                start_ind = (coarse_data > 2.).nonzero()[0][0]
+                try:
+                    start_ind = (coarse_data > 2.).nonzero()[0][0]
+                except:
+                    failure(row, rarray, 1)
+                    #continue
+                    
                 coarse_data = coarse_data[start_ind:]
                 coarse_x = coarse_x[start_ind:]
         
@@ -311,14 +316,14 @@ def wavelengthCal(paramFile):
                 # Case too many peaks
                 if (maxima_num < 2) | (maxima_num > 3) :
                     failure(row, rarray, 2)
-                    continue
+                    #continue
                 if (minima_num > 3):
                     failure(row, rarray, 2)
-                    continue
+                    #continue
                 # Case peak cut off
                 if (min_vals[-1] == 0.):
                     failure(row, rarray, 2)
-                    continue
+                    #continue
 
 
                 # Find peaks: Tries fitting 2 Gaussians
@@ -360,7 +365,7 @@ def wavelengthCal(paramFile):
                 # cut on chi^2
                 if (redchi2gauss > params['chi2_cutoff']):
                     failure(row, rarray, 2)
-                    continue
+                    #continue
         
                 for r,p in enumerate(mpp):
                     parinfo[r]['value'] = p
@@ -374,7 +379,7 @@ def wavelengthCal(paramFile):
                 # Blobby, got through but cutting now...
                 if (np.abs(x_offset2 - min_locations[-1]) < sigma2) | (np.abs(x_offset1 - x_offset2) < 2 * sigma2) | (x_offset2 > min_locations[-1]):
                     failure(row, rarray, 2)
-                    continue
+                    #continue
 
                 gaussfit = amplitude1 * np.exp( -(pow((phasebins-x_offset1),2) / (2. * pow(sigma1,2)))) + amplitude2 * np.exp( -(pow((phasebins-x_offset2),2) / (2. * pow(sigma2,2)))) 
 
@@ -532,7 +537,7 @@ def wavelengthCal(paramFile):
 
                 else:
                     failure(row, rarray, 2)
-                    continue
+                    #continue
 
 
                 # insert row; writes to the table I/O buffer
