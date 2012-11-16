@@ -2,7 +2,7 @@
 
 calfileslist = 'calfile_list.txt'                                      # generated with script list_calfiles.sh/list_calfiles.py 
 #files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
-files2run = '20120913'                                                 # 5th, 12-19th
+files2run = '20120916'                                                 # 5th, 12-19th
 #files2run = 'all'
 
 #outdir = '/ScienceData/waveCalSolnFiles/'
