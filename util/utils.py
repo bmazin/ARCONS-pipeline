@@ -15,6 +15,7 @@ from scipy.signal import convolve
 Modules:
 
 bin12_9ToRad(binOffset12_9)
+confirm(prompt,defaultResponse=True)
 convertDegToHex(ra, dec)
 convertHexToDeg(ra, dec)
 linearFit(x, y, err=None)
@@ -22,7 +23,6 @@ plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe
               plotFileName='arrayPlot.png', plotTitle='')
 printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
-confirm(prompt,defaultResponse=True)
 
 """
 
@@ -36,6 +36,37 @@ def bin12_9ToRad(binOffset12_9):
    return x
 
 
+def confirm(prompt,defaultResponse = True):
+    """
+    Displays a prompt, accepts a yes or no answer, and returns a boolean
+    defaultResponse is the response returned if no response is given
+    if an ill-formed response is given, the prompt is given again
+    """
+    if defaultResponse == True:
+        optionsString = '[y]|n'
+    else:
+        optionsString = 'y|[n]'
+    goodResponse = False
+    while goodResponse == False:
+        try:
+            responseString = raw_input('%s %s: '%(prompt,optionsString))
+            if responseString in ['y','Y','yes','Yes','YES']:
+                response = True
+                goodResponse = True
+            elif responseString in ['n','N','no','No','NO']:
+                response = False
+                goodResponse = True
+            elif responseString == '':
+                response = defaultResponse
+                goodResponse = True
+            else:
+                goodResponse = False
+        except:
+            goodResponse = False
+        if goodResponse == False:
+            print 'Unrecognized response. Try again.'
+    return response
+ 
 def convertDegToHex(ra, dec):
    """
    Convert RA, Dec in decimal degrees to (hh:mm:ss, dd:mm:ss)
@@ -210,34 +241,3 @@ def printObsFileDescriptions( dir_path ):
        print target
     f.close()
     
-def confirm(prompt,defaultResponse = True):
-    """
-    Displays a prompt, accepts a yes or no answer, and returns a boolean
-    defaultResponse is the response returned if no response is given
-    if an ill-formed response is given, the prompt is given again
-    """
-    if defaultResponse == True:
-        optionsString = '[y]|n'
-    else:
-        optionsString = 'y|[n]'
-    goodResponse = False
-    while goodResponse == False:
-        try:
-            responseString = raw_input('%s %s: '%(prompt,optionsString))
-            if responseString in ['y','Y','yes','Yes','YES']:
-                response = True
-                goodResponse = True
-            elif responseString in ['n','N','no','No','NO']:
-                response = False
-                goodResponse = True
-            elif responseString == '':
-                response = defaultResponse
-                goodResponse = True
-            else:
-                goodResponse = False
-        except:
-            goodResponse = False
-        if goodResponse == False:
-            print 'Unrecognized response. Try again.'
-    return response
- 
