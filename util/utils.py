@@ -7,6 +7,7 @@ import pylab
 import glob
 import matplotlib as mpl
 import matplotlib.pylab as plt
+import binascii
 from scipy.signal import convolve
 
 
@@ -21,6 +22,7 @@ plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe
               plotFileName='arrayPlot.png', plotTitle='')
 printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
+confirm(prompt,defaultResponse=True)
 
 """
 
@@ -207,9 +209,35 @@ def printObsFileDescriptions( dir_path ):
        target = f.root.header.header.col('target')[0]
        print target
     f.close()
-
-
-
-   
-
+    
+def confirm(prompt,defaultResponse = True):
+    """
+    Displays a prompt, accepts a yes or no answer, and returns a boolean
+    defaultResponse is the response returned if no response is given
+    if an ill-formed response is given, the prompt is given again
+    """
+    if defaultResponse == True:
+        optionsString = '[y]|n'
+    else:
+        optionsString = 'y|[n]'
+    goodResponse = False
+    while goodResponse == False:
+        try:
+            responseString = raw_input('%s %s: '%(prompt,optionsString))
+            if responseString in ['y','Y','yes','Yes','YES']:
+                response = True
+                goodResponse = True
+            elif responseString in ['n','N','no','No','NO']:
+                response = False
+                goodResponse = True
+            elif responseString == '':
+                response = defaultResponse
+                goodResponse = True
+            else:
+                goodResponse = False
+        except:
+            goodResponse = False
+        if goodResponse == False:
+            print 'Unrecognized response. Try again.'
+    return response
  
