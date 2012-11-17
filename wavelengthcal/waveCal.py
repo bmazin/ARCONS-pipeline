@@ -64,6 +64,7 @@ def failure(row, rarray, flagnum):
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
     row['solnrange'] = np.array([-1.,-1.])
+    row.append()
     rarray.append(0.)
 
     
@@ -277,7 +278,12 @@ def wavelengthCal(paramFile):
                     coarse_data[l] = smoothed_data[l*params['big_step']]
                     coarse_x[l] = np.array(phasebins)[l*params['big_step']]
 
-                start_ind = (coarse_data > 2.).nonzero()[0][0]
+                try:
+                    start_ind = (coarse_data > 2.).nonzero()[0][0]
+                except:
+                    failure(row, rarray, 1)
+                    continue
+                    
                 coarse_data = coarse_data[start_ind:]
                 coarse_x = coarse_x[start_ind:]
         
@@ -423,7 +429,11 @@ def wavelengthCal(paramFile):
                 blue_peak = amp * (pow((x_offset1 - x_off), 2 )) + y_off
                 red_peak = amp * (pow((x_offset2 - x_off), 2 )) + y_off
 
-                ind_blue = (np.where(e_fromphase < blue_peak))[0][0]
+                try:
+                    ind_blue = (np.where(e_fromphase < blue_peak))[0][0]
+                except:
+                    failure(row, rarray, 2)
+                    continue
                 ind_red = (np.where(e_fromphase < red_peak))[0][0]
 
                 blue_amp = np.mean(n_inbin[ind_blue-10:ind_blue+10])
