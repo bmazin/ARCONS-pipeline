@@ -4,7 +4,7 @@ import sys,os
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
-from util.confirm import confirm
+from util.utils import confirm
 from util.loadRawFile import ObsFile
 from util import utils
 from headers import ArconsHeaders
@@ -23,7 +23,7 @@ def applyWvlCal(obsFileName,photonListFileName,wvlCalFileName):
         for iCol in xrange(obsFile.nCol):
             for iSec,sec in enumerate(obsFile.getPixel(iRow,iCol)):
                 for photonPacket in sec:
-                    timestamp,parabolaPeak,baseline = utils.parsePhotonPacket(photonPacket)
+                    timestamp,parabolaPeak,baseline = obsFile.parsePhotonPacket(photonPacket)
                     pulseHeight = parabolaPeak - baseline
                     xOffset = wvlCalTable[iRow,iCol,0]
                     amplitude = wvlCalTable[iRow,iCol,2]
@@ -54,7 +54,8 @@ def createPhotonListFile(photonListFileName):
     return plTable
 
 def loadWvlCalFile(wvlCalFileName,nRow,nCol):
-    scratchDir = os.getenv('INTERM_PATH','/')
+    #scratchDir = os.getenv('INTERM_PATH','/')
+    scratchDir = '/ScienceData/waveCalSolnFiles/'
     fullWvlCalFileName = os.path.join(scratchDir,wvlCalFileName)
     if (not os.path.exists(fullWvlCalFileName)):
         print 'wavelength cal file does not exist: ',fullWvlCalFileName
