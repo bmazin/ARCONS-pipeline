@@ -88,19 +88,20 @@ class ObsFile:
         timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
         pulseHeights = np.array(parabolaPeaks,dtype='double') - np.array(baselines,dtype='double')
         wavelengths = self.convertToWvl(pulseHeights,iRow,iCol)
-        if weighted == False:
-            return wavelengths
-        else:
-            if len(wavelengths) > 0:
-                binIndices = np.digitize(wavelengths,self.flatCalWvlBins[0:-1])
-                #Mark photons with wavelengths below first bin and last bin with index 0, which becomes index -1 (below first bin already at 0)
-                binIndices[binIndices >= self.nFlatCalWvlBins] = 0
-                binIndices -= 1 #adjust so that indices match the lower edge of the wavelength bins
-                pixelFlatWeights = self.flatWeights[iRow,iCol,binIndices]
-                pixelFlatWeights[binIndices == -1] = 0.0
-            else:
-                pixelFlatWeights = np.array([])
-            return wavelengths,pixelFlatWeights
+        return wavelengths
+#        if weighted == False:
+#            return wavelengths
+#        else:
+#            if len(wavelengths) > 0:
+#                binIndices = np.digitize(wavelengths,self.flatCalWvlBins[0:-1])
+#                #Mark photons with wavelengths below first bin and last bin with index 0, which becomes index -1 (below first bin already at 0)
+#                binIndices[binIndices >= self.nFlatCalWvlBins] = 0
+#                binIndices -= 1 #adjust so that indices match the lower edge of the wavelength bins
+#                pixelFlatWeights = self.flatWeights[iRow,iCol,binIndices]
+#                pixelFlatWeights[binIndices == -1] = 0.0
+#            else:
+#                pixelFlatWeights = np.array([])
+#            return wavelengths,pixelFlatWeights
             
 
     def getPixelCount(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted=False):
@@ -108,8 +109,8 @@ class ObsFile:
         if weighted == False:
             return len(packetList)
         else:
-            wavelengths,weights = self.getPixelWvlList(iRow,iCol,firstSec,integrationTime,weighted=True)
-            return sum(weights)
+            weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True)
+            return sum(weightedSpectrum)
 
 
     def getPixelPacketList(self,iRow,iCol,firstSec=0,integrationTime=-1):
@@ -121,7 +122,7 @@ class ObsFile:
         packetList = np.concatenate(pixelData)
         return packetList
 
-    def displaySec(self,pixelRow,pixelCol,firstSec=0,integrationTime=1,weighted=False):
+    def displaySec(self,firstSec=0,integrationTime=1,weighted=False):
         secImg = np.zeros((self.nRow,self.nCol))
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
@@ -130,28 +131,28 @@ class ObsFile:
         plt.colorbar()
         plt.show()
 
-    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False):
-        if weighted == False:
-            wvlList = self.getPixelWvlList(pixelRow,pixelCol,firstSec,integrationTime)
-            spectrum,binEdges = np.histogram(wvlList,bins=self.nFlatCalWvlBins,range=(self.flatCalWvlBins[0],self.flatCalWvlBins[-1]))
-        else:
-            wvlList,weights = self.getPixelWvlList(pixelRow,pixelCol,firstSec,integrationTime,weighted=True)
-            spectrum,binEdges = np.histogram(wvlList,bins=self.nFlatCalWvlBins,range=(self.flatCalWvlBins[0],self.flatCalWvlBins[-1]),weights=weights)
-        return spectrum
+    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=100):
+        wvlList = self.getPixelWvlList(pixelRow,pixelCol,firstSec,integrationTime)
+        nWvlBins = int((wvlStop - wvlStart)/wvlBinWidth)
+        spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
+        if weighted == True:
+            spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
+        return spectrum,wvlBinEdges
 
     def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False):
-        spectrum = self.getPixelSpectrum(pixelRow,pixelCol,firstSec,integrationTime,weighted=weighted)
+        spectrum,binEdges = self.getPixelSpectrum(pixelRow,pixelCol,firstSec,integrationTime,weighted=weighted)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.plot(self.flatCalWvlBins[0:-1],spectrum,label='spectrum for pixel[%d][%d]'%(pixelRow,pixelCol))
         plt.show()
 
-    def convertToWvl(self,pulseHeights,iRow,iCol):
+    def convertToWvl(self,pulseHeights,iRow,iCol,excludeBad = True):
         xOffset = self.wvlCalTable[iRow,iCol,0]
         yOffset = self.wvlCalTable[iRow,iCol,1]
         amplitude = self.wvlCalTable[iRow,iCol,2]
         energies = amplitude*(pulseHeights-xOffset)**2+yOffset
-        energies = energies[energies != 0]
+        if excludeBad == True:
+            energies = energies[energies != 0]
         wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
         return wavelengths
 
@@ -178,41 +179,44 @@ class ObsFile:
         return timestamps,parabolaFitPeaks,baselines
 
 
-#    def createPhotonList(self,photonListFileName,wvlCalFileName):
-#        h = 4.135668e-15 #eV s
-#        c = 2.998e8 #m/s
-#        angstromPerMeter = 1e10
-#        tickDuration = 1e-6 # s 
-#
-#        wvlCalTable = self.loadWvlCalFile(wvlCalFileName)
-#        plTable = self.createPhotonListFile(photonListFileName)
-#
-#        for iRow in xrange(self.nRow):
-#            for iCol in xrange(self.nCol):
-#                for iSec,sec in enumerate(self.getPixel(iRow,iCol)):
-#                    for photonPacket in sec:
-#                        timestamp,parabolaPeak,baseline = self.parsePhotonPacket(photonPacket)
-#                        pulseHeight = parabolaPeak - baseline
-#                        xOffset = wvlCalTable[iRow,iCol,0]
-#                        amplitude = wvlCalTable[iRow,iCol,2]
-#                        yOffset = wvlCalTable[iRow,iCol,1]
-#                        energy = amplitude*(pulseHeight-xOffset)**2+yOffset
-#                        wavelength = h*c*angstromPerMeter/energy
-#                        print wavelength 
-#                        if wavelength > 0 and wavelength != np.inf:
-#                            newRow = plTable.row
-#                            newRow['Xpix'] = iCol
-#                            newRow['Ypix'] = iRow
-#                            newRow['ArrivalTime'] = iSec+timestamp*tickDuration
-#                            newRow['Wavelength'] = wavelength
-#                            newRow.append()
-#        plTable.flush()
+    def createPhotonList(self,photonListFileName):
+        tickDuration = 1e-6 # s 
+        plTable = self.createEmptyPhotonListFile(photonListFileName)
 
-    def createPhotonListFile(self,photonListFileName):
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                flag = self.wvlFlagTable[iRow,iCol]
+                if flag == 0:
+                    print iRow,iCol
+                    wvlError = self.wvlErrorTable[iRow,iCol]
+                    flatWeights = self.flatWeights[iRow,iCol]
+                    for iSec,secData in enumerate(self.getPixel(iRow,iCol)):
+                        timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(secData)
+                        pulseHeights = np.array(parabolaPeaks,dtype='double') - np.array(baselines,dtype='double')
+                        timestamps = iSec + tickDuration*timestamps
+                        wavelengths = self.convertToWvl(pulseHeights,iRow,iCol,excludeBad=False)
+                        if len(wavelengths) > 0:
+                            binIndices = np.digitize(wavelengths,self.flatCalWvlBins[0:-1])
+                        else:
+                            binIndices = np.array([])
+                        for iPhoton in xrange(len(timestamps)):
+                            if wavelengths[iPhoton] > 0 and wavelengths[iPhoton] != np.inf and binIndices[iPhoton] < len(flatWeights):
+                                newRow = plTable.row
+                                newRow['Xpix'] = iCol
+                                newRow['Ypix'] = iRow
+                                newRow['ArrivalTime'] = timestamps[iPhoton]
+                                newRow['Wavelength'] = wavelengths[iPhoton]
+                                newRow['WaveError'] = wvlError
+                                newRow['Flag'] = flag
+                                newRow['FlatWeight'] = flatWeights[binIndices[iPhoton]]
+                                newRow.append()
+        plTable.flush()
+
+    def createEmptyPhotonListFile(self,photonListFileName):
         scratchDir = os.getenv('INTERM_PATH','/')
         fullPhotonListFileName = os.path.join(scratchDir,photonListFileName)
         if (os.path.exists(fullPhotonListFileName)):
-            if confirm('Photon list file  %s exists. Overwrite?'%fullPhotonListFileName,resp=False) == False:
+            if confirm('Photon list file  %s exists. Overwrite?'%fullPhotonListFileName,defaultResponse=False) == False:
                 exit(0)
         zlibFilter = tables.Filters(complevel=1,complib='zlib',fletcher32=False)
         plFile = tables.openFile(fullPhotonListFileName,mode='w')
@@ -230,11 +234,14 @@ class ObsFile:
         self.wvlCalFile = tables.openFile(fullWvlCalFileName,mode='r')
         wvlCalData = self.wvlCalFile.root.wavecal.calsoln
         self.wvlCalTable = np.zeros([self.nRow,self.nCol,ObsFile.nCalCoeffs])
+        self.wvlErrorTable = np.zeros([self.nRow,self.nCol])
+        self.wvlFlagTable = np.zeros([self.nRow,self.nCol])
         for calPixel in wvlCalData:
+            self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
+            self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
             if calPixel['wave_flag'] == 0:
                 self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
         print 'Loaded Wave Cal file'
-        return self.wvlCalTable
 
         
     def loadFlatCalFile(self,flatCalFileName):
