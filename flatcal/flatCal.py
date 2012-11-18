@@ -40,7 +40,6 @@ class FlatCal:
         self.flatFile = ObsFile(flatFileName)
         self.nRow = self.flatFile.nRow
         self.nCol = self.flatFile.nCol
-
         
     def loadFlatSpectra(self):
         scratchDir = os.getenv('INTERM_PATH','.')
@@ -49,21 +48,15 @@ class FlatCal:
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 print iRow,iCol,
-                wvlList = self.flatFile.getPixelWvlList(iRow,iCol)
-                self.spectra[iRow][iCol],self.wvlBinEdges = np.histogram(wvlList,bins=self.nWvlBins,range=(self.wvlStart,self.wvlStop))
-                print len(wvlList)
+                count = self.flatFile.getPixelCount(iRow,iCol)
+                print count
+                #wvlList = self.flatFile.getPixelWvlList(iRow,iCol)
+                #self.spectra[iRow][iCol],self.wvlBinEdges = np.histogram(wvlList,bins=self.nWvlBins,range=(self.wvlStart,self.wvlStop))
+                self.spectra[iRow][iCol],self.wvlBinEdges = self.flatFile.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
         self.spectra = np.array(self.spectra)
         np.save(os.path.join(flatDir,'flatSpectra.npy'),self.spectra)
         self.calculateMedians()
         return self.spectra
-
-#    def applyWvlCal(self,row,col,pulseHeights):
-#        wavelengths = np.array(self.calTable[row][col][0]*pulseHeights + self.calTable[row][col][1],dtype=np.uint32)
-#        return wavelengths
-
-        
-    def loadSpectraFile(self):
-        self.spectra = np.load('/ScienceData/intermediate/flatSpectra.npy')
 
 
     def calculateMedians(self):
@@ -101,109 +94,3 @@ class FlatCal:
         bintable = tables.Array(calgroup,'wavelengthBins',object=self.wvlBinEdges,title='Wavelength bin edges corresponding to third dimension of weights array')
         flatCalFile.flush()
         flatCalFile.close()
-
-        
-    def loadFactors(self):
-        self.flatFactors = np.load('/ScienceData/intermediate/factors.npy')
-        #plt.matshow(self.flatFactors[:,:,4000])
-        #plt.colorbar()
-        #plt.title('weights at pulseh=4000')
-        #plt.show()
-
-        
-    def plotMedian(self):
-        fig = plt.figure()
-        ax=fig.add_subplot(111)
-        ax.plot(range(self.wvlBinWidth),self.wvlMedians,label='median spectrum')
-        plt.xlim([3750,self.wvlBinWidth])
-        plt.legend(loc=2)
-        plt.show()
-
-    def plotPixelSpectra(self,pixelR,pixelC):
-        fig = plt.figure()
-        ax=fig.add_subplot(111)
-        ax.plot(range(self.wvlBinWidth),self.wvlMedians,'r-',label='median spectrum')
-        ax.plot(np.arange(self.wvlBinWidth),self.spectra[pixelR,pixelC,:],label='pixel spectrum')
-        plt.xlim([3750,self.wvlBinWidth])
-        plt.legend(loc=2)
-        plt.show()
-        fig = plt.figure()
-        ax=fig.add_subplot(111)
-        ax.plot(range(self.wvlBinWidth),self.wvlMedians,'r-',label='median spectrum')
-        ax.plot(np.arange(self.wvlBinWidth),self.pixelCalSpectra,label='cal pixel spectrum')
-        plt.xlim([3750,self.wvlBinWidth])
-        plt.legend(loc=2)
-        plt.show()
-
-    def plotPixelFactors(self,pixelR,pixelC):
-        fig = plt.figure()
-        ax=fig.add_subplot(111)
-        ax.plot(self.wvlBinEdges[0:self.nWvlBins],self.wvlMedians,'r-',label='median spectrum')
-        ax.plot(self.wvlBinEdges[0:self.nWvlBins],self.spectra[pixelR,pixelC,:],label='pixel spectrum')
-        ax.plot(self.wvlBinEdges[0:self.nWvlBins],self.flatFactors[pixelR,pixelC,:],label='pixel weights')
-        plt.legend(loc=1)
-        plt.show()
-        
-    def displaySec(self,displaySec=0,pixelR=30,pixelC=30):
-        secImg = np.zeros((self.nRow,self.nCol))
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                secImg[iRow,iCol] = self.obsFile.getPixelRawCount(iRow,iCol,displaySec,integrationTime=1)
-        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
-        plt.colorbar()
-        plt.show()
-
-    def displayCalibratedSec(self,displaySec=0,pixelR=30,pixelC=30):
-        pulseMask = int(12*'1',2) #bitmask of 12 ones
-        nBitsAfterEnergy = 44
-        nBitsAfterBaseline = 20
-        secImg = np.zeros((self.nRow,self.nCol),dtype='float')
-        self.pixelCalSpectra = np.zeros(self.wvlBinWidth)
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                pixel = self.obsBeamImage[iRow][iCol]
-                secs = self.obsFile.getNode('/'+pixel)
-                for sec in secs:
-                    for packet in sec:
-                        packet = int(packet) #64 bit photon packet
-                        #extract parabolaFitPeak as energy
-                        parabolaFitPeak = (packet >> nBitsAfterEnergy) & pulseMask
-                        baseline = (packet >> nBitsAfterBaseline) & pulseMask
-                        pulseAmplitude = parabolaFitPeak-baseline
-                        if pulseAmplitude > 0:
-                            wavelength = self.applyWvlCal(row,col,pulseAmplitude)
-                            flatFactor = self.flatFactors[iRow,iCol,wavelength]
-                            secImg[iRow,iCol]+=flatFactor
-                            if (iRow == pixelR and iCol == pixelC):
-                                self.pixelCalSpectra[wavelength]+=flatFactor
-                        
-        print secImg[pixelR,pixelC]
-        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
-        plt.colorbar()
-        plt.show()
-
-
-def main():
-    np.set_printoptions(threshold=np.nan)
-    cal = FlatCal('obs_20120919-131142.h5','calsol_20120917-072537.h5','flatsol_20120919-131142.h5')
-    #cal = FlatCal()
-    #cal.loadObsFile('obs_20120919-131346.h5')
-    #cal.loadObsFile('obs_20120919-131142.h5')
-    #cal.loadSpectraFile()
-    ob = ObsFile('obs_20120919-131346.h5')
-    ob.loadWvlCalFile('calsol_20120917-072537.h5')
-    ob.loadFlatCalFile('flatsol_20120919-131142.h5')
-    cal.plotPixelFactors(17,12)
-    ob.displaySec(17,12,integrationTime=-1)
-    ob.displaySec(17,12,weighted=True,integrationTime=-1)
-    ob.plotPixelSpectra(17,12)
-    ob.plotPixelSpectra(17,12,weighted=True)
-    #cal.displayCalibratedSec(pixelR=12,pixelC=35)
-    #cal.plotPixelSpectra(12,35)
-
-
-if __name__ == '__main__':
-    main()
-
-
-
