@@ -6,11 +6,14 @@ import numpy as np
 def main():
     np.set_printoptions(threshold=np.nan)
     #obs_20120919-131142.h5,obs_20120919-131346.h5
+    #create a cal file from a twilight flat
     cal = FlatCal('obs_20120919-131346.h5','calsol_20120917-072537.h5','flatsol_20120919-131142.h5')
+    #open another twilight flat as an observation and apply a wavelength cal and the new flat cal
     ob = ObsFile('obs_20120919-131142.h5')
     ob.loadWvlCalFile('calsol_20120917-072537.h5')
     ob.loadFlatCalFile('flatsol_20120919-131142.h5')
 
+    #plot some uncalibrated and calibrated spectra for one pixel
     fig = plt.figure()
     ax = fig.add_subplot(211)
     ax2 = fig.add_subplot(212)
@@ -32,6 +35,8 @@ def main():
 
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3),fancybox=True,ncol=3)
     plt.show()
+
+    #display a time-flattened image of the twilight flat as it is and after using itself as it's flat cal
     cal.flatFile.loadFlatCalFile('flatsol_20120919-131142.h5')
     cal.flatFile.displaySec(weighted=True,integrationTime=-1)
     ob.displaySec(integrationTime=-1)
