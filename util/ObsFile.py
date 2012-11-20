@@ -251,10 +251,10 @@ class ObsFile:
         plTable.flush()
 
     def createEmptyPhotonListFile(self,photonListFileName):
-    """
-    creates a file at $INTERM_PATH/photonLists/photonListFileName
-    using header in headers.ArconsHeaders
-    """
+        """
+        creates a file at $INTERM_PATH/photonLists/photonListFileName
+        using header in headers.ArconsHeaders
+        """
         scratchDir = os.getenv('INTERM_PATH','/')
         plDir = os.path.join(scratchDir,'photonLists')
         fullPhotonListFileName = os.path.join(scratchDir,photonListFileName)
@@ -268,9 +268,9 @@ class ObsFile:
         return plTable
 
     def loadWvlCalFile(self,wvlCalFileName):
-    """
-    loads the wavelength cal coefficients from a given file
-    """
+        """
+        loads the wavelength cal coefficients from a given file
+        """
         scratchDir = '/ScienceData'
         wvlDir = os.path.join(scratchDir,'waveCalSolnFiles')
         fullWvlCalFileName = os.path.join(wvlDir,wvlCalFileName)
@@ -290,9 +290,9 @@ class ObsFile:
 
         
     def loadFlatCalFile(self,flatCalFileName):
-    """
-    loads the flat cal factors from the given file
-    """
+        """
+        loads the flat cal factors from the given file
+        """
         scratchDir = os.getenv('INTERM_PATH','/')
         flatCalPath = os.path.join(scratchDir,'flatCalSolnFiles')
         fullFlatCalFileName = os.path.join(flatCalPath,flatCalFileName)
