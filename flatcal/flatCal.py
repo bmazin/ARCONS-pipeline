@@ -44,7 +44,6 @@ class FlatCal:
         self.nCol = self.flatFile.nCol
         
     def loadFlatSpectra(self):
-        flatDir = os.path.join(scratchDir,'flatCalSolnFiles')
         self.spectra = [[[] for i in xrange(self.nCol)] for j in xrange(self.nRow)]
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
