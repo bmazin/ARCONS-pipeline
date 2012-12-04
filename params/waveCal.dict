@@ -2,7 +2,8 @@
 
 calfileslist = 'calfile_list.txt'                                      # generated with script list_calfiles.sh/list_calfiles.py 
 #files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
-files2run = '20120918'                                                 # 5th, 12-19th
+files2run = '/Scratch/newArrayData/cal_20121128-064859.h5'
+#files2run = '20120918'                                                 # 5th, 12-19th
 #files2run = 'all'
 
 #outdir = '/ScienceData/waveCalSolnFiles/'
@@ -24,6 +25,7 @@ fwhm2sig = 2.35
 
 n_rows = 46
 n_cols = 44
+n_roaches = 8
 divisor = 275
 read_freq = 550
 
@@ -44,6 +46,8 @@ bluelambda = 4009.4      # Angstroms
 redlambda  = 6560.4 
 irlambda   = 9744.9
 
+n_lasers = 3
+
 
 ## Parameters for finding extreema
 
@@ -54,10 +58,10 @@ bin_smooth = 60.    ## window size needs to be even to work
 
 low_counts_val = 5
 chi2_cutoff = 2.7
-cr_low = 30
-cr_high = 400
-#cr_low = 0          # for sci 4
-#cr_high = 500
+#cr_low = 30
+#cr_high = 400
+cr_low = 0          # for sci 4
+cr_high = 150
 
 
 
