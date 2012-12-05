@@ -184,7 +184,7 @@ def wavelengthCal(paramFile):
 
     file_list = open(outdir+infile, 'r')
 
-    if 'cal_' in files2run:
+    if (('cal_' in files2run) | ('obs_' in files2run)):
         cal_files.append(files2run)
     else:
         if '201209' in files2run:
@@ -272,7 +272,6 @@ def wavelengthCal(paramFile):
 
                 pstring = beammap[i][j]
                 pixelNode = pstring.split('t')[0]
-                print pstring, pixelNode
     
                 xarray.append(j)
                 yarray.append(i)
