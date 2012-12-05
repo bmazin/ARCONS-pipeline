@@ -453,7 +453,7 @@ def wavelengthCal(paramFile):
 
                 n_in_fit = 0
                 # If 3, pass in max_vals, max_locs, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right] -> fitThree(), return params
-                if ((maxima_num == n_lasers) & (len(max_locations) == n_lasers)):
+                if ((maxima_num == params['n_lasers']) & (len(max_locations) == params['n_lasers'])):
                     n_in_fit = n_lasers
                     gparams, redchi2gauss = fitThree(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right]) 
                     sigma1 = gparams[0]
