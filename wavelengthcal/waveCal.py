@@ -272,6 +272,7 @@ def wavelengthCal(paramFile):
 
                 pstring = beammap[i][j]
                 pixelNode = pstring.split('t')[0]
+                print pstring, pixelNode
     
                 xarray.append(j)
                 yarray.append(i)
