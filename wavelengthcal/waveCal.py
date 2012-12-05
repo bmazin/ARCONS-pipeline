@@ -218,7 +218,11 @@ def wavelengthCal(paramFile):
         roacharr = []
 
         # Open outfile to write parameters to
-        outfile = 'calsol' + cal_files[k].split('cal')[1]
+        try:
+            outfile = 'calsol' + cal_files[k].split('cal')[1]
+        except:
+            outfile = 'calsol' + cal_files[k].split('obs')[1]
+            
         try:
             h5out = tables.openFile(outdir+datedir+outfile, mode='w')
         except:
