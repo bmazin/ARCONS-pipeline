@@ -568,7 +568,7 @@ def wavelengthCal(paramFile):
                 except:
                     ind_right = 0
                 
-                if (n_in_fit == n_lasers):
+                if (n_in_fit == params['n_lasers']):
                     ir_peak = amp * (pow((x_offset3 - x_off), 2 )) + y_off
                     ind_ir = (np.where(e_fromphase < ir_peak))[0][0]
                     ir_amp = np.mean(n_inbin[ind_ir-10:ind_ir+10])
