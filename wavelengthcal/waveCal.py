@@ -77,8 +77,8 @@ def fitTwo(peaks, peak_locations, xarr, yarr):
     x_offset2 = peak_locations[1]
 
     fwhm = 100.                                   # Could do better...
-    sigma1 = fwhm/fwhm2sig
-    sigma2 = fwhm/fwhm2sig
+    sigma1 = fwhm/params['fwhm2sig']
+    sigma2 = fwhm/params['fwhm2sig']
         
     params2=[sigma1, x_offset1, amplitude1, sigma2, x_offset2, amplitude2]  # First guess at fit params
     errs = np.sqrt(yarr)                         # Poisson counts 
@@ -126,9 +126,9 @@ def fitThree(peaks, peak_locations, xarr, yarr):
     x_offset3 = peak_locations[2]
 
     fwhm = 100.                                   
-    sigma1 = fwhm/fwhm2sig
-    sigma2 = fwhm/fwhm2sig
-    sigma3 = fwhm/fwhm2sig
+    sigma1 = fwhm/params['fwhm2sig']
+    sigma2 = fwhm/params['fwhm2sig']
+    sigma3 = fwhm/params['fwhm2sig']
         
     params3=[sigma1, x_offset1, amplitude1, sigma2, x_offset2, amplitude2, sigma3, x_offset3, amplitude3]  
     errs = np.sqrt(yarr)                         
