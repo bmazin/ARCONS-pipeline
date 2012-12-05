@@ -488,7 +488,7 @@ def wavelengthCal(paramFile):
 
                 ## Now fit parabola to get wavelength <-> phase amplitude correspondance
 
-                if (n_in_fit == n_lasers):
+                if (n_in_fit == params['n_lasers']):
                     wavelengths = [params['bluelambda'],params['redlambda'], params['irlambda']]
                     phaseamps = [x_offset1, x_offset2, x_offset3]
                 else:
