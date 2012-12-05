@@ -477,7 +477,7 @@ def wavelengthCal(paramFile):
                     x_offset2 = gparams[4]
                     amplitude2 = gparams[5]
             
-                if (n_in_fit == n_lasers-1):
+                if (n_in_fit == params['n_lasers']-1):
                     gaussfit = amplitude1 * np.exp( -(pow((phasebins-x_offset1),2) / (2. * pow(sigma1,2)))) + \
                                amplitude2 * np.exp( -(pow((phasebins-x_offset2),2) / (2. * pow(sigma2,2)))) 
                 else:
