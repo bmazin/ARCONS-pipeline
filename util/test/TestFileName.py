@@ -16,32 +16,35 @@ class TestFileName(unittest.TestCase):
         intermDir = os.getenv('INTERM_DIR', default="/Scratch")
         run = 'LICK2012'
         date = '20120919'
-        fn = FileName.FileName(run, date, mkidDataDir, intermDir)
-        flavor = 'obs'
         tstamp = '20120920-123350'
-        rawFn = fn.raw(flavor, tstamp)
-        #print "rawFn=",rawFn
-        self.assertTrue(os.path.exists(rawFn))
+        fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
+
+        obsFn = fn.obs()
+        self.assertTrue(os.path.exists(obsFn))
+
+        calFn = fn.cal()
+        self.assertFalse(os.path.exists(calFn))
+
 
     def testCalSoln(self):
         mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
         intermDir = os.getenv('INTERM_DIR', default="/Scratch")
         run = 'LICK2012'
         date = '20120919'
-        fn = FileName.FileName(run, date, mkidDataDir, intermDir)
         tstamp = '20120920-123900'
-        calFn = fn.calSoln(tstamp)
-        print "calFn=",calFn
-        self.assertTrue(os.path.exists(calFn))
+        fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
+        calSolnFn = fn.calSoln()
+        print "calSolnFn=",calSolnFn
+        self.assertTrue(os.path.exists(calSolnFn))
 
     def testTimeMask(self):
         mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
         intermDir = os.getenv('INTERM_DIR', default="/Scratch")
         run = 'LICK2012'
         date = '20120919'
-        fn = FileName.FileName(run, date, mkidDataDir, intermDir)
         tstamp = '20120920-123350'
-        tmFn = fn.timeMask(tstamp)
+        fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
+        tmFn = fn.timeMask()
         print "tmFn=",tmFn
         self.assertGreater(len(tmFn),0)
 

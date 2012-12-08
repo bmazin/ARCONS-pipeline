@@ -13,30 +13,37 @@ tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 import os
 class FileName:
     
-    def __init__(self, run, date, 
+    def __init__(self, run, date, tstamp, \
                  mkidDataDir="/ScienceData", intermDir="/Scratch"):
         self.mkidDataDir = mkidDataDir
         self.intermDir = intermDir
         self.run = run
         self.date = date
+        self.tstamp = tstamp
 
-    def raw(self, flavor, tstamp):
+    def obs(self):
         return self.mkidDataDir + os.sep + \
             self.run + os.sep + \
             self.date + os.sep + \
-            flavor + "_" + tstamp + '.h5'
+            "obs_" + self.tstamp + '.h5'
 
-    def timeMask(self, tstamp):
+    def cal(self):
+        return self.mkidDataDir + os.sep + \
+            self.run + os.sep + \
+            self.date + os.sep + \
+            "cal_" + self.tstamp + '.h5'
+
+    def timeMask(self):
         return self.intermDir + os.sep + \
             'timeMasks' + os.sep + \
             self.date + os.sep + \
-            "timeMask_" + tstamp + '.h5'
+            "timeMask_" + self.tstamp + '.h5'
 
-    def calSoln(self, tstamp):
+    def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
             self.date + os.sep + \
-            "calsol_" + tstamp + '.h5'
+            "calsol_" + self.tstamp + '.h5'
 
                            
                             
