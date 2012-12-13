@@ -352,6 +352,7 @@ def wavelengthCal(paramFile):
                 # Cut off any hits above zero (~nonsensible)
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
 
+                print i, j, parab_phase
                 # Cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
