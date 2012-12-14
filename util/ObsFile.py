@@ -105,8 +105,12 @@ class ObsFile:
         if weighted is True, flat cal weights are applied
         if getTimes is True, returns timestamps,wavelengths
         """
-        packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
-        timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+        if getTimes == False:
+            packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
+            timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+        else:
+            timestamps,parabolaPeaks,baselines = self.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+            
         pulseHeights = np.array(parabolaPeaks,dtype='double') - np.array(baselines,dtype='double')
         wavelengths = self.convertToWvl(pulseHeights,iRow,iCol)
         if getTimes == False:
