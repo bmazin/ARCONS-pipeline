@@ -226,7 +226,7 @@ def printCalFileDescriptions( dir_path ):
        print obs,hdr['description'][0]
        target = f.root.header.header.col('target')[0]
        print target
-    f.close()
+       f.close()
     
 
 def printObsFileDescriptions( dir_path ):
@@ -240,5 +240,5 @@ def printObsFileDescriptions( dir_path ):
        print obs,hdr['description'][0]
        target = f.root.header.header.col('target')[0]
        print target
-    f.close()
+       f.close()
     
