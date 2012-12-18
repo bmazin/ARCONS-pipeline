@@ -3,6 +3,7 @@ import string
 import numpy
 import scipy
 import sys, os
+import tables
 import pylab
 import glob
 import matplotlib as mpl
