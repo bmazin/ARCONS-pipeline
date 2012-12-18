@@ -197,7 +197,10 @@ class ObsFile:
         wvlList = self.getPixelWvlList(pixelRow,pixelCol,firstSec,integrationTime)
         nWvlBins = int((wvlStop - wvlStart)/wvlBinWidth)
         spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
-        if weighted == True:
+        if weighted == False:
+            spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
+        else:
+            spectrum,wvlBinEdges = np.histogram(wvlList,bins=self.flatCalWvlBins)
             spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
         return spectrum,wvlBinEdges
 
