@@ -34,7 +34,6 @@ class TestFileName(unittest.TestCase):
         tstamp = '20120920-123900'
         fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
         calSolnFn = fn.calSoln()
-        print "calSolnFn=",calSolnFn
         self.assertTrue(os.path.exists(calSolnFn))
 
     def testTimeMask(self):
@@ -45,7 +44,6 @@ class TestFileName(unittest.TestCase):
         tstamp = '20120920-123350'
         fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
         tmFn = fn.timeMask()
-        print "tmFn=",tmFn
         self.assertGreater(len(tmFn),0)
 
 if __name__ == '__main__':

@@ -14,12 +14,12 @@ import matplotlib.pyplot as plt
 from util.utils import confirm
 from headers import ArconsHeaders
 from util import utils
+from interval import interval, inf, imath
 
 class ObsFile:
     h = 4.135668e-15 #eV s
     c = 2.998e8 #m/s
     angstromPerMeter = 1e10
-    tickDuration = 1e-6 #s
     nCalCoeffs = 3
     def __init__(self,fileName):
         """
@@ -44,10 +44,17 @@ class ObsFile:
         """
         Opens file and loads obs file attributes and beammap
         """
-        self.fileName = fileName
-        #make the full file name by joining the input name to the MKID_DATA_DIR (or . if the environment variable is not defined)
-        dataDir = os.getenv('MKID_DATA_DIR','/')
-        self.fullFileName = os.path.join(dataDir,self.fileName)
+        if (os.path.isabs(fileName)):
+            self.fileName = os.path.basename(fileName)
+            self.fullFileName = fileName
+        else:
+            self.fileName = fileName
+            # make the full file name by joining the input name 
+            # to the MKID_DATA_DIR (or . if the environment variable 
+            # is not defined)
+            dataDir = os.getenv('MKID_DATA_DIR','/')
+            self.fullFileName = os.path.join(dataDir,self.fileName)
+
         if (not os.path.exists(self.fullFileName)):
             print 'file does not exist: ',self.fullFileName
             sys.exit(1)
@@ -56,9 +63,35 @@ class ObsFile:
         self.file = tables.openFile(self.fullFileName,mode='r')
 
         #get the header
-        header = self.file.root.header.header
-        titles = header.colnames
-        info = header[0] #header is a table with one row
+        self.header = self.file.root.header.header
+        self.titles = self.header.colnames
+        self.info = self.header[0] #header is a table with one row
+
+        # Useful information about data format set here.
+        # For now, set all of these as constants.
+        # If we get data taken with different parameters, straighten
+        # that all out here.
+
+        ## These parameters are for LICK2012 and PAL2012 data
+        self.timeMask = int(20*'1',2)   #bitmask of 20 ones
+        self.tickDuration = 1e-6 #s
+        self.ticksPerSec = int(1.0/self.tickDuration)
+        self.intervalAll = interval[0.0, (1.0/self.tickDuration)-1]
+        #  8 bits - channel
+        # 12 bits - Parabola Fit Peak Height
+        # 12 bits - Sampled Peak Height
+        # 12 bits - Low pass filter baseline
+        # 20 bits - Microsecond timestamp
+
+        self.nBitsAfterParabolaPeak = 44
+        self.nBitsAfterBaseline = 20
+        self.nBitsInPulseHeight = 12
+        self.nBitsInTimestamp = 20
+
+        #bitmask of 12 ones
+        self.pulseMask = int(self.nBitsInPulseHeight*'1',2) 
+        #bitmask of 20 ones
+        self.timestampMask = int(self.nBitsInTimestamp*'1',2) 
 
         #get the beam image.
         try:
@@ -70,6 +103,13 @@ class ObsFile:
         beamShape = self.beamImage.shape
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
+
+
+    def getFromHeader(self,name):
+        """
+        returns the value for name in the header
+        """
+        return self.info[self.titles.index(name)]
 
     def __iter__(self):
         """
@@ -188,48 +228,73 @@ class ObsFile:
         return wavelengths
 
 
-    def parsePhotonPackets(self,packets):
+    def parsePhotonPackets(self,packets, inter=interval(), 
+                           doParabolaFitPeaks=True, doBaselines=True):
         """
         Parses an array of uint64 packets with the obs file format
-        8 bits - channel
-        12 bits - Parabola Fit Peak Height
-        12 bits - Sampled Peak Height
-        12 bits - Low pass filter baseline
-        20 bits - Microsecond timestamp
-        """
-        nBitsAfterParabolaPeak = 44
-        nBitsAfterBaseline = 20
-        nBitsInPulseHeight = 12
-        nBitsInTimestamp = 20
-        pulseMask = int(nBitsInPulseHeight*'1',2) #bitmask of 12 ones
-        timestampMask = int(nBitsInTimestamp*'1',2) #bitmask of 12 ones
-        packets = np.array(packets,dtype='uint64') #64 bit photon packet
-        timestamps = np.bitwise_and(packets,timestampMask)
-        parabolaFitPeaks = np.bitwise_and(np.right_shift(packets,nBitsAfterParabolaPeak),pulseMask)
-        baselines = np.bitwise_and(np.right_shift(packets,nBitsAfterBaseline),pulseMask)
-        return timestamps,parabolaFitPeaks,baselines
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
 
+        """
+
+        # first special case:  inter masks out everything so return zero-length
+        # numpy arrays
+        if (inter == self.intervalAll):
+            timestamps = np.arange(0)
+            parabolaFitPeaks = np.arange(0)
+            baselines = np.arange(0)
+        else:
+            # parse all packets
+            packetsAll = np.array(packets,dtype='uint64') #64 bit photon packet
+            timestampsAll = np.bitwise_and(packets,self.timestampMask)
+
+            if doParabolaFitPeaks:
+                parabolaFitPeaksAll = np.bitwise_and(\
+                    np.right_shift(packets,self.nBitsAfterParabolaPeak),\
+                        self.pulseMask)
+            else:
+                parabolaFitPeaksAll = np.arange(0)
+
+            if doBaselines:
+                baselinesAll = np.bitwise_and(\
+                    np.right_shift(packets,self.nBitsAfterBaseline),\
+                        self.pulseMask)
+            else:
+                baselinesAll = np.arange(0)
+
+            if inter==interval() or len(timestampsAll) == 0:
+                # nothing excluded or nothing to exclude
+                # so return all unpacked values
+                timestamps = timestampsAll
+                parabolaFitPeaks = parabolaFitPeaksAll
+                baselines = baselinesAll
+            else:
+                # there is a non-trivial set of times to mask. 
+                slices = calculateSlices(inter, timestampsAll)
+                timestamps = repackArray(timestampsAll, slices)
+                parabolaFitPeaks = repackArray(parabolaFitPeaksAll, slices)
+                baselines = repackArray(baselinesAll, slices)
+        # return the values filled in above
+        return timestamps,parabolaFitPeaks,baselines
 
     def createPhotonList(self,photonListFileName):
         """
         writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
         *Should be changed to use same filename as obs file but with pl prefix
         """
-        tickDuration = 1e-6 # s 
         plTable = self.createEmptyPhotonListFile(photonListFileName)
 
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 flag = self.wvlFlagTable[iRow,iCol]
                 if flag == 0:#only write photons in good pixels
-                    print iRow,iCol
                     wvlError = self.wvlErrorTable[iRow,iCol]
                     flatWeights = self.flatWeights[iRow,iCol]
                     #go through the list of seconds in a pixel dataset
                     for iSec,secData in enumerate(self.getPixel(iRow,iCol)):
                         timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(secData)
                         pulseHeights = np.array(parabolaPeaks,dtype='double') - np.array(baselines,dtype='double')
-                        timestamps = iSec + tickDuration*timestamps
+                        timestamps = iSec + self.tickDuration*timestamps
                         wavelengths = self.convertToWvl(pulseHeights,iRow,iCol,excludeBad=False)
                         #calculate what wavelength bins each photon falls into to see which flat cal factor should be applied
                         if len(wavelengths) > 0:
@@ -303,3 +368,49 @@ class ObsFile:
         self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
+
+
+def calculateSlices(inter, timestamps):
+    """
+    return a list of strings, with format i0:i1 for a python array slice
+    inter is the interval of values in timestamps to mask out.
+    The resulting list of strings indicate elements that are not masked out
+    """
+    slices = []
+    prevInclude = not (timestamps[0] in inter)
+    if prevInclude:
+        slce = "0:"
+    nIncluded = 0
+    for i in range(len(timestamps)):
+        include = not (timestamps[i] in inter)
+        if include:
+            nIncluded += 1
+        if (prevInclude and not include):
+            slce += str(i) # end the current range
+            slices.append(slce)
+        elif (include and not prevInclude):
+            slce = "%d:" % i # begin a new range
+        prevInclude = include
+    if (prevInclude):
+        slce += str(i+1) # end the last range if it is included
+        slices.append(slce)
+    return slices
+
+def repackArray(array, slices):
+    """
+    returns a copy of array that includes only the element defined by slices
+    """
+    nIncluded = 0
+    for slce in slices:
+        s0 = int(slce.split(":")[0])
+        s1 = int(slce.split(":")[1])
+        nIncluded += s1 - s0
+    retval = np.zeros(nIncluded)
+    iPt = 0;
+    for slce in slices:
+        s0 = int(slce.split(":")[0])
+        s1 = int(slce.split(":")[1])
+        iPtNew = iPt+s1-s0        
+        retval[iPt:iPtNew] = array[s0:s1]
+        iPt = iPtNew
+    return retval

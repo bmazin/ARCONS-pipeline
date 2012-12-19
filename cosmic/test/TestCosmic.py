@@ -3,6 +3,8 @@ import unittest
 from cosmic.Cosmic import Cosmic
 import matplotlib.pyplot as plt
 from util import FileName
+from interval import interval, inf, imath
+import inspect
 
 class TestCosmic(unittest.TestCase):
     """
@@ -18,7 +20,7 @@ class TestCosmic(unittest.TestCase):
     """
     def setUp(self):
         self.fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
-        self.cosmic = Cosmic(self.fn, beginTime= 223, endTime=227,\
+        self.cosmic = Cosmic(self.fn, beginTime= 222, endTime=228,\
                                  nBinsPerSec = 10)
         self.assertEqual(self.cosmic.file.beamImage[1][2], 
                          '/r7/p162/t1348133188')
@@ -32,15 +34,23 @@ class TestCosmic(unittest.TestCase):
 
     def test_nPhoton(self):
         """test the nPhoton method"""
-        self.assertEqual(self.cosmic.nPhoton(), 815755)
+        self.assertEqual(self.cosmic.nPhoton(), 1064969)
 
-    def test_makeTimeHgs(self):
+    def test_findAndWriteFlashes(self):
         """make and plot the time hgs"""
         self.cosmic.findFlashes()
         self.cosmic.writeFlashesToHdf5()
+        #self.cosmic.findCosmics()
         #self.cosmic.plotTimeHgs()
-        #plt.savefig(self.fileName+".png")
+        #plt.savefig(self.fn.makeName("plot_",""))
 
+    def test_getHgForOneSec(self):
+        """test and plot results from getHgForOneSec"""
 
+        inter = interval()
+        hg = self.cosmic.getHgForOneSec(self.cosmic.beginTime,inter)
+        plt.clf()
+        plt.plot(hg)
+        plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
 if __name__ == '__main__':
     unittest.main()

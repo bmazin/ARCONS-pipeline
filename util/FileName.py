@@ -21,6 +21,9 @@ class FileName:
         self.date = date
         self.tstamp = tstamp
 
+    def makeName(self, prefix="plot_", suffix="png"):
+        return prefix+self.tstamp+suffix
+
     def obs(self):
         return self.mkidDataDir + os.sep + \
             self.run + os.sep + \

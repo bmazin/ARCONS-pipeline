@@ -14,7 +14,6 @@ class TestObsFile(unittest.TestCase):
         slices = ObsFile.calculateSlices(inter, secs)
         self.assertEquals(slices, ["0:2","7:10"])
         new = ObsFile.repackArray(secs, slices)
-        print "new=",new
         self.assertTrue(npEquals(new,np.array([0,1,7,8,9])))
 
     def testCalculateSlicesBeginningAndEnd(self):
@@ -23,7 +22,6 @@ class TestObsFile(unittest.TestCase):
         inter = interval[0,3] | interval[8,9]
         slices = ObsFile.calculateSlices(inter, secs)
         new = ObsFile.repackArray(secs, slices)
-        print "new=",new
         self.assertTrue(npEquals(new, np.array([4,5,6,7])))
 
     def testParsePhotonPacketsWithIntervalMask(self):
