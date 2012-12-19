@@ -13,19 +13,39 @@ import tables
 import numpy as np
 import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
+from util.readDict import readDict
+from util.FileName import FileName
 
 class FlatCal:
-    def __init__(self,flatFileName=None,wvlCalFileName=None,flatCalFileName=None):
+    def __init__(self,paramFile):
         """
         opens flat file,sets wavelength binnning parameters, and calculates flat factors for the file
         """
-        self.wvlBinWidth = 100 #angstroms
-        self.wvlStart = 3000 #angstroms
-        self.wvlStop = 13000 #angstroms
+        params = readDict()
+        params.read_from_file(paramFile)
+
+        run = params['run']
+        flatSunsetLocalDate = params['flatSunsetLocalDate']
+        flatTimestamp = params['flatTimestamp']
+        wvlCalSunsetLocalDate = params['wvlCalSunsetLocalDate']
+        wvlCalTimestamp = params['wvlCalTimestamp']
+
+        #flatFileName = params['flatFileName']
+        #wvlCalFileName = params['wvlCalFileName']
+        #flatCalFileName = params['flatCalFileName']
+        flatFileName = FileName(run=run,date=flatSunsetLocalDate,tstamp=flatTimestamp).flat()
+        print flatFileName
+        flatCalFileName = FileName(run=run,date=flatSunsetLocalDate,tstamp=flatTimestamp).flatSoln()
+        print flatCalFileName
+        wvlCalFileName = FileName(run=run,date=wvlCalSunsetLocalDate,tstamp=wvlCalTimestamp).calSoln()
+
+
+        self.wvlBinWidth = params['wvlBinWidth'] #angstroms
+        self.wvlStart = params['wvlStart'] #angstroms
+        self.wvlStop = params['wvlStop'] #angstroms
         self.nWvlBins = int((self.wvlStop - self.wvlStart)/self.wvlBinWidth)
         
-        self.loadFlatFile(flatFileName)
-        self.flatFile.loadWvlCalFile(wvlCalFileName)#load the wavelength cal to be applied to the flat
+        self.loadFlatFile(flatFileName,wvlCalFileName)
         self.loadFlatSpectra()
         self.calculateFactors()
         self.writeFactors(flatCalFileName)
@@ -37,37 +57,6 @@ class FlatCal:
         except AttributeError:#flatFile was never defined
             pass
 
-    def loadFlatFile(self,flatFileName):
-        #open the hdf5 file
-        self.flatFile = ObsFile(flatFileName)
-        self.nRow = self.flatFile.nRow
-        self.nCol = self.flatFile.nCol
-        
-    def loadFlatSpectra(self):
-        self.spectra = [[[] for i in xrange(self.nCol)] for j in xrange(self.nRow)]
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                print iRow,iCol,
-                count = self.flatFile.getPixelCount(iRow,iCol)
-                print count
-                self.spectra[iRow][iCol],self.wvlBinEdges = self.flatFile.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
-        self.spectra = np.array(self.spectra)
-        self.calculateMedians()
-        return self.spectra
-
-
-    def calculateMedians(self):
-        spectra2d = np.reshape(self.spectra,[self.nRow*self.nCol,self.nWvlBins ])
-        self.wvlMedians = np.zeros(self.nWvlBins)
-        for iWvl in xrange(self.nWvlBins):
-            print iWvl,self.wvlBinEdges[iWvl],
-            spectrum = spectra2d[:,iWvl]
-            goodSpectrum = spectrum[spectrum != 0]#dead pixels need to be taken out before calculating medians
-            self.wvlMedians[iWvl] = np.median(goodSpectrum)
-            print self.wvlMedians[iWvl]
-            
-        return self.wvlMedians
-        
     def calculateFactors(self):
         """
         finds flat cal factors as medians/pixelSpectra for each pixel
@@ -76,7 +65,35 @@ class FlatCal:
         #set factors that will cause trouble to 1
         self.flatFactors[self.flatFactors == np.inf]=1.0
         self.flatFactors[self.flatFactors == 0]=1.0
-        np.save('/ScienceData/intermediate/factors.npy',self.flatFactors)
+        #np.save('/ScienceData/intermediate/factors.npy',self.flatFactors)
+
+    def calculateMedians(self):
+        spectra2d = np.reshape(self.spectra,[self.nRow*self.nCol,self.nWvlBins ])
+        self.wvlMedians = np.zeros(self.nWvlBins)
+        for iWvl in xrange(self.nWvlBins):
+            spectrum = spectra2d[:,iWvl]
+            goodSpectrum = spectrum[spectrum != 0]#dead pixels need to be taken out before calculating medians
+            self.wvlMedians[iWvl] = np.median(goodSpectrum)
+            
+        return self.wvlMedians
+    def loadFlatFile(self,flatFileName,wvlCalFileName):
+        #open the hdf5 file
+        self.flatFile = ObsFile(flatFileName)
+        self.nRow = self.flatFile.nRow
+        self.nCol = self.flatFile.nCol
+        self.flatFile.loadWvlCalFile(wvlCalFileName)#load the wavelength cal to be applied to the flat
+        
+    def loadFlatSpectra(self):
+        self.spectra = [[[] for i in xrange(self.nCol)] for j in xrange(self.nRow)]
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                count = self.flatFile.getPixelCount(iRow,iCol)
+                self.spectra[iRow][iCol],self.wvlBinEdges = self.flatFile.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
+#                if iRow == 45 and iCol == 12:
+#                    print iRow,iCol,count,sum(self.spectra[iRow][iCol])
+        self.spectra = np.array(self.spectra)
+        self.calculateMedians()
+        return self.spectra
 
     def writeFactors(self,flatCalFileName):
         """
@@ -96,3 +113,7 @@ class FlatCal:
         bintable = tables.Array(calgroup,'wavelengthBins',object=self.wvlBinEdges,title='Wavelength bin edges corresponding to third dimension of weights array')
         flatCalFile.flush()
         flatCalFile.close()
+
+if __name__ == '__main__':
+    paramFile = sys.argv[1]
+    fc = FlatCal(paramFile)
