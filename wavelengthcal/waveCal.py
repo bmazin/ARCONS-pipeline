@@ -189,7 +189,7 @@ def wavelengthCal(paramFile):
     if (('cal_' in files2run) | ('obs_' in files2run)):
         cal_files.append(files2run)
     else:
-        if '201209' in files2run:
+        if '2012' in files2run:
             for line in file_list:
                 if files2run in line.split('cal')[0]:
                     cal_files.append(line.strip())
@@ -351,7 +351,10 @@ def wavelengthCal(paramFile):
 
                 # Cut off any hits above zero (~nonsensible)
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
-
+                if (len(parab_phase) == 0):
+                    failure(row, rarray, larray, 1)
+                    continue
+                
                 # Cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
