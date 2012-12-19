@@ -6,6 +6,7 @@ Identify synchronous photons
 
 import sys,os
 import tables
+from tables.nodes import filenode
 import numpy as np
 import matplotlib.pyplot as plt
 from util.utils import confirm
@@ -14,6 +15,7 @@ from util import utils
 from util.ObsFile import ObsFile
 from util import meanclip
 from interval import interval, inf, imath
+from cosmic import TimeMask
 
 class Cosmic:
 
@@ -78,6 +80,9 @@ class Cosmic:
                    self.file.file.getNode(self.file.beamImage[iRow][iCol])
 
     def nPhoton(self, beginTime=0, endTime='expTime'):
+        """
+        trivial example of counting the number of photons in a file
+        """
         nPhoton = 0
         for iRow in range(self.file.nRow):
             for iCol in range(self.file.nCol):
@@ -96,9 +101,11 @@ class Cosmic:
 
         
         """
+        # make the blank data structures
         if self.timeHgs == "none":
             self.makeTimeHgs()
             self.flashInterval["all"] = []
+        # find the flashes in each roach 
         for roach in self.roachList:
             self.rMean[roach],self.rSigma[roach],self.rNSurvived[roach] = \
                 meanclip.meanclip(\
@@ -122,31 +129,75 @@ class Cosmic:
             if (prev):
                 self.flashInterval[roach] = \
                     self.flashInterval[roach] | interval[iBegin,i]
+
+        # union of all flashes
         self.flashInterval["all"] = interval()
-        ## union of all flashes
         for roach in self.roachList:
             self.flashInterval["all"] = \
                 self.flashInterval["all"] | self.flashInterval[roach]
-        ## look for gaps smaller than self.flashMergeTime and plug them
+
+        # look for gaps smaller than self.flashMergeTime and plug them
         dMax = self.nBinsPerSec*self.flashMergeTime
-        print "dMax=%d" % dMax
         extrema = self.flashInterval["all"].extrema
         for i in range(len(extrema)/2-1):
             i0 = extrema[2*i+1][0]
             i1 = extrema[2*(i+1)][0]
-            print "==>  i0=%d  i1=%d  d=%d" % (i0, i1, i1-i0)
             if (i1-i0) <= dMax:
                 t0 = self.beginTime + float(i0)/self.nBinsPerSec
                 t1 = self.beginTime + float(i1)/self.nBinsPerSec
-                print "add interval t0=%f  t1=%f" % (t0,t1)
                 self.flashInterval["all"] = \
                     self.flashInterval["all"] | interval[i0,i1]
 
+        # convert to ticks since the beginning of the data file
+        rlAll = list(self.roachList)
+        rlAll.append("all")
+        ticksPerSecond = int(1.0/self.file.tickDuration)
+        print "ticksPerSecond=",ticksPerSecond
+        offset = self.beginTime*ticksPerSecond
+        scale = 1.0/(self.file.tickDuration*self.nBinsPerSec)
+        print "offset=",offset,"  scale=",scale
+        for roach in rlAll:
+            self.flashInterval[roach] = offset+scale*self.flashInterval[roach]
+
     def writeFlashesToHdf5(self,overwrite=1):
-        (fileBaseName, fileExtension)=os.path.splitext(self.fileName)
-        hdf5FileName = os.getenv('INTERM_PATH', '/')+fileBaseName+"-timeMask.h5"
-        print "hdf5FileName=",hdf5FileName
-        
+        """
+        write intervals with flashes to the timeMask file
+        """
+        # get the output file name, and make the directory if you need to
+        tmFileName = self.fn.timeMask()
+        (tmDir,name) = os.path.split(tmFileName)
+        if not os.path.exists(tmDir):
+            os.makedirs(tmDir)
+
+        # write parameters used to find flashes
+        h5f = tables.openFile(tmFileName, 'w')
+        fnode = filenode.newNode(h5f, where='/', name='timeMaskHdr')
+        fnode.attrs.beginTime      = self.beginTime
+        fnode.attrs.endTime        = self.endTime
+        fnode.attrs.nBinsPerSec    = self.nBinsPerSec
+        fnode.attrs.flashMergeTime = self.flashMergeTime
+        fnode.close();
+
+        # write the times where flashes are located
+        tbl =  h5f.createTable('/','timeMask',TimeMask.TimeMask,"Time Mask")
+        rlAll = list(self.roachList)
+        rlAll.append("all")
+        for roach in rlAll:
+            extrema = self.flashInterval[roach].extrema
+            for i in range(len(extrema)/2):
+                row = tbl.row
+                row['tBegin'] = int(extrema[2*i][0])
+                row['tEnd'] = int(extrema[2*i+1][0])
+                if (roach == "all"):
+                    reason = "Merged Flash"
+                else:
+                    reason = "Flash in %s" % roach
+                row['reason'] = TimeMask.timeMaskReason[reason]
+                row.append()
+                tbl.flush()
+        tbl.close()
+        h5f.close()
+
     def makeTimeHgs(self):
         """
         Fill in the timeHgs variable
@@ -213,10 +264,32 @@ class Cosmic:
             plt.text(x0, y, roach, fontsize=8, va="center")
             extrema = self.flashInterval[roach].extrema
             for i in range(len(extrema)/2):
-                t0 = self.beginTime+(extrema[2*i][0]   - 0.5)/self.nBinsPerSec
-                t1 = self.beginTime+(extrema[2*i+1][0] - 0.5)/self.nBinsPerSec
-                print "roach=",roach,"   t0=",t0,"   t1=",t1
+                t0 = (extrema[2*i][0]   - 0.5)*self.file.tickDuration
+                t1 = (extrema[2*i+1][0] - 0.5)*self.file.tickDuration
                 plt.plot([t0,t1],[y,y],'r', linewidth=4)
             y -= 2
 
+    def findCosmics(self):
+        print "begin findCosmics flashInterval=",self.flashInterval['all']
+        tickDur = self.file.tickDuration
+        interFullSec = interval[0, (1.0/tickDur)-1]
+        for iSec in range(self.beginTime, self.endTime):
+            inter = (self.flashInterval['all'] & \
+                interval[iSec/tickDur, ((iSec+1)/tickDur)-1]) - iSec/tickDur
+            print "findCosmics:  iSec=",iSec,"  inter=",inter
+            hg = self.getHgForOneSec(iSec, inter)
+
+    def getHgForOneSec(self, iSec, inter):
+        timeHgValues = np.zeros(self.file.ticksPerSec)
+        for iRow in range(self.file.nRow):
+            for iCol in range(self.file.nCol):
+                sec = self.allSecs[iRow,iCol][iSec]
+                timestamps,parabolaPeaks,baselines = \
+                    ObsFile.parsePhotonPackets(self.file, sec, inter,\
+                                                   doParabolaFitPeaks=False,\
+                                                   doBaselines = False)
         
+                hg = np.histogram(timestamps,self.file.ticksPerSec,\
+                                     range=(0,self.file.ticksPerSec))
+                timeHgValues += hg[0]
+        return timeHgValues
