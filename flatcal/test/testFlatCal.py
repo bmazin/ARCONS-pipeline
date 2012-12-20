@@ -3,6 +3,7 @@ from util.ObsFile import ObsFile
 from util.FileName import FileName
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 from matplotlib.backends.backend_pdf import PdfPages
 
 def main():
