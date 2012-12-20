@@ -68,8 +68,11 @@ class FlatCal:
         finds flat cal factors as medians/pixelSpectra for each pixel
         """
         self.flatFactors = np.divide(self.wvlMedians,self.spectra)
+        self.flatFlags = np.zeros(np.shape(self.flatFactors),dtype='int')
         #set factors that will cause trouble to 1
+        self.flatFlags[self.flatFactors == np.inf] = 1
         self.flatFactors[self.flatFactors == np.inf]=1.0
+        self.flatFlags[self.flatFactors == 0]=2
         self.flatFactors[self.flatFactors == 0]=1.0
         #np.save('/ScienceData/intermediate/factors.npy',self.flatFactors)
 
@@ -108,9 +111,13 @@ class FlatCal:
         """
         Writes an h5 file to put calculated flat cal factors in
         """
-        scratchDir = os.getenv('INTERM_PATH')
-        flatDir = os.path.join(scratchDir,'flatCalSolnFiles')
-        fullFlatCalFileName = os.path.join(flatDir,flatCalFileName)
+        if os.path.isabs(flatCalFileName) == True:
+            fullFlatCalFileName = flatCalFileName
+        else:
+            scratchDir = os.getenv('INTERM_PATH')
+            flatDir = os.path.join(scratchDir,'flatCalSolnFiles')
+            fullFlatCalFileName = os.path.join(flatDir,flatCalFileName)
+
         try:
             flatCalFile = tables.openFile(fullFlatCalFileName,mode='w')
         except:
@@ -119,6 +126,7 @@ class FlatCal:
 
         calgroup = flatCalFile.createGroup(flatCalFile.root,'flatcal','Table of flat calibration weights by pixel and wavelength')
         caltable = tables.Array(calgroup,'weights',object=self.flatFactors,title='Flat calibration Weights indexed by pixelRow,pixelCol,wavelengthBin')
+        flagtable = tables.Array(calgroup,'flags',object=self.flatFlags,title='Flat cal flags indexed by pixelRow,pixelCol,wavelengthBin. 0 is Good')
         bintable = tables.Array(calgroup,'wavelengthBins',object=self.wvlBinEdges,title='Wavelength bin edges corresponding to third dimension of weights array')
         flatCalFile.flush()
         flatCalFile.close()
