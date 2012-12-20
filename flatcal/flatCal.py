@@ -12,6 +12,7 @@ import sys,os
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
+import glob
 from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
@@ -27,16 +28,19 @@ class FlatCal:
         run = params['run']
         flatSunsetLocalDate = params['flatSunsetLocalDate']
         flatTimestamp = params['flatTimestamp']
+
         wvlCalSunsetLocalDate = params['wvlCalSunsetLocalDate']
         wvlCalTimestamp = params['wvlCalTimestamp']
 
         #flatFileName = params['flatFileName']
         #wvlCalFileName = params['wvlCalFileName']
         #flatCalFileName = params['flatCalFileName']
-        flatFileName = FileName(run=run,date=flatSunsetLocalDate,tstamp=flatTimestamp).flat()
-        print flatFileName
+        flatFileNames = [FileName(run=run,date=flatSunsetLocalDate,tstamp=flatTimestamp).flat()]
+        if flatTimestamp == '':
+            flatFilePath = os.path.dirname(flatFileNames[0])
+            flatFileNames = sorted(glob.glob(os.path.join(flatFilePath,'flat*.h5')))
+        print len(flatFileNames), 'flat files to co-add'
         flatCalFileName = FileName(run=run,date=flatSunsetLocalDate,tstamp=flatTimestamp).flatSoln()
-        print flatCalFileName
         wvlCalFileName = FileName(run=run,date=wvlCalSunsetLocalDate,tstamp=wvlCalTimestamp).calSoln()
 
 
@@ -45,14 +49,16 @@ class FlatCal:
         self.wvlStop = params['wvlStop'] #angstroms
         self.nWvlBins = int((self.wvlStop - self.wvlStart)/self.wvlBinWidth)
         
-        self.loadFlatFile(flatFileName,wvlCalFileName)
+        self.loadFlatFile(flatFileNames,wvlCalFileName)
         self.loadFlatSpectra()
         self.calculateFactors()
         self.writeFactors(flatCalFileName)
+        print 'wrote to',flatCalFileName
 
     def __del__(self):
         try:
-            self.flatFile.close()
+            for flat in self.flatFiles:
+                flat.close()
             self.calFile.close()
         except AttributeError:#flatFile was never defined
             pass
@@ -76,21 +82,24 @@ class FlatCal:
             self.wvlMedians[iWvl] = np.median(goodSpectrum)
             
         return self.wvlMedians
-    def loadFlatFile(self,flatFileName,wvlCalFileName):
+    def loadFlatFile(self,flatFileNames,wvlCalFileName):
         #open the hdf5 file
-        self.flatFile = ObsFile(flatFileName)
-        self.nRow = self.flatFile.nRow
-        self.nCol = self.flatFile.nCol
-        self.flatFile.loadWvlCalFile(wvlCalFileName)#load the wavelength cal to be applied to the flat
+        self.flatFiles = [ObsFile(flatFileName) for flatFileName in flatFileNames]
+        self.nRow = self.flatFiles[0].nRow
+        self.nCol = self.flatFiles[0].nCol
+        for flat in self.flatFiles:
+            flat.loadWvlCalFile(wvlCalFileName)#load the wavelength cal to be applied to the flat
         
     def loadFlatSpectra(self):
-        self.spectra = [[[] for i in xrange(self.nCol)] for j in xrange(self.nRow)]
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                count = self.flatFile.getPixelCount(iRow,iCol)
-                self.spectra[iRow][iCol],self.wvlBinEdges = self.flatFile.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
-#                if iRow == 45 and iCol == 12:
-#                    print iRow,iCol,count,sum(self.spectra[iRow][iCol])
+        self.spectra = [[np.zeros(self.nWvlBins) for i in xrange(self.nCol)] for j in xrange(self.nRow)]
+        for iFlat,flat in enumerate(self.flatFiles):
+            print 'flat ',iFlat
+            for iRow in xrange(self.nRow):
+                for iCol in xrange(self.nCol):
+                    spectrum,self.wvlBinEdges = flat.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
+                    self.spectra[iRow][iCol] += spectrum
+#                    if iFlat == len(self.flatFiles)-1:
+#                        print iRow,iCol,sum(self.spectra[iRow][iCol])
         self.spectra = np.array(self.spectra)
         self.calculateMedians()
         return self.spectra
