@@ -10,7 +10,7 @@ if len(sys.argv) != 2:
     print 'Usage: python ',sys.argv[0],' folderPath'
     exit(1)
 obsPath = sys.argv[1]
-for obs in sorted(glob.glob(os.path.join(obsPath,'obs*.h5'))):
+for obs in sorted(glob.glob(os.path.join(obsPath,'obs*.h5')))[::-1]:
 
     f=tables.openFile(obs,'r')
     try:
