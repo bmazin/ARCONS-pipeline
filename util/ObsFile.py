@@ -11,10 +11,10 @@ import sys,os
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
-from util.utils import confirm
 from headers import ArconsHeaders
 from util import utils
 from interval import interval, inf, imath
+from util.FileName import FileName
 
 class ObsFile:
     h = 4.135668e-15 #eV s
@@ -210,7 +210,7 @@ class ObsFile:
 
         
 
-    def displaySec(self,firstSec=0,integrationTime=1,weighted=False):
+    def displaySec(self,firstSec=0,integrationTime=1,weighted=False,plotTitle='',nSdevMax=2):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
@@ -220,9 +220,11 @@ class ObsFile:
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 secImg[iRow,iCol] = self.getPixelCount(iRow,iCol,firstSec,integrationTime=integrationTime,weighted=weighted)
-        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
-        plt.colorbar()
-        plt.show()
+#        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
+#        plt.colorbar()
+#        plt.show()
+        utils.plotArray(secImg,cbar=True,normMax=np.mean(secImg)+nSdevMax*np.std(secImg),plotTitle=plotTitle)
+        
 
     def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=100):
         """
@@ -256,16 +258,20 @@ class ObsFile:
     def convertToWvl(self,pulseHeights,iRow,iCol,excludeBad = True):
         """
         applies wavelength calibration to a list of photon pulse heights
-        if excludeBad is True, wavelengths calculated as np.inf are excised from the array returned
+        if excludeBad is True, wavelengths calculated as np.inf are excised from the array returned, as are wavelengths outside the fit limits of the wavecal
         """
 
         xOffset = self.wvlCalTable[iRow,iCol,0]
         yOffset = self.wvlCalTable[iRow,iCol,1]
         amplitude = self.wvlCalTable[iRow,iCol,2]
+        wvlLowerLimit = self.wvlRangeTable[iRow,iCol,0]
+        wvlUpperLimit = self.wvlRangeTable[iRow,iCol,1]
         energies = amplitude*(pulseHeights-xOffset)**2+yOffset
         if excludeBad == True:
             energies = energies[energies != 0]
         wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
+        if excludeBad == True:
+            wavelengths = wavelengths[np.logical_and(wvlLowerLimit < wavelengths,wavelengths < wvlUpperLimit)]
         return wavelengths
 
 
@@ -318,12 +324,12 @@ class ObsFile:
         # return the values filled in above
         return timestamps,parabolaFitPeaks,baselines
 
-    def createPhotonList(self,photonListFileName):
+    def writePhotonList(self):
         """
         writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
         *Should be changed to use same filename as obs file but with pl prefix
         """
-        plTable = self.createEmptyPhotonListFile(photonListFileName)
+        plTable = self.createEmptyPhotonListFile()
 
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
@@ -331,6 +337,7 @@ class ObsFile:
                 if flag == 0:#only write photons in good pixels
                     wvlError = self.wvlErrorTable[iRow,iCol]
                     flatWeights = self.flatWeights[iRow,iCol]
+                    flatFlags = self.flatFlags[iRow,iCol]
                     #go through the list of seconds in a pixel dataset
                     for iSec,secData in enumerate(self.getPixel(iRow,iCol)):
                         timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(secData)
@@ -342,6 +349,7 @@ class ObsFile:
                             binIndices = np.digitize(wavelengths,self.flatCalWvlBins[0:-1])
                         else:
                             binIndices = np.array([])
+ 
                         for iPhoton in xrange(len(timestamps)):
                             if wavelengths[iPhoton] > 0 and wavelengths[iPhoton] != np.inf and binIndices[iPhoton] < len(flatWeights):
                                 #create a new row for the photon list
@@ -351,26 +359,33 @@ class ObsFile:
                                 newRow['ArrivalTime'] = timestamps[iPhoton]
                                 newRow['Wavelength'] = wavelengths[iPhoton]
                                 newRow['WaveError'] = wvlError
-                                newRow['Flag'] = flag
+                                newRow['Flag'] = flatFlags[binIndices[iPhoton]]
                                 newRow['FlatWeight'] = flatWeights[binIndices[iPhoton]]
                                 newRow.append()
         plTable.flush()
 
-    def createEmptyPhotonListFile(self,photonListFileName):
+    def createEmptyPhotonListFile(self):
         """
-        creates a file at $INTERM_PATH/photonLists/photonListFileName
+        creates a photonList h5 file 
         using header in headers.ArconsHeaders
         """
-        scratchDir = os.getenv('INTERM_PATH','/')
-        plDir = os.path.join(scratchDir,'photonLists')
-        fullPhotonListFileName = os.path.join(scratchDir,photonListFileName)
+            
+        fileTimestamp = self.fileName.split('_')[1].split('.')[0]
+        fileDate = os.path.basename(os.path.dirname(self.fullFileName))
+        run = os.path.basename(os.path.dirname(os.path.dirname(self.fullFileName)))
+        fn = FileName(run=run,date=fileDate,tstamp=fileTimestamp)
+        fullPhotonListFileName = fn.photonList()
         if (os.path.exists(fullPhotonListFileName)):
-            if confirm('Photon list file  %s exists. Overwrite?'%fullPhotonListFileName,defaultResponse=False) == False:
+            if utils.confirm('Photon list file  %s exists. Overwrite?'%fullPhotonListFileName,defaultResponse=False) == False:
                 exit(0)
         zlibFilter = tables.Filters(complevel=1,complib='zlib',fletcher32=False)
-        plFile = tables.openFile(fullPhotonListFileName,mode='w')
-        plGroup = plFile.createGroup('/','photons','Group containing photon list')
-        plTable = plFile.createTable(plGroup,'photons',ArconsHeaders.PhotonList,'Photon List Data',filters=zlibFilter)
+        try:
+            plFile = tables.openFile(fullPhotonListFileName,mode='w')
+            plGroup = plFile.createGroup('/','photons','Group containing photon list')
+            plTable = plFile.createTable(plGroup,'photons',ArconsHeaders.PhotonList,'Photon List Data',filters=zlibFilter)
+        except:
+            plFile.close()
+            raise
         return plTable
 
 
@@ -390,11 +405,13 @@ class ObsFile:
         self.wvlCalTable = np.zeros([self.nRow,self.nCol,ObsFile.nCalCoeffs])
         self.wvlErrorTable = np.zeros([self.nRow,self.nCol])
         self.wvlFlagTable = np.zeros([self.nRow,self.nCol])
+        self.wvlRangeTable = np.zeros([self.nRow,self.nCol,2])
         for calPixel in wvlCalData:
             self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
             self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
             if calPixel['wave_flag'] == 0:
                 self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
+                self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
 
         
     def loadFlatCalFile(self,flatCalFileName):
@@ -409,6 +426,7 @@ class ObsFile:
             return
         self.flatCalFile = tables.openFile(fullFlatCalFileName,mode='r')
         self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
+        self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
 
