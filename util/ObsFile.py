@@ -28,6 +28,7 @@ class ObsFile:
         self.loadFile(fileName)
         self.wvlCalFile = None #initialize to None for an easy test of whether a cal file has been loaded
         self.flatCalFile = None
+        
 
     def __del__(self):
         """
@@ -39,6 +40,10 @@ class ObsFile:
             self.flatCalFile.close()
         except:
             pass
+
+    def getFromHeader(self,name):
+        return self.info[self.titles.index(name)]
+
 
     def loadFile(self,fileName):
         """
@@ -73,7 +78,6 @@ class ObsFile:
         # that all out here.
 
         ## These parameters are for LICK2012 and PAL2012 data
-        self.timeMask = int(20*'1',2)   #bitmask of 20 ones
         self.tickDuration = 1e-6 #s
         self.ticksPerSec = int(1.0/self.tickDuration)
         self.intervalAll = interval[0.0, (1.0/self.tickDuration)-1]
@@ -95,7 +99,7 @@ class ObsFile:
 
         #get the beam image.
         try:
-            self.beamImage = self.file.getNode('/beammap/beamimage')
+            self.beamImage = self.file.getNode('/beammap/beamimage').read()
         except:
             print 'Can\'t access beamimage'
             sys.exit(2)
@@ -131,17 +135,25 @@ class ObsFile:
         pixelData = self.file.getNode('/'+pixelLabel).read()
         return pixelData
 
-    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted = False):
+    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted = False,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
+        if getTimes is True, returns timestamps,wavelengths
         """
-        packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
-        timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+        if getTimes == False:
+            packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
+            timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+        else:
+            timestamps,parabolaPeaks,baselines = self.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+            
         pulseHeights = np.array(parabolaPeaks,dtype='double') - np.array(baselines,dtype='double')
         wavelengths = self.convertToWvl(pulseHeights,iRow,iCol)
-        return wavelengths
+        if getTimes == False:
+            return wavelengths
+        else:
+            return timestamps,wavelengths
             
 
     def getPixelCount(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted=False):
@@ -172,6 +184,32 @@ class ObsFile:
         packetList = np.concatenate(pixelData)
         return packetList
 
+    def getTimedPacketList(self,iRow,iCol,firstSec=0,integrationTime=-1):
+        pixelData = self.getPixel(iRow,iCol)
+        lastSec = firstSec+integrationTime
+        if integrationTime == -1:
+            lastSec = len(pixelData)
+        pixelData = pixelData[firstSec:lastSec]
+
+        timestamps = []
+        baselines = []
+        peakHeights = []
+
+        for t in range(len(pixelData)):
+            times,peaks,bases = self.parsePhotonPackets(pixelData[t])
+            times =firstSec+self.tickDuration*times+t
+            timestamps.append(times)
+            baselines.append(bases)
+            peakHeights.append(peaks)
+            
+        timestamps = np.concatenate(timestamps)
+        baselines = np.concatenate(baselines)
+        peakHeights = np.concatenate(peakHeights)
+        return timestamps,peakHeights,baselines
+
+
+        
+
     def displaySec(self,firstSec=0,integrationTime=1,weighted=False):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
@@ -196,7 +234,10 @@ class ObsFile:
         wvlList = self.getPixelWvlList(pixelRow,pixelCol,firstSec,integrationTime)
         nWvlBins = int((wvlStop - wvlStart)/wvlBinWidth)
         spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
-        if weighted == True:
+        if weighted == False:
+            spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
+        else:
+            spectrum,wvlBinEdges = np.histogram(wvlList,bins=self.flatCalWvlBins)
             spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
         return spectrum,wvlBinEdges
 
@@ -331,6 +372,8 @@ class ObsFile:
         plGroup = plFile.createGroup('/','photons','Group containing photon list')
         plTable = plFile.createTable(plGroup,'photons',ArconsHeaders.PhotonList,'Photon List Data',filters=zlibFilter)
         return plTable
+
+
 
     def loadWvlCalFile(self,wvlCalFileName):
         """

@@ -1,0 +1,21 @@
+##Files and Dirs
+
+run = 'PAL2012'
+
+flatSunsetLocalDate = '20121210'
+#flatTimestamp = '20120919-131448'
+flatTimestamp = ''
+
+wvlCalSunsetLocalDate = '20121210'
+wvlCalTimestamp = '20121211-133056'
+
+#flatFileName = 'obs_20120919-131142.h5'
+#wvlCalFileName = 'calsol_20120917-072537.h5'
+
+#flatCalFileName = 'flatsol_20120919-131142.h5'
+
+##Constants
+
+wvlBinWidth = 100 ##angstroms
+wvlStart = 3000 ##angstroms
+wvlStop = 13000 ##angstroms
