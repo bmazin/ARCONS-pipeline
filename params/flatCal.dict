@@ -16,6 +16,6 @@ wvlCalTimestamp = '20121211-133056'
 
 ##Constants
 
-wvlBinWidth = 100 ##angstroms
+wvlBinWidth = 200 ##angstroms
 wvlStart = 3000 ##angstroms
 wvlStop = 13000 ##angstroms
