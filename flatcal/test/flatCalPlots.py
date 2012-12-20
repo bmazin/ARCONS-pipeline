@@ -22,7 +22,7 @@ def main():
 #    wvlCalFileName = FileName(run=run,date='20120916',tstamp='20120917-072537').calSoln()
 
     run = 'PAL2012'
-    obsFileName = FileName(run=run,date='20121210',tstamp='20121211-135628').flat()
+    #obsFileName = FileName(run=run,date='20121210',tstamp='20121211-135628').flat()
     flatCalFileName = FileName(run=run,date='20121210',tstamp='').flatSoln()
     wvlCalFileName = FileName(run=run,date='20121210',tstamp='20121211-133056').calSoln()
     flatCalPath = os.path.dirname(flatCalFileName)
@@ -30,9 +30,9 @@ def main():
     nPlotsPerPage = 9
     iPlot = 0
 
-    ob = ObsFile(obsFileName)#('obs_20120919-131142.h5')
-    ob.loadWvlCalFile(wvlCalFileName)#('calsol_20120917-072537.h5')
-    ob.loadFlatCalFile(flatCalFileName)#('flatsol_20120919-131142.h5')
+    #ob = ObsFile(obsFileName)#('obs_20120919-131142.h5')
+    #ob.loadWvlCalFile(wvlCalFileName)#('calsol_20120917-072537.h5')
+    #ob.loadFlatCalFile(flatCalFileName)#('flatsol_20120919-131142.h5')
     matplotlib.rcParams['font.size'] = 4
 
     for testPixelRow in xrange(46):
