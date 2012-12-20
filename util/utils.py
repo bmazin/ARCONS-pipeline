@@ -170,39 +170,41 @@ def linearFit( x, y, err=None ):
     return solution
 
 
-def plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
-              plotFileName='arrayPlot.png', plotTitle=''):
+def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
+              cbar=False, cbarticks=None, cbarlabels=None, plotFileName='arrayPlot.png',
+              plotTitle=''):
    """
-   For each corresponding x and y location, where x and y are 1D lists/arrays, plots the z 
-   function to screen or if showMe is set to False, to file.  If normMin and normMax are
-   None, the norm is just set to the full range of the z array.
-
-   Note: could try imshow or pcolor
+   Plots the 2D array to screen or if showMe is set to False, to file.  If normMin and
+   normMax are None, the norm is just set to the full range of the array.
    """
    font = {'family' : 'normal',
            'weight' : 'normal',
-           'size'   : 6}
+           'size'   : 10}
    mpl.rc('font', **font)
    
    if normMin == None:
-      normMin = numpy.min(z)
+      normMin = xyarray.min()
    if normMax == None:
-      normMax = numpy.max(z)
+      normMax = xyarray.max()
    norm = mpl.colors.Normalize(vmin=normMin,vmax=normMax)
 
    fig = plt.figure()
    ax = fig.add_subplot(111)
    
-   plt.scatter(x,y,c=z,s=500,marker='s',cmap=colormap, norm=norm)
-   plt.colorbar()
+   plt.matshow( xyarray, origin='lower',cmap=colormap, norm=norm) 
+
+   if cbar:
+      if cbarticks == None:
+         cbar = plt.colorbar()
+      else:
+         cbar = plt.colorbar(cbarticks)
+      if cbarlabels != None:
+         cbar.ax.set_yticklabels(cbarlabels)
+   
    plt.title(plotTitle)
    plt.xlabel('Column Number')
    plt.ylabel('Row Number')
-
-   x = numpy.array(x)
-   y = numpy.array(y)
-   plt.xlim(numpy.min(x)-1.5, numpy.max(x))#-0.25)
-   plt.ylim(numpy.min(y)-1.5, numpy.max(y)-0.25)
+   ax.xaxis.set_ticks_position('bottom')
 
    if showMe:
       plt.show()
