@@ -33,6 +33,12 @@ class FileName:
             self.date + os.sep + \
             "cal_" + self.tstamp + '.h5'
 
+    def flat(self):
+        return self.mkidDataDir + os.sep + \
+            self.run + os.sep + \
+            self.date + os.sep + \
+            "flat_" + self.tstamp + '.h5'
+
     def timeMask(self):
         return self.intermDir + os.sep + \
             'timeMasks' + os.sep + \
@@ -45,5 +51,16 @@ class FileName:
             self.date + os.sep + \
             "calsol_" + self.tstamp + '.h5'
 
+    def flatSoln(self):
+        return self.intermDir + os.sep + \
+            'flatCalSolnFiles' + os.sep + \
+            self.date + os.sep + \
+            "flatsol_" + self.date + '.h5'
+
+    def photonList(self):
+        return self.intermDir + os.sep + \
+            'photonLists' + os.sep + \
+            self.date + os.sep + \
+            "photons_" + self.tstamp + '.h5'
                            
                             
