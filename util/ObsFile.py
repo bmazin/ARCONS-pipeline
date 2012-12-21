@@ -81,6 +81,7 @@ class ObsFile:
         self.tickDuration = 1e-6 #s
         self.ticksPerSec = int(1.0/self.tickDuration)
         self.intervalAll = interval[0.0, (1.0/self.tickDuration)-1]
+        self.nonAllocPixelName = '/r0/p250/'
         #  8 bits - channel
         # 12 bits - Parabola Fit Peak Height
         # 12 bits - Sampled Peak Height
@@ -429,6 +430,23 @@ class ObsFile:
         self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
+
+    def getDeadPixels(self,showMe=False):
+        countArray = np.array([[self.getPixelCount(iRow,iCol) for iCol in range(self.nCol)] for iRow in range(self.nRow)])
+        deadArray = np.ones((self.nRow,self.nCol))
+        deadArray[countArray == 0] = 0
+        if showMe == True:
+            utils.plotArray(deadArray)
+        return deadArray 
+
+    def getNonAllocPixels(self,showMe=False):
+        nonAllocArray = np.ones((self.nRow,self.nCol))
+        nonAllocArray[np.core.defchararray.startswith(self.beamImage,self.nonAllocPixelName)] = 0
+        if showMe == True:
+            utils.plotArray(nonAllocArray)
+        return nonAllocArray
+
+        
 
 
 def calculateSlices(inter, timestamps):
