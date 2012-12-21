@@ -432,6 +432,11 @@ class ObsFile:
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
 
     def getDeadPixels(self,showMe=False):
+        """
+        returns a mask indicating which pixels had no counts in this observation file
+        1's for pixels with counts, 0's for pixels without counts
+        if showMe is True, a plot of the mask pops up
+        """
         countArray = np.array([[self.getPixelCount(iRow,iCol) for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow,self.nCol))
         deadArray[countArray == 0] = 0
@@ -440,14 +445,17 @@ class ObsFile:
         return deadArray 
 
     def getNonAllocPixels(self,showMe=False):
+        """
+        returns a mask indicating which pixels had no beammap locations 
+        (set to constant /r0/p250/)
+        1's for pixels with locations, 0's for pixels without locations
+        if showMe is True, a plot of the mask pops up
+        """
         nonAllocArray = np.ones((self.nRow,self.nCol))
         nonAllocArray[np.core.defchararray.startswith(self.beamImage,self.nonAllocPixelName)] = 0
         if showMe == True:
             utils.plotArray(nonAllocArray)
         return nonAllocArray
-
-        
-
 
 def calculateSlices(inter, timestamps):
     """
