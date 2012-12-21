@@ -170,52 +170,108 @@ def linearFit( x, y, err=None ):
     return solution
 
 
+def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
+              delay=0.1, **plotArrayKeys):
+    """
+    Makes a movie out of a list of frame objects (2-D arrays)
+    
+    """
+    if len(listOfFrameObj) == 1:
+        raise ValueError, "I cannot make movie out of a list of one object!"
+
+    if frameTitles != None:
+        assert len(frameTitles) == len(listOfFrameObj), "Number of Frame titles\
+        must equal number of frames"
+
+    if os.path.exists("./.tmp_movie"):
+        os.system("rm -rf .tmp_movie")
+
+    os.mkdir(".tmp_movie")
+    iFrame = 0
+    print 'Making individual frames ...'
+    
+    for frame in listOfFrameObj:
+
+       if frameTitles!= None:
+          plotTitle = frameTitles[iFrame]
+       else:
+          plotTitle=''
+       fp = plotArray(frame, showMe=False, plotFileName='.tmp_movie/mov_'+repr(iFrame+10000)+'.png', \
+                      plotTitle=plotTitle, **plotArrayKeys)
+       iFrame += 1
+       del fp
+
+    os.chdir('.tmp_movie')
+
+    if outName[-4:-1]+outName[-1] != '.gif':
+        outName += '.gif'
+
+    delay *= 100
+    delay = int(delay)
+    print 'Making Movie ...'
+
+    if '/' in outName:
+        os.system('convert -delay %s -loop 0 mov_* %s'%(repr(delay),outName))
+    else:
+        os.system('convert -delay %s -loop 0 mov_* ../%s'%(repr(delay),outName))
+    os.chdir("../")
+    os.system("rm -rf .tmp_movie")
+    print 'done.'
+
+
+
 def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
               cbar=False, cbarticks=None, cbarlabels=None, plotFileName='arrayPlot.png',
-              plotTitle=''):
-   """
-   Plots the 2D array to screen or if showMe is set to False, to file.  If normMin and
-   normMax are None, the norm is just set to the full range of the array.
-   """
-   font = {'family' : 'normal',
-           'weight' : 'normal',
-           'size'   : 10}
-   mpl.rc('font', **font)
-   
-   if normMin == None:
-      normMin = xyarray.min()
-   if normMax == None:
-      normMax = xyarray.max()
-   norm = mpl.colors.Normalize(vmin=normMin,vmax=normMax)
+              plotTitle='', sigma=None):
+    """
+    Plots the 2D array to screen or if showMe is set to False, to file.  If normMin and
+    normMax are None, the norm is just set to the full range of the array.
+    """
+    if sigma != None:
+       meanVal = np.mean(accumulatePositive(xyarray))
+       stdVal = np.std(accumulatePositive(xyarray))
+       normMin = meanVal - sigma*stdVal
+       normMax = meanVal + sigma*stdVal
+    if normMin == None:
+       normMin = xyarray.min()
+    if normMax == None:
+       normMax = xyarray.max()
+    norm = mpl.colors.Normalize(vmin=normMin,vmax=normMax)
 
-   fig = plt.figure()
-   ax = fig.add_subplot(111)
-   
-   plt.matshow( xyarray, origin='lower',cmap=colormap, norm=norm) 
+    figWidthPt = 550.0
+    inchesPerPt = 1.0/72.27                 # Convert pt to inch
+    figWidth = figWidthPt*inchesPerPt       # width in inches
+    figHeight = figWidth*1.0                # height in inches
+    figSize =  [figWidth,figHeight]
+    params = {'backend': 'ps',
+              'axes.labelsize': 10,
+              'axes.titlesize': 12,
+              'text.fontsize': 10,
+              'legend.fontsize': 10,
+              'xtick.labelsize': 10,
+              'ytick.labelsize': 10,
+              'figure.figsize': figSize}
+    plt.rcParams.update(params)
 
-   if cbar:
-      if cbarticks == None:
-         cbar = plt.colorbar()
-      else:
-         cbar = plt.colorbar(cbarticks)
-      if cbarlabels != None:
-         cbar.ax.set_yticklabels(cbarlabels)
-   
-   plt.title(plotTitle)
-   plt.xlabel('Column Number')
-   plt.ylabel('Row Number')
-   ax.xaxis.set_ticks_position('bottom')
+    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm)
 
-   if showMe:
-      plt.show()
-   else:
-      try:
-         plt.savefig(plotFileName)
-      except:
-         pass
-   
-   plt.clf()   
+    if cbar:
+        if cbarticks == None:
+           cbar = plt.colorbar(shrink=0.8)
+        else:
+           cbar = plt.colorbar(ticks=cbarticks, shrink=0.8)
+        if cbarlabels != None:
+           cbar.ax.set_yticklabels(cbarlabels)
+    
+    plt.ylabel('Row Number')
+    plt.xlabel('Column Number')
+    plt.title(plotTitle)
 
+    if showMe == False:
+        plt.savefig(plotFileName)
+    else:    
+        plt.show()
+ 
 
 def printCalFileDescriptions( dir_path ):
     """
