@@ -8,8 +8,8 @@ calfileslist = 'calfile_list_Palo.txt'
 #files2run = '/Scratch/matchedData/cal_20121208-023522.h5'
 #files2run = '/ScienceData/PAL2012/20121210/cal_20121211-044853.h5'
                                              
-files2run = '20121211'
-#files2run = 'all'
+#files2run = '20121211'
+files2run = 'all'
 
 #outdir = '/ScienceData/waveCalSolnFiles/'
 outdir = '/Scratch/waveCalSolnFiles/'
