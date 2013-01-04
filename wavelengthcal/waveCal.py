@@ -67,7 +67,7 @@ class DriftObj(IsDescription):
 #    row.append()
 #    rarray.append(0.)
 #    larray.append(0.)
-def failure(row, pixi, pixj, flagnum):
+def failure(row, xyrarray, xylarray, pixi, pixj, flagnum):
     row['wave_flag'] = flagnum
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
@@ -309,7 +309,7 @@ def wavelengthCal(paramFile):
                 # Flag dead pixels
                 if len(photondata)==0:
                     #failure(row, rarray, larray, 1)
-                    failure(row, i, j, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
 
                 # For each second, get the packets
@@ -366,14 +366,14 @@ def wavelengthCal(paramFile):
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
                 if (len(parab_phase) == 0):
                     #failure(row, rarray, larray, 1)
-                    failure(row, i, j, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
                 
                 # Cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
                     #failure(row, rarray, larray, 1)
-                    failure(row, i, j, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
 
 
@@ -390,7 +390,7 @@ def wavelengthCal(paramFile):
                 # Cut on low number of total counts
                 if totalcts < params['low_counts_val'] * 100.:
                     #failure(row, rarray, larray, 1)
-                    failure(row, i, j, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
     
                 # Smooth
@@ -401,7 +401,7 @@ def wavelengthCal(paramFile):
                     smoothed_data = np.array(parab_smooth, dtype=float)
                 except:
                     #failure(row, rarray, larray, 1)
-                    failure(row, i, j, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue 
 
                 # Find extreema:
@@ -418,7 +418,7 @@ def wavelengthCal(paramFile):
                     end_ind = (coarse_data > params['low_counts_val']).nonzero()[0][-1]
                 except:
                     #failure(row, rarray, larray, 1)
-                    failure(row, i, j, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
                     
                 coarse_data = coarse_data[start_ind:end_ind]
@@ -462,11 +462,11 @@ def wavelengthCal(paramFile):
                 # Cut if wrong number of peaks
                 if (maxima_num < params['n_lasers']-1) | (maxima_num > params['n_lasers']) :
                     #failure(row, rarray, larray, 2)
-                    failure(row, i, j, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
                 if (minima_num != maxima_num):
                     #failure(row, rarray, larray, 2)
-                    failure(row, i, j, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
 
 
@@ -555,7 +555,7 @@ def wavelengthCal(paramFile):
             
                 if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.) | (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]) | (gparams[-2] > min_locations[-1]):
                     #failure(row, rarray, larray, 2)
-                    failure(row, i, j, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
                 #if (redchi2gauss > params['chi2_cutoff']):              # Cut on chi^2
                 #    failure(row, rarray, larray, 2)
@@ -577,7 +577,7 @@ def wavelengthCal(paramFile):
                     ind_red = (np.where(e_fromphase < red_peak))[0][0]
                 except:
                     #failure(row, rarray, larray, 2)
-                    failure(row, i, j, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
 
                 blue_amp = np.mean(n_inbin[ind_blue-10:ind_blue+10])
@@ -681,7 +681,7 @@ def wavelengthCal(paramFile):
 
                 else:
                     #failure(row, rarray, larray, 2)
-                    failure(row, i, j, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
 
 
