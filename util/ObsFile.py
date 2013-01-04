@@ -128,13 +128,33 @@ class ObsFile:
                 pixelData = self.file.getNode('/'+pixelLabel)
                 yield pixelData
 
-    def getPixel(self,iRow,iCol):
+    #def getPixel(self,iRow,iCol):
+    #    """
+    #    retrieves a pixel using the file's attached beammap
+    #    """
+    #    pixelLabel = self.beamImage[iRow][iCol]
+    #    pixelData = self.file.getNode('/'+pixelLabel).read()
+    #    return pixelData
+
+    def getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
-        retrieves a pixel using the file's attached beammap
+        Retrieves a pixel using the file's attached beammap.
+        If firstSec/integrationTime are provided, only data from the time 
+        interval 'firstSec' to firstSec+integrationTime are returned.
+        For now firstSec and integrationTime can only be integers.
+        If integrationTime is -1, all data after firstSec are returned.
         """
         pixelLabel = self.beamImage[iRow][iCol]
-        pixelData = self.file.getNode('/'+pixelLabel).read()
+        pixelNode = self.file.getNode('/' + pixelLabel)
+        if integrationTime == -1:
+            lastSec = pixelNode.nrows
+        else:
+            lastSec = firstSec + integrationTime
+        pixelData = pixelNode.read(firstSec, lastSec)
         return pixelData
+
+
+
 
     def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted = False,getTimes=False):
         """
@@ -171,19 +191,34 @@ class ObsFile:
             return sum(weightedSpectrum)
 
 
-    def getPixelPacketList(self,iRow,iCol,firstSec=0,integrationTime=-1):
+#    def getPixelPacketList(self,iRow,iCol,firstSec=0,integrationTime=-1):
+#        """
+#        returns a numpy array of 64-bit photon packets for a given pixel, integrated from firstSec to firstSec+integrationTime.
+#        if integrationTime is -1, All time after firstSec is used.  
+#        if weighted is True, flat cal weights are applied
+#        """
+#        pixelData = self.getPixel(iRow,iCol)
+#        lastSec = firstSec+integrationTime
+#        if integrationTime == -1:
+#            lastSec = len(pixelData)
+#        pixelData = pixelData[firstSec:lastSec]
+#        packetList = np.concatenate(pixelData)
+#        return packetList
+
+    def getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         returns a numpy array of 64-bit photon packets for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         """
-        pixelData = self.getPixel(iRow,iCol)
-        lastSec = firstSec+integrationTime
+        pixelData = self.getPixel(iRow, iCol, firstSec, integrationTime)
+        lastSec = firstSec + integrationTime
         if integrationTime == -1:
             lastSec = len(pixelData)
-        pixelData = pixelData[firstSec:lastSec]
         packetList = np.concatenate(pixelData)
         return packetList
+
+
 
     def getTimedPacketList(self,iRow,iCol,firstSec=0,integrationTime=-1):
         pixelData = self.getPixel(iRow,iCol)
@@ -209,18 +244,30 @@ class ObsFile:
         return timestamps,peakHeights,baselines
 
 
-        
+    def getPixelCountImage(self, firstSec=0, integrationTime=-1, weighted=False):
+        """
+        Return a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime.
+        If integration time is -1, all time after firstSec is used.
+        If weighted is True, flat cal weights are applied. JvE 12/28/12
+        """
+        secImg = np.zeros((self.nRow, self.nCol))
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                secImg[iRow, iCol] = self.getPixelCount(iRow, iCol, firstSec, integrationTime, weighted)
+        return secImg
+    
 
-    def displaySec(self,firstSec=0,integrationTime=1,weighted=False,plotTitle='',nSdevMax=2):
+    def displaySec(self,firstSec=0,integrationTime=-1,weighted=False,plotTitle='',nSdevMax=2):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         """
-        secImg = np.zeros((self.nRow,self.nCol))
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                secImg[iRow,iCol] = self.getPixelCount(iRow,iCol,firstSec,integrationTime=integrationTime,weighted=weighted)
+#       secImg = np.zeros((self.nRow,self.nCol))
+#       for iRow in xrange(self.nRow):
+#           for iCol in xrange(self.nCol):
+#               secImg[iRow,iCol] = self.getPixelCount(iRow,iCol,firstSec,integrationTime=integrationTime,weighted=weighted)
+        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted)
 #        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
 #        plt.colorbar()
 #        plt.show()

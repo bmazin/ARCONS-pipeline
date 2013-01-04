@@ -9,8 +9,9 @@ import glob
 import matplotlib as mpl
 import matplotlib.pylab as plt
 import binascii
+import math
 from scipy.signal import convolve
-
+import scipy.ndimage
 
 """
 Modules:
@@ -299,4 +300,97 @@ def printObsFileDescriptions( dir_path ):
        target = f.root.header.header.col('target')[0]
        print target
        f.close()
+  
+
+def median_filterNaN(input, size=5, *nkwarg, **kwarg):
+    '''NaN-handling version of the scipy median filter function
+    (scipy.ndimage.filters.median_filter). Any NaN values in the input array are
+    simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
+    noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
+    (but note that quantitative applications are probably limited.)
+    Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
+    calling arguments are passed.
     
+    Arguments/return values are same as for scipy median_filter.
+    INPUTS:
+        input : array-like, input array to filter (can be n-dimensional)
+        size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
+                scalar, then same value is used for all dimensions.
+    OUTPUTS:
+        NaN-resistant median filtered version of input.
+    
+    For other parameters see documentation for scipy.ndimage.filters.median_filter.
+
+    e.g.:
+        
+        filteredImage = median_filterNaN(imageArray,size=3)
+    
+    -- returns median boxcar filtered image with a moving box size 3x3 pixels.
+    
+    JvE 12/28/12
+    '''
+         
+    return scipy.ndimage.filters.generic_filter(input, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
+                                                 *nkwarg, **kwarg)
+    
+    
+    
+    
+    
+def rebin2D(a, ysize, xsize):
+    '''
+    Rebin an array to a SMALLER array. Rescales the values such that each element
+    in the output array is the mean of the elememts which it encloses in the input
+    array (i.e., not the total). Similar to the IDL rebin function.
+    Dimensions of binned array must be an integer factor of the input array.
+    Adapted from SciPy cookbook - see http://www.scipy.org/Cookbook/Rebinning
+    JvE 12/28/12
+
+    INPUTS:
+        a - array to be rebinned
+        ysize - new ysize (must be integer factor of y-size of input array)
+        xsize - new xsize (ditto for x-size of input array)
+
+    OUTPUTS:
+        Returns the original array rebinned to the new dimensions requested.        
+    '''
+    
+    yfactor, xfactor = numpy.asarray(a.shape) / numpy.array([ysize, xsize])
+    return a.reshape(ysize, yfactor, xsize, xfactor,).mean(1).mean(2)
+
+  
+  
+def gaussian_psf(fwhm, boxsize, oversample=50):
+    
+    '''
+    Returns a simulated Gaussian PSF: an array containing a 2D Gaussian function
+    of width fwhm (in pixels), binned down to the requested box size. 
+    JvE 12/28/12
+    
+    INPUTS:
+        fwhm - full-width half-max of the Gaussian in pixels
+        boxsize - size of (square) output array
+        oversample (optional) - factor by which the raw (unbinned) model Gaussian
+                                oversamples the final requested boxsize.
+    
+    OUTPUTS:
+        2D boxsize x boxsize array containing the binned Gaussian PSF
+    
+    (Verified against IDL astro library daoerf routine)
+        
+    '''
+  
+    fineboxsize = boxsize * oversample
+    
+    xcoord = ycoord = numpy.arange(-(fineboxsize - 1.) / 2., (fineboxsize - 1.) / 2. + 1.)
+    xx, yy = numpy.meshgrid(xcoord, ycoord)
+    xsigma = ysigma = fwhm / (2.*math.sqrt(2.*math.log(2.))) * oversample
+    zx = (xx ** 2 / (2 * xsigma ** 2))
+    zy = (yy ** 2 / (2 * ysigma ** 2))
+    fineSampledGaussian = numpy.exp(-(zx + zy))
+
+    #Bin down to the required output boxsize:
+    binnedGaussian = rebin2D(fineSampledGaussian, boxsize, boxsize)
+
+    return binnedGaussian
+        
