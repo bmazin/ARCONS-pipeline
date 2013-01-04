@@ -706,12 +706,14 @@ def wavelengthCal(paramFile):
         #plotArray( xarray, yarray, rarray, colormap=mpl.cm.gnuplot2, showMe=False,
         #      plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png', plotTitle='Energy Resolution')
         
-        plotArray( xyrarray, showMe=False, cbar=True, plotFileName=figdir+outfile+'_arrayPlot.png', plotTitle='Energy Resolution at 400nm')
+        plotArray( xyrarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png',
+                  plotTitle='Energy Resolution at 400nm')
 
         #plotArray( xarray, yarray, larray, colormap=mpl.cm.gnuplot2, showMe=False,
         #      plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png', plotTitle='Number of Lasers for Fit')
         
-        plotArray( xylarray, showMe=False, cbar=True, plotFileName=figdir+outfile+'_nlaserPlot.png', plotTitle='Number of lasers for fit')
+        plotArray( xylarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png',
+                  plotTitle='Number of lasers for fit')
 
 
         # Energy Res histo
