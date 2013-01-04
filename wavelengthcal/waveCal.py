@@ -59,14 +59,22 @@ class DriftObj(IsDescription):
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
                                                #    double precision
     
-def failure(row, rarray, larray, flagnum):
+#def failure(row, rarray, larray, flagnum):
+#    row['wave_flag'] = flagnum
+#    row['polyfit'] = np.array([-1.,-1., -1.])
+#    row['sigma'] = -1.
+#    row['solnrange'] = np.array([-1.,-1.])
+#    row.append()
+#    rarray.append(0.)
+#    larray.append(0.)
+def failure(pixi, pixj, flagnum):
     row['wave_flag'] = flagnum
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
     row['solnrange'] = np.array([-1.,-1.])
     row.append()
-    rarray.append(0.)
-    larray.append(0.)
+    xyrarray[pixi][pixj] = 0.
+    xylarray[pixi][pixj] = 0.
 
 def fitTwo(peaks, peak_locations, xarr, yarr):
 
@@ -213,11 +221,14 @@ def wavelengthCal(paramFile):
         n_rows = params['n_rows']
         n_cols = params['n_cols']
     
-        xarray = []
-        yarray = []
-        rarray = []
-        larray = []
-        roacharr = []
+        #xarray = []
+        #yarray = []
+        #rarray = []
+        #larray = []
+        #roacharr = []
+        xyrarray = np.zeros((n_rows, n_cols))
+        xylarray = np.zeros((n_rows, n_cols))
+        roacharr = np.zeros((n_rows, n_cols))
 
         # Open outfile to write parameters to
         try:
@@ -279,11 +290,12 @@ def wavelengthCal(paramFile):
                 pstring = beammap[i][j]
                 pixelNode = pstring.split('t')[0]
     
-                xarray.append(j)
-                yarray.append(i)
+                #xarray.append(j)
+                #yarray.append(i)
                 roach = int(pixelNode.split('/')[1][1:])
                 pixel = int(pixelNode.split('/')[2][1:])
-                roacharr.append(roach)
+                roacharr[i][j] = roach
+                #roacharr.append(roach)
 
                 row['pixelrow'] = i
                 row['pixelcol'] = j
@@ -296,7 +308,8 @@ def wavelengthCal(paramFile):
 
                 # Flag dead pixels
                 if len(photondata)==0:
-                    failure(row, rarray, larray, 1)
+                    #failure(row, rarray, larray, 1)
+                    failure(i, j, 1)
                     continue
 
                 # For each second, get the packets
@@ -352,13 +365,15 @@ def wavelengthCal(paramFile):
                 # Cut off any hits above zero (~nonsensible)
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
                 if (len(parab_phase) == 0):
-                    failure(row, rarray, larray, 1)
+                    #failure(row, rarray, larray, 1)
+                    failure(i, j, 1)
                     continue
                 
                 # Cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
-                    failure(row, rarray, larray, 1)
+                    #failure(row, rarray, larray, 1)
+                    failure(i, j, 1)
                     continue
 
 
@@ -374,7 +389,8 @@ def wavelengthCal(paramFile):
         
                 # Cut on low number of total counts
                 if totalcts < params['low_counts_val'] * 100.:
-                    failure(row, rarray, larray, 1)
+                    #failure(row, rarray, larray, 1)
+                    failure(i, j, 1)
                     continue
     
                 # Smooth
@@ -384,7 +400,8 @@ def wavelengthCal(paramFile):
                     parab_smooth = smooth.smooth(n_inbin, windowsize, window)
                     smoothed_data = np.array(parab_smooth, dtype=float)
                 except:
-                    failure(row, rarray, larray, 1)
+                    #failure(row, rarray, larray, 1)
+                    failure(i, j, 1)
                     continue 
 
                 # Find extreema:
@@ -400,7 +417,8 @@ def wavelengthCal(paramFile):
                     start_ind = (coarse_data > params['low_counts_val']).nonzero()[0][0]
                     end_ind = (coarse_data > params['low_counts_val']).nonzero()[0][-1]
                 except:
-                    failure(row, rarray, larray, 1)
+                    #failure(row, rarray, larray, 1)
+                    failure(i, j, 1)
                     continue
                     
                 coarse_data = coarse_data[start_ind:end_ind]
@@ -443,10 +461,12 @@ def wavelengthCal(paramFile):
 
                 # Cut if wrong number of peaks
                 if (maxima_num < params['n_lasers']-1) | (maxima_num > params['n_lasers']) :
-                    failure(row, rarray, larray, 2)
+                    #failure(row, rarray, larray, 2)
+                    failure(i, j, 2)
                     continue
                 if (minima_num != maxima_num):
-                    failure(row, rarray, larray, 2)
+                    #failure(row, rarray, larray, 2)
+                    failure(i, j, 2)
                     continue
 
 
@@ -534,7 +554,8 @@ def wavelengthCal(paramFile):
                 # Final cuts
             
                 if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.) | (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]) | (gparams[-2] > min_locations[-1]):
-                    failure(row, rarray, larray, 2)
+                    #failure(row, rarray, larray, 2)
+                    failure(i, j, 2)
                     continue
                 #if (redchi2gauss > params['chi2_cutoff']):              # Cut on chi^2
                 #    failure(row, rarray, larray, 2)
@@ -555,7 +576,8 @@ def wavelengthCal(paramFile):
                     ind_blue = (np.where(e_fromphase < blue_peak))[0][0]
                     ind_red = (np.where(e_fromphase < red_peak))[0][0]
                 except:
-                    failure(row, rarray, larray, 2)
+                    #failure(row, rarray, larray, 2)
+                    failure(i, j, 2)
                     continue
 
                 blue_amp = np.mean(n_inbin[ind_blue-10:ind_blue+10])
@@ -634,8 +656,11 @@ def wavelengthCal(paramFile):
                     driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
                     driftrow.append()
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
-                    rarray.append(resest)
-                    larray.append(n_in_fit)
+                    xyrarray[i][j] = resest
+                    xylarray[i][j] = n_in_fit
+                    #rarray.append(resest)
+                    #larray.append(n_in_fit)
+
 
                     # fits plot
                     if (plotcounter % n_plots_per_page == 0):
@@ -655,7 +680,8 @@ def wavelengthCal(paramFile):
                     plotcounter+=1
 
                 else:
-                    failure(row, rarray, larray, 2)
+                    #failure(row, rarray, larray, 2)
+                    failure(i, j, 2)
                     continue
 
 
@@ -677,15 +703,18 @@ def wavelengthCal(paramFile):
 
         # Plots
 
-        plotArray( xarray, yarray, rarray, colormap=mpl.cm.gnuplot2, showMe=False,
-              plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png', plotTitle='Energy Resolution')
+        #plotArray( xarray, yarray, rarray, colormap=mpl.cm.gnuplot2, showMe=False,
+        #      plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png', plotTitle='Energy Resolution')
+        
+        plotArray( xyrarray, showMe=False, cbar=True, plotFileName=figdir+outfile+'_arrayPlot.png', plotTitle='Energy Resolution at 400nm')
 
-        plotArray( xarray, yarray, larray, colormap=mpl.cm.gnuplot2, showMe=False,
-              plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png', plotTitle='Number of Lasers for Fit')
+        #plotArray( xarray, yarray, larray, colormap=mpl.cm.gnuplot2, showMe=False,
+        #      plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png', plotTitle='Number of Lasers for Fit')
+        
+        plotArray( xylarray, showMe=False, cbar=True, plotFileName=figdir+outfile+'_nlaserPlot.png', plotTitle='Number of lasers for fit')
 
-        n_res, resbins = np.histogram(rarray, 80, range = (1,12))
-        binwidth = (resbins[1]-resbins[0])/2.0
-        resbins += binwidth
+
+        # Energy Res histo
         fig3=plt.figure()
         ax2=fig3.add_subplot(111)
         #ax2.plot(resbins[:-1],n_res)
