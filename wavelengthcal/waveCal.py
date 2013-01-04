@@ -719,15 +719,14 @@ def wavelengthCal(paramFile):
         # Energy Res histo
         fig3=plt.figure()
         ax2=fig3.add_subplot(111)
-        #ax2.plot(resbins[:-1],n_res)
         colormap = mpl.cm.gist_ncar
         plt.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.9, params['n_roaches'])])
-        roacharr = np.array(roacharr)
-        rarray = np.array(rarray)
+        #roacharr = np.array(roacharr)
+        #rarray = np.array(rarray)
         labels = []
         for iterator in range(params['n_roaches']):
             roach_pix = np.where(roacharr == iterator)[0]
-            n_res, resbins = np.histogram(rarray[roach_pix], 80, range = (1,12))
+            n_res, resbins = np.histogram(xyrarray[roach_pix].ravel(), 80, range = (1,12))
             ax2.plot(resbins[1:-1],n_res[1:])
             labels.append('roach %i' %(iterator))
         plt.legend(labels, loc='upper left')
@@ -735,7 +734,7 @@ def wavelengthCal(paramFile):
         plt.xlabel('Energy Resolution at 400nm')
         plt.savefig(outdir+datedir+params['figdir']+outfile.split('.')[0]+"_R_Estimates.png")
         plt.clf()
-        
+          
 
     print 'Finish Time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
 
