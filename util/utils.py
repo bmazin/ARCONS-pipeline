@@ -302,8 +302,9 @@ def printObsFileDescriptions( dir_path ):
        f.close()
   
 
-def median_filterNaN(input, size=5, *nkwarg, **kwarg):
-    '''NaN-handling version of the scipy median filter function
+def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
+    '''
+    NaN-handling version of the scipy median filter function
     (scipy.ndimage.filters.median_filter). Any NaN values in the input array are
     simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
     noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
@@ -313,11 +314,11 @@ def median_filterNaN(input, size=5, *nkwarg, **kwarg):
     
     Arguments/return values are same as for scipy median_filter.
     INPUTS:
-        input : array-like, input array to filter (can be n-dimensional)
+        inputarray : array-like, input array to filter (can be n-dimensional)
         size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
                 scalar, then same value is used for all dimensions.
     OUTPUTS:
-        NaN-resistant median filtered version of input.
+        NaN-resistant median filtered version of inputarray.
     
     For other parameters see documentation for scipy.ndimage.filters.median_filter.
 
@@ -328,12 +329,66 @@ def median_filterNaN(input, size=5, *nkwarg, **kwarg):
     -- returns median boxcar filtered image with a moving box size 3x3 pixels.
     
     JvE 12/28/12
-    '''
-         
-    return scipy.ndimage.filters.generic_filter(input, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
+    '''     
+    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
                                                  *nkwarg, **kwarg)
     
     
+    
+def mean_filterNaN(inputarray, size=3, *nkwarg, **kwarg):
+    '''
+    Basically a box-car smoothing filter. Same as median_filterNaN, but calculates a mean instead. 
+    Any NaN values in the input array are ignored in calculating means.
+    See median_filterNaN for details.
+    JvE 1/4/13
+    '''
+         
+    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.mean(x[~numpy.isnan(x)]), size,
+                                                 *nkwarg, **kwarg)
+    
+
+def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
+    '''
+    Replace all NaN values in an array with the mean (or median)
+    of the surrounding pixels. Should work for any number of dimensions, 
+    but only fully tested for 2D arrays at the moment.
+    
+    INPUTS:
+        inputarray - input array
+        mode - 'mean' or 'median' to replace with the mean or median of the neighbouring pixels.
+        boxsize - scalar integer, length of edge of box surrounding bad pixels from which to
+                  calculate the mean or median.
+        iterate - If iterate is set to True then iterate until there are no NaN values left.
+                  (To deal with cases where there are many adjacent NaN's, where some NaN
+                  elements may not have any valid neighbours to calculate a mean/median. 
+                  Such elements will remain NaN if only a single pass is done.)
+    OUTPUTS:
+        Returns 'inputarray' with NaN values replaced.
+        
+    TO DO: currently spits out multiple 'invalid value encoutered' warnings if 
+           NaNs are not all removed on the first pass. These can safely be ignored.
+           Will implement some warning catching to suppress them.
+    JvE 1/4/2013    
+    '''
+    
+    outputarray = numpy.copy(inputarray)
+    print numpy.sum(numpy.isnan(outputarray))
+    while numpy.sum(numpy.isnan(outputarray)) > 0:
+        
+        #Calculate interpolates at *all* locations (because it's easier...)
+        if mode=='mean':
+            interpolates=mean_filterNaN(outputarray,size=boxsize,mode='mirror')
+        elif mode=='median':
+            interpolates=median_filterNaN(outputarray,size=boxsize,mode='mirror')
+        else:
+            raise ValueError('Invalid mode selection - should be one of "mean" or "median"')
+        
+        #Then substitute those values in wherever there are NaN values.
+        outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
+        print numpy.sum(numpy.isnan(outputarray))
+        if not iterate: break 
+
+    return outputarray
     
     
     
