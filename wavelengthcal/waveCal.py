@@ -59,14 +59,14 @@ class DriftObj(IsDescription):
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
                                                #    double precision
     
-def failure(row, rarray, larray, flagnum):
+def failure(row, xyrarray, xylarray, pixi, pixj, flagnum):
     row['wave_flag'] = flagnum
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
     row['solnrange'] = np.array([-1.,-1.])
     row.append()
-    rarray.append(0.)
-    larray.append(0.)
+    xyrarray[pixi][pixj] = 0.
+    xylarray[pixi][pixj] = 0.
 
 def fitTwo(peaks, peak_locations, xarr, yarr):
 
@@ -213,11 +213,9 @@ def wavelengthCal(paramFile):
         n_rows = params['n_rows']
         n_cols = params['n_cols']
     
-        xarray = []
-        yarray = []
-        rarray = []
-        larray = []
-        roacharr = []
+        xyrarray = np.zeros((n_rows, n_cols))
+        xylarray = np.zeros((n_rows, n_cols))
+        roacharr = np.zeros((n_rows, n_cols))
 
         # Open outfile to write parameters to
         try:
@@ -279,11 +277,9 @@ def wavelengthCal(paramFile):
                 pstring = beammap[i][j]
                 pixelNode = pstring.split('t')[0]
     
-                xarray.append(j)
-                yarray.append(i)
                 roach = int(pixelNode.split('/')[1][1:])
                 pixel = int(pixelNode.split('/')[2][1:])
-                roacharr.append(roach)
+                roacharr[i][j] = roach
 
                 row['pixelrow'] = i
                 row['pixelcol'] = j
@@ -296,7 +292,7 @@ def wavelengthCal(paramFile):
 
                 # Flag dead pixels
                 if len(photondata)==0:
-                    failure(row, rarray, larray, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
 
                 # For each second, get the packets
@@ -352,13 +348,13 @@ def wavelengthCal(paramFile):
                 # Cut off any hits above zero (~nonsensible)
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
                 if (len(parab_phase) == 0):
-                    failure(row, rarray, larray, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
                 
                 # Cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
-                    failure(row, rarray, larray, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
 
 
@@ -374,7 +370,7 @@ def wavelengthCal(paramFile):
         
                 # Cut on low number of total counts
                 if totalcts < params['low_counts_val'] * 100.:
-                    failure(row, rarray, larray, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
     
                 # Smooth
@@ -384,7 +380,7 @@ def wavelengthCal(paramFile):
                     parab_smooth = smooth.smooth(n_inbin, windowsize, window)
                     smoothed_data = np.array(parab_smooth, dtype=float)
                 except:
-                    failure(row, rarray, larray, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue 
 
                 # Find extreema:
@@ -400,7 +396,7 @@ def wavelengthCal(paramFile):
                     start_ind = (coarse_data > params['low_counts_val']).nonzero()[0][0]
                     end_ind = (coarse_data > params['low_counts_val']).nonzero()[0][-1]
                 except:
-                    failure(row, rarray, larray, 1)
+                    failure(row, xyrarray, xylarray, i, j, 1)
                     continue
                     
                 coarse_data = coarse_data[start_ind:end_ind]
@@ -443,10 +439,10 @@ def wavelengthCal(paramFile):
 
                 # Cut if wrong number of peaks
                 if (maxima_num < params['n_lasers']-1) | (maxima_num > params['n_lasers']) :
-                    failure(row, rarray, larray, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
                 if (minima_num != maxima_num):
-                    failure(row, rarray, larray, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
 
 
@@ -460,25 +456,37 @@ def wavelengthCal(paramFile):
                 # If 3, pass in max_vals, max_locs, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right] -> fitThree(), return params
                 if ((maxima_num == params['n_lasers']) & (len(max_locations) == params['n_lasers'])):
                     n_in_fit = params['n_lasers']
-                    gparams, redchi2gauss = fitThree(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right]) 
-                    sigma1 = gparams[0]
-                    x_offset1 = gparams[1]
-                    amplitude1 = gparams[2]
-                    sigma2 = gparams[3]
-                    x_offset2 = gparams[4]
-                    amplitude2 = gparams[5]
-                    sigma3 = gparams[6]
-                    x_offset3 = gparams[7]
-                    amplitude3 = gparams[8]
+                    gparams, redchi2gauss = fitThree(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right])
+                    # order Gaussians
+                    off_inds = [1, 4, 7]
+                    x_offset1 = np.min([gparams[xi] for xi in off_inds])
+                    ind1 = off_inds[np.where([gparams[xi] for xi in off_inds] == x_offset1)[0]] 
+                    sigma1 = gparams[ind1-1]
+                    amplitude1 = gparams[ind1+1]
+                    off_inds.remove(ind1)
+                    x_offset2 = np.min([gparams[xi] for xi in off_inds])
+                    ind2 =  off_inds[np.where([gparams[xi] for xi in off_inds] == x_offset2)[0]] 
+                    sigma2 = gparams[ind2-1]
+                    amplitude2 = gparams[ind2+1]
+                    off_inds.remove(ind2)
+                    ind3 = off_inds[0]
+                    x_offset3 = gparams[ind3]
+                    sigma3 = gparams[ind3-1]
+                    amplitude3 = gparams[ind3+1]
                 else:
                     n_in_fit = params['n_lasers']-1
-                    gparams, redchi2gauss = fitTwo(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right]) 
-                    sigma1 = gparams[0]
-                    x_offset1 = gparams[1]
-                    amplitude1 = gparams[2]
-                    sigma2 = gparams[3]
-                    x_offset2 = gparams[4]
-                    amplitude2 = gparams[5]
+                    gparams, redchi2gauss = fitTwo(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right])
+                    # order Gaussians
+                    off_inds = [1, 4]
+                    x_offset1 = np.min( [gparams[xi] for xi in off_inds])
+                    ind1 =  off_inds[np.where([gparams[xi] for xi in off_inds] == x_offset1)[0]] 
+                    sigma1 = gparams[ind1-1]
+                    amplitude1 = gparams[ind1+1]
+                    off_inds.remove(ind1)
+                    ind2 = off_inds[0]
+                    x_offset2 = gparams[ind2]
+                    sigma2 = gparams[ind2-1]
+                    amplitude2 = gparams[ind2+1]
             
                 if (n_in_fit == params['n_lasers']-1):
                     gaussfit = amplitude1 * np.exp( -(pow((phasebins-x_offset1),2) / (2. * pow(sigma1,2)))) + \
@@ -534,7 +542,7 @@ def wavelengthCal(paramFile):
                 # Final cuts
             
                 if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.) | (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]) | (gparams[-2] > min_locations[-1]):
-                    failure(row, rarray, larray, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
                 #if (redchi2gauss > params['chi2_cutoff']):              # Cut on chi^2
                 #    failure(row, rarray, larray, 2)
@@ -555,7 +563,7 @@ def wavelengthCal(paramFile):
                     ind_blue = (np.where(e_fromphase < blue_peak))[0][0]
                     ind_red = (np.where(e_fromphase < red_peak))[0][0]
                 except:
-                    failure(row, rarray, larray, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
 
                 blue_amp = np.mean(n_inbin[ind_blue-10:ind_blue+10])
@@ -634,8 +642,8 @@ def wavelengthCal(paramFile):
                     driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
                     driftrow.append()
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
-                    rarray.append(resest)
-                    larray.append(n_in_fit)
+                    xyrarray[i][j] = resest
+                    xylarray[i][j] = n_in_fit
 
                     # fits plot
                     if (plotcounter % n_plots_per_page == 0):
@@ -655,7 +663,7 @@ def wavelengthCal(paramFile):
                     plotcounter+=1
 
                 else:
-                    failure(row, rarray, larray, 2)
+                    failure(row, xyrarray, xylarray, i, j, 2)
                     continue
 
 
@@ -676,27 +684,23 @@ def wavelengthCal(paramFile):
         print plotcounter, ' good pixels'
 
         # Plots
+    
+        plotArray( xyrarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png',
+                  plotTitle='Energy Resolution at 400nm')
+     
+        plotArray( xylarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png',
+                  plotTitle='Number of lasers for fit')
 
-        plotArray( xarray, yarray, rarray, colormap=mpl.cm.gnuplot2, showMe=False,
-              plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png', plotTitle='Energy Resolution')
 
-        plotArray( xarray, yarray, larray, colormap=mpl.cm.gnuplot2, showMe=False,
-              plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png', plotTitle='Number of Lasers for Fit')
-
-        n_res, resbins = np.histogram(rarray, 80, range = (1,12))
-        binwidth = (resbins[1]-resbins[0])/2.0
-        resbins += binwidth
+        # Energy Res histo
         fig3=plt.figure()
         ax2=fig3.add_subplot(111)
-        #ax2.plot(resbins[:-1],n_res)
         colormap = mpl.cm.gist_ncar
         plt.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.9, params['n_roaches'])])
-        roacharr = np.array(roacharr)
-        rarray = np.array(rarray)
         labels = []
         for iterator in range(params['n_roaches']):
             roach_pix = np.where(roacharr == iterator)[0]
-            n_res, resbins = np.histogram(rarray[roach_pix], 80, range = (1,12))
+            n_res, resbins = np.histogram(xyrarray[roach_pix].ravel(), 80, range = (1,12))
             ax2.plot(resbins[1:-1],n_res[1:])
             labels.append('roach %i' %(iterator))
         plt.legend(labels, loc='upper left')
@@ -704,7 +708,7 @@ def wavelengthCal(paramFile):
         plt.xlabel('Energy Resolution at 400nm')
         plt.savefig(outdir+datedir+params['figdir']+outfile.split('.')[0]+"_R_Estimates.png")
         plt.clf()
-        
+          
 
     print 'Finish Time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
 
