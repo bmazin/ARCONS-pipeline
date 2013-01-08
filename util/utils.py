@@ -9,8 +9,9 @@ import glob
 import matplotlib as mpl
 import matplotlib.pylab as plt
 import binascii
+import math
 from scipy.signal import convolve
-
+import scipy.ndimage
 
 """
 Modules:
@@ -170,50 +171,108 @@ def linearFit( x, y, err=None ):
     return solution
 
 
-def plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
-              plotFileName='arrayPlot.png', plotTitle=''):
-   """
-   For each corresponding x and y location, where x and y are 1D lists/arrays, plots the z 
-   function to screen or if showMe is set to False, to file.  If normMin and normMax are
-   None, the norm is just set to the full range of the z array.
+def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
+              delay=0.1, **plotArrayKeys):
+    """
+    Makes a movie out of a list of frame objects (2-D arrays)
+    
+    """
+    if len(listOfFrameObj) == 1:
+        raise ValueError, "I cannot make movie out of a list of one object!"
 
-   Note: could try imshow or pcolor
-   """
-   font = {'family' : 'normal',
-           'weight' : 'normal',
-           'size'   : 6}
-   mpl.rc('font', **font)
-   
-   if normMin == None:
-      normMin = numpy.min(z)
-   if normMax == None:
-      normMax = numpy.max(z)
-   norm = mpl.colors.Normalize(vmin=normMin,vmax=normMax)
+    if frameTitles != None:
+        assert len(frameTitles) == len(listOfFrameObj), "Number of Frame titles\
+        must equal number of frames"
 
-   fig = plt.figure()
-   ax = fig.add_subplot(111)
-   
-   plt.scatter(x,y,c=z,s=500,marker='s',cmap=colormap, norm=norm)
-   plt.colorbar()
-   plt.title(plotTitle)
-   plt.xlabel('Column Number')
-   plt.ylabel('Row Number')
+    if os.path.exists("./.tmp_movie"):
+        os.system("rm -rf .tmp_movie")
 
-   x = numpy.array(x)
-   y = numpy.array(y)
-   plt.xlim(numpy.min(x)-1.5, numpy.max(x))#-0.25)
-   plt.ylim(numpy.min(y)-1.5, numpy.max(y)-0.25)
+    os.mkdir(".tmp_movie")
+    iFrame = 0
+    print 'Making individual frames ...'
+    
+    for frame in listOfFrameObj:
 
-   if showMe:
-      plt.show()
-   else:
-      try:
-         plt.savefig(plotFileName)
-      except:
-         pass
-   
-   plt.clf()   
+       if frameTitles!= None:
+          plotTitle = frameTitles[iFrame]
+       else:
+          plotTitle=''
+       fp = plotArray(frame, showMe=False, plotFileName='.tmp_movie/mov_'+repr(iFrame+10000)+'.png', \
+                      plotTitle=plotTitle, **plotArrayKeys)
+       iFrame += 1
+       del fp
 
+    os.chdir('.tmp_movie')
+
+    if outName[-4:-1]+outName[-1] != '.gif':
+        outName += '.gif'
+
+    delay *= 100
+    delay = int(delay)
+    print 'Making Movie ...'
+
+    if '/' in outName:
+        os.system('convert -delay %s -loop 0 mov_* %s'%(repr(delay),outName))
+    else:
+        os.system('convert -delay %s -loop 0 mov_* ../%s'%(repr(delay),outName))
+    os.chdir("../")
+    os.system("rm -rf .tmp_movie")
+    print 'done.'
+
+
+
+def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
+              cbar=False, cbarticks=None, cbarlabels=None, plotFileName='arrayPlot.png',
+              plotTitle='', sigma=None):
+    """
+    Plots the 2D array to screen or if showMe is set to False, to file.  If normMin and
+    normMax are None, the norm is just set to the full range of the array.
+    """
+    if sigma != None:
+       meanVal = np.mean(accumulatePositive(xyarray))
+       stdVal = np.std(accumulatePositive(xyarray))
+       normMin = meanVal - sigma*stdVal
+       normMax = meanVal + sigma*stdVal
+    if normMin == None:
+       normMin = xyarray.min()
+    if normMax == None:
+       normMax = xyarray.max()
+    norm = mpl.colors.Normalize(vmin=normMin,vmax=normMax)
+
+    figWidthPt = 550.0
+    inchesPerPt = 1.0/72.27                 # Convert pt to inch
+    figWidth = figWidthPt*inchesPerPt       # width in inches
+    figHeight = figWidth*1.0                # height in inches
+    figSize =  [figWidth,figHeight]
+    params = {'backend': 'ps',
+              'axes.labelsize': 10,
+              'axes.titlesize': 12,
+              'text.fontsize': 10,
+              'legend.fontsize': 10,
+              'xtick.labelsize': 10,
+              'ytick.labelsize': 10,
+              'figure.figsize': figSize}
+    plt.rcParams.update(params)
+
+    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm)
+
+    if cbar:
+        if cbarticks == None:
+           cbar = plt.colorbar(shrink=0.8)
+        else:
+           cbar = plt.colorbar(ticks=cbarticks, shrink=0.8)
+        if cbarlabels != None:
+           cbar.ax.set_yticklabels(cbarlabels)
+    
+    plt.ylabel('Row Number')
+    plt.xlabel('Column Number')
+    plt.title(plotTitle)
+
+    if showMe == False:
+        plt.savefig(plotFileName)
+    else:    
+        plt.show()
+ 
 
 def printCalFileDescriptions( dir_path ):
     """
@@ -241,4 +300,152 @@ def printObsFileDescriptions( dir_path ):
        target = f.root.header.header.col('target')[0]
        print target
        f.close()
+  
+
+def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
+    '''
+    NaN-handling version of the scipy median filter function
+    (scipy.ndimage.filters.median_filter). Any NaN values in the input array are
+    simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
+    noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
+    (but note that quantitative applications are probably limited.)
+    Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
+    calling arguments are passed.
     
+    Arguments/return values are same as for scipy median_filter.
+    INPUTS:
+        inputarray : array-like, input array to filter (can be n-dimensional)
+        size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
+                scalar, then same value is used for all dimensions.
+    OUTPUTS:
+        NaN-resistant median filtered version of inputarray.
+    
+    For other parameters see documentation for scipy.ndimage.filters.median_filter.
+
+    e.g.:
+        
+        filteredImage = median_filterNaN(imageArray,size=3)
+    
+    -- returns median boxcar filtered image with a moving box size 3x3 pixels.
+    
+    JvE 12/28/12
+    '''     
+    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
+                                                 *nkwarg, **kwarg)
+    
+    
+    
+def mean_filterNaN(inputarray, size=3, *nkwarg, **kwarg):
+    '''
+    Basically a box-car smoothing filter. Same as median_filterNaN, but calculates a mean instead. 
+    Any NaN values in the input array are ignored in calculating means.
+    See median_filterNaN for details.
+    JvE 1/4/13
+    '''
+         
+    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.mean(x[~numpy.isnan(x)]), size,
+                                                 *nkwarg, **kwarg)
+    
+
+def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
+    '''
+    Replace all NaN values in an array with the mean (or median)
+    of the surrounding pixels. Should work for any number of dimensions, 
+    but only fully tested for 2D arrays at the moment.
+    
+    INPUTS:
+        inputarray - input array
+        mode - 'mean' or 'median' to replace with the mean or median of the neighbouring pixels.
+        boxsize - scalar integer, length of edge of box surrounding bad pixels from which to
+                  calculate the mean or median.
+        iterate - If iterate is set to True then iterate until there are no NaN values left.
+                  (To deal with cases where there are many adjacent NaN's, where some NaN
+                  elements may not have any valid neighbours to calculate a mean/median. 
+                  Such elements will remain NaN if only a single pass is done.)
+    OUTPUTS:
+        Returns 'inputarray' with NaN values replaced.
+        
+    TO DO: currently spits out multiple 'invalid value encoutered' warnings if 
+           NaNs are not all removed on the first pass. These can safely be ignored.
+           Will implement some warning catching to suppress them.
+    JvE 1/4/2013    
+    '''
+    
+    outputarray = numpy.copy(inputarray)
+    print numpy.sum(numpy.isnan(outputarray))
+    while numpy.sum(numpy.isnan(outputarray)) > 0:
+        
+        #Calculate interpolates at *all* locations (because it's easier...)
+        if mode=='mean':
+            interpolates=mean_filterNaN(outputarray,size=boxsize,mode='mirror')
+        elif mode=='median':
+            interpolates=median_filterNaN(outputarray,size=boxsize,mode='mirror')
+        else:
+            raise ValueError('Invalid mode selection - should be one of "mean" or "median"')
+        
+        #Then substitute those values in wherever there are NaN values.
+        outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
+        print numpy.sum(numpy.isnan(outputarray))
+        if not iterate: break 
+
+    return outputarray
+    
+    
+    
+def rebin2D(a, ysize, xsize):
+    '''
+    Rebin an array to a SMALLER array. Rescales the values such that each element
+    in the output array is the mean of the elememts which it encloses in the input
+    array (i.e., not the total). Similar to the IDL rebin function.
+    Dimensions of binned array must be an integer factor of the input array.
+    Adapted from SciPy cookbook - see http://www.scipy.org/Cookbook/Rebinning
+    JvE 12/28/12
+
+    INPUTS:
+        a - array to be rebinned
+        ysize - new ysize (must be integer factor of y-size of input array)
+        xsize - new xsize (ditto for x-size of input array)
+
+    OUTPUTS:
+        Returns the original array rebinned to the new dimensions requested.        
+    '''
+    
+    yfactor, xfactor = numpy.asarray(a.shape) / numpy.array([ysize, xsize])
+    return a.reshape(ysize, yfactor, xsize, xfactor,).mean(1).mean(2)
+
+  
+  
+def gaussian_psf(fwhm, boxsize, oversample=50):
+    
+    '''
+    Returns a simulated Gaussian PSF: an array containing a 2D Gaussian function
+    of width fwhm (in pixels), binned down to the requested box size. 
+    JvE 12/28/12
+    
+    INPUTS:
+        fwhm - full-width half-max of the Gaussian in pixels
+        boxsize - size of (square) output array
+        oversample (optional) - factor by which the raw (unbinned) model Gaussian
+                                oversamples the final requested boxsize.
+    
+    OUTPUTS:
+        2D boxsize x boxsize array containing the binned Gaussian PSF
+    
+    (Verified against IDL astro library daoerf routine)
+        
+    '''
+  
+    fineboxsize = boxsize * oversample
+    
+    xcoord = ycoord = numpy.arange(-(fineboxsize - 1.) / 2., (fineboxsize - 1.) / 2. + 1.)
+    xx, yy = numpy.meshgrid(xcoord, ycoord)
+    xsigma = ysigma = fwhm / (2.*math.sqrt(2.*math.log(2.))) * oversample
+    zx = (xx ** 2 / (2 * xsigma ** 2))
+    zy = (yy ** 2 / (2 * ysigma ** 2))
+    fineSampledGaussian = numpy.exp(-(zx + zy))
+
+    #Bin down to the required output boxsize:
+    binnedGaussian = rebin2D(fineSampledGaussian, boxsize, boxsize)
+
+    return binnedGaussian
+        
