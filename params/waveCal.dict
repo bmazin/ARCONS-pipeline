@@ -21,8 +21,7 @@ files2run = '/ScienceData/PAL2012/20121210/cal_20121211-044853.h5'
                                              
 
 #outdir = '/ScienceData/waveCalSolnFiles/'
-#outdir = '/Scratch/waveCalSolnFiles/'
-outdir = '/home/danica/optimusP/testing/'
+outdir = '/Scratch/waveCalSolnFiles/'
 
 figdir = 'figs/'
 driftdir = 'drift_study/'
