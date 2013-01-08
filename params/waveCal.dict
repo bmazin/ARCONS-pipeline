@@ -31,6 +31,9 @@ fwhm2sig = 2.35
 n_rows = 46
 n_cols = 44
 n_roaches = 8
+
+non_alloc_pix = 250
+
 divisor = 275
 read_freq = 550
 
