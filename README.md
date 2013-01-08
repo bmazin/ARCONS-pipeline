@@ -10,7 +10,9 @@ Required external software components:
 
 Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.php)
  
-PyEphem (http://rhodesmill.org/pyephem/) 
+PyEphem (http://rhodesmill.org/pyephem/)
+
+PyGuide (http://www.astro.washington.edu/users/rowen/PyGuide/Manual.html)
 
 (you can check if you have them with help('modules') within the (i)python interpreter)
 
