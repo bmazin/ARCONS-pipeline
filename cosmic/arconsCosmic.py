@@ -18,19 +18,140 @@ import tables
 import pyfits
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 
-def openHdfFile(hdf5FileName):
+def countPhotons(hdf5FileName):
     # make the full file name by joining the input name to the MKID_DATA_DIR (or .)
     dataDir = os.getenv('MKID_DATA_DIR','.')
     hdf5FullFileName = os.path.join(dataDir,hdf5FileName)
-    print "full file name is ",hdf5FullFileName
-    try:
-        fid = tables.openFile(hdf5FullFileName, mode='r')
-    except:
-        raise
-    return fid    
+    fid = tables.openFile(hdf5FullFileName, mode='r')
+    header = fid.root.header.header
+    titles = header.colnames
+    info = header[0]
+    exptime = info[titles.index('exptime')]
 
+    timeMask = int(20*'1',2)   #bitmask of 20 ones
+    timeMin = timeMask
+    timeMax = 0
+    nPhoton = 0
+
+    print "before loadAllSecs"
+    nRow,nCol,allSecs,beamImage = loadAllSecs(fid)
+    print "after  loadAllSecs"
+    nPhoton = 0
+    for iRow in range(nRow):
+        for iCol in range(nCol):
+            for sec in allSecs[iRow,iCol]:
+                nPhoton += len(sec)
+    fid.close()
+    return nPhoton
+
+def getHgByRoach(hdf5FileName):
+    hgs = {}
+    # make the full file name by joining the input name to the MKID_DATA_DIR (or .)
+    dataDir = os.getenv('MKID_DATA_DIR','.')
+    hdf5FullFileName = os.path.join(dataDir,hdf5FileName)
+    fid = tables.openFile(hdf5FullFileName, mode='r')
+    header = fid.root.header.header
+    titles = header.colnames
+    info = header[0]
+    exptime = info[titles.index('exptime')]
+
+    timeMask = int(20*'1',2)   #bitmask of 20 ones
+    timeMin = timeMask
+    timeMax = 0
+    nPhoton = 0
+
+    print "before loadAllSecs"
+    nRow,nCol,allSecs,beamImage = loadAllSecs(fid)
+    print "after  loadAllSecs"
+    nPhoton = 0
+    nBins = 10
+    for iSec in range(exptime):
+        print "iSec=%4d / %4d" % (iSec,exptime)
+        hgsThisSec = {}
+        for iRow in range(nRow):
+            for iCol in range(nCol):
+                sec = allSecs[iRow,iCol][iSec]
+                if len(sec) > 0:
+                    times = sec & timeMask
+                    hg,edges = np.histogram(times,bins=nBins,range=(0,10000))
+                    roachName = beamImage[iRow][iCol].split("/")[1]
+                    if not hgsThisSec.has_key(roachName):
+                        hgsThisSec[roachName] = np.zeros(nBins,dtype=np.int64)
+                    hgsThisSec[roachName] += hg
+                    nPhoton += len(sec)
+        for roachName in hgsThisSec.keys():
+            if not hgs.has_key(roachName):
+                hgs[roachName] = []
+            hgs[roachName] += list(hgsThisSec[roachName])
+    fid.close()
+    times = np.arange(0,1,step=1.0/nBins)
+    return nPhoton,hgs,times
+
+def plotHgByRoach(hdf5FileName,hgs,times):
+    pfn = os.path.splitext(hdf5FileName)[0]+"-hgByRoach.png"
+    plt.clf()
+    keys = hgs.keys()
+    keys.sort()
+    for roachName in keys:
+        print "roachName=",roachName
+        plt.plot(times,hgs[roachName],label=roachName)
+    plt.title(hdf5FileName)
+    dt = times[1]-times[0]
+    ylabel = "counts per %.1f sec" % dt
+    plt.ylabel(ylabel)
+    plt.xlabel("time (seconds)")
+    plt.xlim(180,260)
+    plt.legend(loc='best', fancybox=True)
+    plt.legend().get_frame().set_alpha(0.5)
+    #plt.savefig(pfn)
+    
+
+def getMinMaxTime(hdf5FileName):
+    # make the full file name by joining the input name to the MKID_DATA_DIR (or .)
+    dataDir = os.getenv('MKID_DATA_DIR','.')
+    hdf5FullFileName = os.path.join(dataDir,hdf5FileName)
+    fid = tables.openFile(hdf5FullFileName, mode='r')
+    header = fid.root.header.header
+    titles = header.colnames
+    info = header[0]
+    exptime = info[titles.index('exptime')]
+
+    timeMask = int(20*'1',2)   #bitmask of 20 ones
+    timeMin = timeMask
+    timeMax = 0
+    nPhoton = 0
+
+    print "before loadAllSecs"
+    nRow,nCol,allSecs,beamImage = loadAllSecs(fid)
+    print "after  loadAllSecs"
+    bins = 100
+    hgSum = np.zeros(bins)
+    for iSecond in np.arange(exptime):
+        for iRow in np.arange(nRow):
+            for iCol in np.arange(nCol):
+                secs = allSecs[iRow,iCol]
+                print "iRow=%02d iCol=%02d pixel=%20s  nSecs=%5d %10d %10d" % (iRow, iCol, pixel, len(secs), timeMin, timeMax)
+                sec = secs[iSecond]
+                if len(sec) > 0:
+                    nPhoton += len(sec)
+                    times = sec & timeMask
+                    hg,edges = np.histogram(times,bins=bins,range=(0,1000000))
+                    hgSum += hg
+                    timeMin = min(times.min(),timeMin)
+                    timeMax = max(times.max(),timeMax)
+    fid.close()
+    return timeMin,timeMax,nPhoton,hgSum
+
+def loadAllSecs(fid):
+    beamImage = fid.getNode("/beammap/beamimage")
+    nRow = len(beamImage)
+    nCol = len(beamImage[0])
+    allSecs = dict( ((i,j),None) for i in range(nRow) for j in range(nCol) )
+    for iRow in np.arange(nRow):
+        for iCol in np.arange(nCol):
+            allSecs[iRow,iCol] = fid.getNode(beamImage[iRow][iCol])
+    return nRow, nCol, allSecs, beamImage
 
 def makeOrLoadPklFile(hdf5FileName):
     pklFileName = hdf5FileName+".pkl"
