@@ -98,6 +98,9 @@ def myDegFromDMSStr(DMSStr):
     if d<0 : retval *= -1
     return retval
 
+def myDegToHMS(deg):
+    hours = deg/15.0
+    absHours = abs(hours)
 
 
 

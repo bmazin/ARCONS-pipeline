@@ -5,7 +5,7 @@ import pyfits
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from RO import StringUtil
+#from RO import StringUtil
 import time
 from matplotlib import dates
 import datetime
