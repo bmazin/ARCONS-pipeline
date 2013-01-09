@@ -1,9 +1,9 @@
+
 # encoding: utf-8
 """
-ObsHeaders.py
-Contains PyTables headers for observation files and related h5 files
+pulses.py
 
-Created as pulses.py by Ben Mazin on 2011-05-04.
+Created by Ben Mazin on 2011-05-04.
 Copyright (c) 2011 . All rights reserved.
 """
 
@@ -16,16 +16,21 @@ import scipy as sp
 import scipy.signal
 from matplotlib.pyplot import plot, figure, show, rc, grid
 import matplotlib.pyplot as plt
+#import matplotlib.image as mpimg
 import mpfit
+#import numexpr
+#from iqsweep import *
 
-class ObsHeader(IsDescription):#PyTables header for observation files
+class ObsHeader(IsDescription):
     target = StringCol(80)
     datadir = StringCol(80)             # directory where observation data is stored
     calfile = StringCol(80)             # path and filename of calibration file
     beammapfile = StringCol(80)         # path and filename of beam map file
     version = StringCol(80)
     instrument = StringCol(80)
+    description = StringCol(400)
     telescope = StringCol(80)
+    filt = StringCol(80)
     focus = StringCol(80)
     parallactic = Float64Col()
     ra = Float64Col()
@@ -40,17 +45,28 @@ class ObsHeader(IsDescription):#PyTables header for observation files
     obsalt = Float64Col()
     timezone = Int32Col()
     localtime = StringCol(80)
-    ut = Float64Col()
+    unixtime = Float64Col()
+    utc = StringCol(80)
     lst = StringCol(80)
     jd = Float64Col()
     platescl = Float64Col()
     exptime = Int32Col()
  
+class BeamMap(IsDescription):
+    roach = UInt16Col()                 # ROACH board number (0-15) for now!
+    resnum = UInt16Col()                # resonator number on roach board (corresponds to res # in optimal pulse packets)
+    f0 = Float32Col()                   # resonant frequency of center of sweep (can be used to get group name)
+    pixel = UInt32Col()                 # actual pixel number - bottom left of array is 0, increasing up
+    xpos = Float32Col()                 # physical X location in mm
+    ypos = Float32Col()                 # physical Y location in mm
+    scale = Float32Col(3)               # polynomial to convert from degrees to eV 
+
 class Photon(IsDescription):
     """The pytables derived class that holds pulse packet data on the disk.
     Put in a marker pulse with at = int(time.time()) and phase = -32767 every second.
     """
     at = UInt32Col()            # pulse arrival time in microseconds since last sync pulse
+#    phase = Int16Col()          # optimally filtered phase pulse height
 
 class RawPulse(IsDescription):
     """The pytables derived class that hold raw pulse data on the disk.
@@ -83,14 +99,6 @@ class PulseAnalysis(IsDescription):     # contains final template info
     coeff = Float32Col(100)             # coefficients for the near-optimal filter
     nparam = Int16Col()                 # number of parameters in the filter
 
-class BeamMap(IsDescription):
-    roach = UInt16Col()                 # ROACH board number (0-15) for now!
-    resnum = UInt16Col()                # resonator number on roach board (corresponds to res # in optimal pulse packets)
-    f0 = Float32Col()                   # resonant frequency of center of sweep (can be used to get group name)
-    pixel = UInt32Col()                 # actual pixel number - bottom left of array is 0, increasing up
-    xpos = Float32Col()                 # physical X location in mm
-    ypos = Float32Col()                 # physical Y location in mm
-    scale = Float32Col(3)               # polynomial to convert from degrees to eV 
 
    
 # Make a fake observation file
@@ -117,6 +125,41 @@ def FakeObservation(obsname, start, exptime):
     
     h5file = openFile(obsname, mode = "a")
     
+    ''' beam map inserted from beam map file during header gen
+    # make beamap table
+    bgroup = h5file.createGroup('/','beammap','Beam Map of Array')
+    filt = Filters(complevel=0, complib='zlib', fletcher32=False)
+    filt1 = Filters(complevel=1, complib='blosc', fletcher32=False)      # without minimal compression the files sizes are ridiculous...
+    btable = h5file.createTable(bgroup, 'beammap', BeamMap, "Table of anaylzed beam map data",filters=filt1)
+    w = btable.row
+
+    # make beammap array - this is a 2d array (top left is 0,0.  first index is column, second is row) containing a string with the name of the group holding the photon data
+    ca = h5file.createCArray(bgroup, 'beamimage', StringAtom(itemsize=40), (32,32), filters=filt1)  
+    
+    for i in xrange(nroach):
+        for j in xrange(nres):
+            w['roach'] = i
+            w['resnum'] = ((41*j)%256)
+            w['f0'] = 3.5 + (i%2)*.512 + 0.002*j
+            w['pixel'] = ((41*j)%256) + 256*i
+            w['xpos'] = np.floor(j/16)*0.1 
+            w['ypos'] = (j%16)*0.1 
+            if i == 1 or i == 3:
+                w['ypos'] = (j%16)*0.1 + 1.6 
+            if i == 2 or i == 3:
+                w['xpos'] = np.floor(j/16)*0.1 + 1.6                          
+            w.append()
+            colidx = int(np.floor(j/16))
+            rowidx = 31 - j%16
+            if i == 1 or i == 3:
+                rowidx -= 16                
+            if i >= 2:
+                colidx += 16
+            ca[rowidx,colidx] = 'r'+str(i)+'/p'+str( ((41*j)%256) ) 
+    h5file.flush()
+    carray = ca.read()  
+    '''
+
     # load up the 32x32 image we want to simulate
     sourceim = plt.imread('/Users/ourhero/Documents/python/MazinLab/Arcons/ucsblogo.png')
     sourceim = sourceim[:,:,0]
@@ -129,7 +172,16 @@ def FakeObservation(obsname, start, exptime):
             subgroup = h5file.createGroup(group,'p'+str(j))
             dptr.append(subgroup)
             
-   
+    '''
+    # now go in an update the beamimages array to contain the name of the actual data array
+    for i in xrange(32):
+        for j in xrange(32):
+            name = h5file.getNode('/',name=ca[i,j])
+            for leaf in name._f_walkNodes('Leaf'):
+                newname = ca[i,j]+'/'+leaf.name
+                ca[i,j] = newname
+    '''
+    
     # create fake photon data
     #start = np.floor(time.time())
     

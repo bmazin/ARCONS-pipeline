@@ -25,7 +25,8 @@ class PhotonList(IsDescription):
     Dec = Float32Col()              # Offset in arcseconds in Dec from the observation center
     ArrivalTime = Float32Col()      # Time in seconds since the beginning of the observation
     Wavelength = Float32Col()       # Wavelength of the photon in Angstroms        
-    WaveError = Flaot32Col()        # Estimated 1-sigma Wavelength error in Angstroms 
+    WaveError = Float32Col()        # Estimated 1-sigma Wavelength error in Angstroms 
     Weight = Float32Col()           # Weight of this photon.  Weight of 5.0 means the chance of this pixel getting from the top of the atmosphere to the pixel was 20%
+    FlatWeight = Float32Col()
     Flag = UInt8Col()               # Photon quality flag.  0=good, 1=pixel has incomplete wavelength coverage, 2=...
 

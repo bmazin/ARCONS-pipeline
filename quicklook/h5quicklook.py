@@ -74,6 +74,9 @@ class StartQt4(QMainWindow):
 		#load beam map from default beammap directory
 		self.loadbeammap()
 		
+		#selection of bins is disabled.  Now automatically makes bins the same as the data range for 1 to 1 binning.
+		self.ui.nbins.setEnabled(False)
+		
 		#use mouse to select pixel from tv_image, also triggers a new spectrum to be displayed
 		self.ui.tv_image.mousePressEvent = self.start_pixel_select
 		self.ui.tv_image.mouseReleaseEvent = self.end_pixel_select
@@ -143,9 +146,12 @@ class StartQt4(QMainWindow):
 			htable = h5file.root.header.header.read()
 			h5address = h5file.root.beammap.beamimage.read()[0][0]
 			h5time = int(h5address.split('t')[1])
+                        try:
+			    self.ut = int(htable["unixtime"])
+			except ValueError:
+                            print "unixtime not found, checking for deprecated ut field" 
+                            self.ut = int(htable["ut"])
 
-			self.ut = int(htable["ut"])
-			
 			if self.ut != h5time:
 				self.ut = h5time
 			
@@ -411,6 +417,11 @@ class StartQt4(QMainWindow):
 			
 		self.imfile = "TV_frame.png"
 		plt.savefig(self.imfile, pad_inches=0)
+		if self.dark_subtraction == True:
+			darkh5.close()
+		if self.sky_subtraction == True:
+			skyh5.close()
+			h5file.close()
 		print "done making image."
 			
 		self.display_image()
@@ -687,6 +698,11 @@ class StartQt4(QMainWindow):
 			
 			#self.ui.histogram_plot.canvas.format_labels()
 			self.ui.histogram_plot.canvas.draw()
+			if self.dark_subtraction == True:
+				darkh5.close()
+			if self.sky_subtraction == True:
+				skyh5.close()
+			h5file.close()
 			print "done"
 	
 	def plot_histogram(self):		
@@ -732,24 +748,24 @@ class StartQt4(QMainWindow):
 				#skybmap = rot90(skybmap,2)
 
 			darkbbmap = self.bmap
-			
-			totalhist1 = zeros((self.ui.nbins.value()))
-			totalhist2 = zeros((self.ui.nbins.value()))
 	
 			counts = zeros((self.nypix,self.nxpix))
 			
 			bins = range(self.ui.nbins.value()+1)
 			
+			m=-1
+			
 			for i in xrange(self.nypix):
 				for j in xrange(self.nxpix):
 					if i*self.nxpix+j in self.histogram_pixel:
+						m+=1
 						
 						self.ui.pixelpath.setText(str(bmap[i][j]))
 						
 						if bmap[i][j] == '':
 							counts[i][j]=0
-							subtracted1 = zeros((self.ui.nbins.value()))
-							subtracted2 = zeros((self.ui.nbins.value()))
+							subtracted1 = zeros((self.ui.nbins.value()),dtype=float)
+							subtracted2 = zeros((self.ui.nbins.value()),dtype=float)
 							continue
 						try:
 							#etime = len(h5file.root._f_getChild(bmap[i][j]))
@@ -761,6 +777,9 @@ class StartQt4(QMainWindow):
 							#npbaseline = array(baseline, dtype=float)
 							#obsheights = npbaseline-npparabheights
 							#obsheights = baseline
+							
+							#for l in xrange(10):
+								#print peakheights[l], parabheights[l], baseline[l]
 							
 							if self.ui.topplot.currentText() == "Parabola Fit":
 								obs1heights = array(parabheights,dtype=float)
@@ -775,18 +794,28 @@ class StartQt4(QMainWindow):
 								obs2heights = array(peakheights,dtype=float)
 							else:
 								obs2heights = array(baseline,dtype=float)
+								
+							#for l in xrange(10):
+								#print peakheights[l], parabheights[l], baseline[l],"\n",obs1heights[l], obs2heights[l]
 							
 							if self.ui.checkBox.isChecked():
 								obs1heights -= array(baseline,dtype=float)
 							if self.ui.checkBox_2.isChecked():
 								obs2heights -= array(baseline,dtype=float)
 
+							nbins1 = obs1heights.max() - obs1heights.min()
+							nbins2 = obs2heights.max() - obs2heights.min()
+							self.ui.nbins.setValue(nbins1)
+							
+							totalhist1 = zeros((nbins1),dtype=float)
+							totalhist2 = zeros((nbins2),dtype=float)
+
 							if len(obs1heights)==0:
 								counts[i][j]=0
 								continue
 							else:
-								obs1hist,bins = histogram(obs1heights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
-								obs2hist,bins = histogram(obs2heights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+								obs1hist,bins1 = histogram(obs1heights,bins=nbins1,range=(obs1heights.min(),obs1heights.max()))
+								obs2hist,bins2 = histogram(obs2heights,bins=nbins2,range=(obs2heights.min(),obs2heights.max()))
 							#print bins
 							if self.dark_subtraction == True:
 								dtime = float(len(darkh5.root._f_getChild(darkbmap[i][j])))
@@ -799,13 +828,15 @@ class StartQt4(QMainWindow):
 									dark1hist = zeros((self.ui.nbins.value()))
 									dark2hist = zeros((self.ui.nbins.value()))
 								else:
-									dark1hist,bins = histogram(darkheights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+									dark1hist,bins1 = histogram(darkheights,bins=nbins1,range=(obs1heights.min(),obs1heights.max()))
 									subtracted1 = obs1hist-(dark1hist*(tf-ti)/float(dtime))
-									dark2hist,bins = histogram(darkheights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+									dark2hist,bins2 = histogram(darkheights,bins=nbins2,range=(obs2heights.min(),obs2heights.max()))
 									subtracted2 = obs2hist-(dark2hist*(tf-ti)/float(dtime))
 							else:
 								subtracted1=obs1hist
 								subtracted2=obs2hist
+								
+							#for m in xrange(len(obs1hist))
 								
 							for p in range(len(subtracted1)):
 								if subtracted1[p]<0:
@@ -823,9 +854,9 @@ class StartQt4(QMainWindow):
 									if len(skyheights)==0:
 										pass
 									else:
-										sky1hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+										sky1hist,bins1 = histogram(skyheights,bins=nbins1,range=(obs1heights.min(),obs1heights.max()))
 										skysubtracted1 = sky1hist
-										sky2hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+										sky2hist,bins2 = histogram(skyheights,bins=nbins2,range=(obs2heights.min(),obs2heights.max()))
 										skysubtracted2 = sky2hist
 										
 										for p in range(len(skysubtracted1)):
@@ -845,9 +876,9 @@ class StartQt4(QMainWindow):
 									if len(skyheights)==0:
 										pass
 									else:
-										sky1hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs1heights.min(),obs1heights.max()))
+										sky1hist,bins1 = histogram(skyheights,bins=nbins1,range=(obs1heights.min(),obs1heights.max()))
 										skysubtracted1 = sky1hist-(dark1hist*(stime)/float(dtime))
-										sky2hist,bins = histogram(skyheights,bins=self.ui.nbins.value(),range=(obs2heights.min(),obs2heights.max()))
+										sky2hist,bins2 = histogram(skyheights,bins=nbins2,range=(obs2heights.min(),obs2heights.max()))
 										skysubtracted2 = sky2hist-(dark2hist*(stime)/float(dtime))
 										
 										for p in range(len(skysubtracted1)):
@@ -892,11 +923,16 @@ class StartQt4(QMainWindow):
 				#self.ui.histogram_plot.canvas.ax.plot(photon_hist[1][1:],photon_hist[0],'o')
 			#else:
 				#self.ui.histogram_plot.canvas.ax.hist(new_photons, bins = nbins, range = (min(new_photons),max(new_photons)), histtype='bar')
-			self.ui.histogram_plot.canvas.ax.bar(bins[:-1],totalhist1, width=(bins[1]-bins[0]), bottom=0)
-			self.ui.histogram_plot_2.canvas.ax.bar(bins[:-1],totalhist2, width=(bins[1]-bins[0]), bottom=0)
+			self.ui.histogram_plot.canvas.ax.bar(bins1[:-1],totalhist1, width=(bins1[1]-bins1[0]), bottom=0,linewidth=0)
+			self.ui.histogram_plot_2.canvas.ax.bar(bins2[:-1],totalhist2, width=(bins2[1]-bins2[0]), bottom=0,linewidth=0)
 			#self.ui.histogram_plot.canvas.format_labels()
 			self.ui.histogram_plot.canvas.draw()
 			self.ui.histogram_plot_2.canvas.draw()
+			if self.dark_subtraction == True:
+				darkh5.close()
+			if self.sky_subtraction == True:
+				skyh5.close()
+			h5file.close()
 			print "done"
 
 	def closeEvent(self, event=None):

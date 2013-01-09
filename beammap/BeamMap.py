@@ -8,6 +8,10 @@ import scipy.signal as signal
 from scipy import optimize
 import scipy.stats as stats
 
+from PyQt4.QtGui import *
+from PyQt4.QtGui import *
+#from beammap_gui import Ui_beammap_gui
+
 
 # Define the various classes and functions needed for the beam mapping
 # Define BeamMapper class - this allows you to change the location of a peak if there is a mistake
@@ -24,11 +28,11 @@ class BeamMapper():
     def on_click(self,event):
         # If x sweep plot (top plot) is clicked
         if(event.y > 250):
-            self.xvals=np.arange(len(self.crxmedian[pixelno][:]))
+            self.xvals=np.arange(len(self.crx_median[pixelno][:]))
             self.xpeakguess=event.xdata
             self.xfitstart=max([self.xpeakguess-20,0])
             self.xfitend=min([self.xpeakguess+20,len(self.xvals)])
-            params = fitgaussian(self.crxmedian[pixelno][self.xfitstart:self.xfitend],self.xvals[self.xfitstart:self.xfitend])
+            params = fitgaussian(self.crx_median[pixelno][self.xfitstart:self.xfitend],self.xvals[self.xfitstart:self.xfitend])
             self.xfit = gaussian(params,self.xvals)
             self.peakpos[0,self.pixelno]=params[0]
         # If y sweep plot (bottom plot) is clicked
@@ -67,30 +71,212 @@ def file_len(fname):
             pass
     return i + 1
 
+class Sweep_Number(QWidget):
+    
+    def __init__(self):
+        super(Sweep_Number, self).__init__()
+        
+        self.initUI()
+        
+    def initUI(self):      
+
+        self.btnx = QPushButton('X Sweeps', self)
+        self.btnx.move(20, 20)
+        self.btnx.clicked.connect(self.showDialogX)
+
+        self.btny = QPushButton('Y Sweeps', self)
+        self.btny.move(20, 50)
+        self.btny.clicked.connect(self.showDialogY)
+
+        self.btn1 = QPushButton('Frequency Path', self)
+        self.btn1.move(20, 80)
+        self.btn1.clicked.connect(self.freq_dialog)
+
+        self.btn1 = QPushButton('Save Path', self)
+        self.btn1.move(20, 110)
+        self.btn1.clicked.connect(self.save_dialog)
+        
+        self.lex = QLineEdit(self)
+        self.lex.move(130, 20)
+
+        self.ley = QLineEdit(self)
+        self.ley.move(130, 50)
+
+        self.le1 = QLineEdit(self)
+        self.le1.setGeometry(130, 80, 400, 20)
+
+        self.le2 = QLineEdit(self)
+        self.le2.setGeometry(130, 110, 400, 20)
+
+        self.sweep_count = [0,0]
+
+        self.freqpath = ''
+        self.savepath = ''
+
+        self.okbtn = QPushButton('OK', self)
+        self.okbtn.move(20, 150)
+        self.okbtn.clicked.connect(self.close)
+        
+        self.setGeometry(300, 300, 600, 200)
+        self.setWindowTitle('Inputs')
+        self.show()
+
+    def freq_dialog(self):
+        text =QFileDialog.getExistingDirectory()
+        self.freqpath=str(text)
+        self.le1.setText(str(text))
+        
+
+    def save_dialog(self):
+        text =QFileDialog.getExistingDirectory()
+        self.savepath=str(text)
+        self.le2.setText(str(text))
+        
+        
+    def showDialogX(self):
+        
+        text, ok = QInputDialog.getText(self, 'Input Dialog', 
+            'Number of X Sweeps:')
+        
+        if ok:
+            self.lex.setText(str(text))
+            self.sweep_count[0] = int(text)
+
+    def showDialogY(self):
+        
+        text, ok = QInputDialog.getText(self, 'Input Dialog', 
+            'Number of Y Sweeps:')
+        
+        if ok:
+            self.ley.setText(str(text))
+            self.sweep_count[1] = int(text)
+        
+def numberrun():
+    
+    app = QApplication(sys.argv)
+    ex1 = Sweep_Number()
+    app.exec_()
+    return [ex1.sweep_count[0],ex1.sweep_count[1],ex1.freqpath,ex1.savepath]
+
+class Sweep_DialogX(QWidget):    
+    def __init__(self):
+        super(Sweep_DialogX, self).__init__()       
+        self.initUI()
+        
+    def initUI(self):
+
+        self.btn = QPushButton('Add', self)
+        self.btn.move(20, 20)
+        self.btn.clicked.connect(self.file_dialog)
+
+        self.okbtn = QPushButton('Clear', self)
+        self.okbtn.move(20, 50)
+        self.okbtn.clicked.connect(self.clear_sweeps)
+        
+        self.okbtn = QPushButton('OK', self)
+        self.okbtn.move(20, 100)
+        self.okbtn.clicked.connect(self.close)
+
+        self.le = []
+        for i in range(input_params[0]):
+            self.le.append(QLineEdit(self))
+            self.le[i].setGeometry(130, 22+22*i,400,20)
+        
+        self.x_array = []
+        
+        self.setGeometry(300, 300, 600, 150)
+        self.setWindowTitle('Choose X sweep files')
+        self.show()
+
+    def clear_sweeps(self):
+        for i in range(len(self.x_array)):
+            self.le[i].setText('')
+        self.x_array = []
+        
+            
+    def file_dialog(self):
+        text =QFileDialog.getOpenFileName(parent=None, caption=str("Choose Sweep File"), filter=str("H5 (*.h5)")) 
+        self.x_array.append(str(text))
+        for i in range(len(self.x_array)):
+            self.le[i].setText(self.x_array[i])
+
+class Sweep_DialogY(QWidget):    
+    def __init__(self):
+        super(Sweep_DialogY, self).__init__()       
+        self.initUI()
+        
+    def initUI(self):
+
+        self.btn = QPushButton('Add', self)
+        self.btn.move(20, 20)
+        self.btn.clicked.connect(self.file_dialog)
+
+        self.okbtn = QPushButton('Clear', self)
+        self.okbtn.move(20, 50)
+        self.okbtn.clicked.connect(self.clear_sweeps)
+        
+        self.okbtn = QPushButton('OK', self)
+        self.okbtn.move(20, 100)
+        self.okbtn.clicked.connect(self.close)
+
+        self.le = []
+        for i in range(input_params[1]):
+            self.le.append(QLineEdit(self))
+            self.le[i].setGeometry(130, 22+22*i,400,20)
+        
+        self.y_array = []
+        
+        self.setGeometry(300, 300, 600, 150)
+        self.setWindowTitle('Choose Y sweep files')
+        self.show()
+
+    def clear_sweeps(self):
+        for i in range(len(self.y_array)):
+            self.le[i].setText('')
+        self.y_array = []
+        
+            
+    def file_dialog(self):
+        text =QFileDialog.getOpenFileName(parent=None, caption=str("Choose Sweep File"), filter=str("H5 (*.h5)")) 
+        self.y_array.append(str(text))
+        for i in range(len(self.y_array)):
+            self.le[i].setText(self.y_array[i])
+
+def xrun():
+    
+    appx = QApplication(sys.argv)
+    ex = Sweep_DialogX()
+    appx.exec_()
+    return ex.x_array
+
+def yrun():
+    
+    appy = QApplication(sys.argv)
+    ey = Sweep_DialogY()
+    appy.exec_()
+    return ey.y_array
+
+input_params = numberrun()
+xsweep = xrun()
+ysweep = yrun()
+print xsweep
+print ysweep
 
 # Specify input/output directory and files
-path = '/Users/kids/desktop/Beammapping/'
+#path = '/Users/kids/desktop/Beammapping/'
 
-xsweep = []
-xsweep.append('BM_X1.h5')
-xsweep.append('BM_X1.h5')
-xsweep.append('BM_X1.h5')
-xsweep.append('BM_X2.h5')
-xsweep.append('BM_X2.h5')
-xsweep.append('BM_X2.h5')
+#xsweep = []
+#xsweep.append('obs_20121129-014040.h5')
+#xsweep.append('obs_20121129-014802.h5')
 
-ysweep = []
-ysweep.append('BM_Y1.h5')
-ysweep.append('BM_Y1.h5')
-ysweep.append('BM_Y1.h5')
-ysweep.append('BM_Y2.h5')
-ysweep.append('BM_Y2.h5')
-ysweep.append('BM_Y2.h5')
+#ysweep = []
+#ysweep.append('obs_20121129-005856.h5')
+#ysweep.append('obs_20121129-010903.h5')
 
 number_of_roaches = 8
 roach_pixel_count = np.zeros(number_of_roaches)
 for roachno in xrange(0,number_of_roaches):
-    roach_pixel_count[roachno] = file_len(path + 'ps_freq%i.txt' %roachno)-1
+    roach_pixel_count[roachno] = file_len(input_params[2] + '/ps_freq%i.txt' %roachno)-1
 
 # Load the input files
 # X sweep data
@@ -98,22 +284,31 @@ h5file_x = []
 ts_x = []
 exptime_x = []
 for i in range(len(xsweep)):
-    h5file_x.append(openFile(path + xsweep[i], mode = 'r'))
-    ts_x.append(int(h5file_x[i].root.header.header.col('ut')[0]))
+#    h5file_x.append(openFile(path + xsweep[i], mode = 'r'))
+    h5file_x.append(openFile(xsweep[i], mode = 'r'))
+    try:
+        ts_x.append(int(h5file_x[i].root.header.header.col('unixtime')[0]))
+    except KeyError:
+        ts_x.append(int(h5file_x[i].root.header.header.col('ut')[0]))
     exptime_x.append(int(h5file_x[i].root.header.header.col('exptime')[0]))
 # Y sweep data
 h5file_y = []
 ts_y = []
 exptime_y = []
 for i in range(len(ysweep)):
-    h5file_y.append(openFile(path + ysweep[i], mode = 'r'))
-    ts_y.append(int(h5file_y[i].root.header.header.col('ut')[0]))
+#    h5file_y.append(openFile(path + ysweep[i], mode = 'r'))
+    h5file_y.append(openFile(ysweep[i], mode = 'r'))
+    try:
+        ts_y.append(int(h5file_y[i].root.header.header.col('unixtime')[0]))
+    except KeyError:
+        ts_y.append(int(h5file_y[i].root.header.header.col('ut')[0]))
     exptime_y.append(int(h5file_y[i].root.header.header.col('exptime')[0]))
 
 # Print start and sweep durations, also pixel selection commands
 for i in range(len(xsweep)):
     print 'Start Time %i = ' %i,ts_x[i], ts_y[i]
 for i in range(len(xsweep)):
+
     print 'exptime_x %i =' %i,exptime_x[i],'and exptime_y %i =' %i, exptime_y[i]
 print '"A" = Accept, "D" = Delete, "Q" = Quit, "X" = X Only, "Y" = Y Only'
 
@@ -121,7 +316,7 @@ print '"A" = Accept, "D" = Delete, "Q" = Quit, "X" = X Only, "Y" = Y Only'
 # Go through each of the pixels (originally (0,2024))
 for roachno in xrange(0,number_of_roaches):
     map = BeamMapper(exptime_x[0],exptime_y[0],len(xsweep),len(ysweep))
-    f=open(path + 'r%i.pos' %roachno,'w')
+    f=open(input_params[3] + '/r%i.pos' %roachno,'w')
     for pixelno in xrange(0,int(roach_pixel_count[roachno])):
         map.pixelno=pixelno
         map.flag[pixelno] = pixelno
@@ -153,10 +348,10 @@ for roachno in xrange(0,number_of_roaches):
             for i in range(len(ysweep)):
                 data[i][:] = h5file_y[i].root._f_getChild(pn[i]).read()
             for j in xrange(exptime_y[0]):
-                median_array = []
+                median_array = []                
                 for i in range(len(ysweep)):
-                    median_array.append(len(data[i][j]))
-                map.cry_median[pixelno][j] = np.median(median_array)
+                    median_array.append(len(data[i][j]))             
+                map.cry_median[pixelno][j] = np.median(median_array)                
                 for i in range(len(ysweep)):
                     map.cry[i][pixelno][j] = len(data[i][j])
         except:
@@ -217,8 +412,8 @@ for roachno in xrange(0,number_of_roaches):
             if(response == 'a'):
                 print 'Response: ', response
                 plt.close()
-                f=open(path+'r%i.pos' %roachno,'a')
-                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+'\n')
+                f=open(input_params[3]+'/r%i.pos' %roachno,'a')
+                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+ '\n')
                 f.close()
                 break
             # Delete pixel with 'd'
@@ -228,8 +423,8 @@ for roachno in xrange(0,number_of_roaches):
                 map.peakpos[1,pixelno]=0
                 map.flag[pixelno] = -1*pixelno
                 plt.close()
-                f=open(path+'r%i.pos' %roachno,'a')
-                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+'\n')
+                f=open(input_params[3]+'/r%i.pos' %roachno,'a')
+                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+ '\n')
                 f.close()
                 break
             # Control whether only the x or y pixel is selected
@@ -239,8 +434,8 @@ for roachno in xrange(0,number_of_roaches):
                 map.peakpos[1,pixelno]=0
                 map.flag[pixelno] = -1*pixelno
                 plt.close()
-                f=open(path+'r%i.pos' %roachno,'a')
-                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+'\n')
+                f=open(input_params[3]+'/r%i.pos' %roachno,'a')
+                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+ '\n')
                 f.close()
                 break
             # y is okay
@@ -249,8 +444,8 @@ for roachno in xrange(0,number_of_roaches):
                 map.peakpos[0,pixelno]=0
                 map.flag[pixelno] = -1*pixelno
                 plt.close()
-                f=open(path+'r%i.pos' %roachno,'a')
-                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+'\n')
+                f=open(input_params[3]+'/r%i.pos' %roachno,'a')
+                f.write(str(map.peakpos[0,pixelno])+'\t'+str(map.peakpos[1,pixelno])+'\t'+str(int(map.flag[pixelno]))+ '\n')
                 f.close()
                 break
             # Quit program with 'q'

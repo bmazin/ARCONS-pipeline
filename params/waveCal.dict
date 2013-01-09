@@ -1,0 +1,86 @@
+## Files and Dirs
+
+#calfileslist = 'calfile_list_Lick.txt'                                 # generated with script list_calfiles.sh/list_calfiles.py 
+calfileslist = 'calfile_list_Palo.txt'
+
+#files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
+#files2run = '/ScienceData/PAL2012/20121204/obs_20121204-233549.h5'
+#files2run = '/Scratch/matchedData/cal_20121208-023522.h5'
+#files2run = '20121211'
+#files2run = 'all'
+
+
+
+## For Matt's NLTT anal
+#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-133056.h5'
+#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-020441.h5'
+files2run = '/ScienceData/PAL2012/20121210/cal_20121211-044853.h5'
+#files2run = '/ScienceData/PAL2012/20121211/cal_20121212-111847.h5'
+#files2run = '/ScienceData/PAL2012/20121211/cal_20121212-032455.h5'
+
+                                             
+
+#outdir = '/ScienceData/waveCalSolnFiles/'
+outdir = '/Scratch/waveCalSolnFiles/'
+
+figdir = 'figs/'
+driftdir = 'drift_study/'
+
+
+## Constants
+
+#h = 6.6261e-34  # J s
+h = 4.1357e-15   # eV s    
+c = 3.e8        # m/s
+ang2m = 1.e-10
+fwhm2sig = 2.35
+
+
+## Array params - ~Aug. 2012 sci 3 gamma array
+
+n_rows = 46
+n_cols = 44
+n_roaches = 8
+
+non_alloc_pix = 250
+
+divisor = 275
+read_freq = 550
+
+n_bits_long = 12
+n_bits_time = 20
+
+n_bits_base = 20
+n_bits_peak = 32
+n_bits_parab = 44 
+
+pulseMask = int(n_bits_long*'1',2)   # bitmask of 12 ones
+timeMask = int(n_bits_time*'1',2)
+
+
+## Laser light wavelengths
+
+bluelambda = 4009.4      # Angstroms
+redlambda  = 6560.4 
+irlambda   = 9744.9
+
+n_lasers = 3
+
+
+## Parameters for finding extreema
+
+big_step = 10        
+bin_smooth = 60.    ## window size needs to be even to work
+
+## Thresholds for cutting pixels
+
+low_counts_val = 5
+chi2_cutoff = 2.7
+#cr_low = 30
+#cr_high = 400
+cr_low = 0          # for sci 4
+cr_high = 150
+
+
+
+
