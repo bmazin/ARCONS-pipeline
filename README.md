@@ -20,6 +20,47 @@ If you are having troubles with PyTables (which you shouldn't since it is built 
 
 ***
 
+Another package you will need is interval.  It depends on crlibm
+
+On Turk, these packages installed in the usual way without fuss.
+
+On a Mac, you need to do this:
+
+I downloaded crlibm-1.0beta4.tar.gz from 
+http://lipforge.ens-lyon.fr/www/crlibm/ 
+
+$ untar
+$ configure
+$ make
+$ sudo make install. 
+
+Then I downloaded pyinterval-1.0b21.tar.gz from
+http://pypi.python.org/pypi/pyinterval
+and untarred it.
+
+
+Here is the tricky part.
+
+in setup.py pyinterval, change the lines near the end from this
+
+             include_dirs = ['/opt/crlibm/include'],
+             library_dirs = ['/opt/crlibm/lib'],
+
+to this
+
+
+            include_dirs = ['/usr/local/include'],
+            library_dirs = ['/usr/local/lib'],
+
+and then 
+
+python setup.py build
+sudo python setup.py install
+
+The tests in cosmic/TestTimeMask.py uses the class Cosmic which uses
+this, and it will also be used to locate times to mask hot pixels.
+
+
 Recommended external software components:
 ---------------------
 
