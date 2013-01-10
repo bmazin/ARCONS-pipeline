@@ -286,7 +286,7 @@ def wavelengthCal(paramFile):
                 row['pixelcol'] = j
                 row['roach'] = roach
                 row['pixelnum'] = pixel
-                row['wave_flag'] = 0                      # 0 until flagged (1 for dead, 2 for bad data/fit)
+                row['wave_flag'] = 0                      # 0 until flagged
 
                 # Cut non-allocated pixels
                 if (roach==0) & (pixel==params['non_alloc_pix']):
@@ -351,7 +351,7 @@ def wavelengthCal(paramFile):
                             goodind.append(q)
                     parab_phase = parab_phase[goodind]
 
-                # Cut off any hits above zero (~nonsensible)
+                # Cut data with phase amplitude > 0 (nonsensible)
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
                 if (len(parab_phase) == 0):
                     failure(row, xyrarray, xylarray, roacharr, i, j, 3)
@@ -546,12 +546,15 @@ def wavelengthCal(paramFile):
 
 
                 # Final cuts
-            
+
+                # Check rightmost peak not too close to edge or peaks too close together
                 if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.) | (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]) | (gparams[-2] > min_locations[-1]):
                     failure(row, xyrarray, xylarray, roacharr, i, j, 10)
                     continue
-                #if (redchi2gauss > params['chi2_cutoff']):              # Cut on chi^2
-                #    failure(row, rarray, larray, 2)
+                
+                # Cut on ch^2
+                #if (redchi2gauss > params['chi2_cutoff']):             
+                #    failure()
                 #    continue
 
 
