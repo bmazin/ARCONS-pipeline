@@ -548,8 +548,14 @@ def wavelengthCal(paramFile):
                 # Final cuts
 
                 # Check rightmost peak not too close to edge or peaks too close together
-                if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.) | (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]) | (gparams[-2] > min_locations[-1]):
+                if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.): 
                     failure(row, xyrarray, xylarray, roacharr, i, j, 10)
+                    continue
+                if (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]):
+                    failure(row, xyrarray, xylarray, roacharr, i, j, 11)
+                    continue
+                if (gparams[-2] > min_locations[-1]):
+                    failure(row, xyrarray, xylarray, roacharr, i, j, 12)
                     continue
                 
                 # Cut on ch^2
