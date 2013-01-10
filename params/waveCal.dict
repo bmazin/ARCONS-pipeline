@@ -12,9 +12,9 @@ calfileslist = 'calfile_list_Palo.txt'
 
 
 ## For Matt's NLTT anal
-#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-133056.h5'
+files2run = '/ScienceData/PAL2012/20121210/cal_20121211-133056.h5'
 #files2run = '/ScienceData/PAL2012/20121210/cal_20121211-020441.h5'
-files2run = '/ScienceData/PAL2012/20121210/cal_20121211-044853.h5'
+#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-044853.h5'
 #files2run = '/ScienceData/PAL2012/20121211/cal_20121212-111847.h5'
 #files2run = '/ScienceData/PAL2012/20121211/cal_20121212-032455.h5'
 
