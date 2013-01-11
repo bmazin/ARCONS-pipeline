@@ -80,7 +80,7 @@ chi2_cutoff = 2.7
 #cr_high = 400
 cr_low = 0          # for sci 4
 cr_high = 150
-
+badfit_res = 8.
 
 
 
