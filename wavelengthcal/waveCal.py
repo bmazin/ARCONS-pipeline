@@ -503,6 +503,27 @@ def wavelengthCal(paramFile):
                                amplitude3 * np.exp( -(pow((phasebins-x_offset3),2) / (2. * pow(sigma3,2))))
  
 
+
+                # Cuts
+
+                print i, j, gparams, min_locations
+                # Check rightmost peak not too close to edge or peaks too close together
+                if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.): 
+                    failure(row, xyrarray, xylarray, roacharr, i, j, 10)
+                    continue
+                if (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]):
+                    failure(row, xyrarray, xylarray, roacharr, i, j, 11)
+                    continue
+                if (gparams[-2] > min_locations[-1]):
+                    failure(row, xyrarray, xylarray, roacharr, i, j, 12)
+                    continue
+                
+                # Cut on ch^2
+                #if (redchi2gauss > params['chi2_cutoff']):             
+                #    failure(row, xyrarray, xylarray, roacharr, i, j, 13)
+                #    continue
+
+
                 ## Now fit parabola to get wavelength <-> phase amplitude correspondance
 
                 if (n_in_fit == params['n_lasers']):
@@ -543,26 +564,6 @@ def wavelengthCal(paramFile):
                     if r==2: y_off = p
 
                 fitfunc = amp * (pow((phaseamps - x_off), 2 )) + y_off
-
-
-                # Final cuts
-
-                print i, j, gparams, min_locations
-                # Check rightmost peak not too close to edge or peaks too close together
-                if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.): 
-                    failure(row, xyrarray, xylarray, roacharr, i, j, 10)
-                    continue
-                if (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]):
-                    failure(row, xyrarray, xylarray, roacharr, i, j, 11)
-                    continue
-                if (gparams[-2] > min_locations[-1]):
-                    failure(row, xyrarray, xylarray, roacharr, i, j, 12)
-                    continue
-                
-                # Cut on ch^2
-                #if (redchi2gauss > params['chi2_cutoff']):             
-                #    failure()
-                #    continue
 
 
                 # Wavelength/E spectrum
@@ -659,6 +660,9 @@ def wavelengthCal(paramFile):
                     driftrow.append()
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
                     xyrarray[i][j] = resest
+                    if resest > badfit_res:
+                        failure(row, xyrarray, xylarray, roacharr, i, j, 14)
+                        continue
                     xylarray[i][j] = n_in_fit
 
                     # fits plot
@@ -679,7 +683,7 @@ def wavelengthCal(paramFile):
                     plotcounter+=1
 
                 else:
-                    failure(row, xyrarray, xylarray, roacharr, i, j, 12)
+                    failure(row, xyrarray, xylarray, roacharr, i, j, 15)
                     continue
 
 
