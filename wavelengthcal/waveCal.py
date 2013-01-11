@@ -547,6 +547,7 @@ def wavelengthCal(paramFile):
 
                 # Final cuts
 
+                print i, j, gparams, min_locations
                 # Check rightmost peak not too close to edge or peaks too close together
                 if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.): 
                     failure(row, xyrarray, xylarray, roacharr, i, j, 10)
