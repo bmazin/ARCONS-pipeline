@@ -660,7 +660,7 @@ def wavelengthCal(paramFile):
                     driftrow.append()
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
                     xyrarray[i][j] = resest
-                    if resest > badfit_res:
+                    if resest > params['badfit_res']:
                         failure(row, xyrarray, xylarray, roacharr, i, j, 14)
                         continue
                     xylarray[i][j] = n_in_fit
