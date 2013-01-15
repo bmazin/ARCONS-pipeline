@@ -103,6 +103,8 @@ Pipeline components:
 
 /beammap contains tools for creating, viewing, and modifying beam maps 
 
+/hotpix contains tools for finding location and time of hot (and possibly 'cold') pixels
+
 Each directory contains a /test subdirectory, where code to test the module will be stored.
 
 ***
