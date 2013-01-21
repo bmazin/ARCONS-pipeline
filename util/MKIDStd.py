@@ -5,7 +5,7 @@ import numpy
 import types
 import string
 import pyfits
-import smooth
+from util import smooth
 import sys
 from scipy.constants import *
 import math
@@ -122,7 +122,9 @@ class MKIDStd:
             a[:,1] *= (a[:,0] * self.k)
         mag = string.count(self.objects[name]['fluxUnit'][0],"mag")
         if mag:
-            a[:,1] = (10**(-2.406/2.5))*(10**(-0.4*a[:,1]))/(a[:,0]**2) * (a[:,0] * self.k)
+            a[:,1] = \
+                (10**(-2.406/2.5))*(10**(-0.4*a[:,1]))/(a[:,0]**2) * \
+                (a[:,0] * self.k)
         return a
     
     def normalizeFlux(self,a):
@@ -185,7 +187,7 @@ class MKIDStd:
         a = self._getVegaMag(aFlux, aFilter)
         return a
 
-    def plot(self,name="all",xlog=False,ylog=True,xlim=[3000,10000],normalizeFlux=True,countsToErgs=False):
+    def plot(self,name="all",xlog=False,ylog=True,xlim=[3000,13000],normalizeFlux=True,countsToErgs=False):
         """
         Makes a png file that plots the arrays a[:,0] (wavelength) and
         a[:,1] (flux) with balmer wavelengths indicated. Individual
@@ -217,6 +219,7 @@ class MKIDStd:
         """
         if (name == "all"):
             listofobjects = self.objects.keys()
+            listofobjects.sort()
             plotname = "all"
         elif (isinstance(name, types.ListType)):
             listofobjects = name
@@ -228,12 +231,12 @@ class MKIDStd:
         plotYMin = -1
         plotYMax = -1
         for tname in listofobjects:
-            print "tname=", tname
             a = self.load(tname)
             if (countsToErgs):
                 a = self.countsToErgs(a)
             if (normalizeFlux):
                 a = self.normalizeFlux(a)
+            a.shape
             x = a[:,0]
             y = a[:,1]
             if (not xlog and ylog):
@@ -270,9 +273,8 @@ class MKIDStd:
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(bbox_to_anchor=(1.05,1), loc=2, prop={'size':10}, borderaxespad=0.)
         plt.xlim(xlim)
-        print "set ylim with plotYMin=",plotYMin,"  plotYMax=",plotYMax
         plt.ylim([plotYMin,plotYMax])
-        print "plotname=", plotname
+        print "Now write plot to ",plotname+".png"
         plt.savefig(plotname+'.png')
 
     def plotfilters(self):
