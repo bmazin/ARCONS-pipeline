@@ -12,11 +12,10 @@ import math
 class MKIDStd:
     """
     This class contains the spectra of several standard stars and other
-    objects. These
-    spectra may be plotted and used to compare with data from the MKID
-    detector.
+    objects. These spectra may be plotted and used to compare with data 
+    from the MKID detector.
 
-    Wavelength and flux values  and text files describing each object are
+    Wavelength and flux values and text files describing each object are
     saved in the data directory. Each object is described in a .txt file.
     This file lists the file name that contains the data, the units, a 
     citation, and a brief description of the object. 
@@ -26,8 +25,7 @@ class MKIDStd:
         """
         Loads up the list of objects we know about, filters, and
         Balmer wavelengths.
-        The reference wavelength, used when plotting is set at 6500 
-        if _init_()
+        referenceWavelength is used in plot() to normalize spectra
         """
         self.referenceWavelength=referenceWavelength
         self.objects = {}
@@ -137,7 +135,7 @@ class MKIDStd:
 
     def countsToErgs(self,a):
         """
-        This function changes the units of the spectra  from counts to 
+        This function changes the units of the spectra from counts to 
         ergs. 
         """
         a[:,1] /= (a[:,0] * self.k)
@@ -194,38 +192,35 @@ class MKIDStd:
         spectra are labeled and indicated by a legend.
         
         plot() plots the spectrum of all standard stars in the program.
-        plot(['vega'],['bd17']) returns only the spectrum for those two
+        plot(['vega','bd17']) returns only the spectrum for those two
         stars.
-        plot('vega') returns the spectrum for only that star.
+        plot('vega') plots the spectrum for only that star.
+
+        Whether the axes are plotted logaritmically is controlled by the
+        option parameter xlog and ylog.  
         
-        The y array for each plot is presented as a logarithm, while the
-        x array is linear if plot(). This is an optional perameter and can
-        be changed by setting xlog and ylog to true or false when calling
-        the function.
-        
-        x limits are set between 3,000 and 10,000 and y limits are 
-        calculated based on those values. The x limits are optional and 
-        can be altered when calling the function.
-        
-        The flux values are automatically set to counts, but they can be 
+        The optional parameter xlim sets the wavelength limits of the plot.
+        The plot y limits are from flux values for wavelengths included
+        in xlim.
+
+        The flux values are in counts/sec/cm^2/A by default, but they can be 
         changed to ergs by setting countsToErgs=True when calling the 
         function.
         
-        The flux is automatically normalized, but one can choose to not 
-        normalize the flux by setting normalizeFlux=False when calling 
-        the function.
+        By default fluxes are normalized to 1 at self.refernceWavelength
+        and setting normalizeFlux=False disables normalization
         
-        Plots are saved as plotname.png
+        The filename of the plot in the current working director is returned.
         """
         if (name == "all"):
             listofobjects = self.objects.keys()
             listofobjects.sort()
-            plotname = "all"
+            plotName = "all"
         elif (isinstance(name, types.ListType)):
             listofobjects = name
-            plotname = name[0]+"_group"
+            plotName = name[0]+"_group"
         else:
-            plotname = name
+            plotName = name
             listofobjects = [name]
         plt.clf()
         plotYMin = -1
@@ -274,14 +269,20 @@ class MKIDStd:
         ax.legend(bbox_to_anchor=(1.05,1), loc=2, prop={'size':10}, borderaxespad=0.)
         plt.xlim(xlim)
         plt.ylim([plotYMin,plotYMax])
-        print "Now write plot to ",plotname+".png"
-        plt.savefig(plotname+'.png')
+        fullPlotName = plotName+'.png'
+        plt.savefig(fullPlotName)
+        return fullPlotName
 
-    def plotfilters(self):
+    def plotFilters(self):
         """
         Plots all filters.  This includes both the UBVRI and the SDSS 
-        filters. Note that the array is reversed, compared to that used 
-        by the plot() function.
+        filters. 
+
+        Note that the array is reversed, compared to that used 
+        by the plot() function, so wavelength values are in
+        self.filters[filterName][0,:] and the relative transmission is
+        self.filters[filterName][1,:]
+
         The plot made by the filters is saved as filters.png
         """
         plt.clf()
@@ -308,7 +309,7 @@ class MKIDStd:
 
         return y[index]
 
-    def ShowUnits(self):
+    def showUnits(self):
         """
         Returns flux units from the original data files for the spectra 
         of all objects.
