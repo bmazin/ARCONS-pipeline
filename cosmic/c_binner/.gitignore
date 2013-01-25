@@ -5,3 +5,4 @@
 !c_binner.i
 !numpy.i
 !.gitignore
+!build
