@@ -405,6 +405,8 @@ def wavelengthCal(paramFile):
                 coarse_data_len = np.floor(len(smoothed_data)/params['big_step'])
                 coarse_data = np.zeros(coarse_data_len)
                 coarse_x = np.zeros(coarse_data_len)
+
+                print i, j, len(coarse_data), len(smoothed_data), params['big_step']
         
                 for l in range(len(coarse_data)):
                     coarse_data[l] = smoothed_data[l*params['big_step']]
