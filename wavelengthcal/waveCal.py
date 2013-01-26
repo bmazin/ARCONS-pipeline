@@ -404,12 +404,15 @@ def wavelengthCal(paramFile):
                     failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 7)
                     continue 
 
+
+                print windowsize, len(n_inbin), len(parab_smooth), len(smoothed_data)
+
                 # Find extreema:
                 coarse_data_len = np.floor(len(smoothed_data)/params['big_step'])
                 coarse_data = np.zeros(coarse_data_len)
                 coarse_x = np.zeros(coarse_data_len)
 
-                print i, j, len(coarse_data), len(smoothed_data), len(phasebins), params['big_step']
+                print i, j, len(coarse_data), len(smoothed_data), len(phasebins), params['big_step'], coarse_data_len
         
                 for l in range(len(coarse_data)):
                     print l*params['big_step']
