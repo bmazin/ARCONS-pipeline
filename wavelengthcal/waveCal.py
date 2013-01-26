@@ -409,6 +409,7 @@ def wavelengthCal(paramFile):
                 print i, j, len(coarse_data), len(smoothed_data), params['big_step']
         
                 for l in range(len(coarse_data)):
+                    print l*params['big_step']
                     coarse_data[l] = smoothed_data[l*params['big_step']]
                     coarse_x[l] = np.array(phasebins)[l*params['big_step']]
 
