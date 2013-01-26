@@ -373,6 +373,9 @@ def wavelengthCal(paramFile):
                 # pulse moves along the loop in the "negative" direction.  So blue produces a bigger response, = more negative value
 
                 nbins = int(np.ceil(np.abs(rangex)))
+
+                print max(parab_phase), min(parab_phase), rangex, nbins
+                
                 n_inbin, phasebins = np.histogram(parab_phase, nbins)
                 binwidth = phasebins[1]-phasebins[0]                    # 1.0
                 phasebins += binwidth/2.0
