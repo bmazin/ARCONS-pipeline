@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from util import FileName
 from interval import interval, inf, imath
 import inspect
-
+import numpy as np
+from util import hgPlot
 class TestCosmic(unittest.TestCase):
     """
     test the Cosmic class
@@ -48,9 +49,13 @@ class TestCosmic(unittest.TestCase):
         """test and plot results from getHgForOneSec"""
 
         inter = interval()
-        hg = self.cosmic.getHgForOneSec(self.cosmic.beginTime,inter)
+        print "now call getHgForOneSec"
+        hg, hg2 = self.cosmic.getHgsForOneSec(self.cosmic.beginTime,inter)
+
         plt.clf()
-        plt.plot(hg)
+        xp,yp = hgPlot.getPlotValues(hg2, ylog=True)
+        plt.plot(xp,yp)
+        plt.margins(0.1, 0.1)
         plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
 if __name__ == '__main__':
     unittest.main()
