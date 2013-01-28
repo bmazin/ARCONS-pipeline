@@ -13,6 +13,8 @@ timeMaskReasonList.append("Flash in r7");
 timeMaskReasonList.append("Merged Flash");
 timeMaskReasonList.append("cosmic");
 timeMaskReasonList.append("poofing");
+timeMaskReasonList.append("hot pixel")
+timeMaskReasonList.append("cold pixel")
 
 timeMaskReason = tables.Enum(timeMaskReasonList)
 

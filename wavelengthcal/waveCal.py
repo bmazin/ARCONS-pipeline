@@ -58,20 +58,24 @@ class DriftObj(IsDescription):
     pixelcol = tables.UInt16Col()              # physical y location 
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
                                                #    double precision
+    perrors = tables.Float64Col(6)             # the errors on the fits
     
-def failure(row, xyrarray, xylarray, pixi, pixj, flagnum):
+def failure(row, xyrarray, xyrrarray, xylarray, roacharr, pixi, pixj, flagnum):
     row['wave_flag'] = flagnum
     row['polyfit'] = np.array([-1.,-1., -1.])
     row['sigma'] = -1.
     row['solnrange'] = np.array([-1.,-1.])
     row.append()
     xyrarray[pixi][pixj] = 0.
+    xyrrarray[pixi][pixj] = 0.
     xylarray[pixi][pixj] = 0.
+    roacharr[pixi][pixj] = -1
 
 def fitTwo(peaks, peak_locations, xarr, yarr):
 
     amplitude1 = peaks[0]
     amplitude2 = peaks[1]
+    low_counts_val = 10.
  
     x_offset1 = peak_locations[0]
     x_offset2 = peak_locations[1]
@@ -86,12 +90,12 @@ def fitTwo(peaks, peak_locations, xarr, yarr):
     errs[np.where(errs == 0.)] = 1.
     quiet=True
 
-    parinfo = [ {'n':0,'value':params2[0],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
+    parinfo = [ {'n':0,'value':params2[0],'limits':[fwhm/10., fwhm],            'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
                {'n':1,'value':params2[1],'limits':[x_offset1-fwhm, x_offset1+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset blue",'error':0},
-               {'n':2,'value':params2[2],'limits':[0., 2.*amplitude1],            'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
-               {'n':3,'value':params2[3],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
+               {'n':2,'value':params2[2],'limits':[low_counts_val*1.5, 2.*amplitude1],            'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
+               {'n':3,'value':params2[3],'limits':[fwhm/10., fwhm],            'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
                {'n':4,'value':params2[4],'limits':[x_offset2-fwhm, x_offset2+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset red",'error':0},
-               {'n':5,'value':params2[5],'limits':[0., 2.*amplitude2],            'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0}]
+               {'n':5,'value':params2[5],'limits':[low_counts_val*1.5, 2.*amplitude2],            'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0}]
 
     fa = {'x':xarr,'y':yarr,'err':errs}
 
@@ -113,7 +117,7 @@ def fitTwo(peaks, peak_locations, xarr, yarr):
         if k==5: amplitude2 = p
     params2=[sigma1, x_offset1, amplitude1, sigma2, x_offset2, amplitude2]
     
-    return params2, redchi2gauss2
+    return params2, redchi2gauss2, mpperr
         
 
 def fitThree(peaks, peak_locations, xarr, yarr):
@@ -121,6 +125,7 @@ def fitThree(peaks, peak_locations, xarr, yarr):
     amplitude1 = peaks[0]
     amplitude2 = peaks[1]
     amplitude3 = peaks[2]
+    low_counts_val = 10.
  
     x_offset1 = peak_locations[0]
     x_offset2 = peak_locations[1]
@@ -137,15 +142,15 @@ def fitThree(peaks, peak_locations, xarr, yarr):
     errs[np.where(errs == 0.)] = 1.
     quiet=True
 
-    parinfo = [ {'n':0,'value':params3[0],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
+    parinfo = [ {'n':0,'value':params3[0],'limits':[fwhm/10., fwhm],            'limited':[True,True],'fixed':False,'parname':"Sigma Blue",'error':0},
                {'n':1,'value':params3[1],'limits':[x_offset1-fwhm, x_offset1+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset blue",'error':0},
-               {'n':2,'value':params3[2],'limits':[0., 2.*amplitude1],            'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
-               {'n':3,'value':params3[3],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
+               {'n':2,'value':params3[2],'limits':[low_counts_val*1.5, 2.*amplitude1],            'limited':[True,True],'fixed':False,'parname':"Amplitude blue",'error':0},
+               {'n':3,'value':params3[3],'limits':[fwhm/10., fwhm],            'limited':[True,True],'fixed':False,'parname':"Sigma red",'error':0},
                {'n':4,'value':params3[4],'limits':[x_offset2-fwhm, x_offset2+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset red",'error':0},
-               {'n':5,'value':params3[5],'limits':[0., 2.*amplitude2],            'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0},
-               {'n':6,'value':params3[6],'limits':[fwhm/10., fwhm*2.],            'limited':[True,True],'fixed':False,'parname':"Sigma ir",'error':0},
+               {'n':5,'value':params3[5],'limits':[low_counts_val*1.5, 2.*amplitude2],            'limited':[True,True],'fixed':False,'parname':"Amplitude red",'error':0},
+               {'n':6,'value':params3[6],'limits':[fwhm/10., fwhm],            'limited':[True,True],'fixed':False,'parname':"Sigma ir",'error':0},
                {'n':7,'value':params3[7],'limits':[x_offset3-fwhm, x_offset3+fwhm],'limited':[True,True],'fixed':False,'parname':"x offset ir",'error':0},
-               {'n':8,'value':params3[8],'limits':[0., 2.*amplitude3],            'limited':[True,True],'fixed':False,'parname':"Amplitude ir",'error':0}]
+               {'n':8,'value':params3[8],'limits':[low_counts_val*1.5, 2.*amplitude3],            'limited':[True,True],'fixed':False,'parname':"Amplitude ir",'error':0}]
 
     fa = {'x':xarr,'y':yarr,'err':errs}
 
@@ -169,7 +174,7 @@ def fitThree(peaks, peak_locations, xarr, yarr):
         if k==8: amplitude3 = p   
     params3=[sigma1, x_offset1, amplitude1, sigma2, x_offset2, amplitude2, sigma3, x_offset3, amplitude3]
 
-    return params3, redchi2gauss3
+    return params3, redchi2gauss3, mpperr
 
     
 def wavelengthCal(paramFile): 
@@ -214,6 +219,7 @@ def wavelengthCal(paramFile):
         n_cols = params['n_cols']
     
         xyrarray = np.zeros((n_rows, n_cols))
+        xyrrarray = np.zeros((n_rows, n_cols))
         xylarray = np.zeros((n_rows, n_cols))
         roacharr = np.zeros((n_rows, n_cols))
 
@@ -285,14 +291,19 @@ def wavelengthCal(paramFile):
                 row['pixelcol'] = j
                 row['roach'] = roach
                 row['pixelnum'] = pixel
-                row['wave_flag'] = 0                      # 0 until flagged (1 for dead, 2 for bad data/fit)
+                row['wave_flag'] = 0                      # 0 until flagged
+
+                # Cut non-allocated pixels
+                if (roach==0) & (pixel==params['non_alloc_pix']):
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 1)
+                    continue
 
                 # The non-sorted list of all photon packets belonging to pixel i,j
                 photondata = np.concatenate(data.root._f_getChild(pstring)[:])
 
                 # Flag dead pixels
                 if len(photondata)==0:
-                    failure(row, xyrarray, xylarray, i, j, 1)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 2)
                     continue
 
                 # For each second, get the packets
@@ -345,23 +356,24 @@ def wavelengthCal(paramFile):
                             goodind.append(q)
                     parab_phase = parab_phase[goodind]
 
-                # Cut off any hits above zero (~nonsensible)
+                # Cut data with phase amplitude > 0 (nonsensible)
                 parab_phase = parab_phase[np.where(parab_phase < 0.)[0]]
                 if (len(parab_phase) == 0):
-                    failure(row, xyrarray, xylarray, i, j, 1)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 3)
                     continue
                 
                 # Cut on no data
                 rangex = max(parab_phase)-min(parab_phase)
                 if rangex == 0.0:
-                    failure(row, xyrarray, xylarray, i, j, 1)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 4)
                     continue
 
 
                 # Histogram of the phase amplitudes for each photon for pixel i,j.  0 phase sits at 0 degrees, and a
                 # pulse moves along the loop in the "negative" direction.  So blue produces a bigger response, = more negative value
- 
-                n_inbin, phasebins = np.histogram(parab_phase, rangex, range = (min(parab_phase),max(parab_phase)))
+
+                nbins = int(np.ceil(np.abs(rangex)))
+                n_inbin, phasebins = np.histogram(parab_phase, nbins)
                 binwidth = phasebins[1]-phasebins[0]                    # 1.0
                 phasebins += binwidth/2.0
                 phasebins = phasebins[0:len(phasebins)-1]
@@ -370,18 +382,25 @@ def wavelengthCal(paramFile):
         
                 # Cut on low number of total counts
                 if totalcts < params['low_counts_val'] * 100.:
-                    failure(row, xyrarray, xylarray, i, j, 1)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 5)
                     continue
+
+                # This cut removes the pixels with no visible peaks: 
+                if (np.max(phasebins) < params['no_peak_thresh']):
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 6)
+                    continue
+
     
                 # Smooth
                 window = 'hanning'
-                windowsize = int(binwidth * params['bin_smooth'])    
+                windowsize = int(params['bin_smooth'])    
                 try:
                     parab_smooth = smooth.smooth(n_inbin, windowsize, window)
                     smoothed_data = np.array(parab_smooth, dtype=float)
                 except:
-                    failure(row, xyrarray, xylarray, i, j, 1)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 7)
                     continue 
+
 
                 # Find extreema:
                 coarse_data_len = np.floor(len(smoothed_data)/params['big_step'])
@@ -396,7 +415,7 @@ def wavelengthCal(paramFile):
                     start_ind = (coarse_data > params['low_counts_val']).nonzero()[0][0]
                     end_ind = (coarse_data > params['low_counts_val']).nonzero()[0][-1]
                 except:
-                    failure(row, xyrarray, xylarray, i, j, 1)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 8)
                     continue
                     
                 coarse_data = coarse_data[start_ind:end_ind]
@@ -439,10 +458,10 @@ def wavelengthCal(paramFile):
 
                 # Cut if wrong number of peaks
                 if (maxima_num < params['n_lasers']-1) | (maxima_num > params['n_lasers']) :
-                    failure(row, xyrarray, xylarray, i, j, 2)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 9)
                     continue
                 if (minima_num != maxima_num):
-                    failure(row, xyrarray, xylarray, i, j, 2)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 10)
                     continue
 
 
@@ -456,7 +475,7 @@ def wavelengthCal(paramFile):
                 # If 3, pass in max_vals, max_locs, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right] -> fitThree(), return params
                 if ((maxima_num == params['n_lasers']) & (len(max_locations) == params['n_lasers'])):
                     n_in_fit = params['n_lasers']
-                    gparams, redchi2gauss = fitThree(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right])
+                    gparams, redchi2gauss, mperrs = fitThree(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right])
                     # order Gaussians
                     off_inds = [1, 4, 7]
                     x_offset1 = np.min([gparams[xi] for xi in off_inds])
@@ -475,7 +494,7 @@ def wavelengthCal(paramFile):
                     amplitude3 = gparams[ind3+1]
                 else:
                     n_in_fit = params['n_lasers']-1
-                    gparams, redchi2gauss = fitTwo(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right])
+                    gparams, redchi2gauss, mperrs = fitTwo(max_vals, max_locations, phasebins[ind_left:ind_right], n_inbin[ind_left:ind_right])
                     # order Gaussians
                     off_inds = [1, 4]
                     x_offset1 = np.min( [gparams[xi] for xi in off_inds])
@@ -496,6 +515,29 @@ def wavelengthCal(paramFile):
                                amplitude2 * np.exp( -(pow((phasebins-x_offset2),2) / (2. * pow(sigma2,2)))) + \
                                amplitude3 * np.exp( -(pow((phasebins-x_offset3),2) / (2. * pow(sigma3,2))))
  
+
+
+                # Cuts
+
+                # Check rightmost peak not beyond data being considered
+                if (gparams[-2] > min_locations[-1]):
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 11)
+                    continue
+
+                # Cut on fit errors
+                if (mperrs == None):
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 12)
+                    continue
+
+                if (np.min(mperrs)==0.):
+                    if (len(mperrs) < 9):
+                        failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 13)
+                        continue
+                    else:
+                        if (np.where(mperrs == 0.)[0][0] != params['sig_ir_ind']):
+                            failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 13)
+                            continue
+  
 
                 ## Now fit parabola to get wavelength <-> phase amplitude correspondance
 
@@ -539,16 +581,6 @@ def wavelengthCal(paramFile):
                 fitfunc = amp * (pow((phaseamps - x_off), 2 )) + y_off
 
 
-                # Final cuts
-            
-                if (np.abs(gparams[-2] - min_locations[-1]) < gparams[-3]/2.) | (np.abs(gparams[-5] - gparams[-2]) < 2 * gparams[-3]) | (gparams[-2] > min_locations[-1]):
-                    failure(row, xyrarray, xylarray, i, j, 2)
-                    continue
-                #if (redchi2gauss > params['chi2_cutoff']):              # Cut on chi^2
-                #    failure(row, rarray, larray, 2)
-                #    continue
-
-
                 # Wavelength/E spectrum
                 
                 e_fromphase = amp * (pow((phasebins - x_off), 2 )) + y_off
@@ -563,7 +595,7 @@ def wavelengthCal(paramFile):
                     ind_blue = (np.where(e_fromphase < blue_peak))[0][0]
                     ind_red = (np.where(e_fromphase < red_peak))[0][0]
                 except:
-                    failure(row, xyrarray, xylarray, i, j, 2)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 14)
                     continue
 
                 blue_amp = np.mean(n_inbin[ind_blue-10:ind_blue+10])
@@ -605,31 +637,10 @@ def wavelengthCal(paramFile):
                 
                 # Wavelength range:
                 lambda_start = lambda_fromphase[0]
-
-                gradients = np.diff(parab_smooth)
-
-                n_max = 0
-                n_min = 0
-                loc_max = []
-                loc_min = []
-                lambda_min = []
-                val_max = []
-                val_min = []
-                count = 0
-                for grad in gradients[:-1]:
-                    count += 1
-
-                    if ((grad > 0) & (gradients[count] < 0) & (grad != gradients[count]) & (parab_smooth[count] > params['low_counts_val'])):
-                        n_max += 1
-                        loc_max.append(e_fromphase[count])
-                        val_max.append(parab_smooth[count])
-                    if ((grad < 0) & (gradients[count] > 0) & (grad != gradients[count])):
-                        n_min += 1
-                        loc_min.append(e_fromphase[count])
-                        lambda_min.append(lambda_fromphase[count])
-                        val_min.append(parab_smooth[count])
-
-                lambda_stop = lambda_min[-1]
+                
+                minima_inE = amp * (pow((min_locations - x_off), 2 )) + y_off
+                minima_lambda = (params['h'] * params['c'] / params['ang2m']) / minima_inE
+                lambda_stop = minima_lambda[-1]
 
 
                 # Success - write out solution
@@ -640,9 +651,18 @@ def wavelengthCal(paramFile):
                     driftrow['pixelrow'] = i
                     driftrow['pixelcol'] = j
                     driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
+                    driftrow['perrors'] = np.array(mperrs[0:6])
                     driftrow.append()
+                    
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
+                    resest_red = np.abs(red_peak) / (params['fwhm2sig'] * red_sigma)
+                    
+                    if ((resest > params['badfit_res']) | (resest_red > params['badfit_res'])):
+                        failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 15)
+                        continue
+
                     xyrarray[i][j] = resest
+                    xyrrarray[i][j] = resest_red
                     xylarray[i][j] = n_in_fit
 
                     # fits plot
@@ -663,7 +683,7 @@ def wavelengthCal(paramFile):
                     plotcounter+=1
 
                 else:
-                    failure(row, xyrarray, xylarray, i, j, 2)
+                    failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 16)
                     continue
 
 
@@ -681,12 +701,15 @@ def wavelengthCal(paramFile):
         data.close()
 
         pp.close()
-        print plotcounter, ' good pixels'
+        print 'Found ', plotcounter, ' pixels with wavelength calibration solutions.'
 
         # Plots
     
         plotArray( xyrarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlot.png',
                   plotTitle='Energy Resolution at 400nm')
+
+        plotArray( xyrrarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_arrayPlotRed.png',
+                  plotTitle='Energy Resolution at 656nm')
      
         plotArray( xylarray, showMe=False, cbar=True, plotFileName=outdir+datedir+params['figdir']+outfile.split('.')[0]+'_nlaserPlot.png',
                   plotTitle='Number of lasers for fit')

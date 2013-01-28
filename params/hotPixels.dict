@@ -1,0 +1,29 @@
+## Files and Dirs
+## -- None for now - provide as arguments to function call --
+
+inputFileName = 'obs_20121211-024511.h5'
+outputFileName = 'testOutput.h5'
+
+## Parameters
+
+timeStep = 1		#Check for hot pixels every timeStep seconds (integer for
+					#now)
+
+startTime = 0		#Start time (sec) within obs. file to check for hot pixels
+
+endTime = 10		#End time within obs. file to check for hot pixels
+					#(-1 => end of file)
+
+fwhm = 3.0			#Expected full width half max of PSF in pixels. Any pixel
+					#with flux much tighter than this will be flagged as bad.
+					#Larger value => more sensitive hot pixel flagging.
+					  
+boxSize = 5			#Compare flux in each pixel with median flux in a 
+					#surrounding box of this size on a side.
+					
+nSigma = 3.0		#Require flux in a pixel to be > nSigma std. deviations
+					#outside the statistically expected range in order for it
+					#to be flagged. Larger value => less sensitive flagging.
+
+display = False		#If 'True', show plots of each extracted sub-exposure with
+					#detected bad pixels highlighted. 

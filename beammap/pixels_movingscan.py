@@ -1,188 +1,338 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 
+from PyQt4.QtGui import *
+from PyQt4.QtGui import *
+from pixels_gui import Ui_pixels_gui
 
-path = '/Users/Paul/Desktop/Schoolwork/UCSB/Research/Beam_Map/'
+class StartQt4(QMainWindow):
+    def __init__(self):
+        QWidget.__init__(self, parent=None)
+        self.ui = Ui_pixels_gui()
+        self.ui.setupUi(self)
 
-# Alter pscale, xstart, ystart, and angle to match the grid
-# Set up a scale factor for pixel locations
-pscale=8.6
-# Pick x position offset
-xstart=51
-# Pick y position offset
-ystart=78
-# Angle of setup
-angle=3
-# Find the sine and cosine of angle to use for rotations
-s=np.sin(np.pi*angle/180.)
-c=np.cos(np.pi*angle/180.)
-# Size of grid
-size=32
+        # Initialize variables
+        self.xpos=np.empty(0,dtype='float32')
+        self.ypos=np.empty(0,dtype='float32')
+        self.xpos0=np.empty(0,dtype='float32')
+        self.ypos0=np.empty(0,dtype='float32')
+        self.xpos1=np.empty(0,dtype='float32')
+        self.ypos1=np.empty(0,dtype='float32')
+        self.xvals=np.empty(0,dtype='float32')
+        self.yvals=np.empty(0,dtype='float32')
+        self.freqvals=np.empty(0,dtype='float32')
+        self.attenvals=np.empty(0,dtype='float32')
+        self.goodpixtag=np.empty(0,dtype='|S10')
 
-# Not sure about this
-numfound=0
-numfound2=0
+        self.xsize=44;
+        self.ysize=46;
+        
+        self.pscale=10;
+        self.xoff=0;
+        self.yoff=0;
+        
+        self.angle=0;
+        self.s=np.sin(np.pi*self.angle/180.)
+        self.c=np.cos(np.pi*self.angle/180.)
 
-# Initialize variables
-xvals=np.empty(0,dtype='float32')
-yvals=np.empty(0,dtype='float32')
-xfile=np.empty(0,dtype='float32')
-yfile=np.empty(0,dtype='float32')
-freqvals=np.empty(0,dtype='float32')
-attenvals=np.empty(0,dtype='float32')
+        self.ui.pixPlot.canvas.ax.clear()
+        
+        self.ui.dirbtn.clicked.connect(self.dir_choose)
+        self.ui.savebtn.clicked.connect(self.save_process)
+        self.ui.dblbtn.clicked.connect(self.dbl_process)
+        self.ui.hidebtn.clicked.connect(self.hide_process)
+        self.ui.anglele.returnPressed.connect(self.anglele_pressed)
+        self.ui.scalele.returnPressed.connect(self.scalele_pressed)
+        self.ui.xoffle.returnPressed.connect(self.xoffle_pressed)
+        self.ui.yoffle.returnPressed.connect(self.yoffle_pressed)
+        
 
-# Create a list of position files from beam mapping
-infile=[]
-infile.append(path + 'Positions0.pos')
-infile.append(path + 'Positions1.pos')
-infile.append(path + 'Positions2.pos')
-infile.append(path + 'Positions3.pos')
+    def anglele_pressed(self):
+        self.angle=float(self.ui.anglele.text())
+        self.s=np.sin(np.pi*self.angle/180.)
+        self.c=np.cos(np.pi*self.angle/180.)
 
-psfile=[]
-psfile.append(path + 'r0_4.txt')
-psfile.append(path + 'r1_4.txt')
-psfile.append(path + 'r2_4.txt')
-psfile.append(path + 'r3_4.txt')
+        self.ui.pixPlot.canvas.ax.clear()
+        self.plot_grid()
+        self.ui.pixPlot.canvas.ax.plot(self.xvals[self.mask],self.yvals[self.mask],'b+')
+        self.ui.pixPlot.canvas.draw()
 
-# Create origin and scale factor
-origin=[[xstart,ystart]]*len(infile)
-scale=[pscale]*len(infile)
+    def scalele_pressed(self):
+        self.pscale=float(self.ui.scalele.text())
+        self.scale=[self.pscale]*len(self.infile)
 
-# If files need different origins
-origin[0][1] -= 0
-origin[0][1] -= 0
+        self.xvals=np.empty(0,dtype='float32')
+        self.yvals=np.empty(0,dtype='float32')
 
-# Extract x position, y position, and flag from input files
-for j in range(len(infile)):
-    print infile[j]
-    xpos, ypos, flag=np.loadtxt(infile[j],unpack='True')
-    freq, xcenpos, ycenpos, atten=np.loadtxt(psfile[j],unpack='True',skiprows=1)
+        # Can fix this later to pick out individual roaches
+        self.xvals = self.xpos/self.scale[0]
+        self.xvals += self.origin[0][0]
+        self.yvals = self.ypos/self.scale[0]
+        self.yvals += self.origin[0][1]
 
-# Mark the good pixels, all deleted flags will have negative values (except 0?)
-    goodpix=[]
-    addpix=np.where(flag > 0)[0]
-    if flag[0] == 0 and xpos[0] != 0 and ypos[0] != 0:
-        goodpix = np.append(0,addpix)
-    else:
-        goodpix = addpix
+        self.xpos0=np.empty(0,dtype='float32')
+        self.ypos0=np.empty(0,dtype='float32')
+        self.xpos1=np.empty(0,dtype='float32')
+        self.ypos1=np.empty(0,dtype='float32')
 
-    #Shift to account for true origin and divide by the scale factor
-    xpos -= origin[j][0]
-    xpos /= scale[j]
-    ypos -= origin[j][1]
-    ypos /= scale[j]
-    if j==2:
-        xpos -= 2
-        ypos -= 0
-    print len(xpos[goodpix]), 'Good Pixels'
+        self.xpos0 = self.xpost0/self.scale[0]
+        self.xpos0 += self.origin[0][0]
+        self.ypos0 = self.ypost0/self.scale[0]
+        self.ypos0 += self.origin[0][1]
 
-    #Create a list of good pixel locations
-    xvals=np.append(xvals,xpos[goodpix])
-    yvals=np.append(yvals,ypos[goodpix])
-    freqvals=np.append(freqvals,freq[goodpix])
-    attenvals=np.append(attenvals,atten[goodpix])
-    xfile=np.append(xfile,xpos)
-    yfile=np.append(yfile,ypos)
-'''
-    mask2=(np.linspace(0,len(xpos)-1,len(xpos))).astype('int')
-    xfile=((xpos[mask2])*c + (ypos[mask2])*s)
-    yfile=(-1.*(xpos[mask2])*s + (ypos[mask2])*c)
-    xfile=xfile.astype('int')
-    yfile=yfile.astype('int')
+        self.xpos1 = self.xpost1/self.scale[0]
+        self.xpos1 += self.origin[0][0]
+        self.ypos1 = self.ypost1/self.scale[0]
+        self.ypos1 += self.origin[0][1]
+
+        self.mask=(np.linspace(0,len(self.xvals)-1,len(self.xvals))).astype('int')
+        self.ui.pixPlot.canvas.ax.clear()
+        self.plot_grid()
+        self.ui.pixPlot.canvas.ax.plot(self.xvals[self.mask],self.yvals[self.mask],'b+')
+        self.ui.pixPlot.canvas.draw()
+
+    def xoffle_pressed(self):
+        self.xoff=float(self.ui.xoffle.text())
+        self.origin = np.zeros((len(self.infile),2))
+        for i in range(len(self.infile)):
+            self.origin[i][0] = self.xoff
+            self.origin[i][1] = self.yoff
+        
+        self.xvals=np.empty(0,dtype='float32')
+        self.yvals=np.empty(0,dtype='float32')
+
+        # Can fix this later to pick out individual roaches
+        self.xvals = self.xpos/self.scale[0]
+        self.xvals += self.origin[0][0]
+        self.yvals = self.ypos/self.scale[0]
+        self.yvals += self.origin[0][1]
+
+        self.xpos0=np.empty(0,dtype='float32')
+        self.ypos0=np.empty(0,dtype='float32')
+        self.xpos1=np.empty(0,dtype='float32')
+        self.ypos1=np.empty(0,dtype='float32')
+
+        self.xpos0 = self.xpost0/self.scale[0]
+        self.xpos0 += self.origin[0][0]
+        self.ypos0 = self.ypost0/self.scale[0]
+        self.ypos0 += self.origin[0][1]
+
+        self.xpos1 = self.xpost1/self.scale[0]
+        self.xpos1 += self.origin[0][0]
+        self.ypos1 = self.ypost1/self.scale[0]
+        self.ypos1 += self.origin[0][1]
+
+        self.mask=(np.linspace(0,len(self.xvals)-1,len(self.xvals))).astype('int')
+        self.ui.pixPlot.canvas.ax.clear()
+        self.plot_grid()
+        self.ui.pixPlot.canvas.ax.plot(self.xvals[self.mask],self.yvals[self.mask],'b+')
+        self.ui.pixPlot.canvas.draw()
+        
+    def yoffle_pressed(self):
+        self.yoff=float(self.ui.yoffle.text())
+        self.origin = np.zeros((len(self.infile),2))
+        for i in range(len(self.infile)):
+            self.origin[i][0] = self.xoff
+            self.origin[i][1] = self.yoff
+
+        self.xvals=np.empty(0,dtype='float32')
+        self.yvals=np.empty(0,dtype='float32')
+
+        # Can fix this later to pick out individual roaches
+        self.xvals = self.xpos/self.scale[0]
+        self.xvals += self.origin[0][0]
+        self.yvals = self.ypos/self.scale[0]
+        self.yvals += self.origin[0][1]
+
+        self.xpos0=np.empty(0,dtype='float32')
+        self.ypos0=np.empty(0,dtype='float32')
+        self.xpos1=np.empty(0,dtype='float32')
+        self.ypos1=np.empty(0,dtype='float32')
+
+        self.xpos0 = self.xpost0/self.scale[0]
+        self.xpos0 += self.origin[0][0]
+        self.ypos0 = self.ypost0/self.scale[0]
+        self.ypos0 += self.origin[0][1]
+
+        self.xpos1 = self.xpost1/self.scale[0]
+        self.xpos1 += self.origin[0][0]
+        self.ypos1 = self.ypost1/self.scale[0]
+        self.ypos1 += self.origin[0][1]
+
+        self.mask=(np.linspace(0,len(self.xvals)-1,len(self.xvals))).astype('int')
+        self.ui.pixPlot.canvas.ax.clear()
+        self.plot_grid()
+        self.ui.pixPlot.canvas.ax.plot(self.xvals[self.mask],self.yvals[self.mask],'b+')
+        self.ui.pixPlot.canvas.draw()
+
+    def dbl_process(self):
+
+        for i in range(len(self.xpos0)):
+            self.ui.pixPlot.canvas.ax.plot([self.xpos0[i],self.xpos1[i]],[self.ypos0[i],self.ypos1[i]],'D')
+        self.ui.pixPlot.canvas.draw()
+
+    def hide_process(self):
+        self.xvals=np.empty(0,dtype='float32')
+        self.yvals=np.empty(0,dtype='float32')
+
+        # Can fix this later to pick out individual roaches
+        self.xvals = self.xpos/self.scale[0]
+        self.xvals += self.origin[0][0]
+        self.yvals = self.ypos/self.scale[0]
+        self.yvals += self.origin[0][1]
+
+        self.mask=(np.linspace(0,len(self.xvals)-1,len(self.xvals))).astype('int')
+        self.ui.pixPlot.canvas.ax.clear()
+        self.plot_grid()
+        self.ui.pixPlot.canvas.ax.plot(self.xvals[self.mask],self.yvals[self.mask],'b+')
+        self.ui.pixPlot.canvas.draw()
+
+        
+
+    def plot_grid(self):
+        # Vertical Lines
+        xstart=self.xsize*np.linspace(0,1,self.xsize+1)
+        ystart=np.zeros(self.xsize+1)
+        xstop=xstart
+        ystop=ystart+self.ysize
+
+        xstart2=xstart*self.c - ystart*self.s
+        xstop2=xstop*self.c - ystop*self.s
+        ystart2=xstart*self.s + ystart*self.c
+        ystop2=xstop*self.s + ystop*self.c
+
+        for i in range(self.xsize+1):
+            self.ui.pixPlot.canvas.ax.plot([xstart2[i],xstop2[i]],[ystart2[i],ystop2[i]],'g')
+
+        # Horizontal Lines
+        ystart=self.ysize*np.linspace(0,1,self.ysize+1)
+        xstart=np.zeros(self.ysize+1)
+        ystop=ystart
+        xstop=xstart+self.xsize
+
+        xstart2=xstart*self.c - ystart*self.s
+        xstop2=xstop*self.c - ystop*self.s
+        ystart2=xstart*self.s + ystart*self.c
+        ystop2=xstop*self.s + ystop*self.c
+
+        for i in range(self.ysize+1):
+            self.ui.pixPlot.canvas.ax.plot([xstart2[i],xstop2[i]],[ystart2[i],ystop2[i]],'g')
     
-    f= open('xyint%i.txt' %j,'w')
-    for i in range(len(xfile)):
-        f= open('xyint%i.txt' %j,'a')
-        f.write(str(xfile[i]) + '\t' + str(yfile[i]) + '\n')
-        f.close()
-'''
-print len(xvals), 'Total Good Pixels'
-print 'xmin, xmax =', np.min(xvals), np.max(xvals)
-print 'ymin, ymax =', np.min(yvals), np.max(yvals)
+    def dir_choose(self):
+        text =QFileDialog.getExistingDirectory()
+        self.path = str(text)
+        self.ui.dirle.setText(str(text))
 
-# xstart = [0,1,2,...,32]
-xstart=size*np.linspace(0,1,33)
-# ystart = [0,0,0,...,0]
-ystart=np.zeros(33)
-# xstop = [0,1,2,...,32]
-xstop=xstart
-# ystop = [32,32,32,...,32]
-ystop=ystart+size
+        self.infile=[]       
+        self.infile.append(self.path + '/r0.pos')
+        self.infile.append(self.path + '/r1.pos')
+        self.infile.append(self.path + '/r2.pos')
+        self.infile.append(self.path + '/r3.pos')
+        self.infile.append(self.path + '/r4.pos')
+        self.infile.append(self.path + '/r5.pos')
+        self.infile.append(self.path + '/r6.pos')
+        self.infile.append(self.path + '/r7.pos')
 
-# Transform with 2x2 rotation matrix
-xstart2=xstart*c - ystart*s
-xstop2=xstop*c - ystop*s
-ystart2=xstart*s + ystart*c
-ystop2=xstop*s + ystop*c
+        self.psfile=[]
+        self.psfile.append(self.path + '/ps_freq0.txt')
+        self.psfile.append(self.path + '/ps_freq1.txt')
+        self.psfile.append(self.path + '/ps_freq2.txt')
+        self.psfile.append(self.path + '/ps_freq3.txt')
+        self.psfile.append(self.path + '/ps_freq4.txt')
+        self.psfile.append(self.path + '/ps_freq5.txt')
+        self.psfile.append(self.path + '/ps_freq6.txt')
+        self.psfile.append(self.path + '/ps_freq7.txt')       
 
-# plot square grid with 32x32 boxes, rotated counter-clockwise by angle, vertical lines
-for i in range(33):
-    plt.plot([xstart2[i],xstop2[i]],[ystart2[i],ystop2[i]],'g')
+        self.origin = np.zeros((len(self.infile),2))
+        for i in range(len(self.infile)):
+            self.origin[i][0] = self.xoff
+            self.origin[i][1] = self.yoff
+        self.scale=[self.pscale]*len(self.infile)
 
-ystart=size*np.linspace(0,1,33)
-xstart=np.zeros(33)
-ystop=ystart
-xstop=xstart+size
+        self.dblfile=self.path + '/doubles.pos'
+        self.xpost0, self.ypost0, self.xpost1, self.ypost1=np.loadtxt(self.dblfile,unpack='True', usecols = (0,1,2,3))
 
-xstart2=xstart*c - ystart*s
-xstop2=xstop*c - ystop*s
-ystart2=xstart*s + ystart*c
-ystop2=xstop*s + ystop*c
+        # Extract x position, y position, and flag from input files
+        pixeltag =''
+        for j in range(len(self.infile)):
+            print self.infile[j]
+            xpos, ypos, flag=np.loadtxt(self.infile[j],unpack='True')
+            freq, xcenpos, ycenpos, atten=np.loadtxt(self.psfile[j],unpack='True',skiprows=1)       
+        
+            self.goodpix=np.where(flag == 0)[0]
+        
+            pixtag=np.empty(0,dtype='|S10')
+            for pixno in range(len(freq)):
+                pixtag = np.append(pixtag,'/r%i/p%i/' %(j,pixno))     
+        
+            print len(xpos[self.goodpix]), 'Good Pixels'
 
-# Horizontal lines
-for i in range(33):
-    plt.plot([xstart2[i],xstop2[i]],[ystart2[i],ystop2[i]],'g')
+            #Create a list of good pixel locations
+            self.xpos=np.append(self.xpos,xpos[self.goodpix])
+            self.ypos=np.append(self.ypos,ypos[self.goodpix])
+            self.freqvals=np.append(self.freqvals,freq[self.goodpix])
+            self.attenvals=np.append(self.attenvals,atten[self.goodpix])
+            self.goodpixtag=np.append(self.goodpixtag,pixtag[self.goodpix])
 
-# mask = [0,1,2,...,len(xvals)-1]
-mask=(np.linspace(0,len(xvals)-1,len(xvals))).astype('int')
+        # Can fix this later to pick out individual roaches
+        self.xvals = self.xpos/self.scale[0]
+        self.xvals += self.origin[0][0]
+        self.yvals = self.ypos/self.scale[0]
+        self.yvals += self.origin[0][1]
 
-# find the pixel positions
-# Clockwise rotation by angle
-xpix=((xvals[mask])*c + (yvals[mask])*s)
-ypix=(-1.*(xvals[mask])*s + (yvals[mask])*c)
+        self.xpos0 = self.xpost0/self.scale[0]
+        self.xpos0 += self.origin[0][0]
+        self.ypos0 = self.ypost0/self.scale[0]
+        self.ypos0 += self.origin[0][1]
 
-# Plot the locations of the good pixels
-plt.plot(xvals[mask],yvals[mask],'b+')
+        self.xpos1 = self.xpost1/self.scale[0]
+        self.xpos1 += self.origin[0][0]
+        self.ypos1 = self.ypost1/self.scale[0]
+        self.ypos1 += self.origin[0][1]
 
-xpix=xpix.astype('int')
-ypix=ypix.astype('int')
+        self.mask=(np.linspace(0,len(self.xvals)-1,len(self.xvals))).astype('int')
+        # Plot the locations of the good pixels
+        self.ui.pixPlot.canvas.ax.clear()
+        self.plot_grid()
+        self.ui.pixPlot.canvas.ax.plot(self.xvals[self.mask],self.yvals[self.mask],'b+')
+        self.ui.pixPlot.canvas.draw()
 
-# Count the number of pixels inside the entire grid
-numfound  += len(np.where((xpix < 32)&(xpix>-1)&(ypix > -1)&(ypix<32))[0])
-# Count the number of pixels inside the left half of the grid
-numfound2 += len(np.where((xpix < 16)&(xpix>-1)&(ypix > -1)&(ypix<32))[0])
+    def save_process(self):
+        print len(self.xvals), 'Total Good Pixels'
+        print 'xmin, xmax =', np.min(self.xvals), np.max(self.xvals)
+        print 'ymin, ymax =', np.min(self.yvals), np.max(self.yvals)
 
-print numfound, 'pixels in grid'
-print numfound2, 'pixels in left half of grid'
-print numfound-numfound2, 'pixels in right half of grid'
-print 'Ratio of good pixels to total pixels on right half of grid:', (numfound-numfound2)/512.
+        xpix=((self.xvals[self.mask])*self.c + (self.yvals[self.mask])*self.s)
+        ypix=(-1.*(self.xvals[self.mask])*self.s + (self.yvals[self.mask])*self.c)
 
-plt.show()
-# look for regions with fewest gaps
+        xpix0=self.xpos0*self.c + self.ypos0*self.s
+        ypix0=-1.*self.xpos0*self.s + self.ypos0*self.c
 
-# how are these values determined? Originally 5,5
-xsize=5
-ysize=5
+        xpix1=self.xpos1*self.c + self.ypos1*self.s
+        ypix1=-1.*self.xpos1*self.s + self.ypos1*self.c
 
-goodgrid=np.zeros((32,32))
-idx=freqvals.argsort()
-print len(xpix), len(freqvals)
-f= open('freq_atten_x_y.txt','w')
-for i in range(len(xpix)):
-    print freqvals[idx[i]], xpix[idx[i]], ypix[idx[i]]
-    
-    f= open('freq_atten_x_y.txt','a')
-    f.write(str(freqvals[idx[i]]) + '\t' + str(attenvals[idx[i]]) +'\t' + str(xpix[idx[i]]) + '\t' + str(ypix[idx[i]]) +'\n')
-    f.close()
-    
-    xmin=np.max([0,xpix[i]-xsize])
-    xmax=np.min([32,xpix[i]+xsize])
-    ymin=np.max([0,ypix[i]-xsize])
-    ymax=np.min([32,ypix[i]+xsize])
-    goodgrid[xmin:xmax,ymin:ymax] += 1
-print goodgrid, np.max(goodgrid)
+        idx=self.freqvals.argsort()
+        
+        f= open('freq_atten_x_y.txt','w')
+        for i in range(len(xpix)):    
+            f= open('freq_atten_x_y.txt','a')
+            f.write(str(self.freqvals[idx[i]]) + '\t' + str(self.attenvals[idx[i]]) +'\t' + str(xpix[idx[i]]) + '\t' + str(ypix[idx[i]]) +'\t' + self.goodpixtag[idx[i]] + '\n')
+            f.close()
 
-plt.imshow(goodgrid)
+        print 'Number of Doubles:' + str(len(self.xpos0))
+        dbltag=np.loadtxt(self.dblfile,unpack='True', usecols = (4,), dtype='|S10' )
+        f= open('double_positions.txt','w')
+        for i in range(len(self.xpos0)):
+            f= open('double_positions.txt','a')
+            f.write(str(xpix0[i]) + '\t' + str(ypix0[i]) + '\t' + str(xpix1[i]) + '\t' + str(ypix1[i]) + '\t' + dbltag[i] + '\n')
+            f.close()
+        
 
-#plt.show()
+# Start up main gui
+if __name__ == "__main__":
+	app = QApplication(sys.argv)
+	myapp = StartQt4()
+	myapp.show()
+	app.exec_()
 

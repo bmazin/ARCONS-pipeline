@@ -10,13 +10,56 @@ Required external software components:
 
 Enthought Python Distribution (EPD) 7.3 (http://www.enthought.com/products/epd.php)
  
-PyEphem (http://rhodesmill.org/pyephem/) 
+PyEphem (http://rhodesmill.org/pyephem/)
+
+PyGuide (http://www.astro.washington.edu/users/rowen/PyGuide/Manual.html)
 
 (you can check if you have them with help('modules') within the (i)python interpreter)
 
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
+
+Another package you will need is interval.  It depends on crlibm
+
+On Turk, these packages installed in the usual way without fuss.
+
+On a Mac, you need to do this:
+
+I downloaded crlibm-1.0beta4.tar.gz from 
+http://lipforge.ens-lyon.fr/www/crlibm/ 
+
+$ untar
+$ configure
+$ make
+$ sudo make install. 
+
+Then I downloaded pyinterval-1.0b21.tar.gz from
+http://pypi.python.org/pypi/pyinterval
+and untarred it.
+
+
+Here is the tricky part.
+
+in setup.py pyinterval, change the lines near the end from this
+
+             include_dirs = ['/opt/crlibm/include'],
+             library_dirs = ['/opt/crlibm/lib'],
+
+to this
+
+
+            include_dirs = ['/usr/local/include'],
+            library_dirs = ['/usr/local/lib'],
+
+and then 
+
+python setup.py build
+sudo python setup.py install
+
+The tests in cosmic/TestTimeMask.py uses the class Cosmic which uses
+this, and it will also be used to locate times to mask hot pixels.
+
 
 Recommended external software components:
 ---------------------
@@ -59,6 +102,8 @@ Pipeline components:
 /quicklook contains tools for quickly looking at ARCONS h5 files
 
 /beammap contains tools for creating, viewing, and modifying beam maps 
+
+/hotpix contains tools for finding location and time of hot (and possibly 'cold') pixels
 
 Each directory contains a /test subdirectory, where code to test the module will be stored.
 

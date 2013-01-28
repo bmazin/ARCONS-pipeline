@@ -1,6 +1,5 @@
 #!/bin/python
 '''Author:  Chris Stoughton    Date:  November 28, 2012
-
 Identify synchronous photons
 '''
 
@@ -16,7 +15,8 @@ from util.ObsFile import ObsFile
 from util import meanclip
 from interval import interval, inf, imath
 from cosmic import TimeMask
-
+from cosmic import c_binner
+import time
 class Cosmic:
 
     def __init__(self, fn, beginTime=0, endTime='exptime', \
@@ -211,7 +211,7 @@ class Cosmic:
                 for iCol in range(self.file.nCol):
                     sec = self.allSecs[iRow,iCol][iSec]
                     if len(sec) > 0:
-                        times = sec & self.file.timeMask
+                        times = sec & self.file.timestampMask
                         hg,edges = \
                         np.histogram(times,bins=self.nBinsPerSec, \
                                      range=(0,1.0/self.file.tickDuration))
@@ -279,17 +279,30 @@ class Cosmic:
             print "findCosmics:  iSec=",iSec,"  inter=",inter
             hg = self.getHgForOneSec(iSec, inter)
 
-    def getHgForOneSec(self, iSec, inter):
-        timeHgValues = np.zeros(self.file.ticksPerSec)
+    def getHgsForOneSec(self, iSec, inter, binFactor=1, populationMax=10):
+        bins = np.arange(0, self.file.ticksPerSec, binFactor)
+        minLength = self.file.ticksPerSec/binFactor
+        timeHgValues = np.zeros(minLength, dtype=np.int64)
+        elapsed = 0.0;
+        start = time.clock()
         for iRow in range(self.file.nRow):
             for iCol in range(self.file.nCol):
                 sec = self.allSecs[iRow,iCol][iSec]
-                timestamps,parabolaPeaks,baselines = \
-                    ObsFile.parsePhotonPackets(self.file, sec, inter,\
-                                                   doParabolaFitPeaks=False,\
-                                                   doBaselines = False)
-        
-                hg = np.histogram(timestamps,self.file.ticksPerSec,\
-                                     range=(0,self.file.ticksPerSec))
-                timeHgValues += hg[0]
-        return timeHgValues
+                if (sec.size > 0):
+                    timestamps,parabolaPeaks,baselines = \
+                        ObsFile.parsePhotonPackets(\
+                        self.file, sec, inter,\
+                            doParabolaFitPeaks=False,\
+                            doBaselines = False)
+
+                    #hg = np.bincount(timestamps.astype(np.int64)\
+                    #                     ,minlength=minLength)
+                    #timeHgValues += hg
+                    c_binner.binner(timestamps, timeHgValues)
+        end = time.clock();
+        populationHg = np.histogram(timeHgValues,\
+                                        populationMax, 
+                                    range=(-0.5,populationMax-1))
+        elapsed += end-start
+        print "elapsed=",elapsed
+        return timeHgValues,populationHg

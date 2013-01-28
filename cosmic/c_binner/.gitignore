@@ -1,0 +1,8 @@
+*
+!README.TXT
+!__init__.py
+!CMakeLists.txt
+!c_binner.i
+!numpy.i
+!.gitignore
+!build
