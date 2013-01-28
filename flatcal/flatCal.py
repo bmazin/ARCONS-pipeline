@@ -131,6 +131,9 @@ class FlatCal:
         flatCalFile.flush()
         flatCalFile.close()
 
+        npzFileName = os.path.splitext(fullFlatCalFileName)[0]+'.npz'
+        np.savez(npzFileName,median=self.wvlMedians,binEdges=self.wvlBinEdges,spectra=self.spectra,weights=self.flatFactors)
+
 if __name__ == '__main__':
     paramFile = sys.argv[1]
     fc = FlatCal(paramFile)
