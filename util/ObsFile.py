@@ -315,7 +315,8 @@ class ObsFile:
         """
         Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) is called
         wavelengths outside these limits are excluded.  To remove limits
-        set wvlLowerLimit and/or wvlUpperLimit to None
+        set wvlLowerLimit and/or wvlUpperLimit to None.  To use the wavecal limits
+        for each individual pixel, set wvlLowerLimit and/or wvlUpperLimit to -1 
         """
         self.wvlLowerLimit = wvlLowerLimit
         self.wvlUpperLimit = wvlUpperLimit
@@ -329,15 +330,19 @@ class ObsFile:
         xOffset = self.wvlCalTable[iRow,iCol,0]
         yOffset = self.wvlCalTable[iRow,iCol,1]
         amplitude = self.wvlCalTable[iRow,iCol,2]
-        #wvlLowerLimit = self.wvlRangeTable[iRow,iCol,0]
-        #wvlUpperLimit = self.wvlRangeTable[iRow,iCol,1]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow,iCol,0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow,iCol,1]
         energies = amplitude*(pulseHeights-xOffset)**2+yOffset
         if excludeBad == True:
             energies = energies[energies != 0]
         wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
-        if excludeBad == True and self.wvlLowerLimit != None:
+        if excludeBad == True and self.wvlLowerLimit == -1:
+            wavelengths = wavelengths[wvlCalLowerLimit < wavelengths]
+        elif excludeBad == True and self.wvlLowerLimit != None:
             wavelengths = wavelengths[self.wvlLowerLimit < wavelengths]
-        if excludeBad == True and self.wvlUpperLimit != None:
+        if excludeBad == True and self.wvlUpperLimit == -1:
+            wavelengths = wavelengths[wavelengths < wvlCalUpperLimit]
+        elif excludeBad == True and self.wvlUpperLimit != None:
             wavelengths = wavelengths[wavelengths < self.wvlUpperLimit]
 #            if len(wavelengths) > 0 and self.flatCalFile != None:
 #                #filter out wavelengths without a valid flat weight
