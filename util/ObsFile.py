@@ -28,6 +28,8 @@ class ObsFile:
         self.loadFile(fileName)
         self.wvlCalFile = None #initialize to None for an easy test of whether a cal file has been loaded
         self.flatCalFile = None
+        self.wvlLowerLimit = None
+        self.wvlUpperLimit = None
         
 
     def __del__(self):
@@ -156,11 +158,10 @@ class ObsFile:
 
 
 
-    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted = False,getTimes=False):
+    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used.  
-        if weighted is True, flat cal weights are applied
         if getTimes is True, returns timestamps,wavelengths
         """
         if getTimes == False:
@@ -221,6 +222,13 @@ class ObsFile:
 
 
     def getTimedPacketList(self,iRow,iCol,firstSec=0,integrationTime=-1):
+        """
+        Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
+        parses packets from firstSec to firstSec+integrationTime.
+        if integrationTime is -1, All time after firstSec is used.  
+        """
         pixelData = self.getPixel(iRow,iCol)
         lastSec = firstSec+integrationTime
         if integrationTime == -1:
@@ -274,7 +282,7 @@ class ObsFile:
         utils.plotArray(secImg,cbar=True,normMax=np.mean(secImg)+nSdevMax*np.std(secImg),plotTitle=plotTitle)
         
 
-    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=100):
+    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=200):
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime, and an array giving the cutoff wavelengths used to bin the wavelength values
         if integrationTime is -1, All time after firstSec is used.  
@@ -303,6 +311,16 @@ class ObsFile:
         ax.plot(self.flatCalWvlBins[0:-1],spectrum,label='spectrum for pixel[%d][%d]'%(pixelRow,pixelCol))
         plt.show()
 
+    def setWvlCutoffs(self,wvlLowerLimit=3000,wvlUpperLimit=8000):
+        """
+        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) is called
+        wavelengths outside these limits are excluded.  To remove limits
+        set wvlLowerLimit and/or wvlUpperLimit to None.  To use the wavecal limits
+        for each individual pixel, set wvlLowerLimit and/or wvlUpperLimit to -1 
+        """
+        self.wvlLowerLimit = wvlLowerLimit
+        self.wvlUpperLimit = wvlUpperLimit
+
     def convertToWvl(self,pulseHeights,iRow,iCol,excludeBad = True):
         """
         applies wavelength calibration to a list of photon pulse heights
@@ -312,14 +330,28 @@ class ObsFile:
         xOffset = self.wvlCalTable[iRow,iCol,0]
         yOffset = self.wvlCalTable[iRow,iCol,1]
         amplitude = self.wvlCalTable[iRow,iCol,2]
-        wvlLowerLimit = self.wvlRangeTable[iRow,iCol,0]
-        wvlUpperLimit = self.wvlRangeTable[iRow,iCol,1]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow,iCol,0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow,iCol,1]
         energies = amplitude*(pulseHeights-xOffset)**2+yOffset
         if excludeBad == True:
             energies = energies[energies != 0]
         wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
-        if excludeBad == True:
-            wavelengths = wavelengths[np.logical_and(wvlLowerLimit < wavelengths,wavelengths < wvlUpperLimit)]
+        if excludeBad == True and self.wvlLowerLimit == -1:
+            wavelengths = wavelengths[wvlCalLowerLimit < wavelengths]
+        elif excludeBad == True and self.wvlLowerLimit != None:
+            wavelengths = wavelengths[self.wvlLowerLimit < wavelengths]
+        if excludeBad == True and self.wvlUpperLimit == -1:
+            wavelengths = wavelengths[wavelengths < wvlCalUpperLimit]
+        elif excludeBad == True and self.wvlUpperLimit != None:
+            wavelengths = wavelengths[wavelengths < self.wvlUpperLimit]
+#            if len(wavelengths) > 0 and self.flatCalFile != None:
+#                #filter out wavelengths without a valid flat weight
+#                pixelFlags = self.flatFlags[iRow,iCol]
+#                binIndices = np.digitize(wavelengths,self.flatCalWvlBins)-1
+#                wavelengths=wavelengths[np.logical_and(binIndices>=0,binIndices<len(pixelFlags))]
+#                binIndices=binIndices[np.logical_and(binIndices>=0,binIndices<len(pixelFlags))]
+#                flags = pixelFlags[binIndices]
+#                wavelengths = wavelengths[flags==1]
         return wavelengths
 
 
@@ -375,9 +407,14 @@ class ObsFile:
     def writePhotonList(self):
         """
         writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
-        *Should be changed to use same filename as obs file but with pl prefix
+        currently cuts out photons outside the valid wavelength ranges from the wavecal
         """
-        plTable = self.createEmptyPhotonListFile()
+        plFile = self.createEmptyPhotonListFile()
+        plTable = plFile.root.photons.photons
+        plFile.copyNode(self.flatCalFile.root.flatcal,newparent=plFile.root,recursive=True)
+        plFile.copyNode(self.wvlCalFile.root.wavecal,newparent=plFile.root,recursive=True)
+        plFile.copyNode(self.file.root.header,newparent=plFile.root,recursive=True)
+        plFile.flush()
 
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
@@ -386,6 +423,8 @@ class ObsFile:
                     wvlError = self.wvlErrorTable[iRow,iCol]
                     flatWeights = self.flatWeights[iRow,iCol]
                     flatFlags = self.flatFlags[iRow,iCol]
+                    wvlRange = self.wvlRangeTable[iRow,iCol]
+
                     #go through the list of seconds in a pixel dataset
                     for iSec,secData in enumerate(self.getPixel(iRow,iCol)):
                         timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(secData)
@@ -394,12 +433,13 @@ class ObsFile:
                         wavelengths = self.convertToWvl(pulseHeights,iRow,iCol,excludeBad=False)
                         #calculate what wavelength bins each photon falls into to see which flat cal factor should be applied
                         if len(wavelengths) > 0:
-                            binIndices = np.digitize(wavelengths,self.flatCalWvlBins[0:-1])
+                            binIndices = np.digitize(wavelengths,self.flatCalWvlBins)-1
+
                         else:
                             binIndices = np.array([])
  
                         for iPhoton in xrange(len(timestamps)):
-                            if wavelengths[iPhoton] > 0 and wavelengths[iPhoton] != np.inf and binIndices[iPhoton] < len(flatWeights):
+                            if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
                                 #create a new row for the photon list
                                 newRow = plTable.row
                                 newRow['Xpix'] = iCol
@@ -434,7 +474,7 @@ class ObsFile:
         except:
             plFile.close()
             raise
-        return plTable
+        return plFile
 
 
 
@@ -478,13 +518,13 @@ class ObsFile:
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
 
-    def getDeadPixels(self,showMe=False):
+    def getDeadPixels(self,showMe=False,weighted=True):
         """
         returns a mask indicating which pixels had no counts in this observation file
         1's for pixels with counts, 0's for pixels without counts
         if showMe is True, a plot of the mask pops up
         """
-        countArray = np.array([[self.getPixelCount(iRow,iCol) for iCol in range(self.nCol)] for iRow in range(self.nRow)])
+        countArray = np.array([[self.getPixelCount(iRow,iCol,weighted=weighted) for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow,self.nCol))
         deadArray[countArray == 0] = 0
         if showMe == True:

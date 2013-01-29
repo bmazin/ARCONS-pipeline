@@ -30,6 +30,8 @@ for obs in sorted(glob.glob(os.path.join(obsPath,'obs*.h5'))):
     except tables.exceptions.HDF5ExtError:
         print os.path.basename(obs)
         print 'Can\'t Read Header Data'
+    except IndexError:
+        print 'Missing Header'
 
 
 
