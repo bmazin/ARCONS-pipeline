@@ -94,7 +94,7 @@ class headerDescription(tables.IsDescription):
  
  
  
-def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
+def checkInterval(firstSec, intTime, fwhm=3.0, boxSize=5, nSigma=3.0,
                   obsFile=None, inputFileName=None, image=None,
                   display=False, weighted=False):
     '''
@@ -156,7 +156,7 @@ def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
     gauss_array = utils.gaussian_psf(fwhm, boxSize)
     maxRatio = np.max(gauss_array) / np.median(gauss_array)
 
-    if obsFile is None:
+    if obsFile is None and image is None:
         obsFile = ObsFile.ObsFile(inputFileName)
     #assert 1==0
     if image is None:
@@ -208,8 +208,10 @@ def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
         y = np.arange(np.shape(image)[0])
         xx, yy = np.meshgrid(x, y)
         mpl.scatter(xx[hotMask], yy[hotMask], c='y')
-        plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-'
-                       + str(firstSec + intTime) + 's')
+        if obsFile is None:
+            plotTitle = ('image' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
+        else:
+            plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
         mpl.suptitle(plotTitle)
 
     return {'mask':hotMask, 'image':image, 'medfiltimage':medFiltImage,
