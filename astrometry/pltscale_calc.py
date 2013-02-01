@@ -68,8 +68,9 @@ mask = np.zeros((grid_height,grid_width))
 # Create a mask for saturated pixels, 0 for okay, 1 for saturated
 satMask = np.zeros((grid_height,grid_width))
 
-integration_time= 10
-xyguess=[0,0]
+integration_time= 30
+pix_array = np.zeros((int(exptime/integration_time),2))
+mag_array = np.zeros(len(pix_array))
 
 f = open(savePath+ '/' + txtout,'w')
 for t in range(int(exptime/integration_time)):
@@ -81,6 +82,7 @@ for t in range(int(exptime/integration_time)):
 	    for i in range(integration_time):
                 pltmat[y][x]+=flux_cube[y][x][int(t*integration_time+i)]/integration_time
     map.ax = map.fig.add_subplot(111)
+    map.ax.set_title('Object 1')
     map.ax.matshow(pltmat,cmap = plt.cm.gray, origin = 'lower')
     map.connect()
     plt.show()
@@ -91,15 +93,55 @@ for t in range(int(exptime/integration_time)):
     print 'Guess = ' + str(xyguess)
     pyguide_output = pg.centroid(pltmat,mask,mask,xyguess,10,ccd,0,False)
     try:
-        xycenter = pyguide_output.xyCtr
-        f=open(savePath+ '/' + txtout,'a')
-        f.write(str(xycenter[0]) + '\t' + str(xycenter[1]) + '\n')
-        f.close()
-        print 'Calculated = ' + str((xycenter))     
+        xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+        print 'Calculated = ' + str((xycenter))
     except TypeError:
         print 'Cannot centroid, using guess'
         xycenter = xyguess
-        f=open(savePath+ '/' + txtout,'a')
-        f.write(str(xycenter[0]) + '\t' + str(xycenter[1]) + '\n')
-        f.close()
+    
+    map = MouseMonitor()
+    map.fig = plt.figure()
+    pltmat = np.zeros((grid_height,grid_width))
+    for y in range(grid_height):
+        for x in range(grid_width):
+	    for i in range(integration_time):
+                pltmat[y][x]+=flux_cube[y][x][int(t*integration_time+i)]/integration_time
+    map.ax = map.fig.add_subplot(111)
+    map.ax.set_title('Object 2')
+    map.ax.matshow(pltmat,cmap = plt.cm.gray, origin = 'lower')
+    map.connect()
+    plt.show()
+    try:
+    	xyguess = map.xyguess
+    except AttributeError:
+	pass
+    print 'Guess = ' + str(xyguess)
+    pyguide_output = pg.centroid(pltmat,mask,mask,xyguess,10,ccd,0,False)
+    try:
+        xycenter1 = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+        print 'Calculated = ' + str((xycenter1))
+    except TypeError:
+        print 'Cannot centroid, using guess'
+        xycenter1 = xyguess
 
+    pix_offset = [xycenter[0] - xycenter1[0],xycenter[1] - xycenter1[1]]
+    pix_array[t][0] =pix_offset[0]
+    pix_array[t][1] =pix_offset[1]
+    mag_array[t] = np.sqrt(pix_offset[0]*pix_offset[0]+pix_offset[1]*pix_offset[1])
+    print pix_offset
+
+    f=open(savePath+ '/' + txtout,'a')
+    f.write(str(pix_offset[0]) + '\t' + str(pix_offset[1]) + '\t' + str(mag_array[t]) + '\n')
+    f.close()
+
+print pix_array
+x_array = np.zeros(len(pix_array))
+y_array = np.zeros(len(pix_array))
+for i in range(len(pix_array)):
+    x_array[i] = pix_array[i][0]
+    y_array[i] = pix_array[i][1]
+print mag_array
+print np.median(mag_array)
+f=open(savePath+ '/' + txtout,'a')
+f.write('\n'+str(np.median(mag_array)))
+f.close()
