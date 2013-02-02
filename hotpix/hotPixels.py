@@ -53,6 +53,8 @@ To do:
         contrast should be higher.
     - Output files seem unnecessarily large. May be some way of making this more
         efficient.
+    - Current image display in checkInterval is wrong way up - need to update
+      to use Danica's image display routine.
 
 See individual routines for more detail.
 
@@ -94,7 +96,7 @@ class headerDescription(tables.IsDescription):
  
  
  
-def checkInterval(firstSec, intTime, fwhm=3.0, boxSize=5, nSigma=3.0,
+def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
                   obsFile=None, inputFileName=None, image=None,
                   display=False, weighted=False):
     '''
