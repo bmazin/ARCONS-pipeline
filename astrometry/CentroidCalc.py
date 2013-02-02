@@ -24,6 +24,9 @@ class MouseMonitor():
 # Set the path and h5 file names to be imported
 h5beamfile = '/ScienceData/sci4alpha/sci4_beammap_palomar.h5'
 
+# Create a mask for saturated pixels, 0 for okay, 1 for saturated
+satMask = np.zeros((grid_height,grid_width))
+
 app = QApplication(sys.argv)
 startingSaveDir = os.getcwd()
 savePath = QFileDialog.getExistingDirectory(None,'Choose Save Path',startingSaveDir, QFileDialog.ShowDirsOnly)
@@ -36,6 +39,9 @@ txtout = 'centroids_' + centroid_list_identifier + '.txt'
 
 grid_width = 44
 grid_height = 46
+
+# Create a mask of bad pixels, 0 for valid, 1 for invalid
+mask = np.zeros((grid_height,grid_width))
 
 # Make map of where pixels fit in grid in format '/r0/p123/'
 h5beam = openFile(h5beamfile, mode = 'r')
@@ -62,11 +68,9 @@ for y in range(grid_height):
 # Specify pixel info CCDInfo(bias,readNoise,ccdGain,satLevel)
 ccd = pg.CCDInfo(0,0.00001,1,2500)
 
-# Create a mask of bad pixels, 0 for valid, 1 for invalid
-mask = np.zeros((grid_height,grid_width))
 
-# Create a mask for saturated pixels, 0 for okay, 1 for saturated
-satMask = np.zeros((grid_height,grid_width))
+
+
 
 integration_time= 10
 xyguess=[0,0]

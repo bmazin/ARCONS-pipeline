@@ -36,6 +36,11 @@ txtout = 'centroids_' + centroid_list_identifier + '.txt'
 
 grid_width = 44
 grid_height = 46
+integration_time= 15
+
+# Create a mask for saturated pixels, 0 for okay, 1 for saturated
+satMask = np.zeros((grid_height,grid_width))
+satMask[12][11] = 1
 
 # Make map of where pixels fit in grid in format '/r0/p123/'
 h5beam = openFile(h5beamfile, mode = 'r')
@@ -44,6 +49,9 @@ location_strings = h5beam.root._f_getChild('/beammap/beamimage')
 # Open the obs file and extract photon data to calculate com positions in time frames
 h5obs = openFile(h5obsfile, mode = 'r')
 exptime = h5obs.root.header.header.col('exptime')[0]
+
+# Create a mask of bad pixels, 0 for valid, 1 for invalid
+mask = np.zeros(((grid_height,grid_width,int(exptime/integration_time))))
 
 try:
     ts = h5obs.root.header.header.col('unixtime')[0]
@@ -58,27 +66,27 @@ for y in range(grid_height):
         data = h5obs.root._f_getChild(pn).read()
         for t in range(exptime):
             flux_cube[y][x][t] = len(data[t])
+	for t in range(int(exptime/integration_time)):
+	    if (len(data[int(t*integration_time)]) == 0):
+		mask[y][x][t] =1
+	    else :
+		mask[y][x][t] =0
 
 # Specify pixel info CCDInfo(bias,readNoise,ccdGain,satLevel)
 ccd = pg.CCDInfo(0,0.00001,1,2500)
 
-# Create a mask of bad pixels, 0 for valid, 1 for invalid
-mask = np.zeros((grid_height,grid_width))
-
-# Create a mask for saturated pixels, 0 for okay, 1 for saturated
-satMask = np.zeros((grid_height,grid_width))
-
-integration_time= 30
 pix_array = np.zeros((int(exptime/integration_time),2))
 mag_array = np.zeros(len(pix_array))
 
 f = open(savePath+ '/' + txtout,'w')
 for t in range(int(exptime/integration_time)):
+    badMask = np.zeros((grid_height,grid_width))
     map = MouseMonitor()
     map.fig = plt.figure()
     pltmat = np.zeros((grid_height,grid_width))
     for y in range(grid_height):
         for x in range(grid_width):
+            badMask[y][x] = mask[y][x][t]
 	    for i in range(integration_time):
                 pltmat[y][x]+=flux_cube[y][x][int(t*integration_time+i)]/integration_time
     map.ax = map.fig.add_subplot(111)
@@ -91,7 +99,7 @@ for t in range(int(exptime/integration_time)):
     except AttributeError:
 	pass
     print 'Guess = ' + str(xyguess)
-    pyguide_output = pg.centroid(pltmat,mask,mask,xyguess,10,ccd,0,False)
+    pyguide_output = pg.centroid(pltmat,badMask,satMask,xyguess,3,ccd,0,False)
     try:
         xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
         print 'Calculated = ' + str((xycenter))
@@ -116,7 +124,7 @@ for t in range(int(exptime/integration_time)):
     except AttributeError:
 	pass
     print 'Guess = ' + str(xyguess)
-    pyguide_output = pg.centroid(pltmat,mask,mask,xyguess,10,ccd,0,False)
+    pyguide_output = pg.centroid(pltmat,badMask,satMask,xyguess,3,ccd,0,False)
     try:
         xycenter1 = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
         print 'Calculated = ' + str((xycenter1))
@@ -142,6 +150,3 @@ for i in range(len(pix_array)):
     y_array[i] = pix_array[i][1]
 print mag_array
 print np.median(mag_array)
-f=open(savePath+ '/' + txtout,'a')
-f.write('\n'+str(np.median(mag_array)))
-f.close()
