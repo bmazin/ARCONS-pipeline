@@ -44,10 +44,12 @@ class FlatCal:
         wvlCalFileName = FileName(run=run,date=wvlCalSunsetLocalDate,tstamp=wvlCalTimestamp).calSoln()
 
 
-        self.wvlBinWidth = params['wvlBinWidth'] #angstroms
+        #self.wvlBinWidth = params['wvlBinWidth'] #angstroms
+        self.energyBinWidth = params['energyBinWidth'] #eV
         self.wvlStart = params['wvlStart'] #angstroms
         self.wvlStop = params['wvlStop'] #angstroms
-        self.nWvlBins = int((self.wvlStop - self.wvlStart)/self.wvlBinWidth)
+        self.setWvlBins(self.energyBinWidth,self.wvlStart,self.wvlStop)
+        #self.nWvlBins = int((self.wvlStop - self.wvlStart)/self.wvlBinWidth)
         
         self.loadFlatFile(flatFileNames,wvlCalFileName)
         self.loadFlatSpectra()
@@ -99,7 +101,7 @@ class FlatCal:
             print 'flat ',iFlat
             for iRow in xrange(self.nRow):
                 for iCol in xrange(self.nCol):
-                    spectrum,self.wvlBinEdges = flat.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
+                    spectrum,binEdges = flat.getPixelSpectrum(iRow,iCol,wvlBinEdges=self.wvlBinEdges,weighted=False,firstSec=0,integrationTime=-1)
                     self.spectra[iRow][iCol] += spectrum
 #                    if iFlat == len(self.flatFiles)-1:
 #                        print iRow,iCol,sum(self.spectra[iRow][iCol])
@@ -133,6 +135,16 @@ class FlatCal:
 
         npzFileName = os.path.splitext(fullFlatCalFileName)[0]+'.npz'
         np.savez(npzFileName,median=self.wvlMedians,binEdges=self.wvlBinEdges,spectra=self.spectra,weights=self.flatFactors)
+
+    def setWvlBins(self,energyBinWidth,wvlStart,wvlStop):
+        h = 4.135668e-15 #eV s
+        c = 2.998e8 #m/s
+        angstromPerMeter = 1e10
+        energyStop = 1.0*h*c*angstromPerMeter/wvlStart
+        energyStart = 1.0*h*c*angstromPerMeter/wvlStop
+        self.nWvlBins = int((energyStop - energyStart)/self.energyBinWidth)
+        energyBins = np.linspace(energyStart,energyStop,self.nWvlBins+1)
+        self.wvlBinEdges = np.array(h*c*angstromPerMeter/energyBins)[::-1]
 
 if __name__ == '__main__':
     paramFile = sys.argv[1]
