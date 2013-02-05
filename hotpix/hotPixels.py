@@ -53,6 +53,8 @@ To do:
         contrast should be higher.
     - Output files seem unnecessarily large. May be some way of making this more
         efficient.
+    - Current image display in checkInterval is wrong way up - need to update
+      to use Danica's image display routine.
 
 See individual routines for more detail.
 
@@ -94,9 +96,9 @@ class headerDescription(tables.IsDescription):
  
  
  
-def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
+def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
                   obsFile=None, inputFileName=None, image=None,
-                  display=False):
+                  display=False, weighted=False):
     '''
     To find the hot pixels in a given time interval for an observation file.
     Compares the ratio of flux in each pixel to the median of the flux in an
@@ -144,6 +146,8 @@ def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
         'diff': the difference between the input image and an image representing
                 the max allowed flux in each pixel.
         'differr': the expected error in the difference calculation.
+        'weighted': boolean, set to True to use flat cal weights (see flatcal/ 
+                    and util.obsFile.getPixelCountImage() )
 
     '''
     
@@ -154,12 +158,13 @@ def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
     gauss_array = utils.gaussian_psf(fwhm, boxSize)
     maxRatio = np.max(gauss_array) / np.median(gauss_array)
 
-    if obsFile is None:
+    if obsFile is None and image is None:
         obsFile = ObsFile.ObsFile(inputFileName)
     #assert 1==0
     if image is None:
         print 'Counting photons per pixel'
-        image = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime)
+        image = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
+                                           weighted=weighted)
         print 'Done'
         
         
@@ -205,8 +210,10 @@ def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
         y = np.arange(np.shape(image)[0])
         xx, yy = np.meshgrid(x, y)
         mpl.scatter(xx[hotMask], yy[hotMask], c='y')
-        plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-'
-                       + str(firstSec + intTime) + 's')
+        if obsFile is None:
+            plotTitle = ('image' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
+        else:
+            plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
         mpl.suptitle(plotTitle)
 
     return {'mask':hotMask, 'image':image, 'medfiltimage':medFiltImage,
@@ -221,7 +228,7 @@ def checkInterval(firstSec, intTime, fwhm, boxSize, nSigma,
 
 def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
                   timeStep=None, startTime=None, endTime=None, fwhm=None, 
-                  boxSize=None, nSigma=None, display=None):
+                  boxSize=None, nSigma=None, display=None, weighted=False):
     '''
     To find hot pixels (and possibly cold pixels too at some point...).
     This routine is the main code entry point.
@@ -255,6 +262,8 @@ def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
                     as hot. Larger value => lower sensitivity.
         display: Boolean. If true, then display the input image and mark those 
                     flagged as hot with a dot.
+        'weighted': boolean, set to True to use flat cal weights (see flatcal/ 
+                    and and util.obsFile.getPixelCountImage() )
         
     OUTPUTS:
         Writes an hdf (.h5) file to outputFile containing tables of start/end
@@ -324,7 +333,7 @@ def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
         print str(eachTime)+' - '+str(eachTime+timeStep)+'s'
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigma=nSigma,
-                                     display=display)['mask']
+                                     display=display, weighted=weighted)['mask']
  
     
     #Initialise an empty list that will eventually be a list of entries corresponding to:
