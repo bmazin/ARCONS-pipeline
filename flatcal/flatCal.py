@@ -48,8 +48,9 @@ class FlatCal:
         self.energyBinWidth = params['energyBinWidth'] #eV
         self.wvlStart = params['wvlStart'] #angstroms
         self.wvlStop = params['wvlStop'] #angstroms
-        self.setWvlBins(self.energyBinWidth,self.wvlStart,self.wvlStop)
-        #self.nWvlBins = int((self.wvlStop - self.wvlStart)/self.wvlBinWidth)
+        self.wvlBinEdges = ObsFile.makeWvlBins(self.energyBinWidth,self.wvlStart,self.wvlStop)
+        #wvlBinEdges includes both lower and upper limits, so number of bins is 1 less than number of edges
+        self.nWvlBins = len(self.wvlBinEdges)-1
         
         self.loadFlatFile(flatFileNames,wvlCalFileName)
         self.loadFlatSpectra()
@@ -136,15 +137,6 @@ class FlatCal:
         npzFileName = os.path.splitext(fullFlatCalFileName)[0]+'.npz'
         np.savez(npzFileName,median=self.wvlMedians,binEdges=self.wvlBinEdges,spectra=self.spectra,weights=self.flatFactors)
 
-    def setWvlBins(self,energyBinWidth,wvlStart,wvlStop):
-        h = 4.135668e-15 #eV s
-        c = 2.998e8 #m/s
-        angstromPerMeter = 1e10
-        energyStop = 1.0*h*c*angstromPerMeter/wvlStart
-        energyStart = 1.0*h*c*angstromPerMeter/wvlStop
-        self.nWvlBins = int((energyStop - energyStart)/self.energyBinWidth)
-        energyBins = np.linspace(energyStart,energyStop,self.nWvlBins+1)
-        self.wvlBinEdges = np.array(h*c*angstromPerMeter/energyBins)[::-1]
 
 if __name__ == '__main__':
     paramFile = sys.argv[1]
