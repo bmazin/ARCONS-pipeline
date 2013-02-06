@@ -4,15 +4,16 @@ from util.FileName import FileName
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 
 def main():
-    
+    flatToDo = sys.argv[1]
     np.set_printoptions(threshold=np.nan)
     #obs_20120919-131142.h5,obs_20120919-131346.h5
     #create a cal file from a twilight flat
-    cal = FlatCal('../../params/flatCal2.dict')
+    cal = FlatCal('../../params/flatCal'+flatToDo+'.dict')
     #open another twilight flat as an observation and apply a wavelength cal and the new flat cal
 #    run='LICK2012'
 #    obsFileName = FileName(run=run,date='20120918',tstamp='20120919-131142').flat()
@@ -21,10 +22,10 @@ def main():
 
     run = 'PAL2012'
     #obsFileName = FileName(run=run,date='20121210',tstamp='20121211-135628').flat()
-    flatCalFileName = FileName(run=run,date='20121211',tstamp='').flatSoln()
+    flatCalFileName = FileName(run=run,date=flatToDo,tstamp='').flatSoln()
     #wvlCalFileName = FileName(run=run,date='20121210',tstamp='20121211-133056').calSoln()
     flatCalPath = os.path.dirname(flatCalFileName)
-    pp = PdfPages(os.path.join(flatCalPath,'flat20121210.pdf'))
+    pp = PdfPages(os.path.join(flatCalPath,'flat_'+flatToDo+'.pdf'))
     nPlotsPerPage = 9
     iPlot = 0
 
