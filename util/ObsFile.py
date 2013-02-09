@@ -184,13 +184,17 @@ class ObsFile:
         if weighted is True, flat cal weights are applied
         """
         packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
-        if weighted == False:
+        if weighted == False and self.wvlLowerLimit == None and self.wvlUpperLimit == None:
             return len(packetList)
         else:
+<<<<<<< HEAD
             if fluxWeighted==True:
                 weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=True)
             else:
                 weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=False)
+=======
+            weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=weighted)
+>>>>>>> f40c28d04c05d95f9e412009a7b1e00c3f339793
             return sum(weightedSpectrum)
 
 
@@ -285,26 +289,55 @@ class ObsFile:
         utils.plotArray(secImg,cbar=True,normMax=np.mean(secImg)+nSdevMax*np.std(secImg),plotTitle=plotTitle)
         
 
+<<<<<<< HEAD
     def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=200):
+=======
+    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
+>>>>>>> f40c28d04c05d95f9e412009a7b1e00c3f339793
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime, and an array giving the cutoff wavelengths used to bin the wavelength values
         if integrationTime is -1, All time after firstSec is used.  
-        if weighted is True, flat cal weights are applied and flat cal wavelength bins are used
-        if weighted is False, wavelength bin parameters given are used
+        if weighted is True, flat cal weights are applied
+        if weighted is False, flat cal weights are not applied
+        the wavelength bins used depends on the parameters given.
+        If energyBinWidth is specified, the wavelength bins use fixed energy bin widths
+        If wvlBinWidth is specified, the wavelength bins use fixed wavelength bin widths
+        If neither is specified and/or if weighted is True, the flat cal wvlBinEdges is used
         """
         wvlList = self.getPixelWvlList(pixelRow,pixelCol,firstSec,integrationTime)
-        nWvlBins = int((wvlStop - wvlStart)/wvlBinWidth)
-        spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
-        if weighted == False:
-            spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
-        else:
+        
+        if self.flatCalFile != None and ((wvlBinEdges == None and energyBinWidth == None and wvlBinWidth == None) or weighted == True):
+        #We've loaded a flat cal already, which has wvlBinEdges defined, and no other bin edges parameters are specified to override it.
             spectrum,wvlBinEdges = np.histogram(wvlList,bins=self.flatCalWvlBins)
+<<<<<<< HEAD
             spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
             if fluxWeighted == True:
                 spectrum = spectrum*self.fluxWeights
         return spectrum,wvlBinEdges
 
     def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False):
+=======
+            if weighted == True:#Need to apply flat weights by wavelenth
+                spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
+        else:
+            if weighted == True:
+                raise ValueError('when weighted=True, flatCal wvl bins are used, so wvlBinEdges,wvlBinWidth,energyBinWidth,wvlStart,wvlStop should not be specified')
+            if wvlBinEdges == None:#We need to construct wvlBinEdges array
+                if energyBinWidth != None:#Fixed energy binwidth specified
+                    #Construct array with variable wvl binwidths
+                    wvlBinEdges = ObsFile.makeWvlBins(energyBinWidth=energyBinWidth,wvlStart=wvlStart,wvlStop=wvlStop)
+                    spectrum,wvlBinEdges = np.histogram(wvlList,bins=wvlBinEdges)
+                elif wvlBinWidth != None:#Fixed wvl binwidth specified
+                    nWvlBins = int((wvlStop - wvlStart)/wvlBinWidth)
+                    spectrum,wvlBinEdges = np.histogram(wvlList,bins=nWvlBins,range=(wvlStart,wvlStop))
+                else:
+                    raise ValueError('getPixelSpectrum needs either wvlBinWidth,wvlBinEnergy, or wvlBinEdges')
+            else:#We are given wvlBinEdges array
+                spectrum,wvlBinEdges = np.histogram(wvlList,bins=wvlBinEdges)
+        return spectrum,wvlBinEdges
+                
+    def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False):
+>>>>>>> f40c28d04c05d95f9e412009a7b1e00c3f339793
         """
         plots the wavelength calibrated spectrum of a given pixel integrated over a given time
         if integrationTime is -1, All time after firstSec is used.  
@@ -569,6 +602,31 @@ class ObsFile:
         if showMe == True:
             utils.plotArray(nonAllocArray)
         return nonAllocArray
+
+    @staticmethod
+    def makeWvlBins(energyBinWidth=.1,wvlStart=3000,wvlStop=13000):
+        """
+        returns an array of wavlength bin edges, with a fixed energy bin width
+        withing the limits given in wvlStart and wvlStop
+        Args:
+            energyBinWidth: bin width in eV
+            wvlStart: Lower wavelength edge in Angstrom
+            wvlStop: Upper wavelength edge in Angstrom
+        Returns:
+            an array of wavelength bin edges that can be used with numpy.histogram(bins=wvlBinEdges)
+        """
+
+        #Calculate upper and lower energy limits from wavelengths
+        #Note that start and stop switch when going to energy
+        energyStop = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter/wvlStart
+        energyStart = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter/wvlStop
+        nWvlBins = int((energyStop - energyStart)/energyBinWidth)
+        #Construct energy bin edges
+        energyBins = np.linspace(energyStart,energyStop,nWvlBins+1)
+        #Convert back to wavelength and reverse the order to get increasing wavelengths
+        wvlBinEdges = np.array(ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter/energyBins)
+        wvlBinEdges = wvlBinEdges[::-1]
+        return wvlBinEdges
 
 def calculateSlices(inter, timestamps):
     """

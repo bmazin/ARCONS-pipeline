@@ -294,7 +294,8 @@ def wavelengthCal(paramFile):
                 row['wave_flag'] = 0                      # 0 until flagged
 
                 # Cut non-allocated pixels
-                if (roach==0) & (pixel==params['non_alloc_pix']):
+                #if (roach==0) & (pixel==params['non_alloc_pix']):
+                if ((roach==0) & (pixel==params['non_alloc_pix'])) | (roach > 3):
                     failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 1)
                     continue
 

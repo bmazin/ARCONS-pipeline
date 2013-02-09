@@ -44,10 +44,13 @@ class FlatCal:
         wvlCalFileName = FileName(run=run,date=wvlCalSunsetLocalDate,tstamp=wvlCalTimestamp).calSoln()
 
 
-        self.wvlBinWidth = params['wvlBinWidth'] #angstroms
+        #self.wvlBinWidth = params['wvlBinWidth'] #angstroms
+        self.energyBinWidth = params['energyBinWidth'] #eV
         self.wvlStart = params['wvlStart'] #angstroms
         self.wvlStop = params['wvlStop'] #angstroms
-        self.nWvlBins = int((self.wvlStop - self.wvlStart)/self.wvlBinWidth)
+        self.wvlBinEdges = ObsFile.makeWvlBins(self.energyBinWidth,self.wvlStart,self.wvlStop)
+        #wvlBinEdges includes both lower and upper limits, so number of bins is 1 less than number of edges
+        self.nWvlBins = len(self.wvlBinEdges)-1
         
         self.loadFlatFile(flatFileNames,wvlCalFileName)
         self.loadFlatSpectra()
@@ -99,7 +102,7 @@ class FlatCal:
             print 'flat ',iFlat
             for iRow in xrange(self.nRow):
                 for iCol in xrange(self.nCol):
-                    spectrum,self.wvlBinEdges = flat.getPixelSpectrum(iRow,iCol,wvlStart=self.wvlStart,wvlStop=self.wvlStop,wvlBinWidth=self.wvlBinWidth,weighted=False,firstSec=0,integrationTime=-1)
+                    spectrum,binEdges = flat.getPixelSpectrum(iRow,iCol,wvlBinEdges=self.wvlBinEdges,weighted=False,firstSec=0,integrationTime=-1)
                     self.spectra[iRow][iCol] += spectrum
 #                    if iFlat == len(self.flatFiles)-1:
 #                        print iRow,iCol,sum(self.spectra[iRow][iCol])
@@ -133,6 +136,7 @@ class FlatCal:
 
         npzFileName = os.path.splitext(fullFlatCalFileName)[0]+'.npz'
         np.savez(npzFileName,median=self.wvlMedians,binEdges=self.wvlBinEdges,spectra=self.spectra,weights=self.flatFactors)
+
 
 if __name__ == '__main__':
     paramFile = sys.argv[1]
