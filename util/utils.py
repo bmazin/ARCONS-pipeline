@@ -385,7 +385,6 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
         
         #Then substitute those values in wherever there are NaN values.
         outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
-        print numpy.sum(numpy.isnan(outputarray))
         if not iterate: break 
 
     return outputarray
