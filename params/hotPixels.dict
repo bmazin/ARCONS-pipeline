@@ -11,7 +11,7 @@ timeStep = 1		#Check for hot pixels every timeStep seconds (integer for
 
 startTime = 0		#Start time (sec) within obs. file to check for hot pixels
 
-endTime = 10		#End time within obs. file to check for hot pixels
+endTime = -1		#End time within obs. file to check for hot pixels
 					#(-1 => end of file)
 
 fwhm = 3.0			#Expected full width half max of PSF in pixels. Any pixel
@@ -24,6 +24,8 @@ boxSize = 5			#Compare flux in each pixel with median flux in a
 nSigma = 3.0		#Require flux in a pixel to be > nSigma std. deviations
 					#outside the statistically expected range in order for it
 					#to be flagged. Larger value => less sensitive flagging.
+
+maxIter = 5			#Max num. of iterations for the hot pixel algorithm.
 
 display = False		#If 'True', show plots of each extracted sub-exposure with
 					#detected bad pixels highlighted. 

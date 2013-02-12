@@ -294,12 +294,18 @@ def printObsFileDescriptions( dir_path ):
     files in the specified directory
     """
     for obs in glob.glob(os.path.join(dir_path,'obs*.h5')):
-       f=tables.openFile(obs,'r')
-       hdr=f.root.header.header.read()
-       print obs,hdr['description'][0]
-       target = f.root.header.header.col('target')[0]
-       print target
-       f.close()
+        f=tables.openFile(obs,'r')
+	try:
+            hdr=f.root.header.header.read()
+            print obs,hdr['description'][0]
+	except:
+	    pass
+        try:
+	    target = f.root.header.header.col('target')[0]
+       	    print target
+        except:
+	    pass
+        f.close()
   
 
 def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
@@ -385,7 +391,6 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
         
         #Then substitute those values in wherever there are NaN values.
         outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
-        print numpy.sum(numpy.isnan(outputarray))
         if not iterate: break 
 
     return outputarray
