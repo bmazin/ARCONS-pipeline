@@ -294,15 +294,18 @@ def printObsFileDescriptions( dir_path ):
     files in the specified directory
     """
     for obs in glob.glob(os.path.join(dir_path,'obs*.h5')):
-       f=tables.openFile(obs,'r')
-       hdr=f.root.header.header.read()
-       print obs,hdr['description'][0]
-       try:
-	  target = f.root.header.header.col('target')[0]
-       	  print target
-       except:
-	  pass
-       f.close()
+        f=tables.openFile(obs,'r')
+	try:
+            hdr=f.root.header.header.read()
+            print obs,hdr['description'][0]
+	except:
+	    pass
+        try:
+	    target = f.root.header.header.col('target')[0]
+       	    print target
+        except:
+	    pass
+        f.close()
   
 
 def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
