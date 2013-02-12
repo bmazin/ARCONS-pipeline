@@ -28,6 +28,7 @@ class ObsFile:
         self.loadFile(fileName)
         self.wvlCalFile = None #initialize to None for an easy test of whether a cal file has been loaded
         self.flatCalFile = None
+        self.fluxCalFile = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
         
@@ -156,8 +157,6 @@ class ObsFile:
         return pixelData
 
 
-
-
     def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
@@ -178,7 +177,7 @@ class ObsFile:
             return timestamps,wavelengths
             
 
-    def getPixelCount(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted=False):
+    def getPixelCount(self,iRow,iCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False):
         """
         returns the number of photons received in a given pixel from firstSec to firstSec + integrationTime
         if integrationTime is -1, All time after firstSec is used.  
@@ -188,7 +187,10 @@ class ObsFile:
         if weighted == False and self.wvlLowerLimit == None and self.wvlUpperLimit == None:
             return len(packetList)
         else:
-            weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=weighted)
+            if fluxWeighted==True:
+                weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=True)
+            else:
+                weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=False)
             return sum(weightedSpectrum)
 
 
@@ -252,20 +254,21 @@ class ObsFile:
         return timestamps,peakHeights,baselines
 
 
-    def getPixelCountImage(self, firstSec=0, integrationTime=-1, weighted=False):
+    def getPixelCountImage(self, firstSec=0, integrationTime=-1, weighted=False,fluxWeighted=False):
         """
         Return a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime.
         If integration time is -1, all time after firstSec is used.
         If weighted is True, flat cal weights are applied. JvE 12/28/12
+        If fluxWeighted is True, flux cal weights are applied. SM 2/7/13
         """
         secImg = np.zeros((self.nRow, self.nCol))
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
-                secImg[iRow, iCol] = self.getPixelCount(iRow, iCol, firstSec, integrationTime, weighted)
+                secImg[iRow, iCol] = self.getPixelCount(iRow, iCol, firstSec, integrationTime, weighted,fluxWeighted)
         return secImg
     
 
-    def displaySec(self,firstSec=0,integrationTime=-1,weighted=False,plotTitle='',nSdevMax=2):
+    def displaySec(self,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False,plotTitle='',nSdevMax=2):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
@@ -275,14 +278,14 @@ class ObsFile:
 #       for iRow in xrange(self.nRow):
 #           for iCol in xrange(self.nCol):
 #               secImg[iRow,iCol] = self.getPixelCount(iRow,iCol,firstSec,integrationTime=integrationTime,weighted=weighted)
-        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted)
+        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted)
 #        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
 #        plt.colorbar()
 #        plt.show()
         utils.plotArray(secImg,cbar=True,normMax=np.mean(secImg)+nSdevMax*np.std(secImg),plotTitle=plotTitle)
         
+    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
 
-    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime, and an array giving the cutoff wavelengths used to bin the wavelength values
         if integrationTime is -1, All time after firstSec is used.  
@@ -300,6 +303,8 @@ class ObsFile:
             spectrum,wvlBinEdges = np.histogram(wvlList,bins=self.flatCalWvlBins)
             if weighted == True:#Need to apply flat weights by wavelenth
                 spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
+                if fluxWeighted == True:
+                    spectrum = spectrum*self.fluxWeights
         else:
             if weighted == True:
                 raise ValueError('when weighted=True, flatCal wvl bins are used, so wvlBinEdges,wvlBinWidth,energyBinWidth,wvlStart,wvlStop should not be specified')
@@ -323,7 +328,7 @@ class ObsFile:
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         """
-        spectrum,binEdges = self.getPixelSpectrum(pixelRow,pixelCol,firstSec,integrationTime,weighted=weighted)
+        spectrum,binEdges = self.getPixelSpectrum(pixelRow,pixelCol,firstSec,integrationTime,weighted=weighted, fluxWeighted=fluxWeighted)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.plot(self.flatCalWvlBins[0:-1],spectrum,label='spectrum for pixel[%d][%d]'%(pixelRow,pixelCol))
@@ -430,6 +435,7 @@ class ObsFile:
         plFile = self.createEmptyPhotonListFile()
         plTable = plFile.root.photons.photons
         plFile.copyNode(self.flatCalFile.root.flatcal,newparent=plFile.root,recursive=True)
+        plFile.copyNode(self.fluxCalFile.root.fluxcal,newparent=plFile.root,recursive=True)
         plFile.copyNode(self.wvlCalFile.root.wavecal,newparent=plFile.root,recursive=True)
         plFile.copyNode(self.file.root.header,newparent=plFile.root,recursive=True)
         plFile.flush()
@@ -441,6 +447,8 @@ class ObsFile:
                     wvlError = self.wvlErrorTable[iRow,iCol]
                     flatWeights = self.flatWeights[iRow,iCol]
                     flatFlags = self.flatFlags[iRow,iCol]
+                    fluxWeights = self.fluxWeights[iRow,iCol]
+                    fluxFlags = self.fluxFlags[iRow,iCol]
                     wvlRange = self.wvlRangeTable[iRow,iCol]
 
                     #go through the list of seconds in a pixel dataset
@@ -467,6 +475,8 @@ class ObsFile:
                                 newRow['WaveError'] = wvlError
                                 newRow['Flag'] = flatFlags[binIndices[iPhoton]]
                                 newRow['FlatWeight'] = flatWeights[binIndices[iPhoton]]
+                                newRow['FluxWeight'] = fluxWeights[binIndices[iPhoton]]
+                                newRow['FluxFlag'] = fluxFlags[binIndices[iphoton]]
                                 newRow.append()
         plTable.flush()
 
@@ -535,6 +545,22 @@ class ObsFile:
         self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
+
+    def loadFluxCalFile(self,fluxCalFileName):
+        """
+        loads the flux cal factors from the given file
+        """
+        scratchDir = os.getenv('INTERM_PATH','/')
+        fluxCalPath = os.path.join(scratchDir,'fluxCalSolnFiles')
+        fullFluxCalFileName = os.path.join(fluxCalPath,fluxCalFileName)
+        if (not os.path.exists(fullFluxCalFileName)):
+            print 'flux cal file does not exist: ',fullFluxCalFileName
+            return
+        self.fluxCalFile = tables.openFile(fullFluxCalFileName,mode='r')
+        self.fluxWeights = self.fluxCalFile.root.fluxcal.weights.read()
+        self.fluxFlags = self.fluxCalFile.root.fluxcal.flags.read()
+        self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
+        self.nFluxCalWvlBins = self.nFlatCalWvlBins
 
     def getDeadPixels(self,showMe=False,weighted=True):
         """
