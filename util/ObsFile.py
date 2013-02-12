@@ -611,7 +611,8 @@ class ObsFile:
                 if np.any(timestamps > 1./self.tickDuration):
                     print 'Corruption detected in pixel (',iRow,iCol,')'
                     corruptedPixels.append((iRow,iCol))
-         corruptionFound = len(corruptedPixels != 0)
+        corruptionFound = len(corruptedPixels) != 0
+        return corruptionFound
 #        exptime = self.getFromHeader('exptime')
 #        lastSec = firstSec + integrationTime
 #        if integrationTime == -1:
@@ -627,7 +628,6 @@ class ObsFile:
 #                    corruptedSecs.append(sec)
 #                    print 'Corruption in pixel',pixelLabel, 'at',sec
 
-        return corruptionFound
                 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1,wvlStart=3000,wvlStop=13000):
