@@ -98,7 +98,7 @@ class headerDescription(tables.IsDescription):
  
 def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
                   obsFile=None, inputFileName=None, image=None,
-                  display=False, weighted=False):
+                  display=False, weighted=False, maxIter=5):
     '''
     To find the hot pixels in a given time interval for an observation file.
     Compares the ratio of flux in each pixel to the median of the flux in an
@@ -111,7 +111,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
     
     INPUTS:
         Must provide one of:-
-            obsFile - an ObsFile object for an already-open observation file.
+            obsFile - an ObsFile instance for an already-open observation file.
             inputFileName: String - input observation file name if not already opened.
             image - a 2D image array of photon counts.
         
@@ -130,6 +130,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
                     as hot.
         display: Boolean. If true, then display the input image and mark those 
                     flagged as hot with a dot.
+        maxIter: Scalar integer. Maximum number of iterations allowed.
+        
 
     OUTPUTS:
         A dictionary containing the result and various diagnostics. Keys are:
@@ -148,87 +150,96 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
         'differr': the expected error in the difference calculation.
         'weighted': boolean, set to True to use flat cal weights (see flatcal/ 
                     and util.obsFile.getPixelCountImage() )
+        'niter': number of iterations performed.
+
+    HISTORY:
+        2/8/2013: Added iteration to the algorithm, to help in cases where some 
+                  pixels are missed because of other nearby hot pixels. Added
+                  input parameter 'maxIter' (also present in parameter file).
+                  Added output dictionary key 'niter'.
 
     '''
     
-    #FirstSec and intTime need to be integers for now.
+    im = np.copy(image)      #So that we pass by value instead of by reference 
+                    #(since we will change 'im').
     
     #Approximate peak/median ratio for an ideal (Gaussian) PSF sampled at 
     #pixel locations corresponding to the median kernal used with the real data.  
     gauss_array = utils.gaussian_psf(fwhm, boxSize)
     maxRatio = np.max(gauss_array) / np.median(gauss_array)
 
-    if obsFile is None and image is None:
+    if obsFile is None and im is None:
         obsFile = ObsFile.ObsFile(inputFileName)
     #assert 1==0
-    if image is None:
+    if im is None:
         print 'Counting photons per pixel'
-        image = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
+        im = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
                                            weighted=weighted)
         print 'Done'
         
-        
     #For now, assume 0 counts in a pixel means the pixel is dead.
     #Turn such pixel values into NaNs.
-    image[image < 1] = np.nan
+    im[im < 1] = np.nan
     
-    #background = ma.median(image)  #Assume median is a reasonable estimate of the sky background.
-    #bsubImage = image - background   #Background subtracted image
-    #bsubImageClipped = ma.clip(bsubImage,0,np.Infinity)     #Set all negative values to zero.
-    #backgroundSigma1 = (scipy.stats.scoreatpercentile(image[~bsubImage.mask], 84.13)
-    #                      - scipy.stats.scoreatpercentile(bsubImage[~image.mask], 15.87)) / 2.0     #Difference between upper and lower 1-sigma percentiles -- robust estimate of std. dev.
-    #absBsubImage = np.abs(bsubImage)
-    #backgroundMAD = ma.median(absBsubImage)  #Median absolute deviation (a robust measure of spread).
-    #backgroundSigma2 = 1.4826 * backgroundMAD    #See Wikipedia definition of MAD...
-    #bsubImageErr = np.sqrt(bsubImageClipped + backgroundSigma ** 2)   #Estimate sigma of flux for each pixel (shot noise + background error)
-
-    #Calculate median filtered image
-    #Each pixel takes the median of itself and the surrounding boxSize x boxSize box.
-    #(Not sure what edge effects there may be...)
-    medFiltImage = utils.median_filterNaN(image, boxSize, mode='mirror') #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection'; 'mirror' does not, and makes more sense for this application.
-
+    oldHotMask = np.zeros(shape=np.shape(im), dtype=bool)  #Initialise a mask (all False) for comparison on each iteration.
     
-    #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
-    #Also calculate the error in the same quantity.
-    diff = image - maxRatio * medFiltImage
-    diffErr = np.sqrt(image + (maxRatio ** 2) * medFiltImage)
-
+    for iIter in range(maxIter):
+        #Calculate median filtered image
+        #Each pixel takes the median of itself and the surrounding boxSize x boxSize box.
+        #(Not sure what edge effects there may be...)
+        medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror') #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection'; 'mirror' does not, and makes more sense for this application.
     
-    #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged
-    #(True=>bad pixel; False=> good pixel).
-    hotMask = diff > (nSigma * diffErr)    
+        #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
+        #Also calculate the error in the same quantity.
+        diff = im - maxRatio * medFiltImage
+        diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)
+        
+        #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged
+        #(True=>bad pixel; False=> good pixel).
+        hotMask = (diff > (nSigma * diffErr)) | oldHotMask
 
+        #If no change between between this and the last iteration then stop iterating
+        if np.all(hotMask == oldHotMask): break
+
+        #Otherwise update 'oldHotMask' and set all detected bad pixels to NaN for the next iteration
+        oldHotMask = np.copy(hotMask)
+        im[hotMask] = np.nan
+                
     
     if display:
         imForDisplay = np.copy(image)
         imForDisplay[np.isnan(image)] = 0  #Just because it looks prettier
         
-        #utils.plotArray(image, cbar=True)
-        mpl.matshow(imForDisplay)
+        #utils.plotArray(im, cbar=True)
+        fig = mpl.figure(figsize=(10,10))
+        mpl.matshow(imForDisplay, vmax=np.percentile(imForDisplay,99.5),fignum=False)
         mpl.colorbar()
-        x = np.arange(np.shape(image)[1])
-        y = np.arange(np.shape(image)[0])
+        x = np.arange(np.shape(imForDisplay)[1])
+        y = np.arange(np.shape(imForDisplay)[0])
         xx, yy = np.meshgrid(x, y)
-        mpl.scatter(xx[hotMask], yy[hotMask], c='y')
-        if obsFile is None:
-            plotTitle = ('image' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
-        else:
+        
+        if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y')
+        #if obsFile is None:
+        #    plotTitle = ('im' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
+        if obsFile is not None:
             plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
-        mpl.suptitle(plotTitle)
+            mpl.suptitle(plotTitle)
 
-    return {'mask':hotMask, 'image':image, 'medfiltimage':medFiltImage,
-            'maxratio':maxRatio, 'diff':diff, 'differr':diffErr}
-
-
+    return {'mask':hotMask, 'image':im, 'medfiltimage':medFiltImage,
+            'maxratio':maxRatio, 'diff':diff, 'differr':diffErr, 'niter':iIter+1}
 
 
 
 
 
 
-def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
+
+
+def findHotPixels(inputFileName=None, outputFileName=None,
+                  paramFile=None,
                   timeStep=None, startTime=None, endTime=None, fwhm=None, 
-                  boxSize=None, nSigma=None, display=None, weighted=False):
+                  boxSize=None, nSigma=None, display=None, weighted=False,
+                  maxIter=None):
     '''
     To find hot pixels (and possibly cold pixels too at some point...).
     This routine is the main code entry point.
@@ -300,6 +311,10 @@ def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
             values override those in the parameter file).
         
         
+    HISTORY:
+        2/8/2013: Added iteration to the algorithm, now takes parameter 
+                    'maxIter' (also added to parameter file). See
+                    checkInterval() for more info.
     '''
 
     if paramFile is not None:
@@ -315,8 +330,16 @@ def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
         if boxSize is None: boxSize = params['boxSize']
         if nSigma is None: nSigma = params['nSigma']
         if display is None: display = params['display']
+        if maxIter is None: maxIter = params['maxIter']
     else:
         print 'No parameter file provided - using defaults/input params'
+    
+    #A few defaults that will be used in the absence of parameter file or 
+    #arguments provided by the caller.
+    if timeStep is None: timeStep = 1
+    if startTime is None: startTime = 0
+    if endTime is None: pass
+    if maxIter is None: maxIter = 5
     
     obsFile = ObsFile.ObsFile(inputFileName)
     expTime = obsFile.getFromHeader('exptime')
@@ -333,7 +356,8 @@ def findHotPixels(paramFile=None, inputFileName=None, outputFileName=None,
         print str(eachTime)+' - '+str(eachTime+timeStep)+'s'
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigma=nSigma,
-                                     display=display, weighted=weighted)['mask']
+                                     display=display, weighted=weighted,
+                                     maxIter=maxIter)['mask']
  
     
     #Initialise an empty list that will eventually be a list of entries corresponding to:
