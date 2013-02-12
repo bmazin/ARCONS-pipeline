@@ -297,8 +297,11 @@ def printObsFileDescriptions( dir_path ):
        f=tables.openFile(obs,'r')
        hdr=f.root.header.header.read()
        print obs,hdr['description'][0]
-       target = f.root.header.header.col('target')[0]
-       print target
+       try:
+	  target = f.root.header.header.col('target')[0]
+       	  print target
+       except:
+	  pass
        f.close()
   
 
