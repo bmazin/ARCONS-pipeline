@@ -187,14 +187,10 @@ class ObsFile:
         if weighted == False and self.wvlLowerLimit == None and self.wvlUpperLimit == None:
             return len(packetList)
         else:
-<<<<<<< HEAD
             if fluxWeighted==True:
                 weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=True)
             else:
                 weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=False)
-=======
-            weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=weighted)
->>>>>>> f40c28d04c05d95f9e412009a7b1e00c3f339793
             return sum(weightedSpectrum)
 
 
@@ -288,12 +284,8 @@ class ObsFile:
 #        plt.show()
         utils.plotArray(secImg,cbar=True,normMax=np.mean(secImg)+nSdevMax*np.std(secImg),plotTitle=plotTitle)
         
+    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
 
-<<<<<<< HEAD
-    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=200):
-=======
-    def getPixelSpectrum(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
->>>>>>> f40c28d04c05d95f9e412009a7b1e00c3f339793
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime, and an array giving the cutoff wavelengths used to bin the wavelength values
         if integrationTime is -1, All time after firstSec is used.  
@@ -309,16 +301,10 @@ class ObsFile:
         if self.flatCalFile != None and ((wvlBinEdges == None and energyBinWidth == None and wvlBinWidth == None) or weighted == True):
         #We've loaded a flat cal already, which has wvlBinEdges defined, and no other bin edges parameters are specified to override it.
             spectrum,wvlBinEdges = np.histogram(wvlList,bins=self.flatCalWvlBins)
-<<<<<<< HEAD
-            spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
-            if fluxWeighted == True:
-                spectrum = spectrum*self.fluxWeights
-        return spectrum,wvlBinEdges
-
-    def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False):
-=======
             if weighted == True:#Need to apply flat weights by wavelenth
                 spectrum = spectrum * self.flatWeights[pixelRow,pixelCol]
+                if fluxWeighted == True:
+                    spectrum = spectrum*self.fluxWeights
         else:
             if weighted == True:
                 raise ValueError('when weighted=True, flatCal wvl bins are used, so wvlBinEdges,wvlBinWidth,energyBinWidth,wvlStart,wvlStop should not be specified')
@@ -337,7 +323,6 @@ class ObsFile:
         return spectrum,wvlBinEdges
                 
     def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False):
->>>>>>> f40c28d04c05d95f9e412009a7b1e00c3f339793
         """
         plots the wavelength calibrated spectrum of a given pixel integrated over a given time
         if integrationTime is -1, All time after firstSec is used.  
