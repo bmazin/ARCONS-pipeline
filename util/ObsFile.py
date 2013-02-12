@@ -264,6 +264,22 @@ class ObsFile:
                 secImg[iRow, iCol] = self.getPixelCount(iRow, iCol, firstSec, integrationTime, weighted)
         return secImg
     
+    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
+        """
+        Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
+        If integration time is -1, all time after firstSec is used.
+        If weighted is True, flat cal weights are applied.
+        """
+        cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                cube[iRow][iCol],wvlBinEdges = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
+                                  firstSec=firstSec,integrationTime=integrationTime,
+                                  weighted=weighted,wvlStart=wvlStart,wvlStop=wvlStop,
+                                  wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
+                                  wvlBinEdges=wvlBinEdges)
+        cube = np.array(cube)
+        return cube,wvlBinEdges
 
     def displaySec(self,firstSec=0,integrationTime=-1,weighted=False,plotTitle='',nSdevMax=2):
         """
@@ -271,14 +287,7 @@ class ObsFile:
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         """
-#       secImg = np.zeros((self.nRow,self.nCol))
-#       for iRow in xrange(self.nRow):
-#           for iCol in xrange(self.nCol):
-#               secImg[iRow,iCol] = self.getPixelCount(iRow,iCol,firstSec,integrationTime=integrationTime,weighted=weighted)
         secImg = self.getPixelCountImage(firstSec, integrationTime, weighted)
-#        plt.matshow(secImg,vmax=np.mean(secImg)+2*np.std(secImg))
-#        plt.colorbar()
-#        plt.show()
         utils.plotArray(secImg,cbar=True,normMax=np.mean(secImg)+nSdevMax*np.std(secImg),plotTitle=plotTitle)
         
 
@@ -562,6 +571,38 @@ class ObsFile:
             utils.plotArray(nonAllocArray)
         return nonAllocArray
 
+    def checkIntegrity(self,firstSec=0,integrationTime=-1):
+        """
+        Checks the obs file for corrupted end-of-seconds
+        Corruption is indicated by timestamps greater than 1/tickDuration=1e6
+        returns 0 if no corruption found
+        """
+        corruptedPixels = []
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
+                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+                if np.any(timestamps > 1./self.tickDuration):
+                    print 'Corruption detected in pixel (',iRow,iCol,')'
+                    corruptedPixels.append((iRow,iCol))
+         corruptionFound = len(corruptedPixels != 0)
+#        exptime = self.getFromHeader('exptime')
+#        lastSec = firstSec + integrationTime
+#        if integrationTime == -1:
+#            lastSec = exptime-1
+#            
+#        corruptedSecs = []
+#        for pixelCoord in corruptedPixels:
+#            for sec in xrange(firstSec,lastSec):
+#                packetList = self.getPixelPacketList(iRow,iCol,sec,integrationTime=1)
+#                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+#                if np.any(timestamps > 1./self.tickDuration):
+#                    pixelLabel = self.beamImage[iRow][iCol]
+#                    corruptedSecs.append(sec)
+#                    print 'Corruption in pixel',pixelLabel, 'at',sec
+
+        return corruptionFound
+                
     @staticmethod
     def makeWvlBins(energyBinWidth=.1,wvlStart=3000,wvlStop=13000):
         """
