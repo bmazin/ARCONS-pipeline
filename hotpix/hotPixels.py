@@ -48,7 +48,7 @@ To do:
         second-by-second).
     - At some point, perhaps update to allow sub-second time steps.
     - Time intervals are currently stored in units of seconds - need to convert
-        to clock ticks for consistency with TimeInterval class.
+        to clock ticks for consistency with TimeInterval class. FIXED - 02/12/2013.
     - If necessary, apply algorithm only at the red end, where hot-pixel
         contrast should be higher.
     - Output files seem unnecessarily large. May be some way of making this more
@@ -80,6 +80,7 @@ dataGroupName = 'timeMasks' #data *table* name is constructed on a per-pixel bas
 nRowColName = 'nRow'        #Name of the no.-of-rows column in the header for the output .h5 file.
 nColColName = 'nCol'        #Ditto for no.-of-columns column.
 obsFileColName = 'obsFileName' #Ditto for the column containing the name of the original obs. file.
+ticksPerSecColName = 'ticksPerSec'  #Ditto for column containing number of clock ticks per second for original obs. file.
 
 def constructDataTableName(x, y):
     '''Construct the name for the pytables table for a given pixel at location x,y'''
@@ -88,11 +89,11 @@ def constructDataTableName(x, y):
 
 
 class headerDescription(tables.IsDescription):
-    """Description of header info structure for the output .h5 file."""
+    """Description of header info structure for the output hot-pixel .h5 file."""
     obsFileName = tables.StringCol(40)  #To record associated obs file name
     nCol = tables.UInt32Col()   #To record how many pixel columns/rows were in
     nRow = tables.UInt32Col()   #the data used to construct the mask.
-
+    ticksPerSec = tables.Float64Col()    #So that code which reads in the file can back out intervals in seconds if needed.
  
  
  
@@ -160,8 +161,10 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
 
     '''
     
-    im = np.copy(image)      #So that we pass by value instead of by reference 
-                    #(since we will change 'im').
+    if image is not None:
+        im = np.copy(image)      #So that we pass by value instead of by reference (since we will change 'im').
+    else:
+        im = None
     
     #Approximate peak/median ratio for an ideal (Gaussian) PSF sampled at 
     #pixel locations corresponding to the median kernal used with the real data.  
@@ -170,12 +173,15 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
 
     if obsFile is None and im is None:
         obsFile = ObsFile.ObsFile(inputFileName)
-    #assert 1==0
+
     if im is None:
         print 'Counting photons per pixel'
         im = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
                                            weighted=weighted)
         print 'Done'
+    
+    #Now im definitely exists, make a copy for display purposes later (before we change im).
+    imOriginal = np.copy(im)
         
     #For now, assume 0 counts in a pixel means the pixel is dead.
     #Turn such pixel values into NaNs.
@@ -207,8 +213,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
                 
     
     if display:
-        imForDisplay = np.copy(image)
-        imForDisplay[np.isnan(image)] = 0  #Just because it looks prettier
+        imForDisplay = np.copy(imOriginal)
+        imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
         
         #utils.plotArray(im, cbar=True)
         fig = mpl.figure(figsize=(10,10))
@@ -297,13 +303,13 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         exposure, and a pytables Enum representing indicating the reason for 
         which the pixel was tagged as bad for each interval.
  
-        ***NOTE - OUTPUT TIMES ARE CURRENTLY IN SECONDS, NOT CLOCK TICKS!***
-        
+        Note - times recorded in the output .h5 file are now in clock ticks.
+                
         
     EXAMPLES: 
     
-        findHotPixels('hotPixels.dict', 'obs_20121211-024511.h5', 
-                        'testOutput.h5', startTime=0, endTime=5)
+        findHotPixels('obs_20121211-024511.h5', 'testOutput.h5', 
+                      'hotPixels.dict', startTime=0, endTime=5)
         
         - Writes time-mask data for 'obs_2012...' to file 'testOutput.h5', 
             using parameter file 'hotPixels.dict', and considering only 
@@ -344,9 +350,11 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     obsFile = ObsFile.ObsFile(inputFileName)
     expTime = obsFile.getFromHeader('exptime')
     if endTime < 0: endTime = expTime
-    stepStarts = np.arange(startTime, endTime, timeStep)  #Start time for each step
+    stepStarts = np.arange(startTime, endTime, timeStep)  #Start time for each step (in seconds).
     stepEnds = stepStarts + timeStep                      #End time for each step
     nSteps = len(stepStarts)
+    stepStartsTicks = stepStarts * obsFile.ticksPerSec
+    stepEndsTicks = stepEnds * obsFile.ticksPerSec
         
     #Initialise stack of masks, one for each time step
     masks = np.zeros([obsFile.nRow, obsFile.nCol, nSteps], dtype=np.int8)
@@ -367,6 +375,8 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     #reasons for flagging:
     #   
     #  [(start time 1, end time1, flag number 1), (Start time 2, end time 2, flag 2), ...] 
+    #
+    #(with times in seconds).
     
     timeMaskData = []  
 
@@ -383,9 +393,9 @@ def findHotPixels(inputFileName=None, outputFileName=None,
             badTimeList = []
             
             for eachFlag in uniqueFlags:
-                #Make a list of intervals for each bad timestep
-                badStepIntervals = [interval([stepStarts[i], stepEnds[i]]) 
-                                    for i in range(nSteps) if flagSequence[i] == eachFlag]
+                #Make a list of intervals for each bad timestep - e.g. one interval for every second if timestep is seconds and the pixel is always bad.
+                badStepIntervals = [interval([stepStartsTicks[i], stepEndsTicks[i]]) 
+                                    for i in range(nSteps) if flagSequence[i] == eachFlag]  #In units of ticks (not seconds).
                 #Find the union of those intervals (concatenate adjacent intervals)
                 badIntervals = interval().union(badStepIntervals)
                 #And then separate out the individual components after concatenating...
@@ -417,7 +427,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
     
     INPUTS:
         timeMaskData - list structure as constructed by findHotPixels()
-        inputFileName - the ObsFile object from which the data to be written
+        obsFile - the ObsFile object from which the data to be written
                         was derived.
         outputFileName - string, the pathname of the .h5 file to write to.
     
@@ -442,6 +452,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
         header[obsFileColName] = obsFile.fileName
         header[nColColName] = max([x[0] for x in timeMaskData]) + 1  #Assume max. x value represents number of columns
         header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
+        header[ticksPerSecColName] = obsFile.ticksPerSec
         header.append()
         headerTable.flush()
         headerTable.close()
@@ -488,8 +499,10 @@ def readHotPixels(inputFileName):
             'nRow' - number of rows in original obs File.
             'nCol' - number of columns.
             'intervals' - nRow x nCol array of lists of pyinterval 'interval' objects.
-                          The intervals represent time intervals where the pixel went bad.
-                          Where there are no bad intervals for a pixel, its list is empty.
+                          The intervals represent time intervals where the pixel went bad
+                          in *seconds* (although the values are stored in clock ticks
+                          in the .h5 file read in). Where there are no bad intervals
+                          for a pixel, its list is empty.
             'reasons' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
                         cosmic/TimeMask). Entries in these lists correspond directly 
                         to entries in the 'intervals' array.            
@@ -497,15 +510,22 @@ def readHotPixels(inputFileName):
                            stored in that array can be parsed back to their enum labels.
             'obsFileName' - the name of the original obs. file from which the
                             hot pixel masking info was derived.
+            'ticksPerSecond' - number of clock ticks per second assumed in creating
+                               the output file.
     
     EXAMPLES:
         
+        Make a hot pixel file and read it in to 'hpData':
+        
         import hotPixels as hp
+        findHotPixels('obs_20121211-024511.h5', 'testOutput.h5', 
+                      'hotPixels.dict', startTime=0, endTime=5)
         hpData = hp.readHotPixels('testoutput.h5')
         
 
         Find out how many discrete time intervals were flagged for pixel 44,5 
-        (which happens to be bad for obs file 'obs_20121211-024511.h5')
+        (which happens to be bad at two times between 0-5s for obs file 
+        'obs_20121211-024511.h5')
             
             >>> len(hpData['reasons'][44,5])
             2
@@ -566,6 +586,7 @@ def readHotPixels(inputFileName):
         nRow = headerInfo[nRowColName]
         nCol = headerInfo[nColColName]
         obsFileName = headerInfo[obsFileColName]
+        ticksPerSec = headerInfo[ticksPerSecColName]
     
         #Intialise two ragged object arrays, one to take lists of Interval objects
         timeIntervals = np.empty((nRow, nCol), dtype='object')
@@ -582,15 +603,15 @@ def readHotPixels(inputFileName):
                 eventListTable = fileh.getNode('/' + dataGroupName, name=tableName)
                 reasonEnum = eventListTable.getEnum('reason')  #Gets read in once for every table, but they should all be the same...
                 timeIntervals[iRow, iCol] = \
-                    [interval([eachRow['tBegin'], eachRow['tEnd']]) for eachRow
-                      in eventListTable]
+                    [interval([eachRow['tBegin'], eachRow['tEnd']])/ticksPerSec for eachRow
+                      in eventListTable]        #Get the times in seconds (not ticks). No doubt this can be sped up if necessary...
                 reasons[iRow, iCol] = [eachRow['reason'] for eachRow 
                                       in eventListTable]
                     
         #Return a simple dictionary
         return {"intervals":timeIntervals, "reasons":reasons,
                 "reasonEnum":reasonEnum, "nRow":nRow, "nCol":nCol, 
-                "obsFileName":obsFileName}
+                "obsFileName":obsFileName, "ticksPerSecond":ticksPerSec}
 
 
     finally:

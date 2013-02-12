@@ -32,7 +32,8 @@ def hotPixelsTest(testFileName='obs_20121211-024511.h5'):
     boxSize = 5
     nSigma = 3.0
 
-    hp.findHotPixels(paramFile, testFileName, outputFile, timeStep=timeStep,
+    hp.findHotPixels(paramFile=paramFile, inputFileName=testFileName,
+                     outputFileName=outputFile, timeStep=timeStep,
                      startTime=testStartTime, endTime=testEndTime,
                      fwhm=fwhm, boxSize=boxSize, nSigma=nSigma, display=True)
     
@@ -42,7 +43,7 @@ def hotPixelsTest(testFileName='obs_20121211-024511.h5'):
                                           fwhm=fwhm, boxSize=boxSize,
                                           nSigma=nSigma)
     
-    hpOutput = hp.readHotPixels('testoutput.h5')
+    hpOutput = hp.readHotPixels(outputFile)
 
     intMask = intermediateOutput['mask']
     intervals = hpOutput['intervals']
@@ -66,7 +67,7 @@ def hotPixelsTest(testFileName='obs_20121211-024511.h5'):
     assert np.all(np.equal(nIntervals, nReasons))
 
     print
-    print "All seems okay."
+    print "All seems okay. The two plots shown should look identical."
 
 
 
