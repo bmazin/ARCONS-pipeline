@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-t = np.load('sdssFit.npz')
+t = np.load('/home/pszypryt/sdss_data/20121208/RedTest-Fit.npz')
 params = t['params']
 jd = t['jd']
 amps = params[:,1]
@@ -11,7 +11,7 @@ xpos = params[:,2]
 ypos = params[:,3]
 jd2 = (jd/0.01966127)%1.
 iPeriod = np.array(jd/0.01966127,dtype=np.int)
-iPeriod -= iPeriod[421]
+iPeriod -= iPeriod[0]
 jd_0 = jd2[iPeriod == 0]
 jd_1 = jd2[iPeriod == 1]
 jd_2 = jd2[iPeriod == 2]

@@ -28,7 +28,7 @@ def gaussian(height, center_x, center_y, width_x, width_y,offset):
 
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
-stackDict = np.load('TestDec10sdssImageStack6000.npz')
+stackDict = np.load('/home/pszypryt/sdss_data/20121208/RedTest-ImageStack.npz')
 stack = stackDict['stack']
 jd = stackDict['jd']
 paramsList = []
@@ -39,8 +39,8 @@ plt.ion()
 for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
     nanMask = np.isnan(frame)
-#    if iFrame < 420:
-#        guessX = 30
+#    if iFrame < 150:
+#        guessX = 31
 #        guessY = 30
 #    else:
     guessX = 14
@@ -51,7 +51,7 @@ for iFrame in range(0,np.shape(stack)[2]):
     err[apertureMask==1] = np.inf#weight points closer to the expected psf higher
     frame[nanMask]=0#set to finite value that will be ignored
     err[nanMask] = np.inf#ignore these data points
-    nearDeadCutoff=375#100/15 cps for 4000-6000 angstroms
+    nearDeadCutoff=0#100/15 cps for 4000-6000 angstroms
     err[frame<nearDeadCutoff] = np.inf
     entireMask = (err==np.inf)
     maFrame = np.ma.masked_array(frame,entireMask)
@@ -126,12 +126,11 @@ for iFrame in range(0,np.shape(stack)[2]):
 #    ax2.set_title('Fit seen along Rows')
 #    plt.show()
 
-    
-utils.makeMovie(fitImgList,cbar=True,outName='Dec10BsdssFit.gif',normMax=1000)
 plt.close()
 print 'closed'
 cube = np.array(fitImgList)
 chisqs = np.array(chisqList)
 params = np.array(paramsList)
 errors = np.array(errorsList)
-np.savez('Dec10BsdssFit.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+np.savez('/home/pszypryt/sdss_data/20121208/Red-Fit.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+#utils.makeMovie(fitImgList,cbar=True,outName='/home/pszypryt/TestFit.gif',normMax=1000)
