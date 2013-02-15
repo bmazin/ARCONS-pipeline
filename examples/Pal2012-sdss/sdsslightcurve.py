@@ -2,14 +2,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-t = np.load('/home/pszypryt/sdss_data/20121208/RedTest-Fit.npz')
+FileName = '/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntfitpsfBlue.npz'
+NumFrames = 1700
+IntTime = 3
+FoldPeriod = 0.01966127 #This is in fractions of a day
+t = np.load(FileName)
 params = t['params']
 jd = t['jd']
 amps = params[:,1]
 widths = params[:,4]
 xpos = params[:,2]
 ypos = params[:,3]
-jd2 = (jd/0.01966127)%1.
+jd2 = (jd/FoldPeriod)%1.
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
@@ -17,7 +21,7 @@ ax = fig.add_subplot(111)
 curve = amps*widths**2
 #curve /= np.median(curve)
 #amps /= np.median(amps)
-x = np.arange(0,930*10,10)
+x = np.arange(0,NumFrames*IntTime,IntTime) # (0,930*10,10)
 #xpos/=np.median(xpos)
 #ypos/=np.median(ypos)
 
@@ -32,7 +36,8 @@ meanYpos = utils.mean_filterNaN(ypos,size=7)
 
 curve/=np.median(curve)
 fwhm/=np.median(fwhm)
-ax.plot(jd,curve,'ko')
+ax.plot(jd,curve,'k.')
+ax.set_title(FileName)
 #ax.plot(x,fwhm,'m')
 #ax.plot(x,medFwhm,'k')
 #ax.plot(x,meanFwhm,'b')
