@@ -28,7 +28,7 @@ def gaussian(height, center_x, center_y, width_x, width_y,offset):
 
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
-stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntImageStackBlue.npz')
+stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIImageStackRed.npz')
 stack = stackDict['stack']
 jd = stackDict['jd']
 paramsList = []
@@ -39,7 +39,7 @@ plt.ion()
 for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
     nanMask = np.isnan(frame)
-#    if iFrame < 150:
+#    if iFrame < 500:
 #        guessX = 31
 #        guessY = 30
 #    else:
@@ -132,5 +132,7 @@ cube = np.array(fitImgList)
 chisqs = np.array(chisqList)
 params = np.array(paramsList)
 errors = np.array(errorsList)
-np.savez('/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntfitpsfBlue.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
-#utils.makeMovie(fitImgList,cbar=True,outName='/home/pszypryt/TestFit.gif',normMax=1000)
+np.savez('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIfitpsfRed.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+print 'saved'
+utils.makeMovie(fitImgList,cbar=True,outName='/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIfitpsfRed.gif')
+#,normMax=1000)

@@ -30,29 +30,33 @@ seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '1
 
 # December 11
 # Final sequence, toward end of run, thin high clouds at around 12:50, moved to confirm position at '122234', also at '130752' at 125s.
-seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238', '123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
+seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238']
+seq6 = ['123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
 
 # Date and cal time stamp arrays
 #utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212']
 #sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211']
 
-#calTimestamps = ['20121209-131132','20121209-133419', '20121211-074031', '20121211-074031', '20121211-133056', '20121212-133821']
-utcDates = ['20121209','20121209']
-sunsetDates = ['20121208','20121208']
-#utcDates = ['20121211', '20121211', '20121211', '20121212']
-#sunsetDates = ['20121210', '20121210', '20121210', '20121211']
+#calTimestamps = ['20121209-131132','20121209-133419', '20121211-090613', '20121211-090613', '20121211-133056', '20121212-111847'] 
+#'20121212-133821' is terrible! 
+#try replacing '20121211-074031' with '20121211-090613'
+utcDates = ['20121211', '20121211']
+sunsetDates = ['20121210', '20121210']
+#utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212']
+#sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211']
 
-calTimestamps = ['20121209-131132','20121209-133419']
-seqs = [seq0,seq1]
+calTimestamps = ['20121211-090613', '20121211-090613']
+seqs = [seq2,seq3]
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
-#flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
-flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
-
+#flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
+flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
+#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 #/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
 
@@ -84,7 +88,7 @@ for iSeq in range(len(seqs)):
         ob = ObsFile(obsFn)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
-        ob.setWvlCutoffs(3000,5000)
+        ob.setWvlCutoffs(5000,7000)
 
 #        row1 = 19
 #        col1 = 30
@@ -149,6 +153,7 @@ for iSeq in range(len(seqs)):
         
 cube = np.dstack(frames)
 times = np.array(times)
-np.savez('/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntImageStackBlue.npz',stack=cube,jd=times)
-utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntImageStackBlue.gif')
+np.savez('/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec10SIImageStackRednewCal.npz',stack=cube,jd=times)
+print 'saved'
+utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec10SIImageStackRednewCal.gif')
 

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-FileName = '/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntfitpsfBlue.npz'
+FileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec11SIImageStackRed.npz'
 NumFrames = 1700
 IntTime = 3
 FoldPeriod = 0.01966127 #This is in fractions of a day
