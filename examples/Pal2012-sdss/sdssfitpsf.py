@@ -28,7 +28,11 @@ def gaussian(height, center_x, center_y, width_x, width_y,offset):
 
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
+<<<<<<< HEAD
 stackDict = np.load('/home/pszypryt/sdss_data/20121210/Blue10-ImageStack.npz')
+=======
+stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntImageStackBlue.npz')
+>>>>>>> c8b701cfcf2e94be0dbc57df049b7c2ec37a362f
 stack = stackDict['stack']
 jd = stackDict['jd']
 paramsList = []
@@ -132,5 +136,9 @@ cube = np.array(fitImgList)
 chisqs = np.array(chisqList)
 params = np.array(paramsList)
 errors = np.array(errorsList)
+<<<<<<< HEAD
 np.savez('/home/pszypryt/sdss_data/20121210/Blue10-Fit.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+=======
+np.savez('/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntfitpsfBlue.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+>>>>>>> c8b701cfcf2e94be0dbc57df049b7c2ec37a362f
 #utils.makeMovie(fitImgList,cbar=True,outName='/home/pszypryt/TestFit.gif',normMax=1000)
