@@ -36,23 +36,26 @@ seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '1
 #utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212']
 #sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211']
 
-#calTimestamps = ['20121209-131132','20121209-133419', '20121211-074031', '20121211-074031', '20121211-133056', '20121212-133821']
-utcDates = ['20121209','20121209']
-sunsetDates = ['20121208','20121208']
-#utcDates = ['20121211', '20121211', '20121211', '20121212']
-#sunsetDates = ['20121210', '20121210', '20121210', '20121211']
 
-calTimestamps = ['20121209-131132','20121209-133419']
-seqs = [seq0,seq1]
+utcDates = ['20121211', '20121211', '20121211']
+sunsetDates = ['20121210', '20121210', '20121210']
+calTimestamps = ['20121211-074031', '20121211-074031', '20121211-133056']
+
+#calTimestamps = ['20121209-131132','20121209-133419', '20121211-074031', '20121211-074031', '20121211-133056', '20121212-133821']
+#utcDates = ['20121209','20121209','20121211', '20121211', '20121211', '20121212']
+#sunsetDates = ['20121208','20121208','20121210', '20121210', '20121210', '20121211']
+
+#calTimestamps = ['20121209-131132','20121209-133419']
+#seqs = [seq0,seq1,seq2,seq3,seq4,seq5]
+seqs=[seq2,seq3,seq4]
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
-
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
-#flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
-flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
-
+flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
+#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 #/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
 
@@ -75,6 +78,7 @@ print (NumFiles)*expTime/integrationTime,'frames to make'
 #print (len(seqs))*expTime/integrationTime,'frames to make'
 for iSeq in range(len(seqs)):
     timestampList = timestampLists[iSeq]
+    print timestampList
     wfn = wvlCalFilenames[iSeq]
     ffn = flatCalFilenames[iSeq]
     sunsetDate = sunsetDates[iSeq]
@@ -84,7 +88,18 @@ for iSeq in range(len(seqs)):
         ob = ObsFile(obsFn)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
-        ob.setWvlCutoffs(5000,7000)
+        ob.setWvlCutoffs(3000,5000)
+
+
+	bad_solution_mask=np.zeros((46,44))
+	bad_count=0;
+	for y in range(46):
+	    for x in range(44):
+		if (ob.wvlRangeTable[y][x][1] < 11000):
+		    bad_solution_mask[y][x] = 1
+		    bad_count = bad_count+1
+        print bad_count
+	
 
 #        row1 = 19
 #        col1 = 30
@@ -141,6 +156,9 @@ for iSeq in range(len(seqs)):
 #            frame[hotPixMaskRaw == 1] = np.nan
             frame[hotPixMask == 1] = np.nan
             frame[deadMask == 0] = np.nan
+
+#	    frame[bad_solution_mask == 1] = np.nan
+
             frames.append(frame)
 
             print showFrame[np.isnan(showFrame)]
@@ -149,6 +167,6 @@ for iSeq in range(len(seqs)):
         
 cube = np.dstack(frames)
 times = np.array(times)
-np.savez('/home/pszypryt/TestImageStackRed.npz',stack=cube,jd=times)
-utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/home/pszypryt/TestImageStackRed.gif')
+np.savez('/home/pszypryt/sdss_data/20121210/Blue10-ImageStack.npz',stack=cube,jd=times)
+utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/home/pszypryt/sdss_data/20121210/Blue10-ImageStack.gif')
 
