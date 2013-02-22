@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-t = np.load('/home/pszypryt/sdss_data/20121208/RedTest-Fit.npz')
+t = np.load('/home/pszypryt/sdss_data/20121210/Blue10-Fit.npz')
 params = t['params']
 jd = t['jd']
 amps = params[:,1]
@@ -32,7 +32,7 @@ meanYpos = utils.mean_filterNaN(ypos,size=7)
 
 curve/=np.median(curve)
 fwhm/=np.median(fwhm)
-ax.plot(jd,curve,'ko')
+ax.plot(jd,curve,'k.')
 #ax.plot(x,fwhm,'m')
 #ax.plot(x,medFwhm,'k')
 #ax.plot(x,meanFwhm,'b')

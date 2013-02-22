@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-t = np.load('/home/pszypryt/sdss_data/20121208/RedTest-Fit.npz')
+t = np.load('/home/pszypryt/sdss_data/20121211/seq5Blue-Fit.npz')
 params = t['params']
 jd = t['jd']
 amps = params[:,1]
@@ -16,8 +16,6 @@ jd_0 = jd2[iPeriod == 0]
 jd_1 = jd2[iPeriod == 1]
 jd_2 = jd2[iPeriod == 2]
 jd_3 = jd2[iPeriod == 3]
-
-
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
@@ -43,9 +41,9 @@ curve_1 = curve[iPeriod == 1]
 curve_2 = curve[iPeriod == 2]
 curve_3 = curve[iPeriod == 3]
 fwhm/=np.median(fwhm)
-ax.plot(jd_0,curve_0,'co')
-ax.plot(jd_1,curve_1,'yo')
-ax.plot(jd_2,curve_2,'bo')
-ax.plot(jd_3,curve_3,'ro')
+ax.plot(jd_0,curve_0,'c.')
+ax.plot(jd_1,curve_1,'y.')
+ax.plot(jd_2,curve_2,'b.')
+ax.plot(jd_3,curve_3,'r.')
 plt.show()
 #np.savez('fix.npz',widths=medFwhm,x=meanXpos,y=meanYpos)
