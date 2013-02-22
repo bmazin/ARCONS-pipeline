@@ -651,8 +651,12 @@ def wavelengthCal(paramFile):
                     row['solnrange'] = np.array([lambda_start,lambda_stop])   # Angstroms
                     driftrow['pixelrow'] = i
                     driftrow['pixelcol'] = j
-                    driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
-                    driftrow['perrors'] = np.array(mperrs[0:6])
+                    try:
+                        driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2, x_offset3, amplitude3, sigma3])
+                        driftrow['perrors'] = np.array(mperrs[0:9])
+                    except:
+                        driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
+                        driftrow['perrors'] = np.array(mperrs[0:6])
                     driftrow.append()
                     
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)
