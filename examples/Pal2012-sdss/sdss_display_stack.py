@@ -89,8 +89,6 @@ for iSeq in range(len(seqs)):
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
         ob.setWvlCutoffs(3000,5000)
-<<<<<<< HEAD
-
 
 	bad_solution_mask=np.zeros((46,44))
 	bad_count=0;
@@ -100,9 +98,6 @@ for iSeq in range(len(seqs)):
 		    bad_solution_mask[y][x] = 1
 		    bad_count = bad_count+1
         print bad_count
-	
-=======
->>>>>>> c8b701cfcf2e94be0dbc57df049b7c2ec37a362f
 
 #        row1 = 19
 #        col1 = 30
@@ -170,11 +165,6 @@ for iSeq in range(len(seqs)):
         
 cube = np.dstack(frames)
 times = np.array(times)
-<<<<<<< HEAD
 np.savez('/home/pszypryt/sdss_data/20121210/Blue10-ImageStack.npz',stack=cube,jd=times)
 utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/home/pszypryt/sdss_data/20121210/Blue10-ImageStack.gif')
-=======
-np.savez('/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntImageStackBlue.npz',stack=cube,jd=times)
-utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntImageStackBlue.gif')
->>>>>>> c8b701cfcf2e94be0dbc57df049b7c2ec37a362f
 
