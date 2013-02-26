@@ -38,14 +38,14 @@ def aperture(startpx,startpy,radius=3):
     r = radius
     length = 2*r 
     height = length
-    allx = xrange(startpx-int(np.ceil(length/2.0)),startpx+int(np.floor(length/2.0))+1)
-    ally = xrange(startpy-int(np.ceil(height/2.0)),startpy+int(np.floor(height/2.0))+1)
+    allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
+    ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
     pixx = []
     pixy = []
-    mask=np.ones((46,44))
+    mask=numpy.ones((46,44))
     for x in allx:
         for y in ally:
-            if (np.abs(x-startpx))**2+(np.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
+            if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
                 mask[y,x]=0.
     return mask
 
