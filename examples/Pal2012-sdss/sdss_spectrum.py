@@ -57,6 +57,9 @@ ob.loadWvlCalFile(wvlCalFilenames[0])
 ob.loadFlatCalFile(flatCalFilenames[0])
 deadMask = ob.getDeadPixels()
 
+frame = ob.getPixelCountImage(firstSec=0,integrationTime=300,weighted=True)
+hotPixMask = hotPixels.checkInterval(image=frame, firstSec=0, intTime=300, weighted=True, display=True)['mask']
+
 guessX=14
 guessY=8
 radius=5
@@ -65,8 +68,8 @@ wvlBin=100
 apertureMask=aperture(guessX,guessY,radius=radius)
 bigMask = aperture(guessX,guessY,radius=radius*2)
 skyMask = bigMask-apertureMask
-y_values,x_values= np.where(np.logical_and(apertureMask==0,deadMask==1))
-y_sky,x_sky=np.where(np.logical_and(skyMask==0,deadMask==1))
+y_values,x_values= np.where(np.logical_and(np.logical_and(apertureMask==0,deadMask==1),hotPixMask==0))
+y_sky,x_sky=np.where(np.logical_and(np.logical_and(skyMask==0,deadMask==1),hotPixMask==0))
 
 skyspectrum=[]
 for i in range(len(x_sky)):
