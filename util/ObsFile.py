@@ -621,7 +621,7 @@ class ObsFile:
 #        corruptedSecs = []
 #        for pixelCoord in corruptedPixels:
 #            for sec in xrange(firstSec,lastSec):
-#                packetList = self.getPixelPacketList(iRow,iCol,sec,integrationTime=1)
+#                packetList = self.getPixelPacketList(pixelCoord[0],pixelCoord[1],sec,integrationTime=1)
 #                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
 #                if np.any(timestamps > 1./self.tickDuration):
 #                    pixelLabel = self.beamImage[iRow][iCol]
