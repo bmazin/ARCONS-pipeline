@@ -16,6 +16,7 @@ import scipy.ndimage
 """
 Modules:
 
+aperture(startpx,startpy,radius=3)
 bin12_9ToRad(binOffset12_9)
 confirm(prompt,defaultResponse=True)
 convertDegToHex(ra, dec)
@@ -27,6 +28,26 @@ printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
 
 """
+
+def aperture(startpx,startpy,radius=3):
+    """
+    Creates a mask with specified radius and centered at specified pixel
+    position.  Output mask is a 46x44 array with 0 represented pixels within
+    the aperture and 1 representing pixels outside the aperture.
+    """
+    r = radius
+    length = 2*r 
+    height = length
+    allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
+    ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
+    pixx = []
+    pixy = []
+    mask=numpy.ones((46,44))
+    for x in allx:
+        for y in ally:
+            if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
+                mask[y,x]=0.
+    return mask
 
 
 def bin12_9ToRad(binOffset12_9):

@@ -26,14 +26,14 @@ def gaussian(height, center_x, center_y, width_x, width_y,offset):
 
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
-stackDict = np.load('FinalDec10TestsdssImageStack6000.npz')
+stackDict = np.load('/home/pszypryt/sdss_data/20121210/Blue10-ImageStack.npz')
 stack = stackDict['stack']
 paramsList = []
 fitImgList = []
 frames = []
 for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
-    plt.hist(np.ravel(frame),bins=100,range=(0,5000))
+    plt.hist(np.ravel(frame),bins=300,range=(1,300))
     plt.show()
 
     nanMask = np.isnan(frame)
