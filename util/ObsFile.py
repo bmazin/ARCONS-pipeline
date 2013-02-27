@@ -334,23 +334,27 @@ class ObsFile:
         ax.plot(self.flatCalWvlBins[0:-1],spectrum,label='spectrum for pixel[%d][%d]'%(pixelRow,pixelCol))
         plt.show()
 
-    def getApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True):
+    def getApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,hotPixMask=None):
 	'''
 	Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
 	center, as well as radius.  Wave and flat cals should be loaded before using this
-	function.  Will add more options as other pieces of pipeline become more refined.
+	function.  If no hot pixel mask is applied, taking the median of the sky rather than
+	the average to account for high hot pixel counts.
+	Will add more options as other pieces of pipeline become more refined.
 	'''
 	print 'Creating dead pixel mask...'
 	deadMask = self.getDeadPixels()
-	#frame = self.getPixelCountImage(firstSec=0,integrationTime=300,weighted=True)
-	#hotPixMask = hotPixels.checkInterval(image=frame, firstSec=0, intTime=300, weighted=True, display=True)['mask']
 	print 'Creating aperture mask...'
 	apertureMask=utils.aperture(pixelCol,pixelRow,radius=radius)
 	print 'Creating sky mask...'
 	bigMask = utils.aperture(pixelCol,pixelRow,radius=radius*3)
 	skyMask = bigMask-apertureMask
-	y_values,x_values= np.where(np.logical_and(apertureMask==0,deadMask==1))
-	y_sky,x_sky=np.where(np.logical_and(skyMask==0,deadMask==1))
+	if hotPixMask == None:
+	    y_values,x_values= np.where(np.logical_and(apertureMask==0,deadMask==1))
+	    y_sky,x_sky=np.where(np.logical_and(skyMask==0,deadMask==1))
+	else:
+	    y_values,x_values= np.where(np.logical_and(np.logical_and(apertureMask==0,deadMask==1),hotPixMask==0))
+	    y_sky,x_sky=np.where(np.logical_and(np.logical_and(skyMask==0,deadMask==1),hotPixMask==0))
 	wvlBinEdges = self.getPixelSpectrum(y_values[0],x_values[0],weighted=weighted)[1]
 	print 'Creating average sky spectrum...'
 	skyspectrum=[]
@@ -361,7 +365,10 @@ class ObsFile:
 	    ispectrum = np.zeros(len(skyspectrum))
 	    for i in range(len(skyspectrum)):    
 	        ispectrum[i]= skyspectrum[i][j]
-	    sky_array[j] = np.median(ispectrum)
+	    if hotPixMask==None:
+		sky_array[j] = np.median(ispectrum)
+	    else:
+	        sky_array[j] = np.average(ispectrum)
 	print 'Creating sky subtracted spectrum...'
 	spectrum=[]
 	for i in range(len(x_values)):
@@ -376,8 +383,8 @@ class ObsFile:
 	    summed_array[i] /= (wvlBinEdges[i+1]-wvlBinEdges[i])
 	return summed_array,wvlBinEdges
 
-    def plotApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True):
-	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=14,pixelRow=8,radius=7)
+    def plotApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,hotPixMask=None):
+	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=pixelCol,pixelRow=pixelRow,radius=radius,hotPixMask=hotPixMask)
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	ax.plot(bin_edges[12:-2],summed_array[12:-1])
