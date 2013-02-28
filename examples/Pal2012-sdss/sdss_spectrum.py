@@ -7,22 +7,6 @@ import matplotlib.pyplot as plt
 from hotpix import hotPixels
 
 
-def aperture(startpx,startpy,radius=3):
-    r = radius
-    length = 2*r 
-    height = length
-    allx = xrange(startpx-int(np.ceil(length/2.0)),startpx+int(np.floor(length/2.0))+1)
-    ally = xrange(startpy-int(np.ceil(height/2.0)),startpy+int(np.floor(height/2.0))+1)
-    pixx = []
-    pixy = []
-    mask=np.ones((46,44))
-    for x in allx:
-        for y in ally:
-            if (np.abs(x-startpx))**2+(np.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
-                mask[y,x]=0.
-    return mask
-
-
 run = 'PAL2012'
 
 # December 8
@@ -62,35 +46,45 @@ hotPixMask = hotPixels.checkInterval(image=frame, firstSec=0, intTime=300, weigh
 
 guessX=14
 guessY=8
-radius=5
+radius=7
 wvlBin=100
 
-apertureMask=aperture(guessX,guessY,radius=radius)
-bigMask = aperture(guessX,guessY,radius=radius*2)
+apertureMask=utils.aperture(guessX,guessY,radius=radius)
+bigMask = utils.aperture(guessX,guessY,radius=radius*3)
 skyMask = bigMask-apertureMask
 y_values,x_values= np.where(np.logical_and(np.logical_and(apertureMask==0,deadMask==1),hotPixMask==0))
 y_sky,x_sky=np.where(np.logical_and(np.logical_and(skyMask==0,deadMask==1),hotPixMask==0))
 
+bin_edges = ob.getPixelSpectrum(y_values[0],x_values[0],weighted=True)[1]
+
+h = 6.626068*10**-34
+c = 299792458.0
+k = 1.3806503*10**-23
+T = 10000.0
+
+numerator = 6*10**-29
+denominator= (bin_edges*10**-10)**5*(np.exp(((h*c)/(bin_edges*k*T*10**-10))) - 1)
+bbcurve = numerator/denominator
+print bbcurve
+
 skyspectrum=[]
 for i in range(len(x_sky)):
 #    skyspectrum.append(ob.getPixelSpectrum(y_sky[i],x_sky[i])[0])
-    skyspectrum.append(ob.getPixelSpectrum(y_sky[i],x_sky[i],wvlBinWidth=wvlBin)[0])
+    skyspectrum.append(ob.getPixelSpectrum(y_sky[i],x_sky[i],weighted=True)[0])
 
 sky_array = np.zeros(len(skyspectrum[0]))
 for j in range(len(skyspectrum[0])):
     ispectrum = np.zeros(len(skyspectrum))
     for i in range(len(skyspectrum)):    
         ispectrum[i]= skyspectrum[i][j]
-    sky_array[j] = np.median(ispectrum)
-
+    sky_array[j] = np.average(ispectrum)
 
 #spectrum = np.zeros(len(x_values))
 #bin_edges = np.zeros(len(x_values))
 spectrum=[]
 for i in range(len(x_values)):
 #    spectrum.append(ob.getPixelSpectrum(y_values[i],x_values[i])[0]-sky_array)
-    spectrum.append(ob.getPixelSpectrum(y_values[i],x_values[i],wvlBinWidth=wvlBin)[0]-sky_array)
-bin_edges = ob.getPixelSpectrum(y_values[0],x_values[0],wvlBinWidth=wvlBin)[1]
+    spectrum.append(ob.getPixelSpectrum(y_values[i],x_values[i],weighted=True)[0]-sky_array)
 
 summed_array = np.zeros(len(spectrum[0]))
 for j in range(len(spectrum[0])):
@@ -99,9 +93,15 @@ for j in range(len(spectrum[0])):
         ispectrum[i]= spectrum[i][j]
     summed_array[j] = np.sum(ispectrum)
 
+for i in range(len(summed_array)):
+    summed_array[i] /= (bin_edges[i+1]-bin_edges[i])
+
+
+
 fig = plt.figure()
 ax = fig.add_subplot(111)
 #ax.plot(ob.flatCalWvlBins[0:-1],summed_array)
+#ax.plot(bin_edges[0:-1],summed_array,bin_edges[0:-1],bbcurve[0:-1])
 ax.plot(bin_edges[0:-1],summed_array)
 plt.xlabel('Wavelength ($\AA$)')
 plt.ylabel('Counts')

@@ -331,7 +331,7 @@ class ObsFile:
                 spectrum,wvlBinEdges = np.histogram(wvlList,bins=wvlBinEdges)
         return spectrum,wvlBinEdges
                 
-    def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False):
+    def plotPixelSpectra(self,pixelRow,pixelCol,firstSec=0,integrationTime=-1,weighted=False,fluxWeighted=False):
         """
         plots the wavelength calibrated spectrum of a given pixel integrated over a given time
         if integrationTime is -1, All time after firstSec is used.  
@@ -342,6 +342,66 @@ class ObsFile:
         ax = fig.add_subplot(111)
         ax.plot(self.flatCalWvlBins[0:-1],spectrum,label='spectrum for pixel[%d][%d]'%(pixelRow,pixelCol))
         plt.show()
+
+    def getApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,fluxWeighted=False,hotPixMask=None):
+	'''
+	Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
+	center, as well as radius.  Wave and flat cals should be loaded before using this
+	function.  If no hot pixel mask is applied, taking the median of the sky rather than
+	the average to account for high hot pixel counts.
+	Will add more options as other pieces of pipeline become more refined.
+	'''
+	print 'Creating dead pixel mask...'
+	deadMask = self.getDeadPixels()
+	print 'Creating aperture mask...'
+	apertureMask=utils.aperture(pixelCol,pixelRow,radius=radius)
+	print 'Creating sky mask...'
+	bigMask = utils.aperture(pixelCol,pixelRow,radius=radius*3)
+	skyMask = bigMask-apertureMask
+	if hotPixMask == None:
+	    y_values,x_values= np.where(np.logical_and(apertureMask==0,deadMask==1))
+	    y_sky,x_sky=np.where(np.logical_and(skyMask==0,deadMask==1))
+	else:
+	    y_values,x_values= np.where(np.logical_and(np.logical_and(apertureMask==0,deadMask==1),hotPixMask==0))
+	    y_sky,x_sky=np.where(np.logical_and(np.logical_and(skyMask==0,deadMask==1),hotPixMask==0))
+	wvlBinEdges = self.getPixelSpectrum(y_values[0],x_values[0],weighted=weighted)[1]
+	print 'Creating average sky spectrum...'
+	skyspectrum=[]
+	for i in range(len(x_sky)):
+	    skyspectrum.append(self.getPixelSpectrum(y_sky[i],x_sky[i],weighted=weighted,fluxWeighted=fluxWeighted)[0])
+	sky_array = np.zeros(len(skyspectrum[0]))
+	for j in range(len(skyspectrum[0])):
+	    ispectrum = np.zeros(len(skyspectrum))
+	    for i in range(len(skyspectrum)):    
+	        ispectrum[i]= skyspectrum[i][j]
+	    if hotPixMask==None:
+		sky_array[j] = np.median(ispectrum)
+	    else:
+	        sky_array[j] = np.average(ispectrum)
+	print 'Creating sky subtracted spectrum...'
+	spectrum=[]
+	for i in range(len(x_values)):
+	    spectrum.append(self.getPixelSpectrum(y_values[i],x_values[i],weighted=weighted,fluxWeighted=fluxWeighted)[0]-sky_array)
+	summed_array = np.zeros(len(spectrum[0]))
+	for j in range(len(spectrum[0])):
+	    ispectrum = np.zeros(len(spectrum))
+	    for i in range(len(spectrum)):    
+	        ispectrum[i]= spectrum[i][j]
+	    summed_array[j] = np.sum(ispectrum)
+	for i in range(len(summed_array)):
+	    summed_array[i] /= (wvlBinEdges[i+1]-wvlBinEdges[i])
+	return summed_array,wvlBinEdges
+
+    def plotApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,fluxWeighted=False,hotPixMask=None):
+	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=pixelCol,pixelRow=pixelRow,radius=radius,weighted=weighted,fluxWeighted=fluxWeighted,hotPixMask=hotPixMask)
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	ax.plot(bin_edges[12:-2],summed_array[12:-1])
+	plt.xlabel('Wavelength ($\AA$)')
+	plt.ylabel('Counts')
+	plt.show()
+	
+	
 
     def setWvlCutoffs(self,wvlLowerLimit=3000,wvlUpperLimit=8000):
         """
