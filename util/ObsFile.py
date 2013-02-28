@@ -384,7 +384,7 @@ class ObsFile:
 	return summed_array,wvlBinEdges
 
     def plotApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,fluxWeighted=False,hotPixMask=None):
-	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=pixelCol,pixelRow=pixelRow,radius=radius,,weighted=weighted,fluxWeighted=fluxWeighted,hotPixMask=hotPixMask)
+	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=pixelCol,pixelRow=pixelRow,radius=radius,weighted=weighted,fluxWeighted=fluxWeighted,hotPixMask=hotPixMask)
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	ax.plot(bin_edges[12:-2],summed_array[12:-1])
