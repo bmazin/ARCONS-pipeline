@@ -334,7 +334,7 @@ class ObsFile:
         ax.plot(self.flatCalWvlBins[0:-1],spectrum,label='spectrum for pixel[%d][%d]'%(pixelRow,pixelCol))
         plt.show()
 
-    def getApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,hotPixMask=None):
+    def getApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,fluxWeighted=False,hotPixMask=None):
 	'''
 	Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
 	center, as well as radius.  Wave and flat cals should be loaded before using this
@@ -359,7 +359,7 @@ class ObsFile:
 	print 'Creating average sky spectrum...'
 	skyspectrum=[]
 	for i in range(len(x_sky)):
-	    skyspectrum.append(self.getPixelSpectrum(y_sky[i],x_sky[i],weighted=weighted)[0])
+	    skyspectrum.append(self.getPixelSpectrum(y_sky[i],x_sky[i],weighted=weighted,fluxWeighted=fluxWeighted)[0])
 	sky_array = np.zeros(len(skyspectrum[0]))
 	for j in range(len(skyspectrum[0])):
 	    ispectrum = np.zeros(len(skyspectrum))
@@ -372,7 +372,7 @@ class ObsFile:
 	print 'Creating sky subtracted spectrum...'
 	spectrum=[]
 	for i in range(len(x_values)):
-	    spectrum.append(self.getPixelSpectrum(y_values[i],x_values[i],weighted=True)[0]-sky_array)
+	    spectrum.append(self.getPixelSpectrum(y_values[i],x_values[i],weighted=weighted,fluxWeighted=fluxWeighted)[0]-sky_array)
 	summed_array = np.zeros(len(spectrum[0]))
 	for j in range(len(spectrum[0])):
 	    ispectrum = np.zeros(len(spectrum))
@@ -383,8 +383,8 @@ class ObsFile:
 	    summed_array[i] /= (wvlBinEdges[i+1]-wvlBinEdges[i])
 	return summed_array,wvlBinEdges
 
-    def plotApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,hotPixMask=None):
-	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=pixelCol,pixelRow=pixelRow,radius=radius,hotPixMask=hotPixMask)
+    def plotApertureSpectrum(self,pixelRow,pixelCol,radius,weighted=True,fluxWeighted=False,hotPixMask=None):
+	summed_array,bin_edges=self.getApertureSpectrum(pixelCol=pixelCol,pixelRow=pixelRow,radius=radius,,weighted=weighted,fluxWeighted=fluxWeighted,hotPixMask=hotPixMask)
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	ax.plot(bin_edges[12:-2],summed_array[12:-1])
