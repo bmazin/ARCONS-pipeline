@@ -1,3 +1,9 @@
+#!/bin/python
+'''
+Author: Matt Strader        Date: March 6,2013
+
+This program opens a series of observations of the crab pulsar.  It calculates the period, and calcluates the phase for every photon in the series of observations, It then plots a light curve, and a histogram of counts per period
+'''
 from flatcal.flatCal import FlatCal
 from util.ObsFile import ObsFile
 from util.FileName import FileName
@@ -25,25 +31,7 @@ def circ(startpx,startpy,radius=3):
                 pixy.append(y)
     return pixx,pixy
 
-def main():
-    #filenames = ['obs_20121212-033825.h5',
-    fn = FileName(run='PAL2012',date='20121211',tstamp='20121212-055428').obs()
-    ob = ObsFile(fn)
-    frame = ob.getPixelCountImage(0,30,weighted=False)
-    hotPixMask = hotPixels.findHotPixels(image=frame,firstSec=0,intTime=30,weighted=False)['badflag']
-    frame[hotPixMask == 1] = 0
-    def plotFrame(fig,axes):
-        hMat=axes.matshow(frame,cmap=matplotlib.cm.gnuplot,origin='lower',vmax=np.mean(frame)+3*np.std(frame))
-        fig.colorbar(hMat)
-    PopUp(plotFunc=plotFrame)
-    #d = datetime.date(2012,10,15)#date of table value
-    #d2 = datetime.date(2012,12,11)#date of observation
-    #dt=(d2-d).total_seconds()#seconds between obs and table value
-    ##crabtime ephemeris
-    #nu=29.6957720714 #1/us
-    #pdot=4.2013878e-13#us/s
-    #period=(1.0/nu)+pdot*dt#us
-
+def calculatePeriod(jd,secOffset):
     #goldstone ephemeris
     F0=29.7414493465249770#Hz
     deltaF0=0.0000000055983574
@@ -52,15 +40,35 @@ def main():
     pEpoch = 54781.604891 #Modified Julian Date corresponding to F0
     pEpoch = pEpoch+2400000.5#convert mjd to jd
     pEpoch *= 24*3600 #in seconds
-    obsDate = ob.getFromHeader('jd')
-    print ob.getFromHeader('utc')
-    startTime = obsDate*24*3600#in seconds
-    dt = startTime-pEpoch#seconds since pepoch
+    startTime = jd*24*3600#in seconds
+    dt = startTime-pEpoch+secOffset#seconds since pepoch
 
     #freq = F0+F1*dt+F2/2*dt**2
     freq = F0+F1*dt
     period = 1.0/freq
-    print 'period=',period,'s'
+    return period
+
+def main():
+    outFile = 'jdTimesSeq2.npy'
+    obsSequence="""
+    055428
+    055930
+    060432
+    060934
+    061436
+    061938
+    062440
+    062942
+    """
+    obsSequence = obsSequence.strip().split()
+    obsUtcDate = '20121212'
+    obsSequence = [obsUtcDate+'-'+ts for ts in obsSequence]
+
+    obsFileNames = [FileName(run='PAL2012',date='20121211',tstamp=ts).obs() for ts in obsSequence]
+
+    obList = [ObsFile(fn) for fn in obsFileNames]
+    obsDate = obList[0].getFromHeader('jd')
+
 
 
     #period=0.03367660643405371
@@ -73,9 +81,7 @@ def main():
     circCol,circRow = circ(iCol,iRow,radius=4)
     firstSec = 0
     
-    dt = startTime-pEpoch + firstSec
-    freq = F0+F1*dt
-    period = 1.0/freq
+    period = calculatePeriod(obsDate,firstSec)
     print 'period=',period,'s'
 
     nPhaseBins = 200
@@ -83,18 +89,23 @@ def main():
     
     jdTimes = np.array([],dtype=np.float64)
     times = np.array([])
-    for i in range(len(circCol)):
-        iRow = circRow[i]
-        iCol = circCol[i]
-        timestamps,peaks,baselines = ob.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
-        timestamps = np.array(timestamps,dtype=np.float64)
-        jdTimestamps = obsDate+timestamps /(24.*3600.)
-        jdTimes = np.append(jdTimes,jdTimestamps)
-        times = np.append(times,timestamps)
+    for iOb,ob in enumerate(obList):
+        print iOb,'of',len(obList)
+        obsDate = ob.getFromHeader('jd')
+        for i in range(len(circCol)):
+            iRow = circRow[i]
+            iCol = circCol[i]
+            timestamps,peaks,baselines = ob.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+            timestamps = np.array(timestamps,dtype=np.float64)
+            jdTimestamps = obsDate+timestamps /(24.*3600.)
+            jdTimes = np.append(jdTimes,jdTimestamps)
+            times = np.append(times,timestamps)
 
     jdTimes -= 2400000.5 #convert to modified jd
+
+    np.save(outFile,jdTimes)
     periodDays = period/(24.*3600.)
-    phaseOffset = 0
+    phaseOffset = .2
     phases = (jdTimes % periodDays)/periodDays+phaseOffset
     #in case phaseOffset pushed a phase past 1. roll it back 
     phases = phases % 1.0 
@@ -121,19 +132,6 @@ def main():
     histSinglePeriodCounts,countBinEdges = np.histogram(singlePeriodCounts,bins=50)
     plt.plot(countBinEdges[:-1],histSinglePeriodCounts)
     plt.show()
-
-    n = 30
-    counts = []
-    for i in range(n):
-        jdTimesSelect = jdTimes[(periodIndices-firstPeriod)==2000+i]
-        counts.append(len(jdTimesSelect))
-        phases = (jdTimesSelect % periodDays)/periodDays+phaseOffset
-        histPhases,phaseBinEdges = np.histogram(phases,bins=10)
-        plt.plot(phaseBinEdges[0:-1],histPhases,c=matplotlib.cm.jet(1.*i/n))
-    plt.show()
-    plt.plot(counts)
-    plt.show()
-        
 
 if __name__=='__main__':
     main()
