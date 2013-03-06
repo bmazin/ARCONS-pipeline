@@ -12,6 +12,7 @@ import binascii
 import math
 from scipy.signal import convolve
 import scipy.ndimage
+#from interval import interval
 
 """
 Modules:
@@ -474,4 +475,29 @@ def gaussian_psf(fwhm, boxsize, oversample=50):
     binnedGaussian = rebin2D(fineSampledGaussian, boxsize, boxsize)
 
     return binnedGaussian
-        
+
+
+
+
+def intervalSize(inter):
+    '''
+    INPUTS:
+        inter - a pyinterval 'interval' instance.
+    OUTPUTS:
+        Returns the total size of an pyinterval '(multi)interval' instance. 
+        So if an interval instance represents a set of time ranges, this returns
+        the total amount of time covered by the ranges.
+        E.g.:
+            >>> from interval import interval
+            >>> from util import utils
+            >>> 
+            >>> x=interval([10,15],[9],[2,3],[2.5,3.5]) #Sub-intervals are automatically unioned
+            >>> x
+            interval([2.0, 3.5], [9.0], [10.0, 15.0])
+            >>> utils.intervalSize(x)
+            6.5
+    '''
+    size=0.0
+    for eachComponent in inter.components:
+        size+=(eachComponent[0][-1]-eachComponent[0][0])
+    return size
