@@ -199,6 +199,8 @@ def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
     Makes a movie out of a list of frame objects (2-D arrays)
     
     """
+    # Looks like theres some sort of bug when normMax != None.
+    # Causes frame to pop up in a window as gif is made.
     if len(listOfFrameObj) == 1:
         raise ValueError, "I cannot make movie out of a list of one object!"
 
