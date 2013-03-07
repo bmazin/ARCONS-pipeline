@@ -52,8 +52,13 @@ def main():
     pEpoch = 54781.604891 #Modified Julian Date corresponding to F0
     pEpoch = pEpoch+2400000.5#convert mjd to jd
     pEpoch *= 24*3600 #in seconds
-    obsDate = ob.getFromHeader('jd')
-    print ob.getFromHeader('utc')
+    #obsDate = ob.getFromHeader('jd')
+
+    unixEpochJD = 2440587.5
+    unixSecsInDay = 86400.
+    headerUnixtime = ob.getFromHeader('unixtime')
+    obsDate = headerUnixtime/unixSecsInDay+unixEpochJD
+
     startTime = obsDate*24*3600#in seconds
     dt = startTime-pEpoch#seconds since pepoch
 
@@ -93,6 +98,7 @@ def main():
         times = np.append(times,timestamps)
 
     jdTimes -= 2400000.5 #convert to modified jd
+    np.savetxt('crabOpticalSample-20121212-055428.txt',jdTimes)
     periodDays = period/(24.*3600.)
     phaseOffset = .2
     phases = (jdTimes % periodDays)/periodDays+.2
@@ -105,7 +111,6 @@ def main():
 
     plt.plot(phaseBinEdges[0:-1],histPhases)
     plt.show()
-    np.savetxt('crabOpticalSample30s.txt',jdTimes)
 
 if __name__=='__main__':
     main()
