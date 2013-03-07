@@ -60,19 +60,19 @@ See individual routines for more detail.
 
 '''
 
-
+import os.path
+import sys
 from math import *
+from interval import interval
+import tables
 import numpy as np
 import numpy.ma as ma
 import matplotlib.pylab as mpl
 import util.ObsFile as ObsFile
 import util.utils as utils
-from interval import interval
-import tables
 import cosmic.TimeMask as tm
 import util.readDict as readDict
-import os.path
-import sys
+
 
 headerGroupName = 'header'  #Define labels for the output .h5 file.
 headerTableName = 'header'
@@ -97,7 +97,7 @@ class headerDescription(tables.IsDescription):
  
  
  
-def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
+def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
                   obsFile=None, inputFileName=None, image=None,
                   display=False, weighted=False, maxIter=5):
     '''
@@ -176,8 +176,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
 
     if im is None:
         print 'Counting photons per pixel'
-        im = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
-                                           weighted=weighted)
+        im = (obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
+                                           weighted=weighted, getRawCount=True))['image']
         print 'Done'
     
     #Now im definitely exists, make a copy for display purposes later (before we change im).
@@ -217,8 +217,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
         imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
         
         #utils.plotArray(im, cbar=True)
-        fig = mpl.figure(figsize=(10,10))
-        mpl.matshow(imForDisplay, vmax=np.percentile(imForDisplay,99.5),fignum=False)
+        fig = mpl.figure(figsize=(10, 10))
+        mpl.matshow(imForDisplay, vmax=np.percentile(imForDisplay, 99.5), fignum=False)
         mpl.colorbar()
         x = np.arange(np.shape(imForDisplay)[1])
         y = np.arange(np.shape(imForDisplay)[0])
@@ -232,7 +232,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
             mpl.suptitle(plotTitle)
 
     return {'mask':hotMask, 'image':im, 'medfiltimage':medFiltImage,
-            'maxratio':maxRatio, 'diff':diff, 'differr':diffErr, 'niter':iIter+1}
+            'maxratio':maxRatio, 'diff':diff, 'differr':diffErr, 'niter':iIter + 1}
 
 
 
@@ -243,9 +243,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=3.0, boxSize=5, nSigma=3.0,
 
 def findHotPixels(inputFileName=None, outputFileName=None,
                   paramFile=None,
-                  timeStep=None, startTime=None, endTime=None, fwhm=None, 
-                  boxSize=None, nSigma=None, display=None, weighted=False,
-                  maxIter=None):
+                  timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
+                  boxSize=5, nSigma=3.0, display=False, weighted=False,
+                  maxIter=5):
     '''
     To find hot pixels (and possibly cold pixels too at some point...).
     This routine is the main code entry point.
@@ -361,7 +361,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
 
     #Get the mask for each time step
     for i, eachTime in enumerate(stepStarts):
-        print str(eachTime)+' - '+str(eachTime+timeStep)+'s'
+        print str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigma=nSigma,
                                      display=display, weighted=weighted,
@@ -434,10 +434,26 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
     OUTPUTS:
         Writes an .h5 file to filename outputFileName. See findHotPixels()
         for full description of the output data structure.
-
+        
+    HISTORY:
+        2/15/2013: Updated so that behaviour of outputFileName is consistent with the
+        behaviour of the input file name for an ObsFile instance. (i.e., 
+        unless the path provided is absolute, $MKID_DATA_DIR is prepended
+        to the file name.
     '''
     
-    fileh = tables.openFile(outputFileName, mode='w')
+    if (os.path.isabs(outputFileName)):
+        #self.fileName = os.path.basename(fileName)
+        fullFileName = outputFileName
+    else:
+        #self.fileName = fileName
+        # make the full file name by joining the input name 
+        # to the MKID_DATA_DIR (or . if the environment variable 
+        # is not defined)
+        dataDir = os.getenv('MKID_DATA_DIR', '/')
+        fullFileName = os.path.join(dataDir, outputFileName)
+    
+    fileh = tables.openFile(fullFileName, mode='w')
     
     try:    
         #Construct groups for header and time mask data.
@@ -502,7 +518,10 @@ def readHotPixels(inputFileName):
                           The intervals represent time intervals where the pixel went bad
                           in *seconds* (although the values are stored in clock ticks
                           in the .h5 file read in). Where there are no bad intervals
-                          for a pixel, its list is empty.
+                          for a pixel, its list is empty. Note the list for a given 
+                          interval is not unioned into a single 'interval' object
+                          since there may be different 'reasons' for the different
+                          intervals!
             'reasons' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
                         cosmic/TimeMask). Entries in these lists correspond directly 
                         to entries in the 'intervals' array.            
@@ -603,14 +622,14 @@ def readHotPixels(inputFileName):
                 eventListTable = fileh.getNode('/' + dataGroupName, name=tableName)
                 reasonEnum = eventListTable.getEnum('reason')  #Gets read in once for every table, but they should all be the same...
                 timeIntervals[iRow, iCol] = \
-                    [interval([eachRow['tBegin'], eachRow['tEnd']])/ticksPerSec for eachRow
+                    [interval([eachRow['tBegin'], eachRow['tEnd']]) / ticksPerSec for eachRow
                       in eventListTable]        #Get the times in seconds (not ticks). No doubt this can be sped up if necessary...
                 reasons[iRow, iCol] = [eachRow['reason'] for eachRow 
                                       in eventListTable]
                     
         #Return a simple dictionary
         return {"intervals":timeIntervals, "reasons":reasons,
-                "reasonEnum":reasonEnum, "nRow":nRow, "nCol":nCol, 
+                "reasonEnum":reasonEnum, "nRow":nRow, "nCol":nCol,
                 "obsFileName":obsFileName, "ticksPerSecond":ticksPerSec}
 
 
@@ -623,9 +642,9 @@ def readHotPixels(inputFileName):
 
 if __name__ == "__main__":
     
-    paramFile=None
-    inputFile=None
-    outputFile=None
+    paramFile = None
+    inputFile = None
+    outputFile = None
     
     nArg = len(sys.argv)
     if nArg == 1: paramFile = 'hotPixels.dict'
