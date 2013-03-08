@@ -1,3 +1,14 @@
+#!/bin/python
+
+'''
+Author: Paul Szypryt		Date: October 16, 2012
+
+Creates an Ra/Dec grid for the given observation file.  Requires a known ra/dec position of an object
+in the array, as well as the center of rotation of the array.  Calculates the hour angle from the
+objects RA and the recorded LST and uses this to rotate the pixel grid and calculate arcsec offsets
+for each pixel location.  Outputs this into an h5 file which will likely be loaded using ObsFile.py.
+'''
+
 import numpy as np
 from tables import *
 import ConfigParser

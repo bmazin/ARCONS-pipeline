@@ -1,3 +1,14 @@
+#!/bin/python
+
+'''
+Author: Paul Szypryt		Date: October 29, 2012
+
+Loads up an h5 observation file and uses the PyGuide package to calculate the centroid of an object,
+for a given frame.  Requires an initial x and y pixel position guess for the centroid.  Uses this guess
+if PyGuide algorithm fails to find the centroid.
+'''
+
+
 import numpy as np
 from tables import *
 import sys

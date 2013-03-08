@@ -1,3 +1,12 @@
+#!/bin/python
+
+'''
+Author: Paul Szypryt		Date: January 18, 2013
+
+Uses x and y position data from beammap.py.  Rescales, rotates, and offsets these positions in order to fit
+them to a pixel grid of the current array size.
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
