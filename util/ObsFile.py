@@ -164,6 +164,7 @@ class ObsFile:
             wavelengths
             effIntTime  (effective integration time)
         JvE 3/5/2013
+        if excludeBad is True, relevant wavelength cuts are applied to timestamps and wavelengths before returning 
         [if getTimes is True, returns timestamps,wavelengths - OBSELETED - JvE 3/2/2013]
         """
         
