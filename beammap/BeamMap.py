@@ -1,3 +1,12 @@
+#!/bin/python
+
+'''
+Author: Paul Szypryt		Date: January 18, 2013
+
+Uses X and Y sweep observation files to fit Gaussians to observed resonances.  Uses this data to map each
+resonant frequency to and x and y position on the MKID array.
+'''
+
 import numpy as np
 from tables import *
 import os
@@ -9,7 +18,6 @@ import scipy.signal as signal
 from scipy import optimize
 import scipy.stats as stats
 
-from PyQt4.QtGui import *
 from PyQt4.QtGui import *
 from beammap_gui import Ui_beammap_gui
 

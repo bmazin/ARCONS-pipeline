@@ -1,3 +1,14 @@
+#!/bin/python
+
+'''
+Author: Paul Szypryt		Date: February 1, 2013
+
+Variation of CentroidCalc.py.  This code is used specifically to find the distance between
+two objects on the array by centroiding both.  This is done by clicking to guess centroid positions
+of both objects for a given frame, and then averaging over the entire observation file.  If the 
+Ra/Dec positions of these objects are known and given, a plate scale is calculated.
+'''
+
 import numpy as np
 from tables import *
 import sys
