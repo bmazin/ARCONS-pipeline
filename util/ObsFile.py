@@ -154,7 +154,7 @@ class ObsFile:
         return pixelData
 
 
-    def getPixelWvlList(self, iRow, iCol, firstSec=0, integrationTime= -1): #,getTimes=False):
+    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True): #,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used. 
@@ -178,10 +178,28 @@ class ObsFile:
             x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
                     
         pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
-        wavelengths = self.convertToWvl(pulseHeights, iRow, iCol)  #Note convertToWvl also applies wavelength cutoffs        
-        #if getTimes == False:
-        #    return wavelengths
-        #else:
+        xOffset = self.wvlCalTable[iRow,iCol,0]
+        yOffset = self.wvlCalTable[iRow,iCol,1]
+        amplitude = self.wvlCalTable[iRow,iCol,2]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow,iCol,0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow,iCol,1]
+        energies = amplitude*(pulseHeights-xOffset)**2+yOffset
+        
+        wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
+        if excludeBad == True:
+            goodMask = ~np.isnan(wavelengths)
+            goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
+            if self.wvlLowerLimit == -1:
+                goodMask = np.logical_and(goodMask,wvlCalLowerLimit < wavelengths)
+            elif self.wvlLowerLimit != None:
+                goodMask = np.logical_and(goodMask,self.wvlLowerLimit < wavelengths)
+            if self.wvlUpperLimit == -1:
+                goodMask = np.logical_and(goodMask,wavelengths < wvlCalUpperLimit)
+            elif self.wvlUpperLimit != None:
+                goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
+            wavelengths = wavelengths[goodMask]
+            timestamps = timestamps[goodMask]
+
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime}
             
@@ -355,6 +373,22 @@ class ObsFile:
         #else:
         #    return secImg
     
+    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
+        """
+        Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
+        If integration time is -1, all time after firstSec is used.
+        If weighted is True, flat cal weights are applied.
+        """
+        cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                cube[iRow][iCol],wvlBinEdges = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
+                                  firstSec=firstSec,integrationTime=integrationTime,
+                                  weighted=weighted,wvlStart=wvlStart,wvlStop=wvlStop,
+                                  wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
+                                  wvlBinEdges=wvlBinEdges)
+        cube = np.array(cube)
+        return cube,wvlBinEdges
 
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
@@ -515,7 +549,7 @@ class ObsFile:
 
     def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
         """
-        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) is called
+        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) or getPixelWvlList(excludeBad=True) is called
         wavelengths outside these limits are excluded.  To remove limits
         set wvlLowerLimit and/or wvlUpperLimit to None.  To use the wavecal limits
         for each individual pixel, set wvlLowerLimit and/or wvlUpperLimit to -1 
@@ -830,6 +864,38 @@ class ObsFile:
             utils.plotArray(nonAllocArray)
         return nonAllocArray
 
+    def checkIntegrity(self,firstSec=0,integrationTime=-1):
+        """
+        Checks the obs file for corrupted end-of-seconds
+        Corruption is indicated by timestamps greater than 1/tickDuration=1e6
+        returns 0 if no corruption found
+        """
+        corruptedPixels = []
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
+                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+                if np.any(timestamps > 1./self.tickDuration):
+                    print 'Corruption detected in pixel (',iRow,iCol,')'
+                    corruptedPixels.append((iRow,iCol))
+        corruptionFound = len(corruptedPixels) != 0
+        return corruptionFound
+#        exptime = self.getFromHeader('exptime')
+#        lastSec = firstSec + integrationTime
+#        if integrationTime == -1:
+#            lastSec = exptime-1
+#            
+#        corruptedSecs = []
+#        for pixelCoord in corruptedPixels:
+#            for sec in xrange(firstSec,lastSec):
+#                packetList = self.getPixelPacketList(pixelCoord[0],pixelCoord[1],sec,integrationTime=1)
+#                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+#                if np.any(timestamps > 1./self.tickDuration):
+#                    pixelLabel = self.beamImage[iRow][iCol]
+#                    corruptedSecs.append(sec)
+#                    print 'Corruption in pixel',pixelLabel, 'at',sec
+
+                
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):
         """
