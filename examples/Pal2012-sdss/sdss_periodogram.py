@@ -4,7 +4,7 @@ from scipy.signal import spectral
 import matplotlib.pyplot as plt
 from util import utils
 
-FileName = '/home/pszypryt/sdss_data/Red-3sint-Fit.npz'
+FileName = '/home/pszypryt/sdss_data/20121208/Blue-Fit.npz'
 
 FoldPeriod = 0.01966127 #This is in fractions of a day
 t = np.load(FileName)
@@ -14,18 +14,13 @@ amps = params[:,1]
 widths = params[:,4]
 xpos = params[:,2]
 ypos = params[:,3]
-
 curve = amps*widths**2
-curve = curve[3100:4800]
-jd = jd[3100:4800]
 
-#curve /= np.median(curve)
-
-
-time = jd
-
-# Check to see if this scaling is done correctly
 scaled_curve = (curve-curve.mean())/curve.std()
+#curve = curve[3100:4800]
+#jd = jd[3100:4800]
+#curve /= np.median(curve)
+time = jd
 
 freqs=np.linspace(0.1,250,10000)
 angular_freqs=2*np.pi*freqs
