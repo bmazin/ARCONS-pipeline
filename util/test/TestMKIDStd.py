@@ -4,6 +4,10 @@ import math
 from util import MKIDStd
 class TestMKIDStd(unittest.TestCase):
 
+    def testPlot(self):
+        std = MKIDStd.MKIDStd()
+        std.plot()
+
     def testGetVegaMag(self):
         """
         confirm that the magnitude of Vega in all bands is 0.03
