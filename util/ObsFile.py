@@ -209,34 +209,23 @@ class ObsFile:
                      accounted for.
         """
         
-        #if (weighted == False and self.wvlLowerLimit == None
-        #        and self.wvlUpperLimit == None and fluxWeighted is False and
-        #        self.hotPixIsApplied is False and type(firstSec) is int
-        #        and type(integrationTime) is int):
+
         if getRawCount is True:
-            #packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
-            #return len(packetList)
             x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
+            #x2 = self.getTimedPacketList_old(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
+            #assert np.array_equal(x['timestamps'],x2['timestamps'])
+            #assert np.array_equal(x['effIntTime'],x2['effIntTime'])
+            #assert np.array_equal(x['peakHeights'],x2['peakHeights'])
+            #assert np.array_equal(x['baselines'],x2['baselines'])
             timestamps, effIntTime = x['timestamps'], x['effIntTime']
             counts = len(timestamps)
-            #if getEffInt is True:
             return {'counts':counts, 'effIntTime':effIntTime}
-            #else:
-            #    return counts
+
         else:
-        #    if fluxWeighted==True:
-        #        weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=True)
-        #    else:       
-        #        weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=False)
-        #    return sum(weightedSpectrum)
-        
             pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,
                                           weighted=weighted, fluxWeighted=fluxWeighted)
             counts = sum(pspec['spectrum'])
-            #if getEffInt is True:
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
-            #else:
-            #    return counts
 
 
 
@@ -255,8 +244,10 @@ class ObsFile:
 
 
 
-    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
+    def getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
+        DEPRECATED VERSION. JvE 3/13/2013
+        
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
         inter is an interval of time values to mask out [missing?? To be implented? JvE 2/18/13]
         returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
@@ -283,6 +274,82 @@ class ObsFile:
         if integrationTime == -1 or lastSec > len(pixelData):
             lastSec = len(pixelData)
         pixelData = pixelData[int(np.floor(firstSec)):int(np.ceil(lastSec))]
+
+        if self.hotPixIsApplied:
+            inter = self.getPixelBadTimes(iRow, iCol)
+        else:
+            inter = interval()
+        
+        if (type(firstSec) is not int) or (type(integrationTime) is not int):
+            #Also exclude times outside firstSec to lastSec. Allows for sub-second
+            #(floating point) values in firstSec and integrationTime
+            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
+
+        #Inter now contains a single 'interval' instance, which contains a list of
+        #times to exclude, in seconds, including all times outside the requested
+        #integration if necessary.
+
+        #Calculate the total effective time for the integration after removing
+        #any 'intervals':
+        integrationInterval = interval([firstSec, lastSec])
+        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel.
+        effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
+
+        timestamps = []
+        baselines = []
+        peakHeights = []
+
+        for t in range(len(pixelData)):
+            interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
+            times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
+            times = np.floor(firstSec) + self.tickDuration * times + t
+            timestamps.append(times)
+            baselines.append(bases)
+            peakHeights.append(peaks)
+            
+        timestamps = np.concatenate(timestamps)
+        baselines = np.concatenate(baselines)
+        peakHeights = np.concatenate(peakHeights)
+        return {'timestamps':timestamps, 'peakHeights':peakHeights,
+                'baselines':baselines, 'effIntTime':effectiveIntTime}
+
+
+    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
+        """
+        Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
+        inter is an interval of time values to mask out [missing?? To be implented? JvE 2/18/13]
+        returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
+        integration time after accounting for time-masking.)
+        parses packets from firstSec to firstSec+integrationTime.
+        if integrationTime is -1, all time after firstSec is used.  
+        
+        Now updated to take advantage of masking capabilities in parsePhotonPackets
+        to allow for correct application of non-integer values in firstSec and
+        integrationTime. JvE Feb 27 2013.
+        
+        CHANGED RETURN VALUES - now returns a dictionary including effective integration
+        time (allowing for bad pixel masking), with keys:
+        
+            'timestamps'
+            'peakHeights'
+            'baselines'
+            'effIntTime'
+         
+         - JvE 3/5/2013.
+         
+         **Modified to increase speed for integrations shorter than the full exposure
+         length. JvE 3/13/2013**
+         
+        """
+        #pixelData = self.getPixel(iRow, iCol)
+        lastSec = firstSec + integrationTime
+        #Make sure we include *all* the complete seconds that overlap the requested range
+        integerIntTime = int(np.ceil(lastSec)-np.floor(firstSec)) 
+        pixelData = self.getPixel(iRow, iCol, firstSec=int(np.floor(firstSec)),
+                                  integrationTime=integerIntTime)
+
+        if integrationTime == -1 or integerIntTime > len(pixelData):
+            lastSec = int(np.floor(firstSec))+len(pixelData)
 
         if self.hotPixIsApplied:
             inter = self.getPixelBadTimes(iRow, iCol)
@@ -945,4 +1012,3 @@ def repackArray(array, slices):
         retval[iPt:iPtNew] = array[s0:s1]
         iPt = iPtNew
     return retval
-
