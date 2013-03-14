@@ -154,7 +154,7 @@ class ObsFile:
         return pixelData
 
 
-    def getPixelWvlList(self, iRow, iCol, firstSec=0, integrationTime= -1): #,getTimes=False):
+    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True): #,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used. 
@@ -164,6 +164,7 @@ class ObsFile:
             wavelengths
             effIntTime  (effective integration time)
         JvE 3/5/2013
+        if excludeBad is True, relevant wavelength cuts are applied to timestamps and wavelengths before returning 
         [if getTimes is True, returns timestamps,wavelengths - OBSELETED - JvE 3/2/2013]
         """
         
@@ -178,10 +179,28 @@ class ObsFile:
             x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
                     
         pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
-        wavelengths = self.convertToWvl(pulseHeights, iRow, iCol)  #Note convertToWvl also applies wavelength cutoffs        
-        #if getTimes == False:
-        #    return wavelengths
-        #else:
+        xOffset = self.wvlCalTable[iRow,iCol,0]
+        yOffset = self.wvlCalTable[iRow,iCol,1]
+        amplitude = self.wvlCalTable[iRow,iCol,2]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow,iCol,0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow,iCol,1]
+        energies = amplitude*(pulseHeights-xOffset)**2+yOffset
+        
+        wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
+        if excludeBad == True:
+            goodMask = ~np.isnan(wavelengths)
+            goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
+            if self.wvlLowerLimit == -1:
+                goodMask = np.logical_and(goodMask,wvlCalLowerLimit < wavelengths)
+            elif self.wvlLowerLimit != None:
+                goodMask = np.logical_and(goodMask,self.wvlLowerLimit < wavelengths)
+            if self.wvlUpperLimit == -1:
+                goodMask = np.logical_and(goodMask,wavelengths < wvlCalUpperLimit)
+            elif self.wvlUpperLimit != None:
+                goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
+            wavelengths = wavelengths[goodMask]
+            timestamps = timestamps[goodMask]
+
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime}
             
@@ -422,7 +441,6 @@ class ObsFile:
         #else:
         #    return secImg
     
-
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
                    scaleByEffInt=False):
@@ -582,7 +600,7 @@ class ObsFile:
 
     def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
         """
-        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) is called
+        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) or getPixelWvlList(excludeBad=True) is called
         wavelengths outside these limits are excluded.  To remove limits
         set wvlLowerLimit and/or wvlUpperLimit to None.  To use the wavecal limits
         for each individual pixel, set wvlLowerLimit and/or wvlUpperLimit to -1 
