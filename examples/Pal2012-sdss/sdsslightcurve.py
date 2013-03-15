@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-FileName = '/Scratch/dataProcessing/SDSS_J0926/20121208/ShortIntfitpsfBlue.npz'
+FileName = '/home/pszypryt/sdss_data/20121208/Blue-Fit.npz'
 
 FoldPeriod = 0.01966127 #This is in fractions of a day
 t = np.load(FileName)

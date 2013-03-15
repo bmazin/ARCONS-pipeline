@@ -7,6 +7,7 @@ Uses x and y position data from beammap.py.  Rescales, rotates, and offsets thes
 them to a pixel grid of the current array size.
 '''
 
+
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -238,20 +239,20 @@ class StartQt4(QMainWindow):
         self.infile.append(self.path + '/r1.pos')
         self.infile.append(self.path + '/r2.pos')
         self.infile.append(self.path + '/r3.pos')
-        self.infile.append(self.path + '/r4.pos')
-        self.infile.append(self.path + '/r5.pos')
-        self.infile.append(self.path + '/r6.pos')
-        self.infile.append(self.path + '/r7.pos')
+        #self.infile.append(self.path + '/r4.pos')
+        #self.infile.append(self.path + '/r5.pos')
+        #self.infile.append(self.path + '/r6.pos')
+        #self.infile.append(self.path + '/r7.pos')
 
         self.psfile=[]
         self.psfile.append(self.path + '/ps_freq0.txt')
         self.psfile.append(self.path + '/ps_freq1.txt')
         self.psfile.append(self.path + '/ps_freq2.txt')
         self.psfile.append(self.path + '/ps_freq3.txt')
-        self.psfile.append(self.path + '/ps_freq4.txt')
-        self.psfile.append(self.path + '/ps_freq5.txt')
-        self.psfile.append(self.path + '/ps_freq6.txt')
-        self.psfile.append(self.path + '/ps_freq7.txt')       
+        #self.psfile.append(self.path + '/ps_freq4.txt')
+        #self.psfile.append(self.path + '/ps_freq5.txt')
+        #self.psfile.append(self.path + '/ps_freq6.txt')
+        #self.psfile.append(self.path + '/ps_freq7.txt')       
 
         self.origin = np.zeros((len(self.infile),2))
         for i in range(len(self.infile)):
@@ -344,4 +345,5 @@ if __name__ == "__main__":
 	myapp = StartQt4()
 	myapp.show()
 	app.exec_()
+
 
