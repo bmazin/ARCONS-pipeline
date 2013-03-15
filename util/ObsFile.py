@@ -527,7 +527,7 @@ class ObsFile:
         plt.show()
         
 
-    def getApertureSpectrum(self, pixelRow, pixelCol, radius, weighted=False,
+    def getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False,
                             fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1):
     	'''
     	Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
@@ -547,9 +547,9 @@ class ObsFile:
     		if (self.wvlRangeTable[y][x][0] > lowCut or self.wvlRangeTable[y][x][1] < highCut):
     		    bad_solution_mask[y][x] = 1
     	print 'Creating aperture mask...'
-    	apertureMask = utils.aperture(pixelCol, pixelRow, radius=radius)
+    	apertureMask = utils.aperture(pixelCol, pixelRow, radius=radius1)
     	print 'Creating sky mask...'
-    	bigMask = utils.aperture(pixelCol, pixelRow, radius=radius * 2)
+    	bigMask = utils.aperture(pixelCol, pixelRow, radius=radius2)
     	skyMask = bigMask - apertureMask
     	#if hotPixMask == None:
     	#    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
@@ -602,8 +602,8 @@ class ObsFile:
     	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
     	return summed_array, wvlBinEdges
     
-    def plotApertureSpectrum(self, pixelRow, pixelCol, radius, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1):
-    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius=radius, weighted=weighted, fluxWeighted=fluxWeighted, lowCut=lowCut, highCut=highCut, firstSec=firstSec,integrationTime=integrationTime)
+    def plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1):
+    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius1=radius1, radius2=radius2, weighted=weighted, fluxWeighted=fluxWeighted, lowCut=lowCut, highCut=highCut, firstSec=firstSec,integrationTime=integrationTime)
     	fig = plt.figure()
     	ax = fig.add_subplot(111)
     	ax.plot(bin_edges[12:-2], summed_array[12:-1])
