@@ -104,7 +104,7 @@ print 'Loaded files in',time()-tic, 'seconds.'
 tic = time()
 print 'Binning photon events...'
 total_seconds = len(seq0*exptime)
-bins_per_second = 10**2
+bins_per_second = 10**3
 #time_bins = np.linspace(0,total_seconds,total_seconds*bins_per_second+1)
 #jd = time_bins/86400
 #counts_per_timestep = np.zeros(len(time_bins)-1)
@@ -132,11 +132,16 @@ print 'Eclipse period =',eclipse_period,'days.'
 print 'Eclipse frequency =',eclipse_frequency, 'cycles/day.'
 print 'Percent error = ' + str(100*(eclipse_period-expected_period)/expected_period) + '%'
 
+np.savetxt('/home/pszypryt/sdss_data/periodogram.txt',periodogram)
+np.savetxt('/home/pszypryt/sdss_data/frequencies.txt',freqs)
+np.savetxt('/home/pszypryt/sdss_data/lightcurve.txt',scaled_counts[10::10**3])
+np.savetxt('/home/pszypryt/sdss_data/times.txt',jd[10::10**3])
+
 # Create a figure with light curve in top plot and periodogram in bottom plot
 fig = plt.figure()
 # Plot light curve
 ax = fig.add_subplot(211)
-#ax.plot(jd,scaled_counts,'b.')
+ax.plot(jd[0::10**4],scaled_counts[0::10**4],'b.')
 ax.set_title('Light Curve')
 plt.xlabel('Time (Days)')
 plt.ylabel('Scaled Counts')

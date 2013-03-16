@@ -17,10 +17,14 @@ import PyGuide as pg
 import math
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from util.ObsFile import ObsFile 
 
 import os
 from PyQt4.QtGui import *
+import hotpix.hotPixels as hp
 
+
+# Class to allow clicking of a pixel in plt.matshow and storing the xy position of the click in an array.
 class MouseMonitor():
     def __init__(self):
         pass
@@ -30,91 +34,103 @@ class MouseMonitor():
    
     def connect(self):
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
-	
 
-# Set the path and h5 file names to be imported
-h5beamfile = '/ScienceData/sci4alpha/sci4_beammap_palomar.h5'
-
-# Create a mask for saturated pixels, 0 for okay, 1 for saturated
-satMask = np.zeros((grid_height,grid_width))
-
+# Choose obs, wavecal, and flatcal files
 app = QApplication(sys.argv)
-startingSaveDir = os.getcwd()
-savePath = QFileDialog.getExistingDirectory(None,'Choose Save Path',startingSaveDir, QFileDialog.ShowDirsOnly)
-startingh5Dir = '/ScienceData/PAL2012/'
-h5obsfile =str(QFileDialog.getOpenFileName(None, 'Choose Observation File',startingh5Dir, filter=str("H5 (*.h5)")))
-n0 = h5obsfile.rfind('/')
-n1 = h5obsfile.find('.')
-centroid_list_identifier = h5obsfile[n0+1:n1]
-txtout = 'centroids_' + centroid_list_identifier + '.txt'
 
-grid_width = 44
-grid_height = 46
+startingObsDirectory = '/ScienceData/PAL2012/'
+#obsFn =str(QFileDialog.getOpenFileName(None, 'Choose Observation File',startingObsDirectory, filter=str("H5 (*.h5)")))
+obsFn = '/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
 
-# Create a mask of bad pixels, 0 for valid, 1 for invalid
-mask = np.zeros((grid_height,grid_width))
+index1 = obsFn.find('_')
+index2 = obsFn.find('-')
+utcDate = int(obsFn[index1+1:index2])
+sunsetDate = utcDate-1
+startingWfnDirectory = '/Scratch/waveCalSolnFiles/' + str(sunsetDate)
+#wfn = str(QFileDialog.getOpenFileName(None, 'Choose Wavelength Calibration File',startingWfnDirectory, filter=str("H5 (*.h5)")))
+wfn = '/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5'
 
-# Make map of where pixels fit in grid in format '/r0/p123/'
-h5beam = openFile(h5beamfile, mode = 'r')
-location_strings = h5beam.root._f_getChild('/beammap/beamimage')
+startingFfnDirectory = '/Scratch/flatCalSolnFiles/'
+#ffn = str(QFileDialog.getOpenFileName(None, 'Choose Flat Calibration File',startingFfnDirectory, filter=str("H5 (*.h5)")))
+ffn = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
-# Open the obs file and extract photon data to calculate com positions in time frames
-h5obs = openFile(h5obsfile, mode = 'r')
-exptime = h5obs.root.header.header.col('exptime')[0]
+# Create ObsFile instance
+ob = ObsFile(obsFn)
 
-try:
-    ts = h5obs.root.header.header.col('unixtime')[0]
-except KeyError:
-    print 'Using "ut" instead of "unixtime" in header'
-    ts = h5obs.root.header.header.col('ut')[0]
+# Load wavelength and flat cal solutions
+ob.loadWvlCalFile(wfn)
+ob.loadFlatCalFile(ffn)
+ob.setWvlCutoffs(3000,5000)
 
-flux_cube = np.zeros(((grid_height,grid_width,exptime)))
-for y in range(grid_height):
-    for x in range(grid_width):
-        pn = location_strings[y][x] + 't' + str(int(ts))
-        data = h5obs.root._f_getChild(pn).read()
-        for t in range(exptime):
-            flux_cube[y][x][t] = len(data[t])
+# Load/generate hot pixel mask file
+hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
+if not os.path.exists(hotPixFn):
+    hp.findHotPixels(obsFn,hotPixFn)
+    print "Flux file pixel mask saved to %s"%(hotPixFn)
+ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
+print "Hot pixel mask loaded %s"%(hotPixFn)
 
-# Specify pixel info CCDInfo(bias,readNoise,ccdGain,satLevel)
+# Get exptime from header.  Also choose guess time.  This will be the time over which a guess will be valid
+# for the centroid position.  Actual centroid calculated using this guess.  For example, choosing a guess
+# time of 300 will use the same guess for the entire observation file.
+exptime = ob.getFromHeader('exptime')
+guessTime = 300
+
+# Pick an integration time over which to centroid.
+integrationTime=10
+
+# Get array size information from obs file
+gridHeight = ob.nCol
+gridWidth = ob.nRow
+
+# Create saturated pixel mask.  Leave as zero since hot pixel masking already does this for us.
+saturatedMask = np.zeros((gridWidth,gridHeight))
+
+# Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
+deadMask = ob.getDeadPixels()
+deadMask = -1*deadMask + 1
+
+# Specify CCDInfo (bias,readNoise,ccdGain,satLevel)
 ccd = pg.CCDInfo(0,0.00001,1,2500)
 
+# Create output file to save centroid data
+outFn = '/home/pszypryt/Scratch/centroid_test/centroid_list.txt'
+f = open(outFn,'w')
 
-
-
-
-integration_time= 10
-xyguess=[0,0]
-
-f = open(savePath+ '/' + txtout,'w')
-for t in range(int(exptime/integration_time)):
-    map = MouseMonitor()
-    map.fig = plt.figure()
-    pltmat = np.zeros((grid_height,grid_width))
-    for y in range(grid_height):
-        for x in range(grid_width):
-	    for i in range(integration_time):
-                pltmat[y][x]+=flux_cube[y][x][int(t*integration_time+i)]/integration_time
-    map.ax = map.fig.add_subplot(111)
-    map.ax.matshow(pltmat,cmap = plt.cm.gray, origin = 'lower')
-    map.connect()
-    plt.show()
-    try:
-    	xyguess = map.xyguess
-    except AttributeError:
-	pass
-    print 'Guess = ' + str(xyguess)
-    pyguide_output = pg.centroid(pltmat,mask,mask,xyguess,10,ccd,0,False)
-    try:
-        xycenter = pyguide_output.xyCtr
-        f=open(savePath+ '/' + txtout,'a')
-        f.write(str(xycenter[0]) + '\t' + str(xycenter[1]) + '\n')
-        f.close()
-        print 'Calculated = ' + str((xycenter))     
-    except TypeError:
-        print 'Cannot centroid, using guess'
-        xycenter = xyguess
-        f=open(savePath+ '/' + txtout,'a')
-        f.write(str(xycenter[0]) + '\t' + str(xycenter[1]) + '\n')
+for iFrame in range(exptime):
+    # Integrate over the guess time.  Click a pixel in the plot corresponding to the xy center guess.  This will be used to centroid for the duration of guessTime.
+    if iFrame%guessTime == 0:
+	# Use obsFile to get guessTime image.
+        imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= guessTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
+        image=imageInformation['image']
+        map = MouseMonitor()
+        map.fig = plt.figure()
+        map.ax = map.fig.add_subplot(111)
+        map.ax.set_title('Object 1')
+        map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower')
+        map.connect()
+        plt.show()
+	try:
+    	    xyguess = map.xyguess
+        except AttributeError:
+	    pass
+        print 'Guess = ' + str(xyguess)
+    # Centroid an image that has been integrated over integrationTime.
+    if iFrame%integrationTime == 0:
+	# Use obsFile to get integrationTime image.
+        imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
+        image=imageInformation['image']        
+	# Use PyGuide centroiding algorithm.
+        pyguide_output = pg.centroid(image,deadMask,saturatedMask,xyguess,3,ccd,0,False)
+	# Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
+        try:
+            xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+            print 'Calculated [x,y] center = ' + str((xycenter)) + ' for frame ' + str(iFrame) +'.'
+        except TypeError:
+            print 'Cannot centroid frame' + str(iFrame) + ', using guess instead'
+            xycenter = xyguess
+        # Write data to file
+        f=open(outFn,'a')
+        f.write(str(iFrame) + '\t' + str(xycenter[0]) + '\t' + str(xycenter[1]) + '\n')
         f.close()
 
