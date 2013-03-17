@@ -1,0 +1,10 @@
+datadir=/ScienceData/PAL2012/20121207
+flatdir=/Scratch/flatCalSolnFiles/20121207
+wvldir=/Scratch/waveCalSolnFiles/20121207
+fluxfile=obs_20121208-133231.h5
+skyfile=obs_20121208-133936.h5
+flatfile=flatsol_20121207.h5
+wvlfile=calsol_20121208-132558.h5
+fluxdir=/Scratch/fluxCalSolnFiles/20121207
+fluxoutfile=fluxsol_20121208-133231.h5
+objectName=HR3454

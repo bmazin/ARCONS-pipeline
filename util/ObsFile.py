@@ -228,34 +228,23 @@ class ObsFile:
                      accounted for.
         """
         
-        #if (weighted == False and self.wvlLowerLimit == None
-        #        and self.wvlUpperLimit == None and fluxWeighted is False and
-        #        self.hotPixIsApplied is False and type(firstSec) is int
-        #        and type(integrationTime) is int):
+
         if getRawCount is True:
-            #packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
-            #return len(packetList)
             x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
+            #x2 = self.getTimedPacketList_old(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
+            #assert np.array_equal(x['timestamps'],x2['timestamps'])
+            #assert np.array_equal(x['effIntTime'],x2['effIntTime'])
+            #assert np.array_equal(x['peakHeights'],x2['peakHeights'])
+            #assert np.array_equal(x['baselines'],x2['baselines'])
             timestamps, effIntTime = x['timestamps'], x['effIntTime']
             counts = len(timestamps)
-            #if getEffInt is True:
             return {'counts':counts, 'effIntTime':effIntTime}
-            #else:
-            #    return counts
+
         else:
-        #    if fluxWeighted==True:
-        #        weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=True)
-        #    else:       
-        #        weightedSpectrum,binEdges = self.getPixelSpectrum(iRow,iCol,firstSec,integrationTime,weighted=True,fluxWeighted=False)
-        #    return sum(weightedSpectrum)
-        
             pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,
                                           weighted=weighted, fluxWeighted=fluxWeighted)
             counts = sum(pspec['spectrum'])
-            #if getEffInt is True:
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
-            #else:
-            #    return counts
 
 
 
@@ -274,8 +263,10 @@ class ObsFile:
 
 
 
-    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
+    def getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
+        DEPRECATED VERSION. JvE 3/13/2013
+        
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
         inter is an interval of time values to mask out [missing?? To be implented? JvE 2/18/13]
         returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
@@ -302,6 +293,82 @@ class ObsFile:
         if integrationTime == -1 or lastSec > len(pixelData):
             lastSec = len(pixelData)
         pixelData = pixelData[int(np.floor(firstSec)):int(np.ceil(lastSec))]
+
+        if self.hotPixIsApplied:
+            inter = self.getPixelBadTimes(iRow, iCol)
+        else:
+            inter = interval()
+        
+        if (type(firstSec) is not int) or (type(integrationTime) is not int):
+            #Also exclude times outside firstSec to lastSec. Allows for sub-second
+            #(floating point) values in firstSec and integrationTime
+            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
+
+        #Inter now contains a single 'interval' instance, which contains a list of
+        #times to exclude, in seconds, including all times outside the requested
+        #integration if necessary.
+
+        #Calculate the total effective time for the integration after removing
+        #any 'intervals':
+        integrationInterval = interval([firstSec, lastSec])
+        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel.
+        effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
+
+        timestamps = []
+        baselines = []
+        peakHeights = []
+
+        for t in range(len(pixelData)):
+            interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
+            times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
+            times = np.floor(firstSec) + self.tickDuration * times + t
+            timestamps.append(times)
+            baselines.append(bases)
+            peakHeights.append(peaks)
+            
+        timestamps = np.concatenate(timestamps)
+        baselines = np.concatenate(baselines)
+        peakHeights = np.concatenate(peakHeights)
+        return {'timestamps':timestamps, 'peakHeights':peakHeights,
+                'baselines':baselines, 'effIntTime':effectiveIntTime}
+
+
+    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
+        """
+        Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
+        inter is an interval of time values to mask out [missing?? To be implented? JvE 2/18/13]
+        returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
+        integration time after accounting for time-masking.)
+        parses packets from firstSec to firstSec+integrationTime.
+        if integrationTime is -1, all time after firstSec is used.  
+        
+        Now updated to take advantage of masking capabilities in parsePhotonPackets
+        to allow for correct application of non-integer values in firstSec and
+        integrationTime. JvE Feb 27 2013.
+        
+        CHANGED RETURN VALUES - now returns a dictionary including effective integration
+        time (allowing for bad pixel masking), with keys:
+        
+            'timestamps'
+            'peakHeights'
+            'baselines'
+            'effIntTime'
+         
+         - JvE 3/5/2013.
+         
+         **Modified to increase speed for integrations shorter than the full exposure
+         length. JvE 3/13/2013**
+         
+        """
+        #pixelData = self.getPixel(iRow, iCol)
+        lastSec = firstSec + integrationTime
+        #Make sure we include *all* the complete seconds that overlap the requested range
+        integerIntTime = int(np.ceil(lastSec)-np.floor(firstSec)) 
+        pixelData = self.getPixel(iRow, iCol, firstSec=int(np.floor(firstSec)),
+                                  integrationTime=integerIntTime)
+
+        if integrationTime == -1 or integerIntTime > len(pixelData):
+            lastSec = int(np.floor(firstSec))+len(pixelData)
 
         if self.hotPixIsApplied:
             inter = self.getPixelBadTimes(iRow, iCol)
@@ -478,77 +545,89 @@ class ObsFile:
         ax.plot(self.flatCalWvlBins[0:-1], spectrum, label='spectrum for pixel[%d][%d]' % (pixelRow, pixelCol))
         plt.show()
         
+    def getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False,
+                            fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1):
+    	'''
+    	Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
+    	center, as well as radius.  Wave and flat cals should be loaded before using this
+    	function.  If no hot pixel mask is applied, taking the median of the sky rather than
+    	the average to account for high hot pixel counts.
+    	Will add more options as other pieces of pipeline become more refined.
+    	(Note - not updated to handle loaded hot pixel time-masks - if applied,
+    	behaviour may be unpredictable. JvE 3/5/2013).
+    	'''
+    	print 'Creating dead pixel mask...'
+    	deadMask = self.getDeadPixels()
+    	print 'Creating wavecal solution mask...'
+    	bad_solution_mask = np.zeros((self.nRow, self.nCol))
+    	for y in range(self.nRow):
+    	    for x in range(self.nCol):
+    		if (self.wvlRangeTable[y][x][0] > lowCut or self.wvlRangeTable[y][x][1] < highCut):
+    		    bad_solution_mask[y][x] = 1
+    	print 'Creating aperture mask...'
+    	apertureMask = utils.aperture(pixelCol, pixelRow, radius=radius1)
+    	print 'Creating sky mask...'
+    	bigMask = utils.aperture(pixelCol, pixelRow, radius=radius2)
+    	skyMask = bigMask - apertureMask
+    	#if hotPixMask == None:
+    	#    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
+    	#    y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(skyMask == 0, deadMask == 1)))
+    	#else:
+    	#    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(apertureMask == 0, deadMask == 1), hotPixMask == 0)))
+    	#    y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(skyMask == 0, deadMask == 1), hotPixMask == 0)))
 
-    def getApertureSpectrum(self, pixelRow, pixelCol, radius, weighted=True,
-                            fluxWeighted=False, hotPixMask=None, lowcut=3000, highcut=7000):
-        '''
-        Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
-        center, as well as radius.  Wave and flat cals should be loaded before using this
-        function.  If no hot pixel mask is applied, taking the median of the sky rather than
-        the average to account for high hot pixel counts.
-        Will add more options as other pieces of pipeline become more refined.
-        (Note - not updated to handle loaded hot pixel time-masks - if applied,
-        behaviour may be unpredictable. JvE 3/5/2013).
-        '''
-        print 'Creating dead pixel mask...'
-        deadMask = self.getDeadPixels()
-        print 'Creating wavecal solution mask...'
-        bad_solution_mask = np.zeros((46, 44))
-        for y in range(46):
-            for x in range(44):
-                if (self.wvlRangeTable[y][x][0] > lowcut or self.wvlRangeTable[y][x][1] < highcut):
-                    bad_solution_mask[y][x] = 1
-        print 'Creating aperture mask...'
-        apertureMask = utils.aperture(pixelCol, pixelRow, radius=radius)
-        print 'Creating sky mask...'
-        bigMask = utils.aperture(pixelCol, pixelRow, radius=radius * 2)
-        skyMask = bigMask - apertureMask
-        if hotPixMask == None:
-            y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
-            y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(skyMask == 0, deadMask == 1)))
-        else:
-            y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(apertureMask == 0, deadMask == 1), hotPixMask == 0)))
-            y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(skyMask == 0, deadMask == 1), hotPixMask == 0)))
-        wvlBinEdges = self.getPixelSpectrum(y_values[0], x_values[0], weighted=weighted)['wvlBinEdges']
-        print 'Creating average sky spectrum...'
-        skyspectrum = []
-        for i in range(len(x_sky)):
-            skyspectrum.append(self.getPixelSpectrum(y_sky[i], x_sky[i], weighted=weighted,
-                               fluxWeighted=fluxWeighted)['spectrum'])
-        sky_array = np.zeros(len(skyspectrum[0]))
-        for j in range(len(skyspectrum[0])):
-            ispectrum = np.zeros(len(skyspectrum))
-            for i in range(len(skyspectrum)):    
-                ispectrum[i] = skyspectrum[i][j]
-            if hotPixMask == None:
-                sky_array[j] = np.median(ispectrum)
-            else:
-                sky_array[j] = np.average(ispectrum)
-        print 'Creating sky subtracted spectrum...'
-        spectrum = []
-        for i in range(len(x_values)):
-            spectrum.append(self.getPixelSpectrum(y_values[i], x_values[i], weighted=weighted,
-                            fluxWeighted=fluxWeighted)['spectrum'] - sky_array)
-        summed_array = np.zeros(len(spectrum[0]))
-        for j in range(len(spectrum[0])):
-            ispectrum = np.zeros(len(spectrum))
-            for i in range(len(spectrum)):    
-                ispectrum[i] = spectrum[i][j]
-            summed_array[j] = np.sum(ispectrum)
-        for i in range(len(summed_array)):
-            summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
-        return {'wvlBinEdges':wvlBinEdges,'spectrum':summed_array,'skySpectrum':sky_array,'skyMask':skyMask,'apertureMask':apertureMask}
+        y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
+    	y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(skyMask == 0, deadMask == 1)))
+
+    	#wvlBinEdges = self.getPixelSpectrum(y_values[0], x_values[0], weighted=weighted)['wvlBinEdges']
+    	print 'Creating average sky spectrum...'
+    	skyspectrum = []
+    	for i in range(len(x_sky)):
+            specDict = self.getPixelSpectrum(y_sky[i],x_sky[i],weighted=weighted, fluxWeighted=fluxWeighted, firstSec=firstSec, integrationTime=integrationTime)
+            self.skySpectrumSingle,wvlBinEdges,self.effIntTime = specDict['spectrum'],specDict['wvlBinEdges'],specDict['effIntTime']
+            self.scaledSpectrum = self.skySpectrumSingle/self.effIntTime #scaled spectrum by effective integration time
+            #print "Sky spectrum"
+            #print self.skySpectrumSingle
+            #print "Int time"
+            #print self.effIntTime
+    	    skyspectrum.append(self.scaledSpectrum)
+    	sky_array = np.zeros(len(skyspectrum[0]))
+    	for j in range(len(skyspectrum[0])):
+    	    ispectrum = np.zeros(len(skyspectrum))
+    	    for i in range(len(skyspectrum)):    
+    	        ispectrum[i] = skyspectrum[i][j]
+            sky_array[j] = np.median(ispectrum)
+    	    #if hotPixMask == None:
+    	    #    sky_array[j] = np.median(ispectrum)
+    	    #else:
+    	    #    sky_array[j] = np.average(ispectrum)
+    	print 'Creating sky subtracted spectrum...'
+    	spectrum = []
+    	for i in range(len(x_values)):
+            specDict = self.getPixelSpectrum(y_values[i],x_values[i],weighted=weighted, fluxWeighted=fluxWeighted, firstSec=firstSec, integrationTime=integrationTime)
+            self.obsSpectrumSingle,wvlBinEdges,self.effIntTime = specDict['spectrum'],specDict['wvlBinEdges'],specDict['effIntTime']   
+            self.scaledSpectrum = self.obsSpectrumSingle/self.effIntTime #scaled spectrum by effective integration time
+    	    spectrum.append(self.scaledSpectrum - sky_array)
+
+    	    #spectrum.append(self.getPixelSpectrum(y_values[i], x_values[i], weighted=weighted,fluxWeighted=fluxWeighted)['spectrum'] - sky_array)
+    	summed_array = np.zeros(len(spectrum[0]))
+    	for j in range(len(spectrum[0])):
+    	    ispectrum = np.zeros(len(spectrum))
+    	    for i in range(len(spectrum)):    
+    	        ispectrum[i] = spectrum[i][j]
+    	    summed_array[j] = np.sum(ispectrum)
+    	for i in range(len(summed_array)):
+    	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
+    	return summed_array, wvlBinEdges
     
-    def plotApertureSpectrum(self, pixelRow, pixelCol, radius, weighted=True, fluxWeighted=False, hotPixMask=None, lowcut=3000, highcut=7000):
-        summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius=radius, weighted=weighted, fluxWeighted=fluxWeighted, hotPixMask=hotPixMask, lowcut=lowcut, highcut=highcut)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(bin_edges[12:-2], summed_array[12:-1])
-        plt.xlabel('Wavelength ($\AA$)')
-        plt.ylabel('Counts')
-        plt.show()
-        
-    
+    def plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1):
+    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius1=radius1, radius2=radius2, weighted=weighted, fluxWeighted=fluxWeighted, lowCut=lowCut, highCut=highCut, firstSec=firstSec,integrationTime=integrationTime)
+    	fig = plt.figure()
+    	ax = fig.add_subplot(111)
+    	ax.plot(bin_edges[12:-2], summed_array[12:-1])
+    	plt.xlabel('Wavelength ($\AA$)')
+    	plt.ylabel('Counts')
+    	plt.show()
 
     def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
         """
@@ -846,7 +925,7 @@ class ObsFile:
         1's for pixels with counts, 0's for pixels without counts
         if showMe is True, a plot of the mask pops up
         """
-        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['image']
+        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts']
                                  for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow, self.nCol))
         deadArray[countArray == 0] = 0
@@ -1014,4 +1093,3 @@ def repackArray(array, slices):
         retval[iPt:iPtNew] = array[s0:s1]
         iPt = iPtNew
     return retval
-
