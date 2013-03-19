@@ -16,7 +16,7 @@ class PopUp(QMainWindow):
         self.setWindowTitle(title)
         self.plotFunc = plotFunc
         self.clickFunc = clickFunc
-        self.create_main_frame()
+        self.create_main_frame(title)
         self.create_status_bar()
         if plotFunc != None:
             plotFunc(fig=self.fig,axes=self.axes0)
@@ -28,7 +28,7 @@ class PopUp(QMainWindow):
         self.clickFunc(fig=self.fig,axes=self.axes0,event=event)
         self.canvas.draw()
 
-    def create_main_frame(self):
+    def create_main_frame(self,title):
         self.main_frame = QWidget()
       # Create the mpl Figure and FigCanvas objects. 
         self.dpi = 100
@@ -36,6 +36,7 @@ class PopUp(QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
         self.axes0 = self.fig.add_subplot(111)
+        self.axes0.set_title(title)
         if self.clickFunc != None:
             cid=self.canvas.mpl_connect('button_press_event', self.clickCanvas)
 
