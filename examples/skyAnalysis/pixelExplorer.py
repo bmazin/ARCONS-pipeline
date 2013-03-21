@@ -7,19 +7,18 @@ import matplotlib.cm as cm
 import numpy as np
 import sys
 import os
-import imp
-from functools import partial
 from scipy.stats import chi2
 
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
+from functools import partial
 
 from util.ObsFile import ObsFile
 from util.FileName import FileName
 from util.readDict import readDict
-from util.popup import PopUp
+from util.popup import PopUp,onscroll_cbar,onclick_cbar
 #from hotpix import hotPixelsMatt as hotPixels
 from hotpix import hotPixels
 
@@ -251,7 +250,8 @@ class AppForm(QMainWindow):
 
     def showArrayRawImage(self):
         self.rawFrame[np.isnan(self.rawFrame)] = 0
-        self.popUpArray(image=self.rawFrame,title='raw image')
+        #self.popUpArray(image=self.rawFrame,title='raw image')
+        PopUp(parent=self,title='showArrayRawImage').plotArray(image=self.rawFrame,title='raw image')
 
     def showArrayStdVsIntTime(self):
         pass
@@ -259,7 +259,8 @@ class AppForm(QMainWindow):
     def showTwilightArrayImage(self):
         image = self.twilightFrame
         image[np.isnan(image)] = 0
-        self.popUpArray(image=image,title='twilight image')
+        #self.popUpArray(image=image,title='twilight image')
+        PopUp(parent=self,title='showTwilightArrayImage').plotArray(image=image,title='Twilight Image')
         
     def showTwilightArrayStdVsFlux(self):
         pass
@@ -274,16 +275,19 @@ class AppForm(QMainWindow):
         chisqImage[chisqImage == np.inf]=0
         hotPixMask = hotPixels.checkInterval(image=chisqImage)['mask']
         chisqImage[hotPixMask != 0] = 0
-        self.popUpArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
+        #self.popUpArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
+        PopUp(parent=self,title='showTwilightArrayReducedChisqImage').plotArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
 
     def showSkyArrayImage(self):
         image = self.skyFrame
         image[np.isnan(image)] = 0
-        self.popUpArray(image,title='sky image')
+        #self.popUpArray(image,title='sky image')
+        PopUp(parent=self,title='showSkyArrayImage').plotArray(image=image,title='Sky Image')
 
     def showArrayWvlCalRange(self):
         rangeTable = self.cal.wvlRangeTable[:,:,1]#Get upper limit from valid wvl ranges 
-        self.popUpArray(image=rangeTable,title=r'Upper Wavecal Limits ($\AA$)')
+        #self.popUpArray(image=rangeTable,title=r'Upper Wavecal Limits ($\AA$)')
+        PopUp(parent=self,title='showArrayWvlCalRange').plotArray(image=rangeTable,title=r'Upper Wavecal Limits ($\AA$)')
 
 
     def showPixelSpectrum(self,row,col):
@@ -294,14 +298,15 @@ class AppForm(QMainWindow):
             rawSpectrum = self.rawSpectra[row,col]
             rawSpectrum/=binWidths
 
-        def plotFunc(fig,axes):
-            axes.step(self.wvlBinEdges[:-1],spectrum,label='calibrated',color='b')
-            if self.params['showPixelRawSpectrum']:
-                axes.step(self.wvlBinEdges[:-1],rawSpectrum,label='raw',color='r')
-            axes.set_xlabel(r'$\lambda$ ($\AA$)')
-            axes.set_ylabel(r'counts/$\AA$')
-            axes.legend(loc='lower right')
-        popup = PopUp(parent=self,plotFunc=plotFunc,title='spectrum (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showPixelSpectrum')
+        pop.axes.step(self.wvlBinEdges[:-1],spectrum,label='calibrated',color='b')
+        if self.params['showPixelRawSpectrum']:
+            pop.axes.step(self.wvlBinEdges[:-1],rawSpectrum,label='raw',color='r')
+        pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        pop.axes.set_ylabel(r'counts/$\AA$')
+        pop.axes.legend(loc='lower right')
+        pop.axes.set_title('spectrum (%d,%d)'%(row,col))
+        pop.draw()
 
     def showPixelWvlLightCurves(self,row,col):
         spectrumInTime = []
@@ -313,19 +318,20 @@ class AppForm(QMainWindow):
                 spectrumInTime.append(spectrum)
         spectrumInTime = np.array(spectrumInTime)
         nBins = np.shape(spectrumInTime)[1]
-        def plotFunc(fig,axes):
-            #plot counts vs time for each wavelength bin
-            times=np.arange(len(spectrumInTime[:,0]))*self.intTime
-            for iBin in xrange(nBins):
-                axes.plot(times,1.0*spectrumInTime[:,iBin]/self.intTime,
-                    c=cm.jet((iBin+1.)/nBins),
-                    label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[iBin],
-                    self.rebinnedWvlEdges[iBin+1]))
-            axes.set_xlabel('time (s)')
-            axes.set_ylabel('cps')
-            #plot counts vs time summed over all wavelengths
-            axes.legend(loc='upper right')
-        popup = PopUp(parent=self,plotFunc=plotFunc,title='Light Curve by Band (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showPixelWvlLightCurves')
+        #plot counts vs time for each wavelength bin
+        times=np.arange(len(spectrumInTime[:,0]))*self.intTime
+        for iBin in xrange(nBins):
+            pop.axes.plot(times,1.0*spectrumInTime[:,iBin]/self.intTime,
+                c=cm.jet((iBin+1.)/nBins),
+                label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[iBin],
+                self.rebinnedWvlEdges[iBin+1]))
+        pop.axes.set_xlabel('time (s)')
+        pop.axes.set_ylabel('cps')
+        #plot counts vs time summed over all wavelengths
+        pop.axes.legend(loc='upper right')
+        pop.axes.set_title('Light Curve by Band (%d,%d)'%(row,col))
+        pop.draw()
 
 
     def showPixelLightCurve(self,row,col):
@@ -335,25 +341,27 @@ class AppForm(QMainWindow):
                 x = ob.getPixelCount(iRow=row,iCol=col,firstSec=sec,integrationTime=self.intTime,weighted=True)
                 counts = x['counts']/self.intTime
                 lightCurve.append(counts)
-        def plotFunc(fig,axes):
-            times=np.arange(0,len(lightCurve)*self.intTime,self.intTime)
-            axes.set_xlabel('time (s)')
-            axes.set_ylabel('cps')
-            axes.plot(times,lightCurve,c='k')
-        popup = PopUp(parent=self,plotFunc=plotFunc,title='Light Curve (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showPixelLightCurve')
+        times=np.arange(0,len(lightCurve)*self.intTime,self.intTime)
+        pop.axes.set_xlabel('time (s)')
+        pop.axes.set_ylabel('cps')
+        pop.axes.plot(times,lightCurve,c='k')
+        pop.axes.set_title('Light Curve (%d,%d)'%(row,col))
+        pop.draw()
 
     def showPixelLaserSpectrum(self,row,col):
         #First plot the laser cal spectrum for this pixel to see if it's good
         x = self.cal.getTimedPacketList(row,col)
         phases=np.array(x['peakHeights'],dtype=np.double)-np.array(x['baselines'],dtype=np.double)
-        def plotFunc(fig,axes):
-            nBins=np.max(phases)-np.min(phases)
-            histPhases,binEdges = np.histogram(phases,bins=nBins)
-            lambdaBinEdges = self.cal.convertToWvl(binEdges,row,col)
-            axes.step(lambdaBinEdges[:-1],histPhases)
-            axes.set_xlabel(r'$\lambda$ ($\AA$)')
-            axes.set_ylabel('counts')
-        PopUp(parent=self,plotFunc=plotFunc,title='Raw Laser Cal Spectrum (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showPixelLaserSpectrum')
+        nBins=np.max(phases)-np.min(phases)
+        histPhases,binEdges = np.histogram(phases,bins=nBins)
+        lambdaBinEdges = self.cal.convertToWvl(binEdges,row,col)
+        pop.axes.step(lambdaBinEdges[:-1],histPhases)
+        pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        pop.axes.set_ylabel('counts')
+        pop.axes.set_title('Raw Laser Cal Spectrum (%d,%d)'%(row,col))
+        pop.draw()
 
     def showPixelStdVsIntTime(self,row,col):
         intTimes = [1,2,3,5,10,15,30]
@@ -386,68 +394,74 @@ class AppForm(QMainWindow):
         spectrumSqrts = np.array(spectrumSqrts)
 
             
-        def plotFunc(fig,axes):
-            axes.set_xlabel('integration time (s)')
-            axes.set_ylabel('normalized $\sigma$')
-            axes.plot(intTimes,countSqrts/np.max(countSqrts),'k--',
-                label=r'$\sqrt{N}$')
-            axes.plot(intTimes,countStds/np.max(countSqrts),'k',
-                label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[0],self.rebinnedWvlEdges[-1]))
-            nBins = np.shape(spectrumStds)[1]
-            for iBin in xrange(nBins):
-                axes.plot(intTimes,
-                    spectrumStds[:,iBin]/np.max(spectrumSqrts[:,iBin]),
-                    c=cm.jet((iBin+1.0)/nBins),
-                    label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[iBin],
-                        self.rebinnedWvlEdges[iBin+1]))
-            axes.legend(loc='upper left')
-        popup = PopUp(parent=self,plotFunc=plotFunc,
-            title='Standard Deviation vs Integration Time (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showPixelStdVsIntTime')
+        pop.axes.set_xlabel('integration time (s)')
+        pop.axes.set_ylabel('normalized $\sigma$')
+        pop.axes.plot(intTimes,countSqrts/np.max(countSqrts),'k--',
+            label=r'$\sqrt{N}$')
+        pop.axes.plot(intTimes,countStds/np.max(countSqrts),'k',
+            label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[0],self.rebinnedWvlEdges[-1]))
+        nBins = np.shape(spectrumStds)[1]
+        for iBin in xrange(nBins):
+            pop.axes.plot(intTimes,
+                spectrumStds[:,iBin]/np.max(spectrumSqrts[:,iBin]),
+                c=cm.jet((iBin+1.0)/nBins),
+                label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[iBin],
+                    self.rebinnedWvlEdges[iBin+1]))
+        pop.axes.legend(loc='upper left')
+        pop.axes.set_title('Sky Pixel StdDev vs Int Time (%d,%d)'%(row,col))
+        pop.draw()
+
     def showPixelRawPhaseHist(self,row,col):
         phases = np.array([],dtype=np.double)
         for iOb,ob in enumerate(self.obList):
             x = ob.getTimedPacketList(row,col)
             phases=np.append(phases,(np.array(x['peakHeights'],dtype=np.double)-np.array(x['baselines'],dtype=np.double)))
-        def plotFunc(fig,axes):
-            nBins=np.max(phases)-np.min(phases)
-            histPhases,binEdges = np.histogram(phases,bins=nBins)
-            axes.step(binEdges[:-1],histPhases)
-            axes.set_xlabel('peak-baseline')
-        PopUp(parent=self,plotFunc=plotFunc,title='Peaks-Baselines')
+        pop = PopUp(parent=self,title='showPixelRawPhaseHist')
+        nBins=np.max(phases)-np.min(phases)
+        histPhases,binEdges = np.histogram(phases,bins=nBins)
+        pop.axes.step(binEdges[:-1],histPhases)
+        pop.axes.set_xlabel('peak-baseline')
+        pop.axes.set_title('Peaks-Baselines')
+        pop.draw()
 
     def showPixelRawBaselineHist(self,row,col):
         baselines = np.array([],dtype=np.double)
         for iOb,ob in enumerate(self.obList):
             x = ob.getTimedPacketList(row,col)
             baselines=np.append(baselines,np.array(x['baselines'],dtype=np.double))
-        def plotFunc(fig,axes):
-            nBins=np.max(baselines)-np.min(baselines)
-            histBaselines,binEdges = np.histogram(baselines,bins=nBins)
-            axes.step(binEdges[:-1],histBaselines)
-            axes.set_xlabel('baseline')
-        PopUp(parent=self,plotFunc=plotFunc,title='Baselines')
+        pop = PopUp(parent=self,title='showPixelRawBaselineHist')
+        nBins=np.max(baselines)-np.min(baselines)
+        histBaselines,binEdges = np.histogram(baselines,bins=nBins)
+        pop.axes.step(binEdges[:-1],histBaselines)
+        pop.axes.set_xlabel('baseline')
+        pop.axes.set_title('Baselines')
+        pop.draw()
 
     def showPixelRawPeakHist(self,row,col):
         peaks = np.array([],dtype=np.double)
         for iOb,ob in enumerate(self.obList):
             x = ob.getTimedPacketList(row,col)
             peaks = np.append(peaks,np.array(x['peakHeights'],dtype=np.double))
-        def plotFunc(fig,axes):
-            nBins=np.max(peaks)-np.min(peaks)
-            histPeaks,binEdges = np.histogram(peaks,bins=nBins)
-            axes.step(binEdges[:-1],histPeaks)
-            axes.set_xlabel('peak')
-        PopUp(parent=self,plotFunc=plotFunc,title='Peaks')
+        pop = PopUp(parent=self,title='showPixelRawPeakHist')
+        nBins=np.max(peaks)-np.min(peaks)
+        histPeaks,binEdges = np.histogram(peaks,bins=nBins)
+        pop.axes.step(binEdges[:-1],histPeaks)
+        pop.axes.set_xlabel('peak')
+        pop.axes.set_title('Packet Peaks (No Baseline Subtracted)')
+        pop.draw()
 
     def showPixelFlatWeights(self,row,col):
         pass
     def showTwilightPixelSpectrum(self,row,col):
         spectrum = self.twilightSpectra[row,col]
-        def plotFunc(fig,axes):
-            axes.step(self.wvlBinEdges[:-1],spectrum)
-            axes.set_xlabel(r'$\lambda$ ($\AA$)')
-            axes.set_ylabel(r'total counts')
-        popup = PopUp(parent=self,plotFunc=plotFunc,title='twilight spectrum (%d,%d) '%(row,col))
+        pop = PopUp(parent=self,title='showTwilightPixelSpectrum')
+        pop.axes.step(self.wvlBinEdges[:-1],spectrum)
+        pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        pop.axes.set_ylabel(r'total counts')
+        pop.axes.set_title('twilight spectrum (%d,%d) '%(row,col))
+        pop.draw()
+
     def showTwilightPixelStdVsFlux(self,row,col):
         spectrumVsFluxVsTime = []
         for iOb,ob in enumerate(self.twilightObList):
@@ -481,23 +495,23 @@ class AppForm(QMainWindow):
         spectrumStds = np.array(spectrumStds)
         spectrumSqrts = np.array(spectrumSqrts)
 
-        def plotFunc(fig,axes):
-            axes.set_xlabel('median counts')
-            axes.set_ylabel('normalized $\sigma$')
-            axes.plot(fluxes,countSqrts/np.max(countSqrts),'k--',
-                label=r'$\sqrt{N}$')
-            axes.plot(fluxes,countStds/np.max(countSqrts),'k',
-                label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[0],self.rebinnedWvlEdges[-1]))
-            nBins = np.shape(spectrumStds)[1]
-            for iBin in xrange(nBins):
-                axes.plot(fluxes,
-                    spectrumStds[:,iBin]/np.max(spectrumSqrts[:,iBin]),
-                    c=cm.jet((iBin+1.0)/nBins),
-                    label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[iBin],
-                        self.rebinnedWvlEdges[iBin+1]))
-            axes.legend(loc='upper left')
-        popup = PopUp(parent=self,plotFunc=plotFunc,
-            title='Normalized Standard Deviation vs Twilight Flux, (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showTwilightPixelStdVsFlux')
+        pop.axes.set_xlabel('median counts')
+        pop.axes.set_ylabel('normalized $\sigma$')
+        pop.axes.plot(fluxes,countSqrts/np.max(countSqrts),'k--',
+            label=r'$\sqrt{N}$')
+        pop.axes.plot(fluxes,countStds/np.max(countSqrts),'k',
+            label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[0],self.rebinnedWvlEdges[-1]))
+        nBins = np.shape(spectrumStds)[1]
+        for iBin in xrange(nBins):
+            pop.axes.plot(fluxes,
+                spectrumStds[:,iBin]/np.max(spectrumSqrts[:,iBin]),
+                c=cm.jet((iBin+1.0)/nBins),
+                label=r'%d-%d $\AA$'%(self.rebinnedWvlEdges[iBin],
+                    self.rebinnedWvlEdges[iBin+1]))
+        pop.axes.legend(loc='upper left')
+        pop.axes.set_title('Normalized Standard Deviation vs Twilight Flux, (%d,%d)'%(row,col))
+        pop.draw()
 
     def getChisq(self,row,col):
         spectrum = self.twilightSpectra[row,col]
@@ -542,50 +556,26 @@ class AppForm(QMainWindow):
         print 'reduced chisq =',reducedChisq
         print 'P-value =',1-chi2.cdf(chisq,degreesOfFreedom)
 
-        def plotFunc(fig,axes):
-            axes.errorbar(self.wvlBinEdges[:-1],percentDiffSpectrum,linestyle='-',color='k',yerr=deltaPercentDiffSpectrum)
-            axes.set_xlabel(r'$\lambda$ ($\AA$)')
-            axes.set_ylabel(r'percent difference')
-            axes.plot(self.wvlBinEdges[:-1],len(self.wvlBinEdges[:-1])*[0],'gray')
-            axes2 = axes.twinx()
-            axes2.plot(self.wvlBinEdges[:-1],nDeltaFromZero,'m',alpha=.7)
-            align_yaxis(axes,0,axes2,0)
-            axes2.set_ylabel(r'# $\sigma$ from 0',color='m')
-        popup = PopUp(parent=self,plotFunc=plotFunc,title='Diff Spectrum (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showTwilightPixelDeviationFromMedian')
+        pop.axes.errorbar(self.wvlBinEdges[:-1],percentDiffSpectrum,linestyle='-',color='k',yerr=deltaPercentDiffSpectrum)
+        pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        pop.axes.set_ylabel(r'percent difference')
+        pop.axes.plot(self.wvlBinEdges[:-1],len(self.wvlBinEdges[:-1])*[0],'gray')
+        axes2 = pop.axes.twinx()
+        axes2.plot(self.wvlBinEdges[:-1],nDeltaFromZero,'m',alpha=.7)
+        align_yaxis(pop.axes,0,axes2,0)
+        axes2.set_ylabel(r'# $\sigma$ from 0',color='m')
+        pop.axes.set_title('Diff Spectrum (%d,%d)'%(row,col))
+        pop.draw()
+
         weights = self.flatDebugData['weights'][row,col]
-        def plotFunc(fig,axes):
-            axes.plot(self.medianTwilightSpectrum,'k')
-            axes.plot(self.twilightSpectra[row,col],'b')
-            axes.plot(self.twilightSpectra[row,col]/weights,'r')
-        popup = PopUp(parent=self,plotFunc=plotFunc,title='Twilight Spectrum (%d,%d)'%(row,col))
+        pop = PopUp(parent=self,title='showTwilightPixelDeviationFromMedian')
+        pop.axes.plot(self.medianTwilightSpectrum,'k')
+        pop.axes.plot(self.twilightSpectra[row,col],'b')
+        pop.axes.plot(self.twilightSpectra[row,col]/weights,'r')
+        pop.axes.set_title('Twilight Spectrum (%d,%d)'%(row,col))
+        pop.draw()
 
-
-
-    def popUpArray(self,image,normNSigma=3,title=''):
-        def plotFunc(fig,axes):
-            handleMatshow = axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
-            fig.cbar = fig.colorbar(handleMatshow)
-            cid = fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, fig))
-            cid = fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, fig))
-        PopUp(parent=self,plotFunc=plotFunc,title=title)
-
-def onscroll_cbar(fig, event):
-    if event.inaxes is fig.cbar.ax:
-        increment=0.05
-        currentClim = fig.cbar.mappable.get_clim()
-        if event.button == 'up':
-            newClim = (currentClim[0],(1.+increment)*currentClim[1])
-        if event.button == 'down':
-            newClim = (currentClim[0],(1.-increment)*currentClim[1])
-        fig.cbar.mappable.set_clim(newClim)
-        fig.canvas.draw()
-
-def onclick_cbar(fig,event):
-    if event.inaxes is fig.cbar.ax:
-        if event.button == 1:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
 
 def align_yaxis(ax1, v1, ax2, v2):
     """
