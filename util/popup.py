@@ -59,6 +59,7 @@ class PopUp(QMainWindow):
     def plotArray(self,image,normNSigma=3,title=''):
         handleMatshow = self.axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
         self.fig.cbar = self.fig.colorbar(handleMatshow)
+        self.axes.set_title(title)
         cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
         cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
         self.draw()

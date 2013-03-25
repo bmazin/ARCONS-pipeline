@@ -118,9 +118,19 @@ class AppForm(QMainWindow):
         self.twilightIntTime = self.params['twilightIntTime']
 
         
+        #Load flat info for the current obs stack
         flatSolnFileName = FileName(run=self.params['run'],date=self.params['obsFlatCalSunsetDate'],tstamp='').flatSoln()
-        flatDebugDataFileName =  os.path.splitext(flatSolnFileName)[0]+'.npz' 
-        self.flatDebugData = np.load(flatDebugDataFileName)
+        flatInfoFileName =  os.path.splitext(flatSolnFileName)[0]+'.npz' 
+        self.flatInfo= np.load(flatInfoFileName)
+
+        #Load flat info for all flats specified in params file
+        flats = self.params['flatInfoFiles']
+        self.flatInfos = []
+        for flat in flats:
+            flatSolnFileName = FileName(run=self.params['run'],date=flat,tstamp='').flatSoln()
+            flatInfoFileName =  os.path.splitext(flatSolnFileName)[0]+'.npz' 
+            self.flatInfos.append(np.load(flatInfoFileName))
+
 
 
     def prepareForClickPlots(self):
@@ -254,7 +264,32 @@ class AppForm(QMainWindow):
         PopUp(parent=self,title='showArrayRawImage').plotArray(image=self.rawFrame,title='raw image')
 
     def showArrayStdVsIntTime(self):
-        pass
+        intTimes = [1,2,3,5,10,15,30]
+        sdevVsIntTime = []
+        madVsIntTime = []
+        medVsIntTime = []
+        for intTime in intTimes:
+            print intTime
+            image = np.zeros((self.nRow,self.nCol))
+            for iOb,ob in enumerate(self.skyObList):
+                x = ob.getPixelCountImage(firstSec=0,integrationTime=intTime)
+                image+=x['image']
+            hotPixMask = hotPixels.checkInterval(image=image)['mask']
+            image[hotPixMask!=0]=0
+            countList = image[image!=0]
+            sdevVsIntTime.append(np.std(countList))
+            madVsIntTime.append(np.median(np.abs(countList-np.median(countList))))
+            medVsIntTime.append(np.median(countList))
+            PopUp(parent=self).plotArray(image,title=r'%d std=%f mad=%f med=%f'%(intTime,sdevVsIntTime[-1],madVsIntTime[-1],medVsIntTime[-1]))
+        medVsIntTime = np.array(medVsIntTime)
+        sqrtNVsIntTime = np.sqrt(medVsIntTime)
+        pop = PopUp(parent=self,title='showArrayStdVsIntTime')
+        pop.axes.set_xlabel('integration time (s)')
+        pop.axes.set_ylabel('$\sigma$')
+        pop.axes.plot(intTimes,sqrtNVsIntTime,'k--',label=r'$\sqrt(med(N))$')
+        pop.axes.plot(intTimes,sdevVsIntTime,'k')
+        pop.axes.plot(intTimes,madVsIntTime,'r')
+        pop.draw()
 
     def showTwilightArrayImage(self):
         image = self.twilightFrame
@@ -299,9 +334,9 @@ class AppForm(QMainWindow):
             rawSpectrum/=binWidths
 
         pop = PopUp(parent=self,title='showPixelSpectrum')
-        pop.axes.step(self.wvlBinEdges[:-1],spectrum,label='calibrated',color='b')
+        pop.axes.step(self.wvlBinEdges[:-1],spectrum,label='calibrated',color='b',where='post')
         if self.params['showPixelRawSpectrum']:
-            pop.axes.step(self.wvlBinEdges[:-1],rawSpectrum,label='raw',color='r')
+            pop.axes.step(self.wvlBinEdges[:-1],rawSpectrum,label='raw',color='r',where='post')
         pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
         pop.axes.set_ylabel(r'counts/$\AA$')
         pop.axes.legend(loc='lower right')
@@ -357,7 +392,7 @@ class AppForm(QMainWindow):
         nBins=np.max(phases)-np.min(phases)
         histPhases,binEdges = np.histogram(phases,bins=nBins)
         lambdaBinEdges = self.cal.convertToWvl(binEdges,row,col)
-        pop.axes.step(lambdaBinEdges[:-1],histPhases)
+        pop.axes.step(lambdaBinEdges[:-1],histPhases,where='post')
         pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
         pop.axes.set_ylabel('counts')
         pop.axes.set_title('Raw Laser Cal Spectrum (%d,%d)'%(row,col))
@@ -420,7 +455,7 @@ class AppForm(QMainWindow):
         pop = PopUp(parent=self,title='showPixelRawPhaseHist')
         nBins=np.max(phases)-np.min(phases)
         histPhases,binEdges = np.histogram(phases,bins=nBins)
-        pop.axes.step(binEdges[:-1],histPhases)
+        pop.axes.step(binEdges[:-1],histPhases,where='post')
         pop.axes.set_xlabel('peak-baseline')
         pop.axes.set_title('Peaks-Baselines')
         pop.draw()
@@ -433,7 +468,7 @@ class AppForm(QMainWindow):
         pop = PopUp(parent=self,title='showPixelRawBaselineHist')
         nBins=np.max(baselines)-np.min(baselines)
         histBaselines,binEdges = np.histogram(baselines,bins=nBins)
-        pop.axes.step(binEdges[:-1],histBaselines)
+        pop.axes.step(binEdges[:-1],histBaselines,where='post')
         pop.axes.set_xlabel('baseline')
         pop.axes.set_title('Baselines')
         pop.draw()
@@ -446,17 +481,33 @@ class AppForm(QMainWindow):
         pop = PopUp(parent=self,title='showPixelRawPeakHist')
         nBins=np.max(peaks)-np.min(peaks)
         histPeaks,binEdges = np.histogram(peaks,bins=nBins)
-        pop.axes.step(binEdges[:-1],histPeaks)
+        pop.axes.step(binEdges[:-1],histPeaks,where='post')
         pop.axes.set_xlabel('peak')
         pop.axes.set_title('Packet Peaks (No Baseline Subtracted)')
         pop.draw()
 
     def showPixelFlatWeights(self,row,col):
-        pass
+        pop = PopUp(parent=self,title='showPixelFlatWeights')
+        for iFlat,flatInfo in enumerate(self.flatInfos):
+            weights = flatInfo['weights'][row,col]
+            flatSpectra = flatInfo['spectra'][row,col]
+            flatMedians = flatInfo['median']
+            deltaFlatSpectra = np.sqrt(flatSpectra)
+            deltaWeights = weights*deltaFlatSpectra/flatSpectra
+            color=cm.jet((iFlat+1.)/len(self.flatInfos))
+            wvlBinCenters = self.wvlBinEdges[:-1]+np.diff(self.wvlBinEdges)/2.
+            pop.axes.step(self.wvlBinEdges[:-1],weights,linestyle='-',label=self.params['flatInfoFiles'][iFlat],color=color,where='post')
+            pop.axes.errorbar(wvlBinCenters,weights,linestyle=',',yerr=deltaWeights,color=color)
+        pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        pop.axes.set_ylabel(r'Weights')
+        pop.axes.set_title('Flat Weights')
+        pop.axes.legend(loc='lower right')
+        pop.draw()
+
     def showTwilightPixelSpectrum(self,row,col):
         spectrum = self.twilightSpectra[row,col]
         pop = PopUp(parent=self,title='showTwilightPixelSpectrum')
-        pop.axes.step(self.wvlBinEdges[:-1],spectrum)
+        pop.axes.step(self.wvlBinEdges[:-1],spectrum,where='post')
         pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
         pop.axes.set_ylabel(r'total counts')
         pop.axes.set_title('twilight spectrum (%d,%d) '%(row,col))
@@ -516,13 +567,14 @@ class AppForm(QMainWindow):
     def getChisq(self,row,col):
         spectrum = self.twilightSpectra[row,col]
 
-        weights = self.flatDebugData['weights'][row,col]
-        rawSpectrum = spectrum/weights
-        flatSpectra = self.flatDebugData['spectra'][row,col]
-        flatMedians = self.flatDebugData['median']
+        weights = self.flatInfo['weights'][row,col]
+        flatSpectra = self.flatInfo['spectra'][row,col]
+        flatMedians = self.flatInfo['median']
         deltaFlatSpectra = np.sqrt(flatSpectra)
         deltaWeights = weights*deltaFlatSpectra/flatSpectra
         poissonDeltaSpectra = np.sqrt(spectrum)
+
+        rawSpectrum = spectrum/weights
         deltaRawSpectrum = np.sqrt(rawSpectrum)
         deltaSpectra = spectrum*np.sqrt((deltaWeights/weights)**2+(deltaRawSpectrum/rawSpectrum)**2)
         diffSpectrum = (spectrum-self.medianTwilightSpectrum)
@@ -568,7 +620,7 @@ class AppForm(QMainWindow):
         pop.axes.set_title('Diff Spectrum (%d,%d)'%(row,col))
         pop.draw()
 
-        weights = self.flatDebugData['weights'][row,col]
+        weights = self.flatInfo['weights'][row,col]
         pop = PopUp(parent=self,title='showTwilightPixelDeviationFromMedian')
         pop.axes.plot(self.medianTwilightSpectrum,'k')
         pop.axes.plot(self.twilightSpectra[row,col],'b')
