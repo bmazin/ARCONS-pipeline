@@ -67,13 +67,22 @@ def calculateFreq(mjd,secOffset=0):
     return freq
 
 def main():
-    overwriteOutFile = False
-    outFile = 'mjdTimesSeqStableObs.npy'
+    overwriteOutFile = True
+    outFile = 'mjdTimesSeq38Seq0.npy'
 
-    obsSequence="""
-    060934
-    """
 #    obsSequence="""
+#    060934
+#    """
+    obsSequence2="""
+    055428
+    055930
+    060432
+    060934
+    061436
+    061938
+    062440
+    """
+#    obsSequence2="""
 #    055428
 #    055930
 #    060432
@@ -83,7 +92,46 @@ def main():
 #    062440
 #    062942
 #    """
-    obsSequence = obsSequence.strip().split()
+
+    obsSequence0="""
+    033323
+    033825
+    034327
+    034830
+    035332
+    035834
+    040336
+    040838
+    041341
+    041843
+    042346
+    042848
+    043351
+    043853
+    044355
+    044857
+    045359
+    045902
+    """
+
+    obsSequence1="""
+    051409
+    051912
+    052414
+    052917
+    053419
+    053922
+    054424
+    """
+    iRow2 = 10
+    iCol2 = 14
+    iRow0 = 29
+    iCol0 = 28
+    iRow1 = 29
+    iCol1 = 30
+    obsSequence = obsSequence1.strip().split()
+    iRow = iRow1
+    iCol = iCol1
     obsUtcDate = '20121212'
     obsSequence = [obsUtcDate+'-'+ts for ts in obsSequence]
 
@@ -92,8 +140,8 @@ def main():
 
     obList = [ObsFile(fn) for fn in obsFileNames]
     for iOb,ob in enumerate(obList):
-        ob.loadWvlCal(wvlFileName)
-        ob.setWvlCutoffs(4000,6000)
+        ob.loadWvlCalFile(wvlFileName)
+        ob.setWvlCutoffs(3000,8000)
 
     #obsDate = obList[0].getFromHeader('jd')
 
@@ -110,8 +158,7 @@ def main():
     #period=0.03367664238573182
     #period=0.03367662440988317
 
-    iRow = 10
-    iCol = 14
+    
     integrationTime = -1
     circCol,circRow = circ(iCol,iRow,radius=4)
     firstSec = 0
@@ -134,23 +181,25 @@ def main():
         
         jdTimes = np.array([],dtype=np.float64)
         times = np.array([])
+        mjdTimesList = []
         for iOb,ob in enumerate(obList):
             print iOb,'of',len(obList)
-            ob.setWvlCutoffs(4000,6000)
+            jdTimesOb = np.array([],dtype=np.float64)
             #obsDate = ob.getFromHeader('jd')
             #Time of beginning of observation in mjd
             obsDate = ob.getFromHeader('unixtime')/unixSecsInDay+unixEpochJD
             for i in range(len(circCol)):
                 iRow = circRow[i]
                 iCol = circCol[i]
-                timestamps,peaks,baselines = ob.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
-                timestamps = np.array(timestamps,dtype=np.float64)
+                #timestamps,peaks,baselines = ob.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+                pixelWvlList = ob.getPixelWvlList(iRow,iCol,firstSec,integrationTime,excludeBad=True)
+                timestamps = np.array(pixelWvlList['timestamps'],dtype=np.float64)
                 jdTimestamps = obsDate+timestamps /(24.*3600.)
                 jdTimes = np.append(jdTimes,jdTimestamps)
+                jdTimesOb = np.append(jdTimesOb,jdTimestamps)
                 times = np.append(times,timestamps)
-
+            mjdTimesList.append(jdTimesOb-epochMJD)
         mjdTimes = jdTimes - epochMJD #convert to modified jd
-
         np.save(outFile,mjdTimes)
     mjdTime0 = obsDate-epochMJD
     #periodDays = period/(24.*3600.)
@@ -169,9 +218,22 @@ def main():
     #phases = np.log(1+pdot/period0*(mjdTimes-(obsDate-epochMJD))*(24.*3600))/pdot
     #phases = np.log(1+pdot/periodDays0*(mjdTimes-(obsDate-epochMJD)))/pdot
     #phases = mjdTimes/periodDays0-pdot*mjdTimes**2/(2*periodDays0**2)
-    #totalPhases = freq0*(mjdTimes-mjdTime0)+1.65e2*freqDot*(mjdTimes-mjdTime0)**2/2.+phaseOffset
-    totalPhases = freq0*(mjdTimes-mjdTime0)+freqDot*(mjdTimes-mjdTime0)**2/2.+phaseOffset
+    adjust = -200
+    #adjust = 1.
+    totalPhases = freq0*(mjdTimes-mjdTime0)+adjust*freqDot*(mjdTimes-mjdTime0)**2/2.+phaseOffset
+    #totalPhases = freq0*(mjdTimes-mjdTime0)+freqDot*(mjdTimes-mjdTime0)**2/2.+phaseOffset
+    totalPhasesList = []
+    histList = []
     phases0 = ((mjdTimes-mjdTime0) % avgPeriodDays[0])/periodDays+phaseOffset
+    for times in mjdTimesList:
+        phases = freq0*(times-mjdTime0)+adjust*freqDot*(times-mjdTime0)**2/2.+phaseOffset
+        phases = phases % 1.0 
+        totalPhasesList.append(phases)
+        histPhases,phaseBinEdges = np.histogram(phases,bins=nPhaseBins)
+        histList.append(histPhases)
+        plt.plot(phaseBinEdges[0:-1],histPhases)
+    plt.show()
+        
     #in case phaseOffset pushed a phase past 1. roll it back 
     periodIndices=np.array(totalPhases,dtype=np.int)
     phases = totalPhases % 1.0 
@@ -180,7 +242,6 @@ def main():
     phases = phases[0:len(phases)]
     histPhases,phaseBinEdges = np.histogram(phases,bins=nPhaseBins)
     histPhases0,phaseBinEdges = np.histogram(phases0,bins=nPhaseBins)
-       
 
     plt.plot(phaseBinEdges[0:-1],histPhases)
     plt.plot(phaseBinEdges[0:-1],histPhases0+1,'r')
@@ -203,3 +264,4 @@ def main():
 
 if __name__=='__main__':
     main()
+
