@@ -18,7 +18,6 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from util.ObsFile import ObsFile 
-
 import os
 from PyQt4.QtGui import *
 import hotpix.hotPixels as hp
@@ -60,14 +59,14 @@ ob = ObsFile(obsFn)
 # Load wavelength and flat cal solutions
 ob.loadWvlCalFile(wfn)
 ob.loadFlatCalFile(ffn)
-ob.setWvlCutoffs(3000,5000)
+ob.setWvlCutoffs(3000,8000)
 
 # Load/generate hot pixel mask file
 hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
 if not os.path.exists(hotPixFn):
     hp.findHotPixels(obsFn,hotPixFn)
     print "Flux file pixel mask saved to %s"%(hotPixFn)
-ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
+ob.loadHotPixCalFile(hotPixFn,switchOnMask=False)
 print "Hot pixel mask loaded %s"%(hotPixFn)
 
 # Get exptime from header.  Also choose guess time.  This will be the time over which a guess will be valid
@@ -83,10 +82,22 @@ integrationTime=10
 gridHeight = ob.nCol
 gridWidth = ob.nRow
 
-# Create saturated pixel mask.  Leave as zero since hot pixel masking already does this for us.
-saturatedMask = np.zeros((gridWidth,gridHeight))
+# Create saturated pixel mask to apply to PyGuide algorithm.
+print 'Creating saturation mask...'
+nFrames = int(exptime/integrationTime)
+saturatedMask = np.zeros(((nFrames,gridWidth,gridHeight)))
+hotPixInfo = hp.readHotPixels(hotPixFn)
+intervalsMatrix = hotPixInfo['intervals']
+for t in range(nFrames):
+    for x in range(gridHeight):
+	for y in range(gridWidth):
+	    if intervalsMatrix[y][x] == []:
+		pass
+	    else:
+		saturatedMask[t][y][x]=1
 
 # Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
+print 'Creating dead mask...'
 deadMask = ob.getDeadPixels()
 deadMask = -1*deadMask + 1
 
@@ -97,6 +108,7 @@ ccd = pg.CCDInfo(0,0.00001,1,2500)
 outFn = '/home/pszypryt/Scratch/centroid_test/centroid_list.txt'
 f = open(outFn,'w')
 
+print 'Retrieving images...'
 for iFrame in range(exptime):
     # Integrate over the guess time.  Click a pixel in the plot corresponding to the xy center guess.  This will be used to centroid for the duration of guessTime.
     if iFrame%guessTime == 0:
@@ -106,7 +118,7 @@ for iFrame in range(exptime):
         map = MouseMonitor()
         map.fig = plt.figure()
         map.ax = map.fig.add_subplot(111)
-        map.ax.set_title('Object 1')
+        map.ax.set_title('Centroid Guess')
         map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower')
         map.connect()
         plt.show()
@@ -118,10 +130,11 @@ for iFrame in range(exptime):
     # Centroid an image that has been integrated over integrationTime.
     if iFrame%integrationTime == 0:
 	# Use obsFile to get integrationTime image.
+	satMask=saturatedMask[int(iFrame/integrationTime)]
         imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
         image=imageInformation['image']        
 	# Use PyGuide centroiding algorithm.
-        pyguide_output = pg.centroid(image,deadMask,saturatedMask,xyguess,3,ccd,0,False)
+        pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,3,ccd,0,False)
 	# Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
         try:
             xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
