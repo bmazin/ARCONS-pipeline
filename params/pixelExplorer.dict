@@ -1,0 +1,134 @@
+##Files and Dirs
+
+#remake existing npz files with sequence parameters below
+makeObsStackFile = False
+makeRawObsStackFile = False
+makeTwilightStackFile = False
+makeSkyStackFile = False
+
+#Current stack
+showArrayStdVsIntTime = True
+
+showPixelSpectrum = False 
+showPixelLightCurve = False 
+showPixelWvlLightCurves = False 
+showPixelRawPhaseHist = False
+showPixelRawBaselineHist = False
+showPixelRawPeakHist = False
+
+#raw stack
+showArrayRawImage = False 
+showPixelRawSpectrum = False
+
+#flat info
+showPixelFlatWeights = True
+
+#wave cal info
+showArrayWvlCalRange = False
+showPixelLaserSpectrum = False 
+
+#twilight stack
+showTwilightArrayImage = False 
+showTwilightArrayStdVsFlux = True
+showTwilightArrayReducedChisqImage = False
+
+showTwilightPixelSpectrum = False
+showTwilightPixelStdVsFlux = False
+showTwilightPixelDeviationFromMedian = False
+
+#sky stack
+showSkyArrayImage = False
+showPixelStdVsIntTime = False 
+
+
+nWvlBands = 5 #Number of wavelength bins to show in showPixelWvlLightCurves and similar plots
+run = 'PAL2012'
+##current stack
+#Geminga sky where light curves are relatively stable
+#obsStackFileName = '/Scratch/dataProcessing/sky/crabUncut.npz'
+rawStackFileName = '/Scratch/dataProcessing/sky/rawGemingaStableUncut.npz'
+obsStackFileName = '/Scratch/dataProcessing/sky/gemingaStableUncut.npz'
+obsIntTime = 30
+obsSunsetDate = '20121211'
+obsWvlSunsetDate = '20121211'
+obsWvlTimestamp = '20121212-063518'
+obsWvlLowerCutoff = None
+obsWvlUpperCutoff = None
+obsFlatCalSunsetDate = '20121210'
+obsSequence = [\\
+'20121212-033323',\\
+'20121212-033825',\\
+'20121212-034327',\\
+'20121212-034830',\\
+'20121212-035332',\\
+'20121212-035834',\\
+'20121212-040336',\\
+'20121212-040838',\\
+'20121212-041341',\\
+'20121212-041843',\\
+'20121212-042346',\\
+'20121212-042848',\\
+'20121212-043351',\\
+'20121212-043853',\\
+'20121212-044355',\\
+'20121212-044857',\\
+'20121212-045359',\\
+'20121212-045902',\\
+]
+
+
+twilightStackFileName = '/Scratch/dataProcessing/sky/twilight20121211_w_cal20121210.npz'
+twilightIntTime = 1
+twilightSunsetDate = '20121211'
+twilightWvlSunsetDate = '20121211'
+#twilightWvlTimestamp = '20121212-063518'
+twilightWvlTimestamp = '20121212-111847'
+twilightWvlLowerCutoff = None
+twilightWvlUpperCutoff = None
+twilightFlatCalSunsetDate = '20121211'
+twilightSequence = [\\
+'20121212-134024',\\
+'20121212-134127',\\
+'20121212-134229',\\
+'20121212-134331',\\
+'20121212-134433',\\
+'20121212-134535',\\
+'20121212-134637',\\
+'20121212-134739',\\
+'20121212-134841',\\
+'20121212-134943',\\
+'20121212-135045',\\
+'20121212-135147',\\
+'20121212-135249',\\
+'20121212-135351',\\
+'20121212-135453',\\
+'20121212-135555',\\
+'20121212-135657',\\
+'20121212-135759',\\
+'20121212-135901',\\
+'20121212-140003',\\
+'20121212-140105',\\
+]
+
+skyStackFileName = '/Scratch/dataProcessing/sky/gemingaStable.npz'
+skyIntTime = 30
+skySunsetDate = '20121211'
+skyWvlSunsetDate = '20121211'
+skyWvlTimestamp = '20121212-091828'
+skyWvlLowerCutoff = None
+skyWvlUpperCutoff = None
+skyFlatCalSunsetDate = '20121210'
+skySequence = [\\
+'20121212-084725',\\
+'20121212-085228',\\
+'20121212-085730',\\
+'20121212-090233',\\
+'20121212-090735',\\
+'20121212-091237',\\
+]
+
+flatInfoFiles = [\\
+'20121207',\\
+'20121210',\\
+'20121211',\\
+]
