@@ -7,7 +7,6 @@ Uses x and y position data from beammap.py.  Rescales, rotates, and offsets thes
 them to a pixel grid of the current array size.
 '''
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -324,17 +323,17 @@ class StartQt4(QMainWindow):
 
         idx=self.freqvals.argsort()
         
-        f= open('freq_atten_x_y.txt','w')
+        f= open(self.path + '/freq_atten_x_y.txt','w')
         for i in range(len(xpix)):    
-            f= open('freq_atten_x_y.txt','a')
+            f= open(self.path + '/freq_atten_x_y.txt','a')
             f.write(str(self.freqvals[idx[i]]) + '\t' + str(self.attenvals[idx[i]]) +'\t' + str(xpix[idx[i]]) + '\t' + str(ypix[idx[i]]) +'\t' + self.goodpixtag[idx[i]] + '\n')
             f.close()
 
         print 'Number of Doubles:' + str(len(self.xpos0))
         dbltag=np.loadtxt(self.dblfile,unpack='True', usecols = (4,), dtype='|S10' )
-        f= open('double_positions.txt','w')
+        f= open(self.path + '/double_positions.txt','w')
         for i in range(len(self.xpos0)):
-            f= open('double_positions.txt','a')
+            f= open(self.path + '/double_positions.txt','a')
             f.write(str(xpix0[i]) + '\t' + str(ypix0[i]) + '\t' + str(xpix1[i]) + '\t' + str(ypix1[i]) + '\t' + dbltag[i] + '\n')
             f.close()
         
