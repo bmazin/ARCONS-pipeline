@@ -7,6 +7,7 @@ import matplotlib.cm as cm
 import numpy as np
 import sys
 import os
+import tables
 from scipy.stats import chi2
 
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
@@ -269,7 +270,6 @@ class AppForm(QMainWindow):
         madVsIntTime = []
         medVsIntTime = []
         for intTime in intTimes:
-            print intTime
             image = np.zeros((self.nRow,self.nCol))
             for iOb,ob in enumerate(self.skyObList):
                 x = ob.getPixelCountImage(firstSec=0,integrationTime=intTime)
@@ -392,11 +392,63 @@ class AppForm(QMainWindow):
         nBins=np.max(phases)-np.min(phases)
         histPhases,binEdges = np.histogram(phases,bins=nBins)
         lambdaBinEdges = self.cal.convertToWvl(binEdges,row,col)
-        pop.axes.step(lambdaBinEdges[:-1],histPhases,where='post')
+        pop.axes.step(lambdaBinEdges[:-1],histPhases,where='post',color='k')
         pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
         pop.axes.set_ylabel('counts')
         pop.axes.set_title('Raw Laser Cal Spectrum (%d,%d)'%(row,col))
+        wvlCalSigma = self.cal.wvlErrorTable[row,col]
+        xOffset = self.cal.wvlCalTable[row,col,0]
+        yOffset = self.cal.wvlCalTable[row,col,1]
+        amplitude = self.cal.wvlCalTable[row,col,2]
+        #energy(eV) = amplitude*(pulseHeight-xOffset)**2+yOffset
+       
+        stackLabel = 'obs'
+        run = self.params['run']
+        sunsetDate = self.params[stackLabel+'SunsetDate']
+        calTimestamp = self.params[stackLabel+'WvlTimestamp']
+        wvlDriftFileName = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calDriftInfo()
+        wvlDriftFile = tables.openFile(wvlDriftFileName,mode='r')
+        wvlDriftInfo = wvlDriftFile.root.params_drift.driftparams.read()
+        wvlDriftFile.close()
+        driftEntry = wvlDriftInfo[np.logical_and(wvlDriftInfo['pixelrow']==row ,wvlDriftInfo['pixelcol']==col)][0]
+        #extract gaussianparams in first column of selected row
+        bluePhaseSigma=driftEntry[0][2]
+        bluePhaseAmp = driftEntry[0][1]
+        bluePhaseOffset = driftEntry[0][0]
+
+        redPhaseSigma=driftEntry[0][5]
+        redPhaseAmp = driftEntry[0][4]
+        redPhaseOffset = driftEntry[0][3]
+
+        phases = np.linspace(np.min(phases),np.max(phases),(nBins+1)*100.)
+        blueGaussFit = bluePhaseAmp*np.exp(-1/2*((phases-bluePhaseOffset)/bluePhaseSigma)**2)
+        redGaussFit = redPhaseAmp*np.exp(-1/2*((phases-redPhaseOffset)/redPhaseSigma)**2)
+        wavelengths = self.cal.convertToWvl(phases,row,col)
+        pop.axes.plot(wavelengths,blueGaussFit,'b')
+        pop.axes.plot(wavelengths,redGaussFit,'r')
         pop.draw()
+
+        #Create simulated photons with quantization, then apply jitter
+#        quantizedGaussfit = bluePhaseAmp*np.exp(-1/2*((binEdges-bluePhaseOffset)/bluePhaseSigma)**2)
+#        quantizedGaussfit/=np.sum(quantizedGaussfit)#normalize pdf to 1
+#        gaussfit /= np.max(gaussfit) #scale to 1
+#        pop=PopUp(parent=self,title='test')
+#        
+#        cdf = np.add.accumulate(quantizedGaussfit)
+#        size = 1e6
+#        simulatedPhotons = binEdges[np.digitize(np.random.random_sample(size),cdf)]
+#        ditheredPhotons = simulatedPhotons+np.random.random_sample(size)
+#
+#        histPhotons,binEdges=np.histogram(simulatedPhotons,bins=phases)
+#        histPhotons = np.array(histPhotons,dtype=np.double)/np.max(histPhotons)#scale to 1
+#
+#        histDitheredPhotons,binDitherEdges = np.histogram(ditheredPhotons,bins=phases)
+#        histDitheredPhotons = np.array(histDitheredPhotons,dtype=np.double)/np.max(histDitheredPhotons)
+#        pop.axes.step(binDitherEdges[:-1],histDitheredPhotons,where='post')
+#        pop.axes.step(binEdges[:-1],histPhotons,where='post')
+#        pop.axes.plot(phases,gaussfit)
+#        pop.draw()
+
 
     def showPixelStdVsIntTime(self,row,col):
         intTimes = [1,2,3,5,10,15,30]
