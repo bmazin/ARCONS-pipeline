@@ -279,9 +279,20 @@ class Cosmic:
             print "findCosmics:  iSec=",iSec,"  inter=",inter
             hg = self.getHgForOneSec(iSec, inter)
 
-    def getHgsForOneSec(self, iSec, inter, binFactor=1, populationMax=10):
-        bins = np.arange(0, self.file.ticksPerSec, binFactor)
-        minLength = self.file.ticksPerSec/binFactor
+    def getHgsForOneSec(self, iSec, inter, stride=1, populationMax=10):
+        """
+        inputs:
+        iSec = the second to consider
+        inter -- sent to ObsFile.parsePhotonPackets
+
+        return timeHgValues,populationHg 
+        where
+        timeHgValues = histogram of the number of photons in each time interval
+        populationHg = histogram of the number of entries per time bin
+        
+        """
+        bins = np.arange(0, self.file.ticksPerSec, 1)
+        minLength = self.file.ticksPerSec
         timeHgValues = np.zeros(minLength, dtype=np.int64)
         elapsed = 0.0;
         start = time.clock()
@@ -300,9 +311,31 @@ class Cosmic:
                     #timeHgValues += hg
                     c_binner.binner(timestamps, timeHgValues)
         end = time.clock();
-        populationHg = np.histogram(timeHgValues,\
-                                        populationMax, 
-                                    range=(-0.5,populationMax-1))
+        populationHg = Cosmic.populationFromTimeHgValues\
+            (timeHgValues,populationMax,stride)
         elapsed += end-start
-        print "elapsed=",elapsed
+        #print "elapsed=",elapsed
         return timeHgValues,populationHg
+    @staticmethod
+    def populationFromTimeHgValues(timeHgValues,populationMax,stride):
+        popRange = (-0.5,populationMax-0.5)
+        if stride==1:
+            populationHg = np.histogram(\
+                timeHgValues, populationMax, range=popRange)
+        else:
+            # rebin the timeHgValues before counting the populations
+            length = timeHgValues.size
+            
+            timeHgValuesRebinned = np.reshape(\
+                timeHgValues, [length/stride, stride]).sum(axis=1)
+            populationHg0 = np.histogram(
+                timeHgValuesRebinned, populationMax, range=popRange)
+            
+            timeHgValuesRebinned1 = np.reshape(
+                timeHgValues[stride/2:-stride/2], 
+                [(length-stride)/stride, stride]).sum(axis=1)
+            populationHg1 = np.histogram(\
+                timeHgValuesRebinned1, populationMax, range=popRange)
+
+            populationHg = (populationHg0[0]+populationHg1[0], populationHg0[1])
+        return populationHg

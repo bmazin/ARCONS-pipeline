@@ -8,7 +8,6 @@ def getPlotValues(hg, **kwargs):
     an iterable of bin population
     """
     ylog = kwargs.get('ylog',False)
-    print "getPlotValues:  ylog=",ylog
     if isinstance(hg,tuple):
         x = hg[1]
         y = hg[0]
@@ -21,10 +20,11 @@ def getPlotValues(hg, **kwargs):
     xp = []
     yp = [yPlotMin]
     for i in range(len(y)):
+        yval = y[i]
+
         xval = x[i]
         xp.append(xval)
         xp.append(xval)
-        yval = y[i]
         yp.append(yval)
         yp.append(yval)
 
@@ -42,6 +42,5 @@ def getYPlotMin(y,ylog):
     retval = float('inf')
     for yVal in y:
         if not (ylog and yVal <= 0):
-            print "getYPlotMin:  consider yVal=",yVal
             retval = min(retval, yVal)
     return retval

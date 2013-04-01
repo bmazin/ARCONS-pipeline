@@ -1,4 +1,5 @@
 import os
+import math
 import unittest
 from cosmic.Cosmic import Cosmic
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ from interval import interval, inf, imath
 import inspect
 import numpy as np
 from util import hgPlot
+from scipy.stats import poisson
 class TestCosmic(unittest.TestCase):
     """
     test the Cosmic class
@@ -48,14 +50,59 @@ class TestCosmic(unittest.TestCase):
     def test_getHgForOneSec(self):
         """test and plot results from getHgForOneSec"""
 
-        inter = interval()
-        print "now call getHgForOneSec"
-        hg, hg2 = self.cosmic.getHgsForOneSec(self.cosmic.beginTime,inter)
-
         plt.clf()
-        xp,yp = hgPlot.getPlotValues(hg2, ylog=True)
-        plt.plot(xp,yp)
-        plt.margins(0.1, 0.1)
+        inter = interval()
+        for stride in [1,10]:
+            timeHgValues, populationHg = \
+                self.cosmic.getHgsForOneSec(\
+                self.cosmic.beginTime,inter,stride=stride,populationMax=20)
+            xValues = populationHg[1][1:]-0.5
+            xp,yp = hgPlot.getPlotValues\
+                (populationHg, ylog=True)
+            ypNorm = np.array(yp,dtype=np.double)/sum(populationHg[0])
+            
+            nEntries = sum(timeHgValues)
+            nBins = timeHgValues.size
+            mean = stride*nEntries/float(nBins)
+            plt.plot(xp,ypNorm, label="data stride=%d"%stride)
+            plt.yscale('log')
+            limits = plt.axis();
+            poisson = []
+            for x in xValues:
+                prob = (mean**x)*math.exp(-mean)/math.factorial(x)
+                poisson.append(prob)
+                pError = np.sqrt(poisson/sum(populationHg[0]))
+            plt.errorbar(xValues, poisson, pError, \
+                                 label="poisson stride=%d"%stride)
+            plt.ylim(1e-8, 2)
+                
+            plt.margins(0.1, 0.1)
+            ylim = plt.ylim()
+            plt.legend()
+
+            
+        title = "%s %s %s sec=%d"%(self.fn.run,self.fn.date,self.fn.tstamp,self.cosmic.beginTime)
+        plt.title(title)
+        plt.xlabel("N")
+        plt.ylabel("probability(N)")
         plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
+
+    def test_populationFromTimeHgValues(self):
+        minLength = 1000000
+        timeHgValues = np.zeros(minLength, dtype=np.int64)
+        timeHgValues[90001] = 1
+        timeHgValues[90002] = 1
+        timeHgValues[90003] = 1
+
+        populationMax = 5
+        stride = 10
+        populationHg = Cosmic.populationFromTimeHgValues(
+            timeHgValues, populationMax, stride)
+        #print "populationHg[0]=",populationHg[0]
+        self.assertEquals(populationHg[0][0], 199997)
+        self.assertEquals(populationHg[0][1], 0)
+        self.assertEquals(populationHg[0][2], 0)
+        self.assertEquals(populationHg[0][3], 2)
+        self.assertEquals(populationHg[0][4], 0)
 if __name__ == '__main__':
     unittest.main()
