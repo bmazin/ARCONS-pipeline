@@ -6,7 +6,9 @@ from util.FileName import FileName
 from util import utils
 import tables
 import matplotlib.pyplot as plt
-from hotpix import hotPixels
+import hotpix.hotPixels as hp
+import os
+from time import time
 
 
 run = 'PAL2012'
@@ -32,28 +34,34 @@ seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '1
 # Final sequence, toward end of run, thin high clouds at around 12:50, moved to confirm position at '122234', also at '130752' at 125s. (16,15)
 seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238', '123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
 
+seqHMCnc= ['074719', '075225','075753','080456','080959','081501', '082004', '082507', '083009','083747', '084257', '084759', '085302', '085805','090308','090810']
+seq0651=['095930','100453','100955','101457','101959', '102501', '103003', '103505', '104007','104509', '105050', '105553', '110055','110557','111100','111602', '112104','112606', '113108', '113611', '114113', '114615', '115118']
+
 # Date and cal time stamp arrays
 #utcDates = ['20121209','20121209','20121211', '20121211', '20121211', '20121212']
 #sunsetDates = ['20121208','20121208','20121210', '20121210', '20121210', '20121211']
 #calTimestamps = ['20121209-131132','20121209-133419', '20121211-074031', '20121211-074031', '20121211-133056', '20121212-133821']
-utcDates = ['20121211', '20121211', '20121211']
-sunsetDates = ['20121210', '20121210', '20121210']
-calTimestamps = ['20121211-074031', '20121211-074031', '20121211-133056']
+utcDates = ['20121209','20121209']
+sunsetDates = ['20121208','20121208']
+calTimestamps = ['20121209-131132','20121209-133419']
+#utcDates = ['20121206']
+#sunsetDates = ['20121205']
+#calTimestamps = ['20121206-115709']
 
 #seqs = [seq0,seq1,seq2,seq3,seq4,seq5]
-seqs=[seq2,seq3,seq4]
+seqs=[seq0,seq1]
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
-#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
-#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121206/flatsol_20121206.h5'
+flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 #/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
 
-integrationTime=3
+integrationTime=10
 frames = []
 showframes = []
 times = []
@@ -73,10 +81,17 @@ for iSeq in range(len(seqs)):
     wfn = wvlCalFilenames[iSeq]
     ffn = flatCalFilenames[iSeq]
     sunsetDate = sunsetDates[iSeq]
+    
     for i,ts in enumerate(timestampList):
         print 'loading',ts
         obsFn = FileName(run=run,date=sunsetDate,tstamp=ts).obs()
         ob = ObsFile(obsFn)
+	index1 = obsFn.find('_')
+	hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
+        if not os.path.exists(hotPixFn):
+            hp.findHotPixels(obsFn,hotPixFn)
+            print "Flux file pixel mask saved to %s"%(hotPixFn)
+        ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
         ob.setWvlCutoffs(3000,5000)
@@ -88,23 +103,22 @@ for iSeq in range(len(seqs)):
 		if (ob.wvlRangeTable[y][x][1] < 11000):
 		    bad_solution_mask[y][x] = 1
 		    bad_count = bad_count+1
-        print bad_count
 
         startJD = ob.getFromHeader('jd')
         nSecInFile = ob.getFromHeader('exptime')
+	#tic = time()
         deadMask = ob.getDeadPixels()
+	#print 'Dead mask load time = ', time()-tic
         for sec in range(0,nSecInFile,integrationTime):
             jd = startJD + sec/(24.*3600.)#add seconds offset to julian date
             print count,jd
             count+=1
             times.append(jd)
             titles.append('%.6f'%jd)
-            frame = ob.getPixelCountImage(firstSec=sec,integrationTime=integrationTime,weighted=True)
-            hotPixMask = hotPixels.checkInterval(image=frame, firstSec=sec, intTime=integrationTime, weighted=True, display=True)['mask']            
+            frameData = ob.getPixelCountImage(firstSec=sec,integrationTime=integrationTime,weighted=True)
+	    frame = frameData['image']         
             showFrame = np.array(frame)
-            showFrame[hotPixMask == 1] = 0
             showframes.append(showFrame)
-            frame[hotPixMask == 1] = np.nan
             frame[deadMask == 0] = np.nan
             frames.append(frame)
           
