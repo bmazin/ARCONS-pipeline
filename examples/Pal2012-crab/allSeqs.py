@@ -282,6 +282,32 @@ def main():
               fancybox=True, shadow=True, ncol=8)
     plt.show()
 
+    #in case phaseOffset pushed a phase past 1. roll it back 
+    periodIndices=np.array(totalPhases,dtype=np.int)
+    phases = totalPhases % 1.0 
+    #determine which period each mjd timestamp falls in
+    #make folded phase hist
+    phases = phases[0:len(phases)]
+    histPhases,phaseBinEdges = np.histogram(phases,bins=nPhaseBins)
+
+    plt.plot(phaseBinEdges[0:-1],histPhases)
+    plt.show()
+
+    firstPeriod = periodIndices.min()
+    lastPeriod = periodIndices.max()
+    nPeriods = lastPeriod-firstPeriod+1
+    periodBins = np.arange(firstPeriod,lastPeriod+2)
+
+    #Count how many timestamps/photons occur in each period
+    singlePeriodCounts,periodBinEdges = np.histogram(periodIndices,bins=periodBins)
+    plt.plot(periodBinEdges[:-1],singlePeriodCounts)
+    plt.show()
+
+    #make a histogram of counts in each period
+    histSinglePeriodCounts,countBinEdges = np.histogram(singlePeriodCounts,bins=50)
+    plt.plot(countBinEdges[:-1],histSinglePeriodCounts)
+    plt.show()
+
 if __name__=='__main__':
     main()
 
