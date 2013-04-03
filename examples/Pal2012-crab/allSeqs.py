@@ -148,9 +148,15 @@ def main():
         for iOb,ob in enumerate(obList):
             ob.loadWvlCalFile(wvlFileNames[iSeq])
             ob.setWvlCutoffs(3000,8000)
+            obsUtcDate = obsUtcDates[iSeq]
+            sunsetDate = str(int(obsUtcDate)-1)
+            pmLogFileName = FileName(run='PAL2012',date=sunsetDate,tstamp=obsUtcDate+'-'+obsFileNameTimestamps[iSeq][iOb]).packetMasterLog()
             try:
-                f = open('/ScienceData/PacketMasterLogs/obs_%s-%s.log'%(obsUtcDate,obsSequences[iSeq].strip().split()[iOb]),'r')
+                
+                #f = open('/ScienceData/PacketMasterLogs/obs_%s-%s.log'%(obsUtcDate,obsSequences[iSeq].strip().split()[iOb]),'r')
+                f = open(pmLogFileName,'r')
             except:
+                print 'missing Packet Master Log ',pmLogFileName
                 continue
             lastTstampLines = np.zeros(8)
             firstTstampLines = np.zeros(8)
@@ -182,7 +188,7 @@ def main():
             
             print os.path.split(obsFileNames[iSeq][iOb])[1],
             for i in range(8):
-                print '%.2f'%(lastTstampLines[i]+firstPacketDelay-300),
+                print '%d'%((lastTstampLines[i]+firstPacketDelay-300)//1.),
             print ''
 
     #obsDate = obList[0].getFromHeader('jd')
