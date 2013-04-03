@@ -52,8 +52,8 @@ def calculateFreq(mjd,secOffset=0):
     return freq
 
 def main():
-    overwriteOutFile = False
-    outFile = 'mjdTimesSeq2day38.npz'
+    overwriteOutFile = True
+    outFile = 'testWDelays.npz'
 
 
     obsSequence0="""
@@ -62,21 +62,6 @@ def main():
     052520
     """
     obsSequence1="""
-    033323
-    033825
-    034327
-    034830
-    035332
-    035834
-    040336
-    040838
-    041341
-    041843
-    042346
-    042848
-    043351
-    043853
-    044355
     044857
     045359
     045902
@@ -96,38 +81,94 @@ def main():
 
     obsSequence3="""
     054926
-    055428
-    055930
-    060432
-    060934
-    061436
-    061938
-    062440
-    062942
     """
 
-    needPlusOne = """
-    034327
-    040838
-    041843
-    042848
-    050404
-    062942
-    """
 
-    needPlusOne = needPlusOne.strip().split()
-    obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
-    wvlCals = ['051341','063518','063518','063518']
+    obsSequences = [obsSequence1,obsSequence2,obsSequence3]
+    wvlCals = ['063518','063518','063518']
 
     #Row coordinate of center of crab pulsar for each obsSequence
-    centersRow = [9,29,29,10] 
+    centersRow = [29,29,10] 
     #Col coordinate of center of crab pulsar for each obsSequence
-    centersCol = [13,28,30,14] 
+    centersCol = [28,30,14] 
 
+
+    obsUtcDate = '20121212'
+    obsUtcDates = ['20121212','20121212','20121212']
+
+#    obsSequence0="""
+#    051516
+#    052018
+#    052520
+#    """
+#    obsSequence1="""
+#    033323
+#    033825
+#    034327
+#    034830
+#    035332
+#    035834
+#    040336
+#    040838
+#    041341
+#    041843
+#    042346
+#    042848
+#    043351
+#    043853
+#    044355
+#    044857
+#    045359
+#    045902
+#    """
+#
+#    obsSequence2="""
+#    050404
+#    050907
+#    051409
+#    051912
+#    052414
+#    052917
+#    053419
+#    053922
+#    054424
+#    """
+#
+#    obsSequence3="""
+#    054926
+#    055428
+#    055930
+#    060432
+#    060934
+#    061436
+#    061938
+#    062440
+#    062942
+#    """
+#
+#    needPlusOne = """
+#    034327
+#    040838
+#    041843
+#    042848
+#    050404
+#    062942
+#    """
+#
+#    needPlusOne = needPlusOne.strip().split()
+#    obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
+#    wvlCals = ['051341','063518','063518','063518']
+#
+#    #Row coordinate of center of crab pulsar for each obsSequence
+#    centersRow = [9,29,29,10]
+#    #Col coordinate of center of crab pulsar for each obsSequence
+#    centersCol = [13,28,30,14]
+#
+#
+#    obsUtcDate = '20121212'
+#    obsUtcDates = ['20121206','20121212','20121212','20121212']
 
     obsFileNames = []
-    obsUtcDate = '20121212'
-    obsUtcDates = ['20121206','20121212','20121212','20121212']
     obsFileNameTimestamps = []
     wvlFileNames = []
     for iSeq in range(len(obsSequences)):
@@ -146,50 +187,12 @@ def main():
     #print 'fileName','headerUnix','headerUTC','logUnix','packetReceivedUnixTime'
     for iSeq,obList in enumerate(obLists):
         for iOb,ob in enumerate(obList):
+            ob.loadTimeAdjustmentFile(FileName(run='PAL2012').timeAdjustments())
+            print ob.fileName,ob.roachDelays,ob.firmwareDelay
             ob.loadWvlCalFile(wvlFileNames[iSeq])
             ob.setWvlCutoffs(3000,8000)
             obsUtcDate = obsUtcDates[iSeq]
             sunsetDate = str(int(obsUtcDate)-1)
-            pmLogFileName = FileName(run='PAL2012',date=sunsetDate,tstamp=obsUtcDate+'-'+obsFileNameTimestamps[iSeq][iOb]).packetMasterLog()
-            try:
-                
-                #f = open('/ScienceData/PacketMasterLogs/obs_%s-%s.log'%(obsUtcDate,obsSequences[iSeq].strip().split()[iOb]),'r')
-                f = open(pmLogFileName,'r')
-            except:
-                print 'missing Packet Master Log ',pmLogFileName
-                continue
-            lastTstampLines = np.zeros(8)
-            firstTstampLines = np.zeros(8)
-            for line in f:
-                if line.split(' ')[0] == 'bundle':
-                    tstampLine = line
-                    break
-            for line in f:
-                if line.split(' ')[0] == 'bundle':
-                    at = float(line.split('at')[1].split()[0])
-                    lastTstampLine = at
-                    iRoach = int(line.split('roach')[1].split('took')[0].strip())
-                    lastTstampLines[iRoach] = at
-                    if firstTstampLines[iRoach] == 0:
-                        firstTstampLines[iRoach] = at
-                
-#                for line in f:
-#                    if line.split(' ')[0] == 'bundle':
-#                        lastTstampLine = line
-            packetReceivedUnixTimestamp = float((tstampLine.split('took')[1].split('total')[0].strip()))
-#                lastPacketReceivedUnixTimestamp = float(lastTstampLine.split('at')[1].split()[0])
-            firstPacketDelay = packetReceivedUnixTimestamp-int(ob.getFromHeader('unixtime'))
-            #print os.path.split(obsFileNames[iSeq][iOb])[1],time.strftime(tstampFormat,time.gmtime(int(ob.getFromHeader('unixtime')))),time.strftime(tstampFormat,time.gmtime(packetReceivedUnixTimestamp)),packetReceivedUnixTimestamp,lastPacketReceivedUnixTimestamp
-            #print os.path.split(obsFileNames[iSeq][iOb])[1],time.strftime(tstampFormat,time.gmtime(int(ob.getFromHeader('unixtime')))),'%.3f'%firstPacketDelay,'%.2f'%(lastPacketReceivedUnixTimestamp),'%.2f'%(lastPacketReceivedUnixTimestamp+firstPacketDelay)
-#            print os.path.split(obsFileNames[iSeq][iOb])[1],
-#            for i in range(8):
-#                print '%.2f'%firstTstampLines[i],
-#            print ''
-            
-            print os.path.split(obsFileNames[iSeq][iOb])[1],
-            for i in range(8):
-                print '%d'%((lastTstampLines[i]+firstPacketDelay-300)//1.),
-            print ''
 
     #obsDate = obList[0].getFromHeader('jd')
 
@@ -246,21 +249,11 @@ def main():
 
                     jdTimestamps = obsDate+timestamps /secsPerDay
                     jdTimesOb = np.append(jdTimesOb,jdTimestamps)
-                if obsFileNameTimestamps[iSeq][iOb] in needPlusOne:
-                    jdTimesOb += 1./secsPerDay
                 mjdTimesList.append(jdTimesOb-epochMJD)
                 jdTimes = np.append(jdTimes,jdTimesOb)
         mjdTimes = jdTimes - epochMJD #convert to modified jd
         np.savez(outFile,mjdTimes=mjdTimes,mjdTimesList=mjdTimesList)
     mjdTime0 = obsDate0-epochMJD
-
-    needPlusOneMask = []
-    for iSeq,obList in enumerate(obLists):
-        for iOb,ob in enumerate(obList):
-            if obsFileNameTimestamps[iSeq][iOb] in needPlusOne:
-                needPlusOneMask.append(1)
-            else:
-                needPlusOneMask.append(0)
 
     phaseOffset = 0
     print freq0
@@ -287,32 +280,6 @@ def main():
     # Put a legend below current axis
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
               fancybox=True, shadow=True, ncol=8)
-    plt.show()
-        
-    #in case phaseOffset pushed a phase past 1. roll it back 
-    periodIndices=np.array(totalPhases,dtype=np.int)
-    phases = totalPhases % 1.0 
-    #determine which period each mjd timestamp falls in
-    #make folded phase hist
-    phases = phases[0:len(phases)]
-    histPhases,phaseBinEdges = np.histogram(phases,bins=nPhaseBins)
-
-    plt.plot(phaseBinEdges[0:-1],histPhases)
-    plt.show()
-
-    firstPeriod = periodIndices.min()
-    lastPeriod = periodIndices.max()
-    nPeriods = lastPeriod-firstPeriod+1
-    periodBins = np.arange(firstPeriod,lastPeriod+2)
-
-    #Count how many timestamps/photons occur in each period
-    singlePeriodCounts,periodBinEdges = np.histogram(periodIndices,bins=periodBins)
-    plt.plot(periodBinEdges[:-1],singlePeriodCounts)
-    plt.show()
-
-    #make a histogram of counts in each period
-    histSinglePeriodCounts,countBinEdges = np.histogram(singlePeriodCounts,bins=50)
-    plt.plot(countBinEdges[:-1],histSinglePeriodCounts)
     plt.show()
 
 if __name__=='__main__':
