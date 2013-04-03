@@ -269,15 +269,21 @@ class Cosmic:
                 plt.plot([t0,t1],[y,y],'r', linewidth=4)
             y -= 2
 
-    def findCosmics(self):
-        print "begin findCosmics flashInterval=",self.flashInterval['all']
+    def findCosmics(self, stride=10, threshold=10, populationMax=20):
+        print "begin findCosmics"
         tickDur = self.file.tickDuration
         interFullSec = interval[0, (1.0/tickDur)-1]
+        allPopulationHgValues = np.zeros(populationMax)
         for iSec in range(self.beginTime, self.endTime):
-            inter = (self.flashInterval['all'] & \
-                interval[iSec/tickDur, ((iSec+1)/tickDur)-1]) - iSec/tickDur
-            print "findCosmics:  iSec=",iSec,"  inter=",inter
-            hg = self.getHgForOneSec(iSec, inter)
+            print "findCosmics:  iSec=",iSec
+            inter = interval()
+            #inter = (self.flashInterval['all'] & \
+            #    interval[iSec/tickDur, ((iSec+1)/tickDur)-1]) - iSec/tickDur
+
+            timeHgValues,populationHg = self.getHgsForOneSec(\
+                iSec, inter, stride, populationMax)
+            allPopulationHgValues += populationHg[0]
+        return (allPopulationHgValues,populationHg[1])
 
     def getHgsForOneSec(self, iSec, inter, stride=1, populationMax=10):
         """

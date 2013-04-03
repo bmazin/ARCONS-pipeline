@@ -104,5 +104,28 @@ class TestCosmic(unittest.TestCase):
         self.assertEquals(populationHg[0][2], 0)
         self.assertEquals(populationHg[0][3], 2)
         self.assertEquals(populationHg[0][4], 0)
+
+    def test_FindCosmics(self):
+        self.cosmic.findFlashes()
+        plt.clf()
+        inter = interval()
+        stride = 10
+        threshold = 10
+        populationMax = 100
+        populationHg = self.cosmic.findCosmics(stride, threshold, populationMax)
+        xValues = populationHg[1][1:]-0.5
+        xp,yp = hgPlot.getPlotValues\
+            (populationHg, ylog=True)
+        ypNorm = np.array(yp,dtype=np.double)/sum(populationHg[0])
+        
+        plt.plot(xp, yp, label="data stride=%d"%stride)
+
+        #nEntries = sum(timeHgValues)
+        #nBins = timeHgValues.size
+        #mean = stride*nEntries/float(nBins)
+
+        plt.yscale('log')
+        plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
+
 if __name__ == '__main__':
     unittest.main()
