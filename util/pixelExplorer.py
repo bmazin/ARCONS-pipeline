@@ -181,6 +181,7 @@ class AppForm(QMainWindow):
         if stackLabel == 'raw':
             paramsLabel = 'obs'
             weighted = False
+            getRawCounts = True
         x = self.stackObsFileLists[paramsLabel][0].getSpectralCube(weighted=weighted)
         spectra = x['cube']
         wvlBinEdges = x['wvlBinEdges']
@@ -223,6 +224,8 @@ class AppForm(QMainWindow):
             self.showTwilightArrayReducedChisqImage()
         if self.params['showSkyArrayImage']:
             self.showSkyArrayImage()
+        if self.params['showArrayLaserImage']:
+            self.showArrayLaserImage()
 
     def clickCanvas(self,event):
         if event.inaxes is self.axes0:
@@ -260,9 +263,12 @@ class AppForm(QMainWindow):
                 self.showPixelStdVsIntTime(row,col)
 
     def showArrayRawImage(self):
-        self.rawFrame[np.isnan(self.rawFrame)] = 0
-        #self.popUpArray(image=self.rawFrame,title='raw image')
-        PopUp(parent=self,title='showArrayRawImage').plotArray(image=self.rawFrame,title='raw image')
+        output = self.obList[0].getPixelCountImage(getRawCount=True,weighted=False)
+        frame = output['image']
+        for ob in self.obList[1:]:
+            output = ob.getPixelCountImage(getRawCount=True,weighted=False)
+            frame += output['image']
+        PopUp(parent=self,title='showArrayRawImage').plotArray(image=frame,title='raw image')
 
     def showArrayStdVsIntTime(self):
         intTimes = [1,2,3,5,10,15,30]
@@ -328,11 +334,12 @@ class AppForm(QMainWindow):
     def showPixelSpectrum(self,row,col):
         spectrum = self.spectra[row,col]
         binWidths = np.diff(self.wvlBinEdges)
-        spectrum/=binWidths
         if self.params['showPixelRawSpectrum']:
-            rawSpectrum = self.rawSpectra[row,col]
+            weights = self.flatInfo['weights'][row,col]
+            rawSpectrum = self.spectra[row,col]/weights
             rawSpectrum/=binWidths
 
+        spectrum/=binWidths
         pop = PopUp(parent=self,title='showPixelSpectrum')
         pop.axes.step(self.wvlBinEdges[:-1],spectrum,label='calibrated',color='b',where='post')
         if self.params['showPixelRawSpectrum']:
@@ -384,6 +391,13 @@ class AppForm(QMainWindow):
         pop.axes.set_title('Light Curve (%d,%d)'%(row,col))
         pop.draw()
 
+    def showArrayLaserImage(self):
+        getImageOutput = self.cal.getPixelCountImage(getRawCount=True,weighted=False)
+        frame = getImageOutput['image']
+        #self.popUpArray(image=self.rawFrame,title='raw image')
+        pop = PopUp(parent=self,title='showArrayLaserImage')
+        pop.plotArray(image=frame,title='laser cal raw image')
+        
     def showPixelLaserSpectrum(self,row,col):
         #First plot the laser cal spectrum for this pixel to see if it's good
         x = self.cal.getTimedPacketList(row,col)
@@ -391,9 +405,13 @@ class AppForm(QMainWindow):
         pop = PopUp(parent=self,title='showPixelLaserSpectrum')
         nBins=np.max(phases)-np.min(phases)
         histPhases,binEdges = np.histogram(phases,bins=nBins)
-        lambdaBinEdges = self.cal.convertToWvl(binEdges,row,col)
-        pop.axes.step(lambdaBinEdges[:-1],histPhases,where='post',color='k')
+        lambdaBinEdges = self.cal.convertToWvl(binEdges,row,col,excludeBad=True)
         pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        if len(lambdaBinEdges)==0: #no wavecal for this pixel, so lambdaBinEdges came back empty
+            lambdaBinEdges = binEdges
+            pop.axes.set_xlabel('phase (ADU)')
+        pop.axes.step(lambdaBinEdges[:-1],histPhases,where='post',color='k')
+
         pop.axes.set_ylabel('counts')
         pop.axes.set_title('Raw Laser Cal Spectrum (%d,%d)'%(row,col))
         wvlCalSigma = self.cal.wvlErrorTable[row,col]
@@ -424,6 +442,8 @@ class AppForm(QMainWindow):
         blueGaussFit = bluePhaseAmp*np.exp(-1/2*((phases-bluePhaseOffset)/bluePhaseSigma)**2)
         redGaussFit = redPhaseAmp*np.exp(-1/2*((phases-redPhaseOffset)/redPhaseSigma)**2)
         wavelengths = self.cal.convertToWvl(phases,row,col)
+        if len(wavelengths)==0: #no wavecal for this pixel, so lambdaBinEdges came back empty
+            wavelengths=phases
         pop.axes.plot(wavelengths,blueGaussFit,'b')
         pop.axes.plot(wavelengths,redGaussFit,'r')
         pop.draw()
