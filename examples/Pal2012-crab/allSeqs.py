@@ -53,48 +53,8 @@ def calculateFreq(mjd,secOffset=0):
 
 def main():
     overwriteOutFile = True
-    outFile = 'testWDelays.npz'
+    outFile = 'mjdTimes2Days38.npz'
 
-
-    obsSequence0="""
-    051516
-    052018
-    052520
-    """
-    obsSequence1="""
-    044857
-    045359
-    045902
-    """
-
-    obsSequence2="""
-    050404
-    050907
-    051409
-    051912
-    052414
-    052917
-    053419
-    053922
-    054424
-    """
-
-    obsSequence3="""
-    054926
-    """
-
-
-    obsSequences = [obsSequence1,obsSequence2,obsSequence3]
-    wvlCals = ['063518','063518','063518']
-
-    #Row coordinate of center of crab pulsar for each obsSequence
-    centersRow = [29,29,10] 
-    #Col coordinate of center of crab pulsar for each obsSequence
-    centersCol = [28,30,14] 
-
-
-    obsUtcDate = '20121212'
-    obsUtcDates = ['20121212','20121212','20121212']
 
 #    obsSequence0="""
 #    051516
@@ -102,21 +62,6 @@ def main():
 #    052520
 #    """
 #    obsSequence1="""
-#    033323
-#    033825
-#    034327
-#    034830
-#    035332
-#    035834
-#    040336
-#    040838
-#    041341
-#    041843
-#    042346
-#    042848
-#    043351
-#    043853
-#    044355
 #    044857
 #    045359
 #    045902
@@ -136,37 +81,85 @@ def main():
 #
 #    obsSequence3="""
 #    054926
-#    055428
-#    055930
-#    060432
-#    060934
-#    061436
-#    061938
-#    062440
-#    062942
 #    """
 #
-#    needPlusOne = """
-#    034327
-#    040838
-#    041843
-#    042848
-#    050404
-#    062942
-#    """
 #
-#    needPlusOne = needPlusOne.strip().split()
-#    obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
-#    wvlCals = ['051341','063518','063518','063518']
+#    obsSequences = [obsSequence1,obsSequence2,obsSequence3]
+#    wvlCals = ['063518','063518','063518']
 #
 #    #Row coordinate of center of crab pulsar for each obsSequence
-#    centersRow = [9,29,29,10]
+#    centersRow = [29,29,10] 
 #    #Col coordinate of center of crab pulsar for each obsSequence
-#    centersCol = [13,28,30,14]
+#    centersCol = [28,30,14] 
 #
 #
 #    obsUtcDate = '20121212'
-#    obsUtcDates = ['20121206','20121212','20121212','20121212']
+#    obsUtcDates = ['20121212','20121212','20121212']
+
+    obsSequence0="""
+    051516
+    052018
+    052520
+    """
+    obsSequence1="""
+    033323
+    033825
+    034327
+    034830
+    035332
+    035834
+    040336
+    040838
+    041341
+    041843
+    042346
+    042848
+    043351
+    043853
+    044355
+    044857
+    045359
+    045902
+    """
+
+    obsSequence2="""
+    050404
+    050907
+    051409
+    051912
+    052414
+    052917
+    053419
+    053922
+    054424
+    """
+
+    obsSequence3="""
+    054926
+    055428
+    055930
+    060432
+    060934
+    061436
+    061938
+    062440
+    062942
+    """
+
+    obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
+    wvlCals = ['051341','063518','063518','063518']
+
+    #Row coordinate of center of crab pulsar for each obsSequence
+    centersRow = [9,29,29,10]
+    #Col coordinate of center of crab pulsar for each obsSequence
+    centersCol = [13,28,30,14]
+
+
+    obsUtcDate = '20121212'
+    obsUtcDates = ['20121206','20121212','20121212','20121212']
+
+    lowerWvlCutoff=3000
+    upperWvlCutoff=8000
 
     obsFileNames = []
     obsFileNameTimestamps = []
@@ -190,7 +183,7 @@ def main():
             ob.loadTimeAdjustmentFile(FileName(run='PAL2012').timeAdjustments())
             print ob.fileName,ob.roachDelays,ob.firmwareDelay
             ob.loadWvlCalFile(wvlFileNames[iSeq])
-            ob.setWvlCutoffs(3000,8000)
+            ob.setWvlCutoffs(lowerWvlCutoff,upperWvlCutoff)
             obsUtcDate = obsUtcDates[iSeq]
             sunsetDate = str(int(obsUtcDate)-1)
 
@@ -252,7 +245,7 @@ def main():
                 mjdTimesList.append(jdTimesOb-epochMJD)
                 jdTimes = np.append(jdTimes,jdTimesOb)
         mjdTimes = jdTimes - epochMJD #convert to modified jd
-        np.savez(outFile,mjdTimes=mjdTimes,mjdTimesList=mjdTimesList)
+        np.savez(outFile,mjdTimes=mjdTimes,mjdTimesList=mjdTimesList,obsFileNameTimestamps=obsFileNameTimestamps,obsUtcDates=obsUtcDates,wvlCals=wvlCals,centersRow=centersRow,centersCol=centersCol)
     mjdTime0 = obsDate0-epochMJD
 
     phaseOffset = 0
