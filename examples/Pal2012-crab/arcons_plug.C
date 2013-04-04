@@ -1,9 +1,12 @@
 /*
-To install the plugin (replace "linux" as needed to match the other installed plugins):
+To install the plugin (replace "linux-gnu" as needed to match the other installed plugins):
 NOTE: You might need a -fPIC flag on g++ depending on how tempo2 was compiled...
 
-g++ arcons_plug.C -shared -fPIC -o arcons_linux_plug.t2 -I $TEMPO2/include
-cp arcons_linux_plug.t2 $TEMPO2/plugins
+g++ arcons_plug.C -shared -fPIC -o arcons_linux-gnu_plug.t2 -I $TEMPO2/include
+cp arcons_linux-gnu_plug.t2 $TEMPO2/plugins
+
+to run:
+tempo2 -gr arcons -f B0531+21.par -a crab_correctMJD.txt -o demo.txt
 */
 
 #include <stdio.h>
@@ -147,7 +150,8 @@ extern "C" int graphicalInterface(int argc,char *argv[],pulsar *psr,int *npsr)
 			for (int i=1;i<n+1;i++)
 			{
 				double intpart;
-				fprintf(oFile,"%.12Lf %f\n",psr[0].obsn[i].bat,modf((double)psr[0].obsn[i].phase,&intpart));
+				//fprintf(oFile,"%.12Lf %f\n",psr[0].obsn[i].bat,modf((double)psr[0].obsn[i].phase,&intpart));
+				fprintf(oFile,"%d %.12Lf %f\n",i,psr[0].obsn[i].bat,(double)psr[0].obsn[i].phase);
 				tot_photons++;
 			}
 
