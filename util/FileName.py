@@ -13,7 +13,7 @@ tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 import os
 class FileName:
     
-    def __init__(self, run, date, tstamp, \
+    def __init__(self, run='', date='', tstamp='', \
                  mkidDataDir="/ScienceData", intermDir="/Scratch"):
         self.mkidDataDir = mkidDataDir
         self.intermDir = intermDir
@@ -54,6 +54,13 @@ class FileName:
             self.date + os.sep + \
             "calsol_" + self.tstamp + '.h5'
 
+    def calDriftInfo(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.date + os.sep + \
+            'drift_study'+ os.sep+\
+            "calsol_" + self.tstamp + '_drift.h5'
+
     def flatSoln(self):
         return self.intermDir + os.sep + \
             'flatCalSolnFiles' + os.sep + \
@@ -66,4 +73,14 @@ class FileName:
             self.date + os.sep + \
             "photons_" + self.tstamp + '.h5'
                            
+    def packetMasterLog(self):
+        return self.mkidDataDir + os.sep + \
+            'PacketMasterLogs' + os.sep + \
+            "obs_" + self.tstamp + '.log'
+
+    def timeAdjustments(self):
+        return self.intermDir + os.sep + \
+            'timeAdjust' + os.sep + \
+            self.run + '.h5'
+
                             
