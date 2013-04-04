@@ -69,6 +69,11 @@ class ObsFile:
             #does not have data from all roaches
             maxDelay = np.max(self.roachDelays)
             entry -= maxDelay
+        if name=='unixtime' and self.timeAdjustFile != None:
+            #the way getPixel retrieves data accounts for individual roach delay,
+            #but shifted everything by np.max(self.roachDelays), relabeling sec maxDelay as sec 0
+            #so, add maxDelay to the header start time, so all times will be correct relative to it
+            entry += np.max(self.roachDelays)
         return entry
 
 
@@ -144,11 +149,6 @@ class ObsFile:
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
 
-    def getFromHeader(self, name):
-        """
-        returns the value for name in the header
-        """
-        return self.info[self.titles.index(name)]
 
     def __iter__(self):
         """
@@ -472,9 +472,7 @@ class ObsFile:
 
         if self.timeAdjustFile != None:
             timestamps += self.firmwareDelay
-            #the way getPixel retrieves data accounted for individual roach delay,
-            #but shifted everything by np.max(self.roachDelays), so shift it back here
-            timestamps += np.max(self.roachDelays)
+            #timestamps += np.max(self.roachDelays)
 
 
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
