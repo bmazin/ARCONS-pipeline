@@ -53,9 +53,11 @@ class TestCosmic(unittest.TestCase):
         plt.clf()
         inter = interval()
         for stride in [1,10]:
-            timeHgValues, populationHg = \
+            ghfos = \
                 self.cosmic.getHgsForOneSec(\
                 self.cosmic.beginTime,inter,stride=stride,populationMax=20)
+            populationHg = ghfos['populationHg']
+            timeHgValues = ghfos['timeHgValues']
             xValues = populationHg[1][1:]-0.5
             xp,yp = hgPlot.getPlotValues\
                 (populationHg, ylog=True)
@@ -88,22 +90,42 @@ class TestCosmic(unittest.TestCase):
         plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
 
     def test_populationFromTimeHgValues(self):
+        """
+        test the funcion Cosmic.populationFromTimeHgValues.
+
+        Make a time stream where in successive time values you have 1,3,1
+        photons.  Look for cosmic events with a threshold of 4.  Arrange
+        the time stream so that one of the large bins (starting at 89995)
+        overlaps the time stamps with all five photons, but the next one
+        (starting at 90000) only overlaps 4 photons.  With the threshold
+        set to 4, the bin starting at 89995 is found and the bin starting
+        at 90000 is not found.
+        """
         minLength = 1000000
         timeHgValues = np.zeros(minLength, dtype=np.int64)
+        timeHgValues[89999] = 1
+        timeHgValues[90000] = 3
         timeHgValues[90001] = 1
-        timeHgValues[90002] = 1
-        timeHgValues[90003] = 1
 
-        populationMax = 5
+        populationMax = 10
         stride = 10
-        populationHg = Cosmic.populationFromTimeHgValues(
-            timeHgValues, populationMax, stride)
+        threshold = 4
+        pfthv = Cosmic.populationFromTimeHgValues(
+            timeHgValues, populationMax, stride, threshold)
+
+        cosmicTimeList = pfthv['cosmicTimeList']
+        #print "cosmicTimeList=",cosmicTimeList
+        self.assertEquals(cosmicTimeList.size,1)
+        self.assertEquals(cosmicTimeList[0], 89995)
+        populationHg = pfthv['populationHg']
         #print "populationHg[0]=",populationHg[0]
-        self.assertEquals(populationHg[0][0], 199997)
-        self.assertEquals(populationHg[0][1], 0)
+        self.assertEquals(populationHg[0][0], 199996)
+        self.assertEquals(populationHg[0][1], 1)
         self.assertEquals(populationHg[0][2], 0)
-        self.assertEquals(populationHg[0][3], 2)
-        self.assertEquals(populationHg[0][4], 0)
+        self.assertEquals(populationHg[0][3], 0)
+        self.assertEquals(populationHg[0][4], 1)
+        self.assertEquals(populationHg[0][5], 1)
+
 
     def test_FindCosmics(self):
         self.cosmic.findFlashes()
@@ -112,7 +134,8 @@ class TestCosmic(unittest.TestCase):
         stride = 10
         threshold = 10
         populationMax = 100
-        populationHg = self.cosmic.findCosmics(stride, threshold, populationMax)
+        fc = self.cosmic.findCosmics(stride, threshold, populationMax)
+        populationHg = fc['populationHg']
         xValues = populationHg[1][1:]-0.5
         xp,yp = hgPlot.getPlotValues\
             (populationHg, ylog=True)
