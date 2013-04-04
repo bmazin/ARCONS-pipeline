@@ -18,7 +18,6 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from util.ObsFile import ObsFile 
-
 import os
 from PyQt4.QtGui import *
 import hotpix.hotPixels as hp
@@ -34,6 +33,28 @@ class MouseMonitor():
    
     def connect(self):
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+
+# Some useful conversion functions
+def arcsec_to_radians(total_arcsec):
+    total_degrees = total_arcsec/3600.0
+    total_radians = total_degrees*d2r
+    return total_radians
+
+def radians_to_arcsec(total_radians):
+    total_degrees = total_radians*r2d
+    total_arcsec = total_degrees*3600.0
+    return total_arcsec
+
+# Specify input parameters.
+centroid_RA = '09:26:38.7'
+centroid_DEC = '36:24:02.4'
+HA_offset = 19.0
+guessTime = 300
+integrationTime=10
+
+# Some useful conversions
+d2r = np.pi/180.0
+r2d = 180.0/np.pi
 
 # Choose obs, wavecal, and flatcal files
 app = QApplication(sys.argv)
@@ -60,33 +81,51 @@ ob = ObsFile(obsFn)
 # Load wavelength and flat cal solutions
 ob.loadWvlCalFile(wfn)
 ob.loadFlatCalFile(ffn)
-ob.setWvlCutoffs(3000,5000)
+ob.setWvlCutoffs(3000,8000)
 
 # Load/generate hot pixel mask file
 hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
 if not os.path.exists(hotPixFn):
     hp.findHotPixels(obsFn,hotPixFn)
     print "Flux file pixel mask saved to %s"%(hotPixFn)
-ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
+ob.loadHotPixCalFile(hotPixFn,switchOnMask=False)
 print "Hot pixel mask loaded %s"%(hotPixFn)
 
-# Get exptime from header.  Also choose guess time.  This will be the time over which a guess will be valid
-# for the centroid position.  Actual centroid calculated using this guess.  For example, choosing a guess
-# time of 300 will use the same guess for the entire observation file.
+# Get exptime and LST from header.  
 exptime = ob.getFromHeader('exptime')
-guessTime = 300
+original_lst = ob.getFromHeader('lst')
+print 'Original LST from telescope:', original_lst
 
-# Pick an integration time over which to centroid.
-integrationTime=10
+# Initial RA and LST
+centroid_RA_radians = ephem.hours(centroid_RA).real
+centroid_RA_arcsec = radians_to_arcsec(centroid_RA_radians)
+
+centroid_DEC_radians = ephem.degrees(centroid_DEC).real
+centroid_DEC_arcsec = radians_to_arcsec(centroid_DEC_radians)
+
+original_lst_radians = ephem.hours(original_lst).real
+original_lst_seconds = radians_to_arcsec(original_lst_radians)/15.0
 
 # Get array size information from obs file
 gridHeight = ob.nCol
 gridWidth = ob.nRow
 
-# Create saturated pixel mask.  Leave as zero since hot pixel masking already does this for us.
-saturatedMask = np.zeros((gridWidth,gridHeight))
+# Create saturated pixel mask to apply to PyGuide algorithm.
+print 'Creating saturation mask...'
+nFrames = int(exptime/integrationTime)
+saturatedMask = np.zeros(((nFrames,gridWidth,gridHeight)))
+hotPixInfo = hp.readHotPixels(hotPixFn)
+intervalsMatrix = hotPixInfo['intervals']
+for t in range(nFrames):
+    for x in range(gridHeight):
+	for y in range(gridWidth):
+	    if intervalsMatrix[y][x] == []:
+		pass
+	    else:
+		saturatedMask[t][y][x]=1
 
 # Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
+print 'Creating dead mask...'
 deadMask = ob.getDeadPixels()
 deadMask = -1*deadMask + 1
 
@@ -96,7 +135,9 @@ ccd = pg.CCDInfo(0,0.00001,1,2500)
 # Create output file to save centroid data
 outFn = '/home/pszypryt/Scratch/centroid_test/centroid_list.txt'
 f = open(outFn,'w')
+f.write('Time\tX Center\tY Center\tHA\n')
 
+print 'Retrieving images...'
 for iFrame in range(exptime):
     # Integrate over the guess time.  Click a pixel in the plot corresponding to the xy center guess.  This will be used to centroid for the duration of guessTime.
     if iFrame%guessTime == 0:
@@ -106,7 +147,7 @@ for iFrame in range(exptime):
         map = MouseMonitor()
         map.fig = plt.figure()
         map.ax = map.fig.add_subplot(111)
-        map.ax.set_title('Object 1')
+        map.ax.set_title('Centroid Guess')
         map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower')
         map.connect()
         plt.show()
@@ -118,10 +159,11 @@ for iFrame in range(exptime):
     # Centroid an image that has been integrated over integrationTime.
     if iFrame%integrationTime == 0:
 	# Use obsFile to get integrationTime image.
+	satMask=saturatedMask[int(iFrame/integrationTime)]
         imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
         image=imageInformation['image']        
 	# Use PyGuide centroiding algorithm.
-        pyguide_output = pg.centroid(image,deadMask,saturatedMask,xyguess,3,ccd,0,False)
+        pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,3,ccd,0,False)
 	# Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
         try:
             xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
@@ -129,8 +171,15 @@ for iFrame in range(exptime):
         except TypeError:
             print 'Cannot centroid frame' + str(iFrame) + ', using guess instead'
             xycenter = xyguess
+	# Begin RA/DEC mapping
+	current_lst_seconds = original_lst_seconds + iFrame
+        current_lst_radians = arcsec_to_radians(current_lst_seconds*15.0)
+	HA_variable = current_lst_radians - centroid_RA_radians
+        HA_static = HA_offset*d2r
+        HA_current = HA_variable + HA_static
+	HA_degrees = HA_current * r2d
         # Write data to file
         f=open(outFn,'a')
-        f.write(str(iFrame) + '\t' + str(xycenter[0]) + '\t' + str(xycenter[1]) + '\n')
+        f.write(str(iFrame) + '\t' + str(xycenter[0]) + '\t' + str(xycenter[1]) + '\t' + str(HA_degrees) + '\n')
         f.close()
 
