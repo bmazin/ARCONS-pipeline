@@ -7,6 +7,15 @@ import matplotlib.pyplot as plt
 import inspect
 
 class TestObsFile(unittest.TestCase):
+    def testGetFrame(self):
+        fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
+        obsFile = ObsFile.ObsFile(fn.obs())
+        frame = obsFile.getFrame(0,-1)
+        shape = frame.shape
+        self.assertEquals(obsFile.nRow, shape[0])
+        self.assertEquals(obsFile.nCol, shape[1])
+        print "frame=",frame
+
     def testCalculateSlicesMiddle(self):
         "one interval in the middle of the set of timestamps"
         secs = np.arange(10)
