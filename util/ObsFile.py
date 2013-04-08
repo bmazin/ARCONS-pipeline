@@ -116,8 +116,6 @@ class ObsFile:
                 print 'Can\'t read header for ',self.fullFileName
             raise inst
 
-        self.attemptedExpTime = self.getFromHeader('exptime')
-        self.attemptedUnixTime = self.getFromHeader('unixtime')
         # Useful information about data format set here.
         # For now, set all of these as constants.
         # If we get data taken with different parameters, straighten
