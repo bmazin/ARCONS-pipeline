@@ -53,6 +53,10 @@ class ObsFile:
             self.fluxCalFile.close()
         except:
             pass
+        try:
+            self.timeAdjustFile.close()
+        except:
+            pass
         self.file.close()
 
 

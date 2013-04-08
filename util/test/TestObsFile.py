@@ -7,6 +7,34 @@ import matplotlib.pyplot as plt
 import inspect
 
 class TestObsFile(unittest.TestCase):
+    def testGetTimedPhotonPacket(self):
+        fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
+        obsFile = ObsFile.ObsFile(fn.obs())
+        exptime0 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime0, 300)
+        timeAdjustments = fn.timeAdjustments()
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+        exptime1 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime1, 298)
+
+        iRow = 30
+        iCol = 32
+        
+        tpl = obsFile.getTimedPacketList(iRow,iCol)
+        timestamps = tpl['timestamps']
+
+        # Chris S. found these values on April 8, 2012
+        self.assertEquals(timestamps.size,145542)
+        self.assertEquals(timestamps[0],0.002847)
+        self.assertEquals(timestamps[-1],297.999737)
+
+        timestampsUint64 = (timestamps*1e6).astype(np.uint64)
+        self.assertEquals(timestampsUint64.size,145542)
+        self.assertEquals(timestampsUint64[0],2847)
+        self.assertEquals(timestampsUint64[-1],297999737)
+
+        del obsFile
+
     def testGetFrame(self):
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
