@@ -5,8 +5,28 @@ from util import ObsFile, FileName
 from interval import interval, inf, imath
 import matplotlib.pyplot as plt
 import inspect
+from util.FileName import FileName
+from util.ObsFile import ObsFile
 
 class TestObsFile(unittest.TestCase):
+    def testNegativeTimeIssue(self):
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '112709'
+        fileName = FileName(run, sundownDate, obsDate+"-"+seq)
+        timeAdjustments = fileName.timeAdjustments()
+        obsFile = ObsFile(fileName.obs())
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+        iRow = 9
+        iCol = 22
+        firstSec = 0
+        integrationTime = -1
+        gtpl = obsFile.getTimedPacketList(iRow, iCol, 
+                                          firstSec, integrationTime)
+        ts = gtpl['timestamps']
+        print "ts[0]=",ts[0]
+
     def testGetTimedPhotonPacket(self):
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
