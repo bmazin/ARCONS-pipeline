@@ -78,6 +78,7 @@ class ObsFile:
             #but shifted everything by np.max(self.roachDelays), relabeling sec maxDelay as sec 0
             #so, add maxDelay to the header start time, so all times will be correct relative to it
             entry += np.max(self.roachDelays)
+            entry += self.firmwareDelay
         return entry
 
 
@@ -115,6 +116,8 @@ class ObsFile:
                 print 'Can\'t read header for ',self.fullFileName
             raise inst
 
+        self.attemptedExpTime = self.getFromHeader('exptime')
+        self.attemptedUnixTime = self.getFromHeader('unixtime')
         # Useful information about data format set here.
         # For now, set all of these as constants.
         # If we get data taken with different parameters, straighten
@@ -474,8 +477,8 @@ class ObsFile:
         baselines = np.concatenate(baselines)
         peakHeights = np.concatenate(peakHeights)
 
-        if self.timeAdjustFile != None:
-            timestamps += self.firmwareDelay
+#        if self.timeAdjustFile != None:
+#            timestamps += self.firmwareDelay
             #timestamps += np.max(self.roachDelays)
 
 
