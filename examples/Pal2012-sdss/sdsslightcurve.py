@@ -1,8 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
+from util.readDict import readDict
 
-FileName = '/home/pszypryt/sdss_data/20121211/Blue-ImageStackFit.npz'
+param = readDict()
+param.read_from_file('0926params.dict')
+
+FileName = param['npzLoadFitFile']
+FramesPerFile = param['FramesPerFile']
+print FramesPerFile
+TotalNumFiles = param['TotalNumFiles']
+NumFrames = FramesPerFile*TotalNumFiles
+IntTime = param['integrationTime']
 
 FoldPeriod = 0.01966127 #This is in fractions of a day
 t = np.load(FileName)

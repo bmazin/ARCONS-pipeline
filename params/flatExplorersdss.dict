@@ -1,0 +1,17 @@
+##Files and Dirs
+
+run = 'PAL2012'
+intTime = 3
+wvlLowerCutoff = 5000
+wvlUpperCutoff = 7000
+
+obsSunsetDate = '20121211'
+obsUtcDate = '20121212'
+#Geminga sky where light curves are relatively stable
+obsSequence = ['112709', '113212', '113714', '114216', '114718']
+
+wvlSunsetDate = '20121211'
+wvlTimestamp = '20121212-133821'
+
+flatCalSunsetDate = '20121211'
+outFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11PartCut57.npz'

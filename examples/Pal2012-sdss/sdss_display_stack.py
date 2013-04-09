@@ -3,6 +3,7 @@
 import numpy as np
 from util.ObsFile import ObsFile 
 from util.FileName import FileName
+from util.readDict import readDict
 from util import utils
 import tables
 import matplotlib.pyplot as plt
@@ -10,64 +11,47 @@ import hotpix.hotPixels as hp
 import os
 from time import time
 
+param = readDict()
+param.read_from_file('0926params.dict')
 
-run = 'PAL2012'
+run = param['run']
+flatSunsetLocalDate = param['flatSunsetLocalDate']
+flatTimestamp = param['flatTimestamp']
 
-# December 8
-# First sequence, possible reflections at 12:07, 1" SE move at 12:45. (14,8)
-seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
+wvlCalSunsetLocalDate = param['wvlCalSunsetLocalDate']
+wvlCalTimestamp = param['wvlCalTimestamp']
 
-# Sequence during warming up, may need to omit. (14,8)
-seq1 = ['131254', '131802', '132304', '132807']
+expTime = param['expTime']
+integrationTime = param['integrationTime']
 
-# December 10
-# Sequence during 2nd day on object. Moved to confirm position in 082422 between 90 and 105s.'080916' hot pix (31,30)
-seq2 = ['074405', '074907', '075410', '075912', '080414', '080916', '081418', '081920', '082422']
+utcDates = param['utcDates']
+sunsetDates = param['sunsetDates']
 
-# Refocused and started guiding again at 8:37. Ommitting seq 083451, which occured during refocus. (31,30)
-seq3 = ['084029', '084532', '085034', '085536', '090038']
+calTimestamps = param['calTimestamps']
+seqs = param['seqs']
 
-# Back toward end of night, not sure about whether to use cal file '20121211-115429' or '20121211-133056'.  Also, may need to cut out last 2 obs files (14,8)
-seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '123712', '124215', '124809', '125312', '125814', '130316', '130818', '131320', '131822', '132324']
-
-# December 11
-# Final sequence, toward end of run, thin high clouds at around 12:50, moved to confirm position at '122234', also at '130752' at 125s. (16,15)
-seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238', '123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
-
-seqHMCnc= ['074719', '075225','075753','080456','080959','081501', '082004', '082507', '083009','083747', '084257', '084759', '085302', '085805','090308','090810']
-#seq0651=['095930','100453','100955','101457','101959', '102501', '103003', '103505', '104007','104509', '105050', '105553', '110055','110557','111100','111602', '112104','112606', '113108', '113611', '114113', '114615', '115118']
-seq0651=['053921','054423','054925', '055427', '055929', '060432', '060949','061451', '061953', '062455', '062957', '063459', '064002', '064526', '065028', '065530', '070032', '070534', '071037', '071539', '072041']
-
-# Date and cal time stamp arrays
-#utcDates = ['20121209','20121209','20121211', '20121211', '20121211', '20121212']
-#sunsetDates = ['20121208','20121208','20121210', '20121210', '20121210', '20121211']
-#calTimestamps = ['20121209-131132','20121209-133419', '20121211-074031', '20121211-074031', '20121211-133056', '20121212-133821']
-#utcDates = ['20121209','20121209']
-#sunsetDates = ['20121208','20121208']
-#calTimestamps = ['20121209-131132','20121209-133419']
-utcDates = ['20121212']
-sunsetDates = ['20121211']
-calTimestamps = ['20121212-111847']
-
-#seqs = [seq0,seq1,seq2,seq3,seq4,seq5]
-seqs=[seq5]
+wvlLowerCutoff = param['wvlLowerCutoff']
+wvlUpperCutoff = param['wvlUpperCutoff']
+npzFileName = param['npzFileName']
+gifFileName = param['gifFileName']
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
+
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
+#flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
+
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121206/flatsol_20121206.h5'
 #flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 #/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
 
-integrationTime=10
 frames = []
 showframes = []
 times = []
 titles = []
-expTime = 300
 count= 0
 
 NumFiles = []
@@ -95,7 +79,7 @@ for iSeq in range(len(seqs)):
         ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
-        ob.setWvlCutoffs(3000,5000)
+        ob.setWvlCutoffs(wvlLowerCutoff,wvlUpperCutoff)
 
 	bad_solution_mask=np.zeros((46,44))
 	bad_count=0;
@@ -123,9 +107,10 @@ for iSeq in range(len(seqs)):
             frame[deadMask == 0] = np.nan
             frames.append(frame)
           
-        
 cube = np.dstack(frames)
 times = np.array(times)
-np.savez('/home/pszypryt/sdss_data/20121211/Blue-ImageStack.npz',stack=cube,jd=times)
-utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/home/pszypryt/sdss_data/20121211/Blue-ImageStack.gif')
+
+np.savez(npzFileName,stack=cube,jd=times)
+print 'saved'
+utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName=gifFileName)
 

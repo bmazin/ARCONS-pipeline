@@ -53,6 +53,10 @@ class ObsFile:
             self.fluxCalFile.close()
         except:
             pass
+        try:
+            self.timeAdjustFile.close()
+        except:
+            pass
         self.file.close()
 
 
@@ -74,6 +78,7 @@ class ObsFile:
             #but shifted everything by np.max(self.roachDelays), relabeling sec maxDelay as sec 0
             #so, add maxDelay to the header start time, so all times will be correct relative to it
             entry += np.max(self.roachDelays)
+            entry += self.firmwareDelay
         return entry
 
 
@@ -470,8 +475,8 @@ class ObsFile:
         baselines = np.concatenate(baselines)
         peakHeights = np.concatenate(peakHeights)
 
-        if self.timeAdjustFile != None:
-            timestamps += self.firmwareDelay
+#        if self.timeAdjustFile != None:
+#            timestamps += self.firmwareDelay
             #timestamps += np.max(self.roachDelays)
 
 
@@ -1094,8 +1099,29 @@ class ObsFile:
         wvlBinEdges = wvlBinEdges[::-1]
         return wvlBinEdges
 
+    def getFrame(self, firstSec=0, integrationTime=-1):
+        """
+        return a 2d array of numbers with the integrated flux per pixel,
+        suitable for use as a frame in util/utils.py function makeMovie
+
+        firstSec=0 is the starting second to include
+
+        integrationTime=-1 is the number of seconds to include, or -1
+        to include all to the end of this file
 
 
+        output: the frame, in photons per pixel, a 2d numpy array of
+        np.unint32
+
+        """
+        frame = np.zeros((self.nRow,self.nCol),dtype=np.uint32)
+        for iRow in range(self.nRow):
+            for iCol in range(self.nCol):
+                pl = self.getTimedPacketList(iRow,iCol,
+                                             firstSec,integrationTime)
+                nphoton = pl['timestamps'].size
+                frame[iRow][iCol] += nphoton
+        return frame
 
 def calculateSlices_old(inter, timestamps):
     """
