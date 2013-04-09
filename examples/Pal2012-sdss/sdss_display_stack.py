@@ -3,50 +3,35 @@
 import numpy as np
 from util.ObsFile import ObsFile 
 from util.FileName import FileName
+from util.readDict import readDict
 from util import utils
 import tables
 import matplotlib.pyplot as plt
 from hotpix import hotPixels
 
+params = readDict()
+params.read_from_file('0926params.dict')
 
-run = 'PAL2012'
+run = params['run']
+flatSunsetLocalDate = params['flatSunsetLocalDate']
+flatTimestamp = params['flatTimestamp']
 
-# December 8
-# First sequence, possible reflections at 12:07, 1" SE move at 12:45.
-seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
+wvlCalSunsetLocalDate = params['wvlCalSunsetLocalDate']
+wvlCalTimestamp = params['wvlCalTimestamp']
 
-# Sequence during warming up, may need to omit.
-seq1 = ['131254', '131802', '132304', '132807']
+expTime = params['expTime']
+integrationTime = params['integrationTime']
 
-# December 10
-# Sequence during 2nd day on object. Moved to confirm position in 082422 between 90 and 105s.'080916' hot pix
-seq2 = ['074405', '074907', '075410', '075912', '080414', '080916', '081418', '081920', '082422']
+utcDates = params['utcDates']
+sunsetDates = params['sunsetDates']
 
-# Refocused and started guiding again at 8:37. Ommitting seq 083451, which occured during refocus.
-seq3 = ['084029', '084532', '085034', '085536', '090038']
+calTimestamps = params['calTimestamps']
+seqs = params['seqs']
 
-# Back toward end of night, not sure about whether to use cal file '20121211-115429' or '20121211-133056'.  Also, may need to cut out last 2 obs files
-seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '123712', '124215', '124809', '125312', '125814', '130316', '130818', '131320', '131822', '132324']
-
-# December 11
-# Final sequence, toward end of run, thin high clouds at around 12:50, moved to confirm position at '122234', also at '130752' at 125s.
-seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238']
-seq6 = ['123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
-
-# Date and cal time stamp arrays
-#utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212']
-#sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211']
-
-#calTimestamps = ['20121209-131132','20121209-133419', '20121211-090613', '20121211-090613', '20121211-133056', '20121212-111847'] 
-#'20121212-133821' is terrible! 
-#try replacing '20121211-074031' with '20121211-090613'
-utcDates = ['20121211', '20121211']
-sunsetDates = ['20121210', '20121210']
-#utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212']
-#sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211']
-
-calTimestamps = ['20121211-090613', '20121211-090613']
-seqs = [seq2,seq3]
+wvlLowerCutoff = params['wvlLowerCutoff']
+wvlUpperCutoff = params['wvlUpperCutoff']
+npzFileName = params['npzFileName']
+gifFileName = params['gifFileName']
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 
@@ -54,18 +39,17 @@ wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln
 #wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
 #flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
+
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 #flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 #/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
 
-integrationTime=3
 frames = []
 showframes = []
 times = []
 titles = []
-expTime = 300
 #plt.ion()
 count= 0
 
@@ -79,6 +63,7 @@ print (NumFiles)*expTime/integrationTime,'frames to make'
 #print (len(seqs))*expTime/integrationTime,'frames to make'
 for iSeq in range(len(seqs)):
     timestampList = timestampLists[iSeq]
+    print timestampList
     wfn = wvlCalFilenames[iSeq]
     ffn = flatCalFilenames[iSeq]
     sunsetDate = sunsetDates[iSeq]
@@ -88,7 +73,16 @@ for iSeq in range(len(seqs)):
         ob = ObsFile(obsFn)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
-        ob.setWvlCutoffs(5000,7000)
+        ob.setWvlCutoffs(wvlLowerCutoff,wvlUpperCutoff)
+
+	bad_solution_mask=np.zeros((46,44))
+	bad_count=0;
+	for y in range(46):
+	    for x in range(44):
+		if (ob.wvlRangeTable[y][x][1] < 11000):
+		    bad_solution_mask[y][x] = 1
+		    bad_count = bad_count+1
+        print bad_count
 
 #        row1 = 19
 #        col1 = 30
@@ -145,6 +139,9 @@ for iSeq in range(len(seqs)):
 #            frame[hotPixMaskRaw == 1] = np.nan
             frame[hotPixMask == 1] = np.nan
             frame[deadMask == 0] = np.nan
+
+#	    frame[bad_solution_mask == 1] = np.nan
+
             frames.append(frame)
 
 #            print showFrame[np.isnan(showFrame)]
@@ -153,7 +150,8 @@ for iSeq in range(len(seqs)):
         
 cube = np.dstack(frames)
 times = np.array(times)
-np.savez('/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec10SIImageStackRednewCal.npz',stack=cube,jd=times)
+
+np.savez(npzFileName,stack=cube,jd=times)
 print 'saved'
-utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec10SIImageStackRednewCal.gif')
+utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName=gifFileName)
 

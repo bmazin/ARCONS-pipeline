@@ -20,15 +20,17 @@ def aperture(startpx,startpy,radius=3):
                 mask[y,x]=0.
     return mask
 
-def gaussian(height, center_x, center_y, width_x, width_y,offset):
-    """Returns a gaussian function with the given parameters"""
-    width_x = float(width_x)
-    width_y = float(width_y)
-    return lambda x,y: height*np.exp(-(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)+offset
+#def gaussian(height, center_x, center_y, width_x, width_y,offset):
+#    """Returns a gaussian function with the given parameters"""
+#    width_x = float(width_x)
+#    width_y = float(width_y)
+#    return lambda x,y: height*np.exp(-(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)+offset
 
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
-stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIImageStackRed.npz')
+
+stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIImageStackRednewCal.npz')
+
 stack = stackDict['stack']
 jd = stackDict['jd']
 paramsList = []
@@ -39,19 +41,23 @@ plt.ion()
 for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
     nanMask = np.isnan(frame)
-#    if iFrame < 500:
-#        guessX = 31
-#        guessY = 30
-#    else:
-    guessX = 14
-    guessY = 8
+    if 1700 < iFrame < 3100:
+        guessX = 31
+        guessY = 30
+    if iFrame > 4800:
+        guessX = 16
+        guessY = 15
+    else:
+        guessX = 14
+        guessY = 8
+
     apertureMask = aperture(guessX,guessY,radius=10)
     err = np.sqrt(frame)
     #err = np.ones(np.shape(frame))
     err[apertureMask==1] = np.inf#weight points closer to the expected psf higher
     frame[nanMask]=0#set to finite value that will be ignored
     err[nanMask] = np.inf#ignore these data points
-    nearDeadCutoff=0#100/15 cps for 4000-6000 angstroms
+    nearDeadCutoff=1#100/15 cps for 4000-6000 angstroms
     err[frame<nearDeadCutoff] = np.inf
     entireMask = (err==np.inf)
     maFrame = np.ma.masked_array(frame,entireMask)
@@ -132,7 +138,9 @@ cube = np.array(fitImgList)
 chisqs = np.array(chisqList)
 params = np.array(paramsList)
 errors = np.array(errorsList)
-np.savez('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIfitpsfRed.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+
+np.savez('/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIfitpsfRednewCal.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
 print 'saved'
-utils.makeMovie(fitImgList,cbar=True,outName='/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIfitpsfRed.gif')
+utils.makeMovie(fitImgList,cbar=True,outName='/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIfitpsfRednewCal.gif')
 #,normMax=1000)
+
