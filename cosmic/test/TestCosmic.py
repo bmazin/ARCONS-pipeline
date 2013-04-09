@@ -135,6 +135,10 @@ class TestCosmic(unittest.TestCase):
         threshold = 10
         populationMax = 100
         fc = self.cosmic.findCosmics(stride, threshold, populationMax)
+
+        cosmicTimeLists = fc['cosmicTimeLists']
+        print "number of cosmicTimeLists=",len(cosmicTimeLists)
+        self.assertEquals(self.cosmic.endTime-self.cosmic.beginTime,len(cosmicTimeLists))
         populationHg = fc['populationHg']
         xValues = populationHg[1][1:]-0.5
         xp,yp = hgPlot.getPlotValues\
@@ -150,5 +154,6 @@ class TestCosmic(unittest.TestCase):
         plt.yscale('log')
         plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
 
+        
 if __name__ == '__main__':
     unittest.main()

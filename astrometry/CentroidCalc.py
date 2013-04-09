@@ -6,6 +6,11 @@ Author: Paul Szypryt		Date: October 29, 2012
 Loads up an h5 observation file and uses the PyGuide package to calculate the centroid of an object,
 for a given frame.  Requires an initial x and y pixel position guess for the centroid.  Uses this guess
 if PyGuide algorithm fails to find the centroid.
+
+History:
+March 25, 2013 - Now calculates the hour angle using the right ascension of the target object as a 1st
+    order approximation.  To get more exact hour angle, would need right ascension of the center of 
+    rotation position, but this is unknown and non-constant.
 '''
 
 
@@ -15,6 +20,7 @@ import sys
 import ephem
 import PyGuide as pg
 import math
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from util.ObsFile import ObsFile 
@@ -51,6 +57,7 @@ centroid_DEC = '36:24:02.4'
 HA_offset = 19.0
 guessTime = 300
 integrationTime=10
+secondMaxCountsForDisplay = 500
 
 # Some useful conversions
 d2r = np.pi/180.0
@@ -137,6 +144,8 @@ outFn = '/home/pszypryt/Scratch/centroid_test/centroid_list.txt'
 f = open(outFn,'w')
 f.write('Time\tX Center\tY Center\tHA\n')
 
+norm = mpl.colors.Normalize(vmin=0,vmax=secondMaxCountsForDisplay*guessTime)
+
 print 'Retrieving images...'
 for iFrame in range(exptime):
     # Integrate over the guess time.  Click a pixel in the plot corresponding to the xy center guess.  This will be used to centroid for the duration of guessTime.
@@ -148,7 +157,7 @@ for iFrame in range(exptime):
         map.fig = plt.figure()
         map.ax = map.fig.add_subplot(111)
         map.ax.set_title('Centroid Guess')
-        map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower')
+        map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower',norm=norm)
         map.connect()
         plt.show()
 	try:

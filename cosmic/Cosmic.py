@@ -270,12 +270,24 @@ class Cosmic:
             y -= 2
 
     def findCosmics(self, stride=10, threshold=100, populationMax=20):
-        print "begin findCosmics"
+        """
+        Find cosmics ray suspects.  Histogram the number of photons
+        recorded at each timeStamp.  When the number of photons in a
+        group of stride timeStamps is greater than threshold in second
+        iSec, add (iSec,timeStamp) to cosmicTimeLists.  Also keep
+        track of the hisogram of the number of photons per stride
+        timeStamps.
+
+        return a dictionary of 'populationHg' and 'cosmicTimeLists'
+        """
+
         tickDur = self.file.tickDuration
         interFullSec = interval[0, (1.0/tickDur)-1]
         allPopulationHgValues = np.zeros(populationMax)
+        cosmicTimeLists = []
         for iSec in range(self.beginTime, self.endTime):
-            print "findCosmics:  iSec=",iSec
+            if (iSec % 10) == 0:
+                print "findCosmics:  iSec=",iSec
             inter = interval()
             #inter = (self.flashInterval['all'] & \
             #    interval[iSec/tickDur, ((iSec+1)/tickDur)-1]) - iSec/tickDur
@@ -284,8 +296,10 @@ class Cosmic:
                                          populationMax, threshold)
             populationHg = ghfos['populationHg']
             allPopulationHgValues += populationHg[0]
+            cosmicTimeLists.append((iSec,ghfos['cosmicTimeList']))
         retval = {}
         retval['populationHg'] = (allPopulationHgValues,populationHg[1])
+        retval['cosmicTimeLists'] = cosmicTimeLists
         return retval
 
     def getHgsForOneSec(self, iSec, inter, stride=1, populationMax=10, threshold=100):
@@ -322,7 +336,7 @@ class Cosmic:
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = populationHg
-        retval['cosmicTime'] = cosmicTimeList
+        retval['cosmicTimeList'] = cosmicTimeList
         return retval
     @staticmethod
     def populationFromTimeHgValues(timeHgValues,populationMax,stride,threshold):

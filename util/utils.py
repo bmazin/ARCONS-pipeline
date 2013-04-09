@@ -194,9 +194,24 @@ def linearFit( x, y, err=None ):
 
 
 def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
-              delay=0.1, **plotArrayKeys):
+              delay=0.1, listOfPixelsToMark=None, pixelMarkColor='red',
+               **plotArrayKeys):
     """
-    Makes a movie out of a list of frame objects (2-D arrays)
+    Makes a movie out of a list of frame objects (2-D arrays). If you
+    specify other list inputs, these all need to be the same length as
+    the list of frame objects.
+
+    listOfFrameObj is a list of 2d arrays of numbers
+
+    frameTitles is a list of titles to put on the frames
+
+    outName is the file name to write, .gif will be appended
+
+    delay in seconds between frames
+
+    listOfPixelsToMark is a list.  Each entry is itself a list of
+    pixels to mark pixelMarkColor is the color to fill in the marked
+    pixels
     
     """
     # Looks like theres some sort of bug when normMax != None.
@@ -221,8 +236,15 @@ def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
           plotTitle = frameTitles[iFrame]
        else:
           plotTitle=''
-       fp = plotArray(frame, showMe=False, plotFileName='.tmp_movie/mov_'+repr(iFrame+10000)+'.png', \
-                      plotTitle=plotTitle, **plotArrayKeys)
+
+       if listOfPixelsToMark!= None:
+           pixelsToMark = listOfPixelsToMark[iFrame]
+       else:
+           pixelsToMark = []
+       pfn = '.tmp_movie/mov_'+repr(iFrame+10000)+'.png'
+       fp = plotArray(frame, showMe=False, plotFileName=pfn,
+                      plotTitle=plotTitle, pixelsToMark=pixelsToMark,
+                      pixelMarkColor=pixelMarkColor, **plotArrayKeys)
        iFrame += 1
        del fp
 
@@ -245,12 +267,44 @@ def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
 
 
 
-def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
-              cbar=False, cbarticks=None, cbarlabels=None, plotFileName='arrayPlot.png',
-              plotTitle='', sigma=None):
+def plotArray( xyarray, colormap=mpl.cm.gnuplot2, 
+               normMin=None, normMax=None, showMe=True,
+               cbar=False, cbarticks=None, cbarlabels=None, 
+               plotFileName='arrayPlot.png',
+               plotTitle='', sigma=None, 
+               pixelsToMark=[], pixelMarkColor='red'):
     """
-    Plots the 2D array to screen or if showMe is set to False, to file.  If normMin and
-    normMax are None, the norm is just set to the full range of the array.
+    Plots the 2D array to screen or if showMe is set to False, to
+    file.  If normMin and normMax are None, the norm is just set to
+    the full range of the array.
+
+    xyarray is the array to plot
+
+    colormap translates from a number in the range [0,1] to an rgb color,
+    an existing matplotlib.cm value, or create your own
+
+    normMin minimum used for normalizing color values
+
+    normMax maximum used for normalizing color values
+
+    showMe=True to show interactively; false makes a plot
+
+    cbar to specify whether to add a colorbar
+    
+    cbarticks to specify whether to add ticks to the colorbar
+
+    cbarlabels lables to put on the colorbar
+
+    plotFileName where to write the file
+
+    plotTitle put on the top of the plot
+
+    sigma calculate normMin and normMax as this number of sigmas away
+    from the mean of positive values
+
+    pixelsToMark a list of pixels to mark in this image
+
+    pixelMarkColor is the color to fill in marked pixels
     """
     if sigma != None:
        meanVal = np.mean(accumulatePositive(xyarray))
@@ -276,9 +330,18 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, sh
               'xtick.labelsize': 10,
               'ytick.labelsize': 10,
               'figure.figsize': figSize}
+
+    plt.clf()
     plt.rcParams.update(params)
 
-    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm)
+    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm, fignum=1)
+    fig = plt.figure(1)
+
+    for ptm in pixelsToMark:
+        box = mpl.patches.Rectangle((ptm[0]-0.5,ptm[1]-0.5),\
+                                        1,1,color=pixelMarkColor)
+        #box = mpl.patches.Rectangle((1.5,2.5),1,1,color=pixelMarkColor)
+        fig.axes[0].add_patch(box)
 
     if cbar:
         if cbarticks == None:
