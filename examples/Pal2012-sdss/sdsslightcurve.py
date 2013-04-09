@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util import utils
 
-FileName = '/home/pszypryt/sdss_data/20121208/Blue-Fit.npz'
+FileName = '/home/pszypryt/sdss_data/20121211/Blue-ImageStackFit.npz'
 
 FoldPeriod = 0.01966127 #This is in fractions of a day
 t = np.load(FileName)
@@ -25,8 +25,12 @@ fwhm = widths
 
 meanXpos = utils.mean_filterNaN(xpos,size=7)
 meanYpos = utils.mean_filterNaN(ypos,size=7)
+jd = jd[curve<=500]
+curve = curve[curve<=500]
+jd = jd[curve>=100]
+curve = curve[curve>=100]
 
-curve/=np.median(curve)
+#curve/=np.median(curve)
 fwhm/=np.median(fwhm)
 ax.plot(jd,curve,'k.')
 ax.set_title(FileName)
