@@ -1,3 +1,6 @@
+
+######################## For display_stack.py ########################
+
 npzFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec10ImageStackRedUpdated.npz'
 gifFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/FirstDec10ImageStackRedUpdated.gif'
 
@@ -45,4 +48,30 @@ seq6 = ['123740', '124242', '124744', '125246', '125748', '130250', '130752', '1
 
 
 seqs = [seq2,seq3]
+
+######################## For fitpsf.py ########################
+
+npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIImageStackRednewCal.npz'
+npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIfitpsfRednewCal.npz'
+giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIfitpsfRednewCal.gif'
+
+#seq0:13
+#seq1:4
+#seq2:9
+#seq3:5
+#seq4:17
+#seq5:14
+#seq6:12
+
+FramesPerFile = expTime/integrationTime
+
+#seqCorr = [0,seq0seq1,seq2seq3,seq4,seq5seq6]
+NumFiles = [0,17,31,48,74]
+guessX = [14,31,14,16]
+guessY = [8,30,8,15]
+
+######################## For lightcurve.py ########################
+
+npzLoadFitFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIfitpsfRed.npz'
+TotalNumFiles = 74
 
