@@ -14,8 +14,9 @@ from util.FileName import FileName
 from util import utils
 from time import time
 import tables
+import os
 import matplotlib.pyplot as plt
-from hotpix import hotPixels
+import hotpix.hotPixels as hp
 
 
 def aperture(startpx,startpy,radius=3):
@@ -37,9 +38,9 @@ run = 'PAL2012'
 
 # December 8
 # First sequence, possible reflections at 12:07, 1" SE move at 12:45.
-seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
+#seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
 #seq0 = [ '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
-#seq0 = ['120530','121033']
+seq0 = ['121033']
 
 # Sequence during warming up, may need to omit.
 seq1 = ['131254', '131802', '132304', '132807']
@@ -71,15 +72,16 @@ seqs=[seq0]
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
-wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
+#wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 #flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
-exptime = 300
+exptimes = np.zeros(len(seq0))
 app_mask = aperture(15,8,8)
 y_values,x_values = np.where(app_mask==0)
+unixOffset=0.0
 
 timestamps =[]
 tic = time()
@@ -92,38 +94,56 @@ for iSeq in range(len(seqs)):
         print 'Loading',ts
         obsFn = FileName(run=run,date=sunsetDate,tstamp=ts).obs()
         ob = ObsFile(obsFn)
+	ob.loadTimeAdjustmentFile(FileName(run='PAL2012').timeAdjustments())
+	exptime = ob.getFromHeader('exptime')
+	unixtime= ob.getFromHeader('unixtime')
+	if i == 0:
+	    unixOffset = unixtime
+	exptimes[i]=exptime
+	index1 = obsFn.find('_')
+	hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
+        if not os.path.exists(hotPixFn):
+            hp.findHotPixels(obsFn,hotPixFn)
+            print "Flux file pixel mask saved to %s"%(hotPixFn)
+        ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
-	ob.setWvlCutoffs(3000,5000)
+	ob.setWvlCutoffs(3000,8000)
 	for j in range(len(x_values)):
 	    x=ob.getPixelWvlList(iRow=y_values[j],iCol=x_values[j])
-	    timestamps = np.append(timestamps,i*exptime + (x['timestamps']))
+	    timestamps = np.append(timestamps,unixtime - unixOffset + (x['timestamps']))
 print 'Loaded files in',time()-tic, 'seconds.'
 
 # Put photon in events in small time bins ~ 1 microsecond goal
 tic = time()
 print 'Binning photon events...'
-total_seconds = len(seq0*exptime)
-bins_per_second = 10**3
+total_seconds = np.sum(exptimes)
+bins_per_second = 10**6
 #time_bins = np.linspace(0,total_seconds,total_seconds*bins_per_second+1)
 #jd = time_bins/86400
 #counts_per_timestep = np.zeros(len(time_bins)-1)
 #for j in range(len(time_bins)-1):
     #counts_per_timestep[j]=len(np.where(np.logical_and(timestamps>=time_bins[j],timestamps<time_bins[j+1]))[:][0])
 counts_per_timestep, bin_edges = np.histogram(timestamps,bins = bins_per_second*total_seconds)
-jd =bin_edges[0:-1]/86400
+jd =bin_edges[0:-1]
+#jd =bin_edges[0:-1]/86400
 print 'Finished binning in',time()-tic, 'seconds.'
  
 scaled_counts = (counts_per_timestep-counts_per_timestep.mean())/counts_per_timestep.std()
 
 # Create array of frequencies to check for Fourier components, function requires angular frequencies
-freqs=np.linspace(0.1,250,10000)
+#freqs=np.logspace(2,5,num=10**3)
+freqs= np.logspace(0,5,num=10**3)
+#freqs=np.linspace(10**-4,10**-3,num=100)
+#freqs = np.linspace(10**2,10**6,num=999901)
+#freqs= np.linspace(100,1000000,num=999901)
 angular_freqs=2*np.pi*freqs
 print 'Calculating Fourier components...'
 tic = time()
 periodogram = spectral.lombscargle(jd, scaled_counts, angular_freqs)
 print 'Calculated Fourier components in',time()-tic, 'seconds.'
 
+'''
 # Calculate eclipse period and frequency, and compare it to expected value
 eclipse_period = 2*np.pi/(angular_freqs[np.argmax(periodogram)])
 eclipse_frequency = 1/eclipse_period
@@ -131,12 +151,14 @@ expected_period = 0.01966127 # in days
 print 'Eclipse period =',eclipse_period,'days.'
 print 'Eclipse frequency =',eclipse_frequency, 'cycles/day.'
 print 'Percent error = ' + str(100*(eclipse_period-expected_period)/expected_period) + '%'
+'''
 
-np.savetxt('/home/pszypryt/sdss_data/periodogram.txt',periodogram)
-np.savetxt('/home/pszypryt/sdss_data/frequencies.txt',freqs)
-np.savetxt('/home/pszypryt/sdss_data/lightcurve.txt',scaled_counts[10::10**3])
-np.savetxt('/home/pszypryt/sdss_data/times.txt',jd[10::10**3])
+np.savetxt('/home/pszypryt/sdss_data/20121208/periodogram6.txt',periodogram)
+np.savetxt('/home/pszypryt/sdss_data/20121208/frequencies6.txt',freqs)
+np.savetxt('/home/pszypryt/sdss_data/20121208/lightcurve6.txt',scaled_counts[10::10**3])
+np.savetxt('/home/pszypryt/sdss_data/20121208/times6.txt',jd[10::10**3])
 
+'''
 # Create a figure with light curve in top plot and periodogram in bottom plot
 fig = plt.figure()
 # Plot light curve
@@ -156,8 +178,20 @@ plt.ylabel('Transform Component')
 for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
     item.set_fontsize(16)
 plt.show()
+'''
 
-
+fig = plt.figure()
+# Plot fourier transform
+ax = fig.add_subplot(111)
+ax.plot(freqs,periodogram)
+ax.set_xscale('log')
+ax.set_yscale('log')
+ax.set_title('Periodogram')
+plt.xlabel('Frequency (Hz)')
+plt.ylabel('Transform Component')
+for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
+    item.set_fontsize(16)
+plt.show()
 
 
 

@@ -35,21 +35,22 @@ seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '1
 seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238', '123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
 
 seqHMCnc= ['074719', '075225','075753','080456','080959','081501', '082004', '082507', '083009','083747', '084257', '084759', '085302', '085805','090308','090810']
-seq0651=['095930','100453','100955','101457','101959', '102501', '103003', '103505', '104007','104509', '105050', '105553', '110055','110557','111100','111602', '112104','112606', '113108', '113611', '114113', '114615', '115118']
+#seq0651=['095930','100453','100955','101457','101959', '102501', '103003', '103505', '104007','104509', '105050', '105553', '110055','110557','111100','111602', '112104','112606', '113108', '113611', '114113', '114615', '115118']
+seq0651=['053921','054423','054925', '055427', '055929', '060432', '060949','061451', '061953', '062455', '062957', '063459', '064002', '064526', '065028', '065530', '070032', '070534', '071037', '071539', '072041']
 
 # Date and cal time stamp arrays
 #utcDates = ['20121209','20121209','20121211', '20121211', '20121211', '20121212']
 #sunsetDates = ['20121208','20121208','20121210', '20121210', '20121210', '20121211']
 #calTimestamps = ['20121209-131132','20121209-133419', '20121211-074031', '20121211-074031', '20121211-133056', '20121212-133821']
-utcDates = ['20121209','20121209']
-sunsetDates = ['20121208','20121208']
-calTimestamps = ['20121209-131132','20121209-133419']
-#utcDates = ['20121206']
-#sunsetDates = ['20121205']
-#calTimestamps = ['20121206-115709']
+#utcDates = ['20121209','20121209']
+#sunsetDates = ['20121208','20121208']
+#calTimestamps = ['20121209-131132','20121209-133419']
+utcDates = ['20121212']
+sunsetDates = ['20121211']
+calTimestamps = ['20121212-111847']
 
 #seqs = [seq0,seq1,seq2,seq3,seq4,seq5]
-seqs=[seq0,seq1]
+seqs=[seq5]
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
@@ -57,7 +58,7 @@ wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 #flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121206/flatsol_20121206.h5'
-flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 #/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
 
@@ -125,6 +126,6 @@ for iSeq in range(len(seqs)):
         
 cube = np.dstack(frames)
 times = np.array(times)
-np.savez('/home/pszypryt/sdss_data/test.npz',stack=cube,jd=times)
-utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/home/pszypryt/sdss_data/test.gif')
+np.savez('/home/pszypryt/sdss_data/20121211/Blue-ImageStack.npz',stack=cube,jd=times)
+utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName='/home/pszypryt/sdss_data/20121211/Blue-ImageStack.gif')
 
