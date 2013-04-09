@@ -1,3 +1,12 @@
+#!/bin/python
+
+'''
+Author: Paul Szypryt		Date: January 18, 2013
+
+Uses X and Y sweep observation files to fit Gaussians to observed resonances.  Uses this data to map each
+resonant frequency to and x and y position on the MKID array.
+'''
+
 import numpy as np
 from tables import *
 import os
@@ -51,8 +60,8 @@ class Sweep_Number(QWidget):
         self.sweep_count = [1,1]
         self.freqpath = os.getcwd()
         self.savepath = os.getcwd()
-        self.roachnumber = 8
-        self.maxpix = 2024
+        self.roachnumber = 4
+        self.maxpix = 1012
 
         self.btnx = QPushButton('X Sweeps', self)
         self.btnx.move(20, 20)
@@ -586,10 +595,12 @@ class StartQt4(QMainWindow):
                     for i in range(len(ysweep)):
                         data[i][:] = h5file_y[i].root._f_getChild(pn[i]).read()
                     for j in xrange(0,exptime_y[0]):
+                        #median_array = [len(data[0][j]), len(data[1][j]), len(data[2][j-44])]
                         median_array = []
                         for i in range(len(ysweep)):
                             median_array.append(len(data[i][j]))
                         self.cry_median[roachno*ppr + pixelno][j] = np.median(median_array)
+                        #self.cry[2][roachno*ppr + pixelno][j] = len(data[2][j-44])
                         for i in range(len(ysweep)):
                             self.cry[i][roachno*ppr + pixelno][j] = len(data[i][j])
                 except:
@@ -1035,3 +1046,6 @@ for i in range(len(h5file_x)):
     h5file_x[i].close()
 for i in range(len(h5file_y)):
     h5file_y[i].close()
+
+
+

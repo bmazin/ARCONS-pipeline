@@ -12,10 +12,12 @@ import binascii
 import math
 from scipy.signal import convolve
 import scipy.ndimage
+#from interval import interval
 
 """
 Modules:
 
+aperture(startpx,startpy,radius=3)
 bin12_9ToRad(binOffset12_9)
 confirm(prompt,defaultResponse=True)
 convertDegToHex(ra, dec)
@@ -27,6 +29,26 @@ printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
 
 """
+
+def aperture(startpx,startpy,radius=3):
+    """
+    Creates a mask with specified radius and centered at specified pixel
+    position.  Output mask is a 46x44 array with 0 represented pixels within
+    the aperture and 1 representing pixels outside the aperture.
+    """
+    r = radius
+    length = 2*r 
+    height = length
+    allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
+    ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
+    pixx = []
+    pixy = []
+    mask=numpy.ones((46,44))
+    for x in allx:
+        for y in ally:
+            if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
+                mask[y,x]=0.
+    return mask
 
 
 def bin12_9ToRad(binOffset12_9):
@@ -172,11 +194,28 @@ def linearFit( x, y, err=None ):
 
 
 def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
-              delay=0.1, **plotArrayKeys):
+              delay=0.1, listOfPixelsToMark=None, pixelMarkColor='red',
+               **plotArrayKeys):
     """
-    Makes a movie out of a list of frame objects (2-D arrays)
+    Makes a movie out of a list of frame objects (2-D arrays). If you
+    specify other list inputs, these all need to be the same length as
+    the list of frame objects.
+
+    listOfFrameObj is a list of 2d arrays of numbers
+
+    frameTitles is a list of titles to put on the frames
+
+    outName is the file name to write, .gif will be appended
+
+    delay in seconds between frames
+
+    listOfPixelsToMark is a list.  Each entry is itself a list of
+    pixels to mark pixelMarkColor is the color to fill in the marked
+    pixels
     
     """
+    # Looks like theres some sort of bug when normMax != None.
+    # Causes frame to pop up in a window as gif is made.
     if len(listOfFrameObj) == 1:
         raise ValueError, "I cannot make movie out of a list of one object!"
 
@@ -197,8 +236,15 @@ def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
           plotTitle = frameTitles[iFrame]
        else:
           plotTitle=''
-       fp = plotArray(frame, showMe=False, plotFileName='.tmp_movie/mov_'+repr(iFrame+10000)+'.png', \
-                      plotTitle=plotTitle, **plotArrayKeys)
+
+       if listOfPixelsToMark!= None:
+           pixelsToMark = listOfPixelsToMark[iFrame]
+       else:
+           pixelsToMark = []
+       pfn = '.tmp_movie/mov_'+repr(iFrame+10000)+'.png'
+       fp = plotArray(frame, showMe=False, plotFileName=pfn,
+                      plotTitle=plotTitle, pixelsToMark=pixelsToMark,
+                      pixelMarkColor=pixelMarkColor, **plotArrayKeys)
        iFrame += 1
        del fp
 
@@ -221,12 +267,44 @@ def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
 
 
 
-def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
-              cbar=False, cbarticks=None, cbarlabels=None, plotFileName='arrayPlot.png',
-              plotTitle='', sigma=None):
+def plotArray( xyarray, colormap=mpl.cm.gnuplot2, 
+               normMin=None, normMax=None, showMe=True,
+               cbar=False, cbarticks=None, cbarlabels=None, 
+               plotFileName='arrayPlot.png',
+               plotTitle='', sigma=None, 
+               pixelsToMark=[], pixelMarkColor='red'):
     """
-    Plots the 2D array to screen or if showMe is set to False, to file.  If normMin and
-    normMax are None, the norm is just set to the full range of the array.
+    Plots the 2D array to screen or if showMe is set to False, to
+    file.  If normMin and normMax are None, the norm is just set to
+    the full range of the array.
+
+    xyarray is the array to plot
+
+    colormap translates from a number in the range [0,1] to an rgb color,
+    an existing matplotlib.cm value, or create your own
+
+    normMin minimum used for normalizing color values
+
+    normMax maximum used for normalizing color values
+
+    showMe=True to show interactively; false makes a plot
+
+    cbar to specify whether to add a colorbar
+    
+    cbarticks to specify whether to add ticks to the colorbar
+
+    cbarlabels lables to put on the colorbar
+
+    plotFileName where to write the file
+
+    plotTitle put on the top of the plot
+
+    sigma calculate normMin and normMax as this number of sigmas away
+    from the mean of positive values
+
+    pixelsToMark a list of pixels to mark in this image
+
+    pixelMarkColor is the color to fill in marked pixels
     """
     if sigma != None:
        meanVal = np.mean(accumulatePositive(xyarray))
@@ -252,9 +330,18 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, sh
               'xtick.labelsize': 10,
               'ytick.labelsize': 10,
               'figure.figsize': figSize}
+
+    plt.clf()
     plt.rcParams.update(params)
 
-    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm)
+    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm, fignum=1)
+    fig = plt.figure(1)
+
+    for ptm in pixelsToMark:
+        box = mpl.patches.Rectangle((ptm[0]-0.5,ptm[1]-0.5),\
+                                        1,1,color=pixelMarkColor)
+        #box = mpl.patches.Rectangle((1.5,2.5),1,1,color=pixelMarkColor)
+        fig.axes[0].add_patch(box)
 
     if cbar:
         if cbarticks == None:
@@ -453,4 +540,29 @@ def gaussian_psf(fwhm, boxsize, oversample=50):
     binnedGaussian = rebin2D(fineSampledGaussian, boxsize, boxsize)
 
     return binnedGaussian
-        
+
+
+
+
+def intervalSize(inter):
+    '''
+    INPUTS:
+        inter - a pyinterval 'interval' instance.
+    OUTPUTS:
+        Returns the total size of an pyinterval '(multi)interval' instance. 
+        So if an interval instance represents a set of time ranges, this returns
+        the total amount of time covered by the ranges.
+        E.g.:
+            >>> from interval import interval
+            >>> from util import utils
+            >>> 
+            >>> x=interval([10,15],[9],[2,3],[2.5,3.5]) #Sub-intervals are automatically unioned
+            >>> x
+            interval([2.0, 3.5], [9.0], [10.0, 15.0])
+            >>> utils.intervalSize(x)
+            6.5
+    '''
+    size=0.0
+    for eachComponent in inter.components:
+        size+=(eachComponent[0][-1]-eachComponent[0][0])
+    return size

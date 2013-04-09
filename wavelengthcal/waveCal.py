@@ -194,7 +194,7 @@ def wavelengthCal(paramFile):
     if (('cal_' in files2run) | ('obs_' in files2run)):
         cal_files.append(files2run)
     else:
-        if '2012' in files2run:
+        if '201' in files2run:
             for line in file_list:
                 if files2run in line.split('cal')[0]:
                     cal_files.append(line.strip())
@@ -531,10 +531,7 @@ def wavelengthCal(paramFile):
                     continue
 
                 if (np.min(mperrs)==0.):
-                    if (len(mperrs) < 9):
-                        failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 13)
-                        continue
-                    else:
+                    if (len(mperrs) > 6):
                         if (np.where(mperrs == 0.)[0][0] != params['sig_ir_ind']):
                             failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 13)
                             continue
@@ -651,8 +648,12 @@ def wavelengthCal(paramFile):
                     row['solnrange'] = np.array([lambda_start,lambda_stop])   # Angstroms
                     driftrow['pixelrow'] = i
                     driftrow['pixelcol'] = j
-                    driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
-                    driftrow['perrors'] = np.array(mperrs[0:6])
+                    try:
+                        driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2, x_offset3, amplitude3, sigma3])
+                        driftrow['perrors'] = np.array(mperrs[0:9])
+                    except:
+                        driftrow['gaussparams'] = np.array([x_offset1, amplitude1, sigma1, x_offset2, amplitude2, sigma2])
+                        driftrow['perrors'] = np.array(mperrs[0:6])
                     driftrow.append()
                     
                     resest = np.abs(blue_peak) / (params['fwhm2sig'] * blue_sigma)

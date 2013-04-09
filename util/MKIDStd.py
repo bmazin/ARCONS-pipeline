@@ -107,7 +107,9 @@ class MKIDStd:
             
         len = int(self.objects[name]['window_len'][0])
         if len > 1:
-            a[:,1] = smooth.smooth(a[:,1], window_len=len)[len/2:-(len/2)]
+            #temp = smooth.smooth(a[:,1], window_len=len)[len/2:-(len/2)]
+            temp = smooth.smooth(a[:,1], window_len=len)
+            a[:,1] = temp[1:]
         try:
             fluxUnit = self.objects[name]['fluxUnit'][0]
             scale = float(fluxUnit.split()[0])
@@ -338,6 +340,7 @@ class MKIDStd:
         names = self.objects.keys()
         names.sort()
         for name in names:
+            print "name=",name
             vMag = self.getVegaMag(name,'V')
             print "name=%15s   vMag=%+f" % (name, vMag)
     def report(self):

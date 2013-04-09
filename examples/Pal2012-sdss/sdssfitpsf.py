@@ -1,6 +1,7 @@
 from sdssgaussfitter import gaussfit
 import numpy as np
 from util import utils
+from util.readDict import readDict
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
@@ -29,7 +30,20 @@ def aperture(startpx,startpy,radius=3):
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
 
-stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIImageStackRednewCal.npz')
+param = readDict()
+param.read_from_file('0926params.dict')
+
+npzLoadFile = param['npzLoadFile']
+npzfitpsf = param['npzfitpsf']
+giffitpsf = param['giffitpsf']
+
+FramesPerFile = param['FramesPerFile']
+NumFiles = param['NumFiles']
+NumFrames = [filenum*FramesPerFile for filenum in NumFiles]
+guessX = param['guessX']
+guessY = param['guessY']
+
+stackDict = np.load(npzLoadFile)
 
 stack = stackDict['stack']
 jd = stackDict['jd']
@@ -38,18 +52,15 @@ errorsList = []
 fitImgList = []
 chisqList = []
 plt.ion()
+
 for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
     nanMask = np.isnan(frame)
-    if 1700 < iFrame < 3100:
-        guessX = 31
-        guessY = 30
-    if iFrame > 4800:
-        guessX = 16
-        guessY = 15
-    else:
-        guessX = 14
-        guessY = 8
+
+    for interval in xrange(len(NumFrames)-1)
+        if NumFrames[interval] < iFrame < NumFrames[interval+1]
+            guessx = guessX[interval]
+            guessy = guessY[interval]
 
     apertureMask = aperture(guessX,guessY,radius=10)
     err = np.sqrt(frame)
@@ -139,8 +150,8 @@ chisqs = np.array(chisqList)
 params = np.array(paramsList)
 errors = np.array(errorsList)
 
-np.savez('/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIfitpsfRednewCal.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+np.savez(npzfitpsf,fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
 print 'saved'
-utils.makeMovie(fitImgList,cbar=True,outName='/Scratch/dataProcessing/SDSS_J0926/AllData/AllDataSIfitpsfRednewCal.gif')
+utils.makeMovie(fitImgList,cbar=True,outName=giffitpsf)
 #,normMax=1000)
 

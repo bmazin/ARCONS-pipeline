@@ -1,0 +1,10 @@
+datadir=/ScienceData/PAL2012/20121210
+flatdir=/Scratch/flatCalSolnFiles/20121210
+wvldir=/Scratch/waveCalSolnFiles/20121210
+fluxfile=obs_20121211-134519.h5
+skyfile=obs_20121211-134751.h5
+flatfile=flatsol_20121210.h5
+wvlfile=calsol_20121211-133056.h5
+fluxdir=/Scratch/fluxCalSolnFiles/20121210
+fluxoutfile=fluxsol_20121211-134519.h5
+objectName=feige66
