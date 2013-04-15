@@ -9,18 +9,18 @@ class TestUtils(unittest.TestCase):
     Test functions in utils.py
     """
     def testPlotArray(self):
-        "exercise the plotArray function"
-        xyarray = np.arange(20).reshape((4,5))
-        fn1 = inspect.stack()[0][3]+"-1.png"
+        "exercise the plotArray function and make the file testPlotArray.png"
+        xyarray = np.arange(20).reshape((4,5)) - 5
+        fn1 = inspect.stack()[0][3]+".png"
         utils.plotArray(xyarray, showMe=False, cbar=True,
-                        cbarticks=[1,2,4,8,16],
-                        cbarlabels=['one','two','four','eight','sixteen'],
+                        cbarticks=[-4, 1,2,4,8,16],
+                        cbarlabels=['negative four', 'one','two','four','eight','sixteen'],
                         plotTitle='This is the Plot Title!',
                         colormap=mpl.cm.terrain,
                         pixelsToMark=[(0,1)],
                         pixelMarkColor='red',
                         plotFileName=fn1,
-                        sigma=True)
+                        sigma=2.0)
 
     def testMakeMovie0(self):
         """
