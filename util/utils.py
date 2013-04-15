@@ -22,11 +22,20 @@ bin12_9ToRad(binOffset12_9)
 confirm(prompt,defaultResponse=True)
 convertDegToHex(ra, dec)
 convertHexToDeg(ra, dec)
+gaussian_psf(fwhm, boxsize, oversample=50)
+intervalSize(inter)
 linearFit(x, y, err=None)
-plotArray( x, y, z, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
-              plotFileName='arrayPlot.png', plotTitle='')
+makeMovie( listOfFrameObj, frameTitles, outName, delay, listOfPixelsToMark,
+              pixelMarkColor,**plotArrayKeys)              
+mean_filterNaN(inputarray, size=3, *nkwarg, **kwarg)
+median_filterNaN(inputarray, size=5, *nkwarg, **kwarg)
+plotArray( 2darray, colormap=mpl.cm.gnuplot2, normMin=None, normMax=None, showMe=True,
+              cbar=False, cbarticks=None, cbarlabels=None, plotFileName='arrayPlot.png',
+              plotTitle='', sigma=None, pixelsToMark=[], pixelMarkColor='red')
 printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
+rebin2D(a, ysize, xsize)
+replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True)
 
 """
 
@@ -172,6 +181,63 @@ def convertHexToDeg(ra, dec):
 
    return(hh*15.+mm/4.+ss/240., sign*(deg+(arcmin*5./3.+arcsec*5./180.)/100.) )
 
+def gaussian_psf(fwhm, boxsize, oversample=50):
+    
+    '''
+    Returns a simulated Gaussian PSF: an array containing a 2D Gaussian function
+    of width fwhm (in pixels), binned down to the requested box size. 
+    JvE 12/28/12
+    
+    INPUTS:
+        fwhm - full-width half-max of the Gaussian in pixels
+        boxsize - size of (square) output array
+        oversample (optional) - factor by which the raw (unbinned) model Gaussian
+                                oversamples the final requested boxsize.
+    
+    OUTPUTS:
+        2D boxsize x boxsize array containing the binned Gaussian PSF
+    
+    (Verified against IDL astro library daoerf routine)
+        
+    '''
+    fineboxsize = boxsize * oversample
+    
+    xcoord = ycoord = numpy.arange(-(fineboxsize - 1.) / 2., (fineboxsize - 1.) / 2. + 1.)
+    xx, yy = numpy.meshgrid(xcoord, ycoord)
+    xsigma = ysigma = fwhm / (2.*math.sqrt(2.*math.log(2.))) * oversample
+    zx = (xx ** 2 / (2 * xsigma ** 2))
+    zy = (yy ** 2 / (2 * ysigma ** 2))
+    fineSampledGaussian = numpy.exp(-(zx + zy))
+
+    #Bin down to the required output boxsize:
+    binnedGaussian = rebin2D(fineSampledGaussian, boxsize, boxsize)
+
+    return binnedGaussian
+
+
+def intervalSize(inter):
+    '''
+    INPUTS:
+        inter - a pyinterval 'interval' instance.
+    OUTPUTS:
+        Returns the total size of an pyinterval '(multi)interval' instance. 
+        So if an interval instance represents a set of time ranges, this returns
+        the total amount of time covered by the ranges.
+        E.g.:
+            >>> from interval import interval
+            >>> from util import utils
+            >>> 
+            >>> x=interval([10,15],[9],[2,3],[2.5,3.5]) #Sub-intervals are automatically unioned
+            >>> x
+            interval([2.0, 3.5], [9.0], [10.0, 15.0])
+            >>> utils.intervalSize(x)
+            6.5
+    '''
+    size=0.0
+    for eachComponent in inter.components:
+        size+=(eachComponent[0][-1]-eachComponent[0][0])
+    return size
+
    
 def linearFit( x, y, err=None ):
     """
@@ -264,9 +330,49 @@ def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
     os.chdir("../")
     os.system("rm -rf .tmp_movie")
     print 'done.'
+    
+    
+def mean_filterNaN(inputarray, size=3, *nkwarg, **kwarg):
+    '''
+    Basically a box-car smoothing filter. Same as median_filterNaN, but calculates a mean instead. 
+    Any NaN values in the input array are ignored in calculating means.
+    See median_filterNaN for details.
+    JvE 1/4/13
+    '''
+    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.mean(x[~numpy.isnan(x)]), size,
+                                                 *nkwarg, **kwarg)
 
+def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
+    '''
+    NaN-handling version of the scipy median filter function
+    (scipy.ndimage.filters.median_filter). Any NaN values in the input array are
+    simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
+    noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
+    (but note that quantitative applications are probably limited.)
+    Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
+    calling arguments are passed.
+    
+    Arguments/return values are same as for scipy median_filter.
+    INPUTS:
+        inputarray : array-like, input array to filter (can be n-dimensional)
+        size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
+                scalar, then same value is used for all dimensions.
+    OUTPUTS:
+        NaN-resistant median filtered version of inputarray.
+    
+    For other parameters see documentation for scipy.ndimage.filters.median_filter.
 
-
+    e.g.:
+        
+        filteredImage = median_filterNaN(imageArray,size=3)
+    
+    -- returns median boxcar filtered image with a moving box size 3x3 pixels.
+    
+    JvE 12/28/12
+    '''     
+    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
+                                                 *nkwarg, **kwarg)
+    
 def plotArray( xyarray, colormap=mpl.cm.gnuplot2, 
                normMin=None, normMax=None, showMe=True,
                cbar=False, cbarticks=None, cbarlabels=None, 
@@ -307,8 +413,8 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
     pixelMarkColor is the color to fill in marked pixels
     """
     if sigma != None:
-       meanVal = np.mean(accumulatePositive(xyarray))
-       stdVal = np.std(accumulatePositive(xyarray))
+       meanVal = mean(accumulatePositive(xyarray))
+       stdVal = std(accumulatePositive(xyarray))
        normMin = meanVal - sigma*stdVal
        normMax = meanVal + sigma*stdVal
     if normMin == None:
@@ -395,50 +501,27 @@ def printObsFileDescriptions( dir_path ):
         f.close()
   
 
-def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
+def rebin2D(a, ysize, xsize):
     '''
-    NaN-handling version of the scipy median filter function
-    (scipy.ndimage.filters.median_filter). Any NaN values in the input array are
-    simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
-    noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
-    (but note that quantitative applications are probably limited.)
-    Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
-    calling arguments are passed.
-    
-    Arguments/return values are same as for scipy median_filter.
-    INPUTS:
-        inputarray : array-like, input array to filter (can be n-dimensional)
-        size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
-                scalar, then same value is used for all dimensions.
-    OUTPUTS:
-        NaN-resistant median filtered version of inputarray.
-    
-    For other parameters see documentation for scipy.ndimage.filters.median_filter.
-
-    e.g.:
-        
-        filteredImage = median_filterNaN(imageArray,size=3)
-    
-    -- returns median boxcar filtered image with a moving box size 3x3 pixels.
-    
+    Rebin an array to a SMALLER array. Rescales the values such that each element
+    in the output array is the mean of the elememts which it encloses in the input
+    array (i.e., not the total). Similar to the IDL rebin function.
+    Dimensions of binned array must be an integer factor of the input array.
+    Adapted from SciPy cookbook - see http://www.scipy.org/Cookbook/Rebinning
     JvE 12/28/12
-    '''     
-    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
-                                                 *nkwarg, **kwarg)
-    
-    
-    
-def mean_filterNaN(inputarray, size=3, *nkwarg, **kwarg):
+
+    INPUTS:
+        a - array to be rebinned
+        ysize - new ysize (must be integer factor of y-size of input array)
+        xsize - new xsize (ditto for x-size of input array)
+
+    OUTPUTS:
+        Returns the original array rebinned to the new dimensions requested.        
     '''
-    Basically a box-car smoothing filter. Same as median_filterNaN, but calculates a mean instead. 
-    Any NaN values in the input array are ignored in calculating means.
-    See median_filterNaN for details.
-    JvE 1/4/13
-    '''
-         
-    return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.mean(x[~numpy.isnan(x)]), size,
-                                                 *nkwarg, **kwarg)
     
+    yfactor, xfactor = numpy.asarray(a.shape) / numpy.array([ysize, xsize])
+    return a.reshape(ysize, yfactor, xsize, xfactor,).mean(1).mean(2)
+
 
 def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     '''
@@ -481,88 +564,3 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
         if not iterate: break 
 
     return outputarray
-    
-    
-    
-def rebin2D(a, ysize, xsize):
-    '''
-    Rebin an array to a SMALLER array. Rescales the values such that each element
-    in the output array is the mean of the elememts which it encloses in the input
-    array (i.e., not the total). Similar to the IDL rebin function.
-    Dimensions of binned array must be an integer factor of the input array.
-    Adapted from SciPy cookbook - see http://www.scipy.org/Cookbook/Rebinning
-    JvE 12/28/12
-
-    INPUTS:
-        a - array to be rebinned
-        ysize - new ysize (must be integer factor of y-size of input array)
-        xsize - new xsize (ditto for x-size of input array)
-
-    OUTPUTS:
-        Returns the original array rebinned to the new dimensions requested.        
-    '''
-    
-    yfactor, xfactor = numpy.asarray(a.shape) / numpy.array([ysize, xsize])
-    return a.reshape(ysize, yfactor, xsize, xfactor,).mean(1).mean(2)
-
-  
-  
-def gaussian_psf(fwhm, boxsize, oversample=50):
-    
-    '''
-    Returns a simulated Gaussian PSF: an array containing a 2D Gaussian function
-    of width fwhm (in pixels), binned down to the requested box size. 
-    JvE 12/28/12
-    
-    INPUTS:
-        fwhm - full-width half-max of the Gaussian in pixels
-        boxsize - size of (square) output array
-        oversample (optional) - factor by which the raw (unbinned) model Gaussian
-                                oversamples the final requested boxsize.
-    
-    OUTPUTS:
-        2D boxsize x boxsize array containing the binned Gaussian PSF
-    
-    (Verified against IDL astro library daoerf routine)
-        
-    '''
-  
-    fineboxsize = boxsize * oversample
-    
-    xcoord = ycoord = numpy.arange(-(fineboxsize - 1.) / 2., (fineboxsize - 1.) / 2. + 1.)
-    xx, yy = numpy.meshgrid(xcoord, ycoord)
-    xsigma = ysigma = fwhm / (2.*math.sqrt(2.*math.log(2.))) * oversample
-    zx = (xx ** 2 / (2 * xsigma ** 2))
-    zy = (yy ** 2 / (2 * ysigma ** 2))
-    fineSampledGaussian = numpy.exp(-(zx + zy))
-
-    #Bin down to the required output boxsize:
-    binnedGaussian = rebin2D(fineSampledGaussian, boxsize, boxsize)
-
-    return binnedGaussian
-
-
-
-
-def intervalSize(inter):
-    '''
-    INPUTS:
-        inter - a pyinterval 'interval' instance.
-    OUTPUTS:
-        Returns the total size of an pyinterval '(multi)interval' instance. 
-        So if an interval instance represents a set of time ranges, this returns
-        the total amount of time covered by the ranges.
-        E.g.:
-            >>> from interval import interval
-            >>> from util import utils
-            >>> 
-            >>> x=interval([10,15],[9],[2,3],[2.5,3.5]) #Sub-intervals are automatically unioned
-            >>> x
-            interval([2.0, 3.5], [9.0], [10.0, 15.0])
-            >>> utils.intervalSize(x)
-            6.5
-    '''
-    size=0.0
-    for eachComponent in inter.components:
-        size+=(eachComponent[0][-1]-eachComponent[0][0])
-    return size
