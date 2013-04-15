@@ -424,6 +424,11 @@ class ObsFile:
         If scaleByEffInt is True, any pixels that have 'bad' times masked out
         will have their counts scaled up to match the equivalent integration 
         time requested.
+        RETURNS:
+            Dictionary with keys:
+                'image' - a 2D array representing the image
+                'effIntTimes' - a 2D array containing effective integration 
+                                times for each pixel.
         """
         secImg = np.zeros((self.nRow, self.nCol))
         effIntTimes = np.zeros((self.nRow, self.nCol), dtype=np.float64)
@@ -995,8 +1000,8 @@ def calculateSlices(inter, timestamps):
         #Check if eachComponent of the interval overlaps the timerange of the 
         #timestamps - if not, skip to the next component.
         if eachComponent & timerange == interval(): continue
-        imin = np.searchsorted(timestamps, eachComponent[0][0]) #Find nearest timestamp to lower bound
-        imax = np.searchsorted(timestamps, eachComponent[0][1]) #Nearest timestamp to upper bound
+        imin = np.searchsorted(timestamps, eachComponent[0][0], side='left') #Find nearest timestamp to lower bound
+        imax = np.searchsorted(timestamps, eachComponent[0][1], side='right') #Nearest timestamp to upper bound
         #As long as we're not about to create a wasteful '0:0' slice, go ahead 
         #and finish the new slice and append it to the list
         if imin != 0:
