@@ -19,7 +19,8 @@ class TestUtils(unittest.TestCase):
                         colormap=mpl.cm.terrain,
                         pixelsToMark=[(0,1)],
                         pixelMarkColor='red',
-                        plotFileName=fn1)
+                        plotFileName=fn1,
+                        sigma=True)
 
     def testMakeMovie0(self):
         """
