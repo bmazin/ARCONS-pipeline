@@ -3,10 +3,25 @@ import matplotlib as mpl
 import numpy as np
 import unittest
 import os
+import inspect
 class TestUtils(unittest.TestCase):
     """
     Test functions in utils.py
     """
+    def testPlotArray(self):
+        "exercise the plotArray function and make the file testPlotArray.png"
+        xyarray = np.arange(20).reshape((4,5)) - 5
+        fn1 = inspect.stack()[0][3]+".png"
+        utils.plotArray(xyarray, showMe=False, cbar=True,
+                        cbarticks=[-4, 1,2,4,8,16],
+                        cbarlabels=['negative four', 'one','two','four','eight','sixteen'],
+                        plotTitle='This is the Plot Title!',
+                        colormap=mpl.cm.terrain,
+                        pixelsToMark=[(0,1)],
+                        pixelMarkColor='red',
+                        plotFileName=fn1,
+                        sigma=2.0)
+
     def testMakeMovie0(self):
         """
         make a simple movie all 0 and 1
