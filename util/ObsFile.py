@@ -892,7 +892,7 @@ class ObsFile:
         """
         loads the wavelength cal coefficients from a given file
         """
-        scratchDir = '/ScienceData'
+        scratchDir = '/Scratch'
         wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
         fullWvlCalFileName = os.path.join(wvlDir, wvlCalFileName)
         if (not os.path.exists(fullWvlCalFileName)):
