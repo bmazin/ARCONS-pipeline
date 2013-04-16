@@ -8,7 +8,8 @@ from interval import interval, inf, imath
 import inspect
 import numpy as np
 from util import hgPlot
-from scipy.stats import poisson
+from scipy.stats import poisson,expon
+from cosmic import tsBinner
 class TestCosmic(unittest.TestCase):
     """
     test the Cosmic class
@@ -154,6 +155,33 @@ class TestCosmic(unittest.TestCase):
         plt.yscale('log')
         plt.savefig(self.fn.makeName(inspect.stack()[0][3]+"_",""))
 
+    def testExpon(self):
+        """
+        generate and fit an exponential distribution with lifetime of 25
+        make a plot in testExpon.png
+        """
+        tau = 25.0
+        nBins = 400
+        size = 100
+        x = range(nBins)
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        timeStamps = expon.rvs(loc=0, scale=tau, size=size)
+        ts64 = timeStamps.astype(np.uint64)
+        tsBinner.tsBinner(ts64, timeHgValues)
+
+        param = expon.fit(timeStamps)
+        fit = expon.pdf(x,loc=param[0],scale=param[1])
+        fit *= size
+        tvf = timeHgValues.astype(np.double)
+        tvf[tvf<1] = 1e-3 # the plot looks nicer if zero values are replaced
+        plt.plot(x, tvf, label="data")
+        plt.plot(x, fit, label="fit")
+        plt.yscale('log')
+        plt.xlim(xmax=100)
+        plt.ylim(ymin=0.09)
+        plt.legend()
+        plt.title("true tau=%.1f   fit tau=%.1f"%(tau,param[1]))
+        plt.savefig(inspect.stack()[0][3]+".png")
         
 if __name__ == '__main__':
     unittest.main()
