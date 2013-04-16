@@ -413,8 +413,12 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
     pixelMarkColor is the color to fill in marked pixels
     """
     if sigma != None:
-       meanVal = numpy.mean(accumulatePositive(xyarray))
-       stdVal = numpy.std(accumulatePositive(xyarray))
+       # Chris S. does not know what accumulatePositive is supposed to do
+       # so he changed the next two lines.
+       #meanVal = numpy.mean(accumulatePositive(xyarray))
+       #stdVal = numpy.std(accumulatePositive(xyarray))
+       meanVal = numpy.mean(xyarray)
+       stdVal = numpy.std(xyarray)
        normMin = meanVal - sigma*stdVal
        normMax = meanVal + sigma*stdVal
     if normMin == None:
