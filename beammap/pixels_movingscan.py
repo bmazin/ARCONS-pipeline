@@ -238,20 +238,20 @@ class StartQt4(QMainWindow):
         self.infile.append(self.path + '/r1.pos')
         self.infile.append(self.path + '/r2.pos')
         self.infile.append(self.path + '/r3.pos')
-        self.infile.append(self.path + '/r4.pos')
-        self.infile.append(self.path + '/r5.pos')
-        self.infile.append(self.path + '/r6.pos')
-        self.infile.append(self.path + '/r7.pos')
+        #self.infile.append(self.path + '/r4.pos')
+        #self.infile.append(self.path + '/r5.pos')
+        #self.infile.append(self.path + '/r6.pos')
+        #self.infile.append(self.path + '/r7.pos')
 
         self.psfile=[]
         self.psfile.append(self.path + '/ps_freq0.txt')
         self.psfile.append(self.path + '/ps_freq1.txt')
         self.psfile.append(self.path + '/ps_freq2.txt')
         self.psfile.append(self.path + '/ps_freq3.txt')
-        self.psfile.append(self.path + '/ps_freq4.txt')
-        self.psfile.append(self.path + '/ps_freq5.txt')
-        self.psfile.append(self.path + '/ps_freq6.txt')
-        self.psfile.append(self.path + '/ps_freq7.txt')       
+        #self.psfile.append(self.path + '/ps_freq4.txt')
+        #self.psfile.append(self.path + '/ps_freq5.txt')
+        #self.psfile.append(self.path + '/ps_freq6.txt')
+        #self.psfile.append(self.path + '/ps_freq7.txt')       
 
         self.origin = np.zeros((len(self.infile),2))
         for i in range(len(self.infile)):
@@ -323,17 +323,17 @@ class StartQt4(QMainWindow):
 
         idx=self.freqvals.argsort()
         
-        f= open('freq_atten_x_y.txt','w')
+        f= open(self.path + '/freq_atten_x_y.txt','w')
         for i in range(len(xpix)):    
-            f= open('freq_atten_x_y.txt','a')
+            f= open(self.path + '/freq_atten_x_y.txt','a')
             f.write(str(self.freqvals[idx[i]]) + '\t' + str(self.attenvals[idx[i]]) +'\t' + str(xpix[idx[i]]) + '\t' + str(ypix[idx[i]]) +'\t' + self.goodpixtag[idx[i]] + '\n')
             f.close()
 
         print 'Number of Doubles:' + str(len(self.xpos0))
         dbltag=np.loadtxt(self.dblfile,unpack='True', usecols = (4,), dtype='|S10' )
-        f= open('double_positions.txt','w')
+        f= open(self.path + '/double_positions.txt','w')
         for i in range(len(self.xpos0)):
-            f= open('double_positions.txt','a')
+            f= open(self.path + '/double_positions.txt','a')
             f.write(str(xpix0[i]) + '\t' + str(ypix0[i]) + '\t' + str(xpix1[i]) + '\t' + str(ypix1[i]) + '\t' + dbltag[i] + '\n')
             f.close()
         
@@ -344,4 +344,5 @@ if __name__ == "__main__":
 	myapp = StartQt4()
 	myapp.show()
 	app.exec_()
+
 

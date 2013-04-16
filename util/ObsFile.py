@@ -22,14 +22,15 @@ class ObsFile:
     c = 2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName):
+    def __init__(self, fileName,verbose=False):
         """
         load the given file with fileName relative to $MKID_DATA_DIR
         """
-        self.loadFile(fileName)
+        self.loadFile(fileName,verbose=verbose)
         self.wvlCalFile = None #initialize to None for an easy test of whether a cal file has been loaded
         self.flatCalFile = None
         self.fluxCalFile = None
+        self.timeAdjustFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
         self.wvlLowerLimit = None
@@ -40,20 +41,48 @@ class ObsFile:
         """
         Closes the obs file and any cal files that are open
         """
+        try:
+            self.wvlCalFile.close()
+        except:
+            pass
+        try:
+            self.flatCalFile.close()
+        except:
+            pass
+        try:
+            self.fluxCalFile.close()
+        except:
+            pass
+        try:
+            self.timeAdjustFile.close()
+        except:
+            pass
         self.file.close()
-        for eachCalFile in [self.wvlCalFile, self.flatCalFile,
-                            self.fluxCalFile]:
-            try:
-                eachCalFile.close()
-            except:
-                pass
 
 
     def getFromHeader(self, name):
-        return self.info[self.titles.index(name)]
+        """
+        Returns a requested entry from the obs file header
+        If asked for exptime (exposure time) and some roaches have a timestamp offset
+        The returned exposure time will be shortened by the max offset, since ObsFile
+        will not retrieve data from seconds in which some roaches do not have data
+        """
+        entry = self.info[self.titles.index(name)]
+        if name=='exptime' and self.timeAdjustFile != None:
+            #shorten the effective exptime by the number of seconds that 
+            #does not have data from all roaches
+            maxDelay = np.max(self.roachDelays)
+            entry -= maxDelay
+        if name=='unixtime' and self.timeAdjustFile != None:
+            #the way getPixel retrieves data accounts for individual roach delay,
+            #but shifted everything by np.max(self.roachDelays), relabeling sec maxDelay as sec 0
+            #so, add maxDelay to the header start time, so all times will be correct relative to it
+            entry += np.max(self.roachDelays)
+            entry += self.firmwareDelay
+        return entry
 
 
-    def loadFile(self, fileName):
+    def loadFile(self, fileName,verbose=False):
         """
         Opens file and loads obs file attributes and beammap
         """
@@ -69,8 +98,10 @@ class ObsFile:
             self.fullFileName = os.path.join(dataDir, self.fileName)
 
         if (not os.path.exists(self.fullFileName)):
-            print 'file does not exist: ', self.fullFileName
-            sys.exit(1)
+            msg='file does not exist: %s'%self.fullFileName
+            if verbose:
+                print msg
+            raise Exception(msg)
 
         #open the hdf5 file
         self.file = tables.openFile(self.fullFileName, mode='r')
@@ -78,7 +109,12 @@ class ObsFile:
         #get the header
         self.header = self.file.root.header.header
         self.titles = self.header.colnames
-        self.info = self.header[0] #header is a table with one row
+        try:
+            self.info = self.header[0] #header is a table with one row
+        except IndexError as inst:
+            if verbose:
+                print 'Can\'t read header for ',self.fullFileName
+            raise inst
 
         # Useful information about data format set here.
         # For now, set all of these as constants.
@@ -109,25 +145,26 @@ class ObsFile:
         #get the beam image.
         try:
             self.beamImage = self.file.getNode('/beammap/beamimage').read()
-        except:
-            print 'Can\'t access beamimage'
-            sys.exit(2)
+        except Exception as inst:
+            if verbose:
+                print 'Can\'t access beamimage for ',self.fullFileName
+            raise inst
 
         beamShape = self.beamImage.shape
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
 
-    def getFromHeader(self, name):
-        """
-        returns the value for name in the header
-        """
-        return self.info[self.titles.index(name)]
 
     def __iter__(self):
         """
         Allows easy iteration over pixels in obs file
         use with 'for pixel in obsFileObject:'
         yields a single pixel h5 dataset
+
+        MJS 3/28
+        Warning: if timeAdjustFile is loaded, the data from this
+        function will not be corrected for roach delays as in getPixel().
+        Use getPixel() instead.
         """
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
@@ -143,18 +180,39 @@ class ObsFile:
         interval 'firstSec' to firstSec+integrationTime are returned.
         For now firstSec and integrationTime can only be integers.
         If integrationTime is -1, all data after firstSec are returned.
+
+        MJS 3/28
+        Updated so if timeAdjustFile is loaded, data retrieved from roaches
+        with a delay will be offset to match other roaches.  Also, if some roaches
+        have a delay, seconds in which some roaches don't have data are no longer
+        retrieved
         """
         pixelLabel = self.beamImage[iRow][iCol]
         pixelNode = self.file.getNode('/' + pixelLabel)
-        if integrationTime == -1:
-            lastSec = pixelNode.nrows
+
+        if self.timeAdjustFile != None:
+            iRoach = self.getRoachNum(iRow,iCol)
+            maxDelay = np.max(self.roachDelays)
+            #skip over any seconds that don't have data from all roaches
+            #and offset by roach delay so all roaches will match
+            firstSec += maxDelay-self.roachDelays[iRoach]
+
+            if integrationTime == -1:
+                lastSec = pixelNode.nrows-self.roachDelays[iRoach]
+            else:
+                lastSec = firstSec + integrationTime
         else:
-            lastSec = firstSec + integrationTime
+            if integrationTime == -1:
+                lastSec = pixelNode.nrows
+            else:
+                lastSec = firstSec + integrationTime
+            
         pixelData = pixelNode.read(firstSec, lastSec)
+        #return {'pixelData':pixelData,'firstSec':firstSec,'lastSec':lastSec}
         return pixelData
 
 
-    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True): #,getTimes=False):
+    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True): #,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used. 
@@ -166,6 +224,9 @@ class ObsFile:
         JvE 3/5/2013
         if excludeBad is True, relevant wavelength cuts are applied to timestamps and wavelengths before returning 
         [if getTimes is True, returns timestamps,wavelengths - OBSELETED - JvE 3/2/2013]
+
+        MJS 3/28/2013
+        if dither is True, uniform random values in the range (0,1) will be added to all quantized ADC values read, to remedy the effects of quantization
         """
         
         #if getTimes == False:
@@ -177,8 +238,13 @@ class ObsFile:
         x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime)
         timestamps, parabolaPeaks, baselines, effIntTime = \
             x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
+        parabolaPeaks = np.array(parabolaPeaks,dtype=np.double)
+        baselines = np.array(baselines,dtype=np.double)
+        if dither==True:
+            parabolaPeaks += np.random.random_sample(len(parabolaPeaks))
+            baselines += np.random.random_sample(len(baselines))
                     
-        pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
+        pulseHeights = parabolaPeaks - baselines
         xOffset = self.wvlCalTable[iRow,iCol,0]
         yOffset = self.wvlCalTable[iRow,iCol,1]
         amplitude = self.wvlCalTable[iRow,iCol,2]
@@ -254,10 +320,9 @@ class ObsFile:
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         """
-        pixelData = self.getPixel(iRow, iCol, firstSec, integrationTime)
-        lastSec = firstSec + integrationTime
-        if integrationTime == -1:
-            lastSec = len(pixelData)
+#        getPixelOutput = self.getPixel(iRow, iCol, firstSec, integrationTime)
+#        pixelData = getPixelOutput['pixelData']
+        pixelData = self.getPixel(iRow,iCol,firstSec,integrationTime)
         packetList = np.concatenate(pixelData)
         return packetList
 
@@ -358,6 +423,10 @@ class ObsFile:
          
          **Modified to increase speed for integrations shorter than the full exposure
          length. JvE 3/13/2013**
+
+         MJS 3/28/2012
+         **Modified to add known delays to timestamps from roach delays and firmware delay if timeAdjustFile 
+         is loaded**
          
         """
         #pixelData = self.getPixel(iRow, iCol)
@@ -405,6 +474,12 @@ class ObsFile:
         timestamps = np.concatenate(timestamps)
         baselines = np.concatenate(baselines)
         peakHeights = np.concatenate(peakHeights)
+
+#        if self.timeAdjustFile != None:
+#            timestamps += self.firmwareDelay
+            #timestamps += np.max(self.roachDelays)
+
+
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
 
@@ -446,6 +521,25 @@ class ObsFile:
         #else:
         #    return secImg
     
+    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
+        """
+        Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
+        If integration time is -1, all time after firstSec is used.
+        If weighted is True, flat cal weights are applied.
+        """
+        cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                x = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
+                                  firstSec=firstSec,integrationTime=integrationTime,
+                                  weighted=weighted,wvlStart=wvlStart,wvlStop=wvlStop,
+                                  wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
+                                  wvlBinEdges=wvlBinEdges)
+                cube[iRow][iCol] = x['spectrum']
+                wvlBinEdges = x['wvlBinEdges']
+        cube = np.array(cube)
+        return {'cube':cube,'wvlBinEdges':wvlBinEdges}
+
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
                    scaleByEffInt=False):
@@ -531,11 +625,10 @@ class ObsFile:
         ax.plot(self.flatCalWvlBins[0:-1], spectrum, label='spectrum for pixel[%d][%d]' % (pixelRow, pixelCol))
         plt.show()
         
-
-    def getApertureSpectrum(self, pixelRow, pixelCol, radius, weighted=True,
-                            fluxWeighted=False, hotPixMask=None, lowcut=3000, highcut=7000):
+    def getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False,
+                            fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1):
     	'''
-    	Creates a spectrum a group of pixels.  Aperture is defined by pixelRow and pixelCol of
+    	Creates a spectrum from a group of pixels.  Aperture is defined by pixelRow and pixelCol of
     	center, as well as radius.  Wave and flat cals should be loaded before using this
     	function.  If no hot pixel mask is applied, taking the median of the sky rather than
     	the average to account for high hot pixel counts.
@@ -546,42 +639,57 @@ class ObsFile:
     	print 'Creating dead pixel mask...'
     	deadMask = self.getDeadPixels()
     	print 'Creating wavecal solution mask...'
-    	bad_solution_mask = np.zeros((46, 44))
-    	for y in range(46):
-    	    for x in range(44):
-    		if (self.wvlRangeTable[y][x][0] > lowcut or self.wvlRangeTable[y][x][1] < highcut):
+    	bad_solution_mask = np.zeros((self.nRow, self.nCol))
+    	for y in range(self.nRow):
+    	    for x in range(self.nCol):
+    		if (self.wvlRangeTable[y][x][0] > lowCut or self.wvlRangeTable[y][x][1] < highCut):
     		    bad_solution_mask[y][x] = 1
     	print 'Creating aperture mask...'
-    	apertureMask = utils.aperture(pixelCol, pixelRow, radius=radius)
+    	apertureMask = utils.aperture(pixelCol, pixelRow, radius=radius1)
     	print 'Creating sky mask...'
-    	bigMask = utils.aperture(pixelCol, pixelRow, radius=radius * 2)
+    	bigMask = utils.aperture(pixelCol, pixelRow, radius=radius2)
     	skyMask = bigMask - apertureMask
-    	if hotPixMask == None:
-    	    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
-    	    y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(skyMask == 0, deadMask == 1)))
-    	else:
-    	    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(apertureMask == 0, deadMask == 1), hotPixMask == 0)))
-    	    y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(skyMask == 0, deadMask == 1), hotPixMask == 0)))
-    	wvlBinEdges = self.getPixelSpectrum(y_values[0], x_values[0], weighted=weighted)['wvlBinEdges']
+    	#if hotPixMask == None:
+    	#    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
+    	#    y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(skyMask == 0, deadMask == 1)))
+    	#else:
+    	#    y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(apertureMask == 0, deadMask == 1), hotPixMask == 0)))
+    	#    y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(np.logical_and(skyMask == 0, deadMask == 1), hotPixMask == 0)))
+
+        y_values, x_values = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(apertureMask == 0, deadMask == 1)))
+    	y_sky, x_sky = np.where(np.logical_and(bad_solution_mask == 0, np.logical_and(skyMask == 0, deadMask == 1)))
+
+    	#wvlBinEdges = self.getPixelSpectrum(y_values[0], x_values[0], weighted=weighted)['wvlBinEdges']
     	print 'Creating average sky spectrum...'
     	skyspectrum = []
     	for i in range(len(x_sky)):
-    	    skyspectrum.append(self.getPixelSpectrum(y_sky[i], x_sky[i], weighted=weighted,
-                               fluxWeighted=fluxWeighted)['spectrum'])
+            specDict = self.getPixelSpectrum(y_sky[i],x_sky[i],weighted=weighted, fluxWeighted=fluxWeighted, firstSec=firstSec, integrationTime=integrationTime)
+            self.skySpectrumSingle,wvlBinEdges,self.effIntTime = specDict['spectrum'],specDict['wvlBinEdges'],specDict['effIntTime']
+            self.scaledSpectrum = self.skySpectrumSingle/self.effIntTime #scaled spectrum by effective integration time
+            #print "Sky spectrum"
+            #print self.skySpectrumSingle
+            #print "Int time"
+            #print self.effIntTime
+    	    skyspectrum.append(self.scaledSpectrum)
     	sky_array = np.zeros(len(skyspectrum[0]))
     	for j in range(len(skyspectrum[0])):
     	    ispectrum = np.zeros(len(skyspectrum))
     	    for i in range(len(skyspectrum)):    
     	        ispectrum[i] = skyspectrum[i][j]
-    	    if hotPixMask == None:
-    		sky_array[j] = np.median(ispectrum)
-    	    else:
-    	        sky_array[j] = np.average(ispectrum)
+            sky_array[j] = np.median(ispectrum)
+    	    #if hotPixMask == None:
+    	    #    sky_array[j] = np.median(ispectrum)
+    	    #else:
+    	    #    sky_array[j] = np.average(ispectrum)
     	print 'Creating sky subtracted spectrum...'
     	spectrum = []
     	for i in range(len(x_values)):
-    	    spectrum.append(self.getPixelSpectrum(y_values[i], x_values[i], weighted=weighted,
-                            fluxWeighted=fluxWeighted)['spectrum'] - sky_array)
+            specDict = self.getPixelSpectrum(y_values[i],x_values[i],weighted=weighted, fluxWeighted=fluxWeighted, firstSec=firstSec, integrationTime=integrationTime)
+            self.obsSpectrumSingle,wvlBinEdges,self.effIntTime = specDict['spectrum'],specDict['wvlBinEdges'],specDict['effIntTime']   
+            self.scaledSpectrum = self.obsSpectrumSingle/self.effIntTime #scaled spectrum by effective integration time
+    	    spectrum.append(self.scaledSpectrum - sky_array)
+
+    	    #spectrum.append(self.getPixelSpectrum(y_values[i], x_values[i], weighted=weighted,fluxWeighted=fluxWeighted)['spectrum'] - sky_array)
     	summed_array = np.zeros(len(spectrum[0]))
     	for j in range(len(spectrum[0])):
     	    ispectrum = np.zeros(len(spectrum))
@@ -592,16 +700,14 @@ class ObsFile:
     	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
     	return summed_array, wvlBinEdges
     
-    def plotApertureSpectrum(self, pixelRow, pixelCol, radius, weighted=True, fluxWeighted=False, hotPixMask=None, lowcut=3000, highcut=7000):
-    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius=radius, weighted=weighted, fluxWeighted=fluxWeighted, hotPixMask=hotPixMask, lowcut=lowcut, highcut=highcut)
+    def plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1):
+    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius1=radius1, radius2=radius2, weighted=weighted, fluxWeighted=fluxWeighted, lowCut=lowCut, highCut=highCut, firstSec=firstSec,integrationTime=integrationTime)
     	fig = plt.figure()
     	ax = fig.add_subplot(111)
     	ax.plot(bin_edges[12:-2], summed_array[12:-1])
     	plt.xlabel('Wavelength ($\AA$)')
     	plt.ylabel('Counts')
     	plt.show()
-    	
-	
 
     def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
         """
@@ -839,6 +945,22 @@ class ObsFile:
         self.nFluxCalWvlBins = self.nFlatCalWvlBins
 
 
+    def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
+        """
+        loads obsfile specific adjustments to add to all timestamps read
+        adjustments are read from timeAdjustFileName
+        it is suggested to pass timeAdjustFileName=FileName(run=run).timeAdjustments()
+        """
+        try:
+            self.timeAdjustFile = tables.openFile(timeAdjustFileName)
+            self.firmwareDelay = self.timeAdjustFile.root.timeAdjust.firmwareDelay.read()[0]['firmwareDelay']
+            roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
+            self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
+        except Exception as inst:
+            if verbose==True:
+                print 'Error loading time adjustment file',timeAdjustFileName
+            raise Exception
+
     def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True):
         """
         Load a hot pixel time mask from the given file, in a similar way to
@@ -899,7 +1021,7 @@ class ObsFile:
         1's for pixels with counts, 0's for pixels without counts
         if showMe is True, a plot of the mask pops up
         """
-        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['image']
+        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts']
                                  for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow, self.nCol))
         deadArray[countArray == 0] = 0
@@ -920,6 +1042,43 @@ class ObsFile:
             utils.plotArray(nonAllocArray)
         return nonAllocArray
 
+    def checkIntegrity(self,firstSec=0,integrationTime=-1):
+        """
+        Checks the obs file for corrupted end-of-seconds
+        Corruption is indicated by timestamps greater than 1/tickDuration=1e6
+        returns 0 if no corruption found
+        """
+        corruptedPixels = []
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
+                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+                if np.any(timestamps > 1./self.tickDuration):
+                    print 'Corruption detected in pixel (',iRow,iCol,')'
+                    corruptedPixels.append((iRow,iCol))
+        corruptionFound = len(corruptedPixels) != 0
+        return corruptionFound
+#        exptime = self.getFromHeader('exptime')
+#        lastSec = firstSec + integrationTime
+#        if integrationTime == -1:
+#            lastSec = exptime-1
+#            
+#        corruptedSecs = []
+#        for pixelCoord in corruptedPixels:
+#            for sec in xrange(firstSec,lastSec):
+#                packetList = self.getPixelPacketList(pixelCoord[0],pixelCoord[1],sec,integrationTime=1)
+#                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+#                if np.any(timestamps > 1./self.tickDuration):
+#                    pixelLabel = self.beamImage[iRow][iCol]
+#                    corruptedSecs.append(sec)
+#                    print 'Corruption in pixel',pixelLabel, 'at',sec
+
+    def getRoachNum(self,iRow,iCol):
+        pixelLabel = self.beamImage[iRow][iCol]
+        iRoach = int(pixelLabel.split('r')[1][0])
+        return iRoach
+
+                
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):
         """
@@ -945,8 +1104,29 @@ class ObsFile:
         wvlBinEdges = wvlBinEdges[::-1]
         return wvlBinEdges
 
+    def getFrame(self, firstSec=0, integrationTime=-1):
+        """
+        return a 2d array of numbers with the integrated flux per pixel,
+        suitable for use as a frame in util/utils.py function makeMovie
+
+        firstSec=0 is the starting second to include
+
+        integrationTime=-1 is the number of seconds to include, or -1
+        to include all to the end of this file
 
 
+        output: the frame, in photons per pixel, a 2d numpy array of
+        np.unint32
+
+        """
+        frame = np.zeros((self.nRow,self.nCol),dtype=np.uint32)
+        for iRow in range(self.nRow):
+            for iCol in range(self.nCol):
+                pl = self.getTimedPacketList(iRow,iCol,
+                                             firstSec,integrationTime)
+                nphoton = pl['timestamps'].size
+                frame[iRow][iCol] += nphoton
+        return frame
 
 def calculateSlices_old(inter, timestamps):
     """

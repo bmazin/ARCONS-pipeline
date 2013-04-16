@@ -1,6 +1,7 @@
 from sdssgaussfitter import gaussfit
 import numpy as np
 from util import utils
+from util.readDict import readDict
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
@@ -20,15 +21,30 @@ def aperture(startpx,startpy,radius=3):
                 mask[y,x]=0.
     return mask
 
-def gaussian(height, center_x, center_y, width_x, width_y,offset):
-    """Returns a gaussian function with the given parameters"""
-    width_x = float(width_x)
-    width_y = float(width_y)
-    return lambda x,y: height*np.exp(-(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)+offset
+#def gaussian(height, center_x, center_y, width_x, width_y,offset):
+#    """Returns a gaussian function with the given parameters"""
+#    width_x = float(width_x)
+#    width_y = float(width_y)
+#    return lambda x,y: height*np.exp(-(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)+offset
 
 #testy = np.array([[gaussian(2,10,10,3,3,5)(x,y) for y in range(46)] for x in range(44)])
 #utils.plotArray(testy,cbar=True)
-stackDict = np.load('/home/pszypryt/sdss_data/20121211/seq5Blue-ImageStack.npz')
+
+param = readDict()
+param.read_from_file('0926params.dict')
+
+npzLoadFile = param['npzLoadFile']
+npzfitpsf = param['npzfitpsf']
+giffitpsf = param['giffitpsf']
+
+FramesPerFile = param['FramesPerFile']
+NumFiles = param['NumFiles']
+NumFrames = [filenum*FramesPerFile for filenum in NumFiles]
+guessX = param['guessX']
+guessY = param['guessY']
+
+stackDict = np.load(npzLoadFile)
+
 stack = stackDict['stack']
 jd = stackDict['jd']
 paramsList = []
@@ -36,15 +52,16 @@ errorsList = []
 fitImgList = []
 chisqList = []
 plt.ion()
+
 for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
     nanMask = np.isnan(frame)
-    #if (iFrame < 420):
-        #guessX = 31
-        #guessY = 30
-    #else:
-    guessX = 16
-    guessY = 15
+
+    for interval in xrange(len(NumFrames)-1)
+        if NumFrames[interval] < iFrame < NumFrames[interval+1]
+            guessx = guessX[interval]
+            guessy = guessY[interval]
+
     apertureMask = aperture(guessX,guessY,radius=10)
     err = np.sqrt(frame)
     #err = np.ones(np.shape(frame))
@@ -133,6 +150,8 @@ chisqs = np.array(chisqList)
 params = np.array(paramsList)
 errors = np.array(errorsList)
 
-#utils.makeMovie(fitImgList,cbar=True,outName='/home/pszypryt/sdss_data/20121211/seq5Blue2-Fit.gif',normMax=1000)
-utils.makeMovie(fitImgList,cbar=True,outName='/home/pszypryt/sdss_data/20121211/seq5Blue2-Fit.gif')
-np.savez('/home/pszypryt/sdss_data/20121211/seq5Blue2-Fit.npz',fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+np.savez(npzfitpsf,fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=jd)
+print 'saved'
+utils.makeMovie(fitImgList,cbar=True,outName=giffitpsf)
+#,normMax=1000)
+
