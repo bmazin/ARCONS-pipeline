@@ -5,6 +5,48 @@ Author: Matt Strader        Date: August 19, 2012
 The class ObsFile is an interface to observation files.  It provides methods for typical ways of accessing and viewing observation data.  It can also load and apply wavelength and flat calibration.  With calibrations loaded, it can write the obs file out as a photon list
 
 Looks for observation files in $MKID_DATA_DIR and calibration files organized in $INTERM_PATH (intermediate or scratch path)
+
+Class Obsfile:
+__init__(self, fileName,verbose=False)
+__del__(self)
+__iter__(self)
+getFromHeader(self, name)
+loadFile(self, fileName,verbose=False)
+getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1)
+getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True)
+getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, getRawCount=False)
+getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
+getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1)
+getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
+getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
+getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None)
+displaySec(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, plotTitle='', nSdevMax=2,scaleByEffInt=False)
+getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000, wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None)
+plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False)getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1)
+plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1)
+convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True)
+parsePhotonPackets(self, packets, inter=interval(),doParabolaFitPeaks=True, doBaselines=True)
+createEmptyPhotonListFile(self)
+getPixelBadTimes(self, pixelRow, pixelCol)
+getDeadPixels(self, showMe=False, weighted=True)
+getNonAllocPixels(self, showMe=False)
+checkIntegrity(self,firstSec=0,integrationTime=-1)
+getRoachNum(self,iRow,iCol)
+getFrame(self, firstSec=0, integrationTime=-1)
+loadFlatCalFile(self, flatCalFileName)
+loadFluxCalFile(self, fluxCalFileName)
+loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True)
+loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False)
+loadWvlCalFile(self, wvlCalFileName)
+makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000)
+setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000)
+switchOffHotPixTimeMask(self)
+switchOnHotPixTimeMask(self)
+writePhotonList(self)
+
+calculateSlices_old(inter, timestamps)
+calculateSlices(inter, timestamps)
+repackArray(array, slices)
 '''
 
 import sys, os
@@ -58,6 +100,24 @@ class ObsFile:
         except:
             pass
         self.file.close()
+
+
+    def __iter__(self):
+        """
+        Allows easy iteration over pixels in obs file
+        use with 'for pixel in obsFileObject:'
+        yields a single pixel h5 dataset
+
+        MJS 3/28
+        Warning: if timeAdjustFile is loaded, the data from this
+        function will not be corrected for roach delays as in getPixel().
+        Use getPixel() instead.
+        """
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                pixelLabel = self.beamImage[iRow][iCol]
+                pixelData = self.file.getNode('/' + pixelLabel)
+                yield pixelData
 
 
     def getFromHeader(self, name):
@@ -153,24 +213,6 @@ class ObsFile:
         beamShape = self.beamImage.shape
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
-
-
-    def __iter__(self):
-        """
-        Allows easy iteration over pixels in obs file
-        use with 'for pixel in obsFileObject:'
-        yields a single pixel h5 dataset
-
-        MJS 3/28
-        Warning: if timeAdjustFile is loaded, the data from this
-        function will not be corrected for roach delays as in getPixel().
-        Use getPixel() instead.
-        """
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                pixelLabel = self.beamImage[iRow][iCol]
-                pixelData = self.file.getNode('/' + pixelLabel)
-                yield pixelData
 
 
     def getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1):
@@ -708,18 +750,7 @@ class ObsFile:
     	plt.xlabel('Wavelength ($\AA$)')
     	plt.ylabel('Counts')
     	plt.show()
-
-    def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
-        """
-        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) or getPixelWvlList(excludeBad=True) is called
-        wavelengths outside these limits are excluded.  To remove limits
-        set wvlLowerLimit and/or wvlUpperLimit to None.  To use the wavecal limits
-        for each individual pixel, set wvlLowerLimit and/or wvlUpperLimit to -1 
-        NB - changed defaults for lower/upper limits to None (from 3000 and 8000). JvE 2/22/13
-        """
-        self.wvlLowerLimit = wvlLowerLimit
-        self.wvlUpperLimit = wvlUpperLimit
-
+        
 
     def convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True):
         """
@@ -805,63 +836,6 @@ class ObsFile:
         # return the values filled in above
         return timestamps, parabolaFitPeaks, baselines
 
-
-    def writePhotonList(self):
-        """
-        writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
-        currently cuts out photons outside the valid wavelength ranges from the wavecal
-        NOTE - NOT CURRENTLY UPDATED FOR HANDLING HOT PIXEL TIME MASKING. IF A MASK IS
-        LOADED, BEHAVIOUR MAY BE UNPREDICTABLE.... JvE 3/5/2013
-        """
-        plFile = self.createEmptyPhotonListFile()
-        plTable = plFile.root.photons.photons
-        plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, recursive=True)
-        plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, recursive=True)
-        plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, recursive=True)
-        plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
-        plFile.flush()
-
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                flag = self.wvlFlagTable[iRow, iCol]
-                if flag == 0:#only write photons in good pixels
-                    wvlError = self.wvlErrorTable[iRow, iCol]
-                    flatWeights = self.flatWeights[iRow, iCol]
-                    flatFlags = self.flatFlags[iRow, iCol]
-                    fluxWeights = self.fluxWeights[iRow, iCol]
-                    fluxFlags = self.fluxFlags[iRow, iCol]
-                    wvlRange = self.wvlRangeTable[iRow, iCol]
-
-                    #go through the list of seconds in a pixel dataset
-                    for iSec, secData in enumerate(self.getPixel(iRow, iCol)):
-                        timestamps, parabolaPeaks, baselines = self.parsePhotonPackets(secData)
-                        pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
-                        timestamps = iSec + self.tickDuration * timestamps
-                        wavelengths = self.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
-                        #calculate what wavelength bins each photon falls into to see which flat cal factor should be applied
-                        if len(wavelengths) > 0:
-                            binIndices = np.digitize(wavelengths, self.flatCalWvlBins) - 1
-
-                        else:
-                            binIndices = np.array([])
- 
-                        for iPhoton in xrange(len(timestamps)):
-                            if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
-                                #create a new row for the photon list
-                                newRow = plTable.row
-                                newRow['Xpix'] = iCol
-                                newRow['Ypix'] = iRow
-                                newRow['ArrivalTime'] = timestamps[iPhoton]
-                                newRow['Wavelength'] = wavelengths[iPhoton]
-                                newRow['WaveError'] = wvlError
-                                newRow['Flag'] = flatFlags[binIndices[iPhoton]]
-                                newRow['FlatWeight'] = flatWeights[binIndices[iPhoton]]
-                                newRow['FluxWeight'] = fluxWeights[binIndices[iPhoton]]
-                                newRow['FluxFlag'] = fluxFlags[binIndices[iphoton]]
-                                newRow.append()
-        plTable.flush()
-
-
     def createEmptyPhotonListFile(self):
         """
         creates a photonList h5 file 
@@ -885,123 +859,6 @@ class ObsFile:
             plFile.close()
             raise
         return plFile
-
-
-
-    def loadWvlCalFile(self, wvlCalFileName):
-        """
-        loads the wavelength cal coefficients from a given file
-        """
-        scratchDir = '/Scratch'
-        wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
-        fullWvlCalFileName = os.path.join(wvlDir, wvlCalFileName)
-        if (not os.path.exists(fullWvlCalFileName)):
-            print 'wavelength cal file does not exist: ', fullWvlCalFileName
-            return
-        self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
-        wvlCalData = self.wvlCalFile.root.wavecal.calsoln
-        self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
-        self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
-        self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
-        self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
-        for calPixel in wvlCalData:
-            self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
-            self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
-            if calPixel['wave_flag'] == 0:
-                self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
-                self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
-
-        
-    def loadFlatCalFile(self, flatCalFileName):
-        """
-        loads the flat cal factors from the given file
-        """
-        scratchDir = os.getenv('INTERM_PATH', '/')
-        flatCalPath = os.path.join(scratchDir, 'flatCalSolnFiles')
-        fullFlatCalFileName = os.path.join(flatCalPath, flatCalFileName)
-        if (not os.path.exists(fullFlatCalFileName)):
-            print 'flat cal file does not exist: ', fullFlatCalFileName
-            return
-        self.flatCalFile = tables.openFile(fullFlatCalFileName, mode='r')
-        self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
-        self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
-        self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
-        self.nFlatCalWvlBins = self.flatWeights.shape[2]
-
-    def loadFluxCalFile(self, fluxCalFileName):
-        """
-        loads the flux cal factors from the given file
-        """
-        scratchDir = os.getenv('INTERM_PATH', '/')
-        fluxCalPath = os.path.join(scratchDir, 'fluxCalSolnFiles')
-        fullFluxCalFileName = os.path.join(fluxCalPath, fluxCalFileName)
-        if (not os.path.exists(fullFluxCalFileName)):
-            print 'flux cal file does not exist: ', fullFluxCalFileName
-            return
-        self.fluxCalFile = tables.openFile(fullFluxCalFileName, mode='r')
-        self.fluxWeights = self.fluxCalFile.root.fluxcal.weights.read()
-        self.fluxFlags = self.fluxCalFile.root.fluxcal.flags.read()
-        self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
-        self.nFluxCalWvlBins = self.nFlatCalWvlBins
-
-
-    def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
-        """
-        loads obsfile specific adjustments to add to all timestamps read
-        adjustments are read from timeAdjustFileName
-        it is suggested to pass timeAdjustFileName=FileName(run=run).timeAdjustments()
-        """
-        try:
-            self.timeAdjustFile = tables.openFile(timeAdjustFileName)
-            self.firmwareDelay = self.timeAdjustFile.root.timeAdjust.firmwareDelay.read()[0]['firmwareDelay']
-            roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
-            self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
-        except Exception as inst:
-            if verbose==True:
-                print 'Error loading time adjustment file',timeAdjustFileName
-            raise Exception
-
-    def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True):
-        """
-        Load a hot pixel time mask from the given file, in a similar way to
-        loadWvlCalFile, loadFlatCalFile, etc. Switches on hot pixel
-        masking by default.
-        Set switchOnMask=False to prevent switching on hot pixel masking.
-        """
-        import hotpix.hotPixels as hotPixels    #Here instead of at top to prevent circular import problems.
-        
-        scratchDir = os.getenv('INTERM_PATH', '/')
-        hotPixCalPath = os.path.join(scratchDir, 'hotPixCalFiles')
-        fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
-        if (not os.path.exists(fullHotPixCalFileName)):
-            print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
-            return
-        
-        self.hotPixTimeMask = hotPixels.readHotPixels(fullHotPixCalFileName)
-        
-        if (os.path.basename(self.hotPixTimeMask['obsFileName'])
-            != os.path.basename(self.fileName)):
-            warnings.warn('Mismatch between hot pixel time mask file and obs file. Not loading/applying mask!')
-            self.hotPixTimeMask = None
-        else:
-            if switchOnMask: self.switchOnHotPixTimeMask()
-        
-        
-    def switchOnHotPixTimeMask(self):
-        """
-        Switch on hot pixel time masking. Subsequent calls to getPixelCountImage
-        etc. will have bad pixel times removed.
-        """
-        if self.hotPixTimeMask is None:
-            raise RuntimeError, 'No hot pixel file loaded'
-        self.hotPixIsApplied = True
-        
-    def switchOffHotPixTimeMask(self):
-        """
-        Switch off hot pixel time masking - bad pixel times will no longer be
-        removed (although the mask remains 'loaded' in ObsFile instance).
-        """
-        self.hotPixIsApplied = False
         
     def getPixelBadTimes(self, pixelRow, pixelCol):
         """
@@ -1078,7 +935,126 @@ class ObsFile:
         iRoach = int(pixelLabel.split('r')[1][0])
         return iRoach
 
+    def getFrame(self, firstSec=0, integrationTime=-1):
+        """
+        return a 2d array of numbers with the integrated flux per pixel,
+        suitable for use as a frame in util/utils.py function makeMovie
+
+        firstSec=0 is the starting second to include
+
+        integrationTime=-1 is the number of seconds to include, or -1
+        to include all to the end of this file
+
+
+        output: the frame, in photons per pixel, a 2d numpy array of
+        np.unint32
+
+        """
+        frame = np.zeros((self.nRow,self.nCol),dtype=np.uint32)
+        for iRow in range(self.nRow):
+            for iCol in range(self.nCol):
+                pl = self.getTimedPacketList(iRow,iCol,
+                                             firstSec,integrationTime)
+                nphoton = pl['timestamps'].size
+                frame[iRow][iCol] += nphoton
+        return frame
+        
+    def loadFlatCalFile(self, flatCalFileName):
+        """
+        loads the flat cal factors from the given file
+        """
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        flatCalPath = os.path.join(scratchDir, 'flatCalSolnFiles')
+        fullFlatCalFileName = os.path.join(flatCalPath, flatCalFileName)
+        if (not os.path.exists(fullFlatCalFileName)):
+            print 'flat cal file does not exist: ', fullFlatCalFileName
+            return
+        self.flatCalFile = tables.openFile(fullFlatCalFileName, mode='r')
+        self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
+        self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
+        self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
+        self.nFlatCalWvlBins = self.flatWeights.shape[2]
+
+    def loadFluxCalFile(self, fluxCalFileName):
+        """
+        loads the flux cal factors from the given file
+        """
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        fluxCalPath = os.path.join(scratchDir, 'fluxCalSolnFiles')
+        fullFluxCalFileName = os.path.join(fluxCalPath, fluxCalFileName)
+        if (not os.path.exists(fullFluxCalFileName)):
+            print 'flux cal file does not exist: ', fullFluxCalFileName
+            return
+        self.fluxCalFile = tables.openFile(fullFluxCalFileName, mode='r')
+        self.fluxWeights = self.fluxCalFile.root.fluxcal.weights.read()
+        self.fluxFlags = self.fluxCalFile.root.fluxcal.flags.read()
+        self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
+        self.nFluxCalWvlBins = self.nFlatCalWvlBins
+
+    def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True):
+        """
+        Load a hot pixel time mask from the given file, in a similar way to
+        loadWvlCalFile, loadFlatCalFile, etc. Switches on hot pixel
+        masking by default.
+        Set switchOnMask=False to prevent switching on hot pixel masking.
+        """
+        import hotpix.hotPixels as hotPixels    #Here instead of at top to prevent circular import problems.
+        
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        hotPixCalPath = os.path.join(scratchDir, 'hotPixCalFiles')
+        fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
+        if (not os.path.exists(fullHotPixCalFileName)):
+            print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
+            return
+        
+        self.hotPixTimeMask = hotPixels.readHotPixels(fullHotPixCalFileName)
+        
+        if (os.path.basename(self.hotPixTimeMask['obsFileName'])
+            != os.path.basename(self.fileName)):
+            warnings.warn('Mismatch between hot pixel time mask file and obs file. Not loading/applying mask!')
+            self.hotPixTimeMask = None
+        else:
+            if switchOnMask: self.switchOnHotPixTimeMask()
+
+    def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
+        """
+        loads obsfile specific adjustments to add to all timestamps read
+        adjustments are read from timeAdjustFileName
+        it is suggested to pass timeAdjustFileName=FileName(run=run).timeAdjustments()
+        """
+        try:
+            self.timeAdjustFile = tables.openFile(timeAdjustFileName)
+            self.firmwareDelay = self.timeAdjustFile.root.timeAdjust.firmwareDelay.read()[0]['firmwareDelay']
+            roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
+            self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
+        except Exception as inst:
+            if verbose==True:
+                print 'Error loading time adjustment file',timeAdjustFileName
+            raise Exception
                 
+    def loadWvlCalFile(self, wvlCalFileName):
+        """
+        loads the wavelength cal coefficients from a given file
+        """
+        scratchDir = '/Scratch'
+        wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
+        fullWvlCalFileName = os.path.join(wvlDir, wvlCalFileName)
+        if (not os.path.exists(fullWvlCalFileName)):
+            print 'wavelength cal file does not exist: ', fullWvlCalFileName
+            return
+        self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
+        wvlCalData = self.wvlCalFile.root.wavecal.calsoln
+        self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
+        self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
+        self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
+        self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
+        for calPixel in wvlCalData:
+            self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
+            self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
+            if calPixel['wave_flag'] == 0:
+                self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
+                self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
+
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):
         """
@@ -1104,29 +1080,90 @@ class ObsFile:
         wvlBinEdges = wvlBinEdges[::-1]
         return wvlBinEdges
 
-    def getFrame(self, firstSec=0, integrationTime=-1):
+    def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
         """
-        return a 2d array of numbers with the integrated flux per pixel,
-        suitable for use as a frame in util/utils.py function makeMovie
-
-        firstSec=0 is the starting second to include
-
-        integrationTime=-1 is the number of seconds to include, or -1
-        to include all to the end of this file
-
-
-        output: the frame, in photons per pixel, a 2d numpy array of
-        np.unint32
-
+        Sets wavelength cutoffs so that if convertToWvl(excludeBad=True) or getPixelWvlList(excludeBad=True) is called
+        wavelengths outside these limits are excluded.  To remove limits
+        set wvlLowerLimit and/or wvlUpperLimit to None.  To use the wavecal limits
+        for each individual pixel, set wvlLowerLimit and/or wvlUpperLimit to -1 
+        NB - changed defaults for lower/upper limits to None (from 3000 and 8000). JvE 2/22/13
         """
-        frame = np.zeros((self.nRow,self.nCol),dtype=np.uint32)
-        for iRow in range(self.nRow):
-            for iCol in range(self.nCol):
-                pl = self.getTimedPacketList(iRow,iCol,
-                                             firstSec,integrationTime)
-                nphoton = pl['timestamps'].size
-                frame[iRow][iCol] += nphoton
-        return frame
+        self.wvlLowerLimit = wvlLowerLimit
+        self.wvlUpperLimit = wvlUpperLimit
+        
+    def switchOffHotPixTimeMask(self):
+        """
+        Switch off hot pixel time masking - bad pixel times will no longer be
+        removed (although the mask remains 'loaded' in ObsFile instance).
+        """
+        self.hotPixIsApplied = False
+
+    def switchOnHotPixTimeMask(self):
+        """
+        Switch on hot pixel time masking. Subsequent calls to getPixelCountImage
+        etc. will have bad pixel times removed.
+        """
+        if self.hotPixTimeMask is None:
+            raise RuntimeError, 'No hot pixel file loaded'
+        self.hotPixIsApplied = True
+
+    def writePhotonList(self):
+        """
+        writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+        currently cuts out photons outside the valid wavelength ranges from the wavecal
+        NOTE - NOT CURRENTLY UPDATED FOR HANDLING HOT PIXEL TIME MASKING. IF A MASK IS
+        LOADED, BEHAVIOUR MAY BE UNPREDICTABLE.... JvE 3/5/2013
+        """
+        plFile = self.createEmptyPhotonListFile()
+        plTable = plFile.root.photons.photons
+        plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+        plFile.flush()
+
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                flag = self.wvlFlagTable[iRow, iCol]
+                if flag == 0:#only write photons in good pixels
+                    wvlError = self.wvlErrorTable[iRow, iCol]
+                    flatWeights = self.flatWeights[iRow, iCol]
+                    flatFlags = self.flatFlags[iRow, iCol]
+                    fluxWeights = self.fluxWeights[iRow, iCol]
+                    fluxFlags = self.fluxFlags[iRow, iCol]
+                    wvlRange = self.wvlRangeTable[iRow, iCol]
+
+                    #go through the list of seconds in a pixel dataset
+                    for iSec, secData in enumerate(self.getPixel(iRow, iCol)):
+                        timestamps, parabolaPeaks, baselines = self.parsePhotonPackets(secData)
+                        pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
+                        timestamps = iSec + self.tickDuration * timestamps
+                        wavelengths = self.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
+                        #calculate what wavelength bins each photon falls into to see which flat cal factor should be applied
+                        if len(wavelengths) > 0:
+                            binIndices = np.digitize(wavelengths, self.flatCalWvlBins) - 1
+
+                        else:
+                            binIndices = np.array([])
+ 
+                        for iPhoton in xrange(len(timestamps)):
+                            if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
+                                #create a new row for the photon list
+                                newRow = plTable.row
+                                newRow['Xpix'] = iCol
+                                newRow['Ypix'] = iRow
+                                newRow['ArrivalTime'] = timestamps[iPhoton]
+                                newRow['Wavelength'] = wavelengths[iPhoton]
+                                newRow['WaveError'] = wvlError
+                                newRow['Flag'] = flatFlags[binIndices[iPhoton]]
+                                newRow['FlatWeight'] = flatWeights[binIndices[iPhoton]]
+                                newRow['FluxWeight'] = fluxWeights[binIndices[iPhoton]]
+                                newRow['FluxFlag'] = fluxFlags[binIndices[iphoton]]
+                                newRow.append()
+        plTable.flush()
+
+        
+            
 
 def calculateSlices_old(inter, timestamps):
     """
