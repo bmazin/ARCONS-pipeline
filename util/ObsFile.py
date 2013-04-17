@@ -10,8 +10,12 @@ Class Obsfile:
 __init__(self, fileName,verbose=False)
 __del__(self)
 __iter__(self)
-getFromHeader(self, name)
 loadFile(self, fileName,verbose=False)
+checkIntegrity(self,firstSec=0,integrationTime=-1)
+convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True)
+createEmptyPhotonListFile(self)
+displaySec(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, plotTitle='', nSdevMax=2,scaleByEffInt=False)
+getFromHeader(self, name)
 getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True)
 getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, getRawCount=False)
@@ -20,17 +24,10 @@ getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
 getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None)
-displaySec(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, plotTitle='', nSdevMax=2,scaleByEffInt=False)
 getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000, wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None)
-plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False)getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1)
-plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1)
-convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True)
-parsePhotonPackets(self, packets, inter=interval(),doParabolaFitPeaks=True, doBaselines=True)
-createEmptyPhotonListFile(self)
 getPixelBadTimes(self, pixelRow, pixelCol)
 getDeadPixels(self, showMe=False, weighted=True)
 getNonAllocPixels(self, showMe=False)
-checkIntegrity(self,firstSec=0,integrationTime=-1)
 getRoachNum(self,iRow,iCol)
 getFrame(self, firstSec=0, integrationTime=-1)
 loadFlatCalFile(self, flatCalFileName)
@@ -39,6 +36,9 @@ loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True)
 loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False)
 loadWvlCalFile(self, wvlCalFileName)
 makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000)
+parsePhotonPackets(self, packets, inter=interval(),doParabolaFitPeaks=True, doBaselines=True)
+plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False)getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1)
+plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1)
 setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000)
 switchOffHotPixTimeMask(self)
 switchOnHotPixTimeMask(self)
@@ -119,29 +119,6 @@ class ObsFile:
                 pixelData = self.file.getNode('/' + pixelLabel)
                 yield pixelData
 
-
-    def getFromHeader(self, name):
-        """
-        Returns a requested entry from the obs file header
-        If asked for exptime (exposure time) and some roaches have a timestamp offset
-        The returned exposure time will be shortened by the max offset, since ObsFile
-        will not retrieve data from seconds in which some roaches do not have data
-        """
-        entry = self.info[self.titles.index(name)]
-        if name=='exptime' and self.timeAdjustFile != None:
-            #shorten the effective exptime by the number of seconds that 
-            #does not have data from all roaches
-            maxDelay = np.max(self.roachDelays)
-            entry -= maxDelay
-        if name=='unixtime' and self.timeAdjustFile != None:
-            #the way getPixel retrieves data accounts for individual roach delay,
-            #but shifted everything by np.max(self.roachDelays), relabeling sec maxDelay as sec 0
-            #so, add maxDelay to the header start time, so all times will be correct relative to it
-            entry += np.max(self.roachDelays)
-            entry += self.firmwareDelay
-        return entry
-
-
     def loadFile(self, fileName,verbose=False):
         """
         Opens file and loads obs file attributes and beammap
@@ -214,7 +191,131 @@ class ObsFile:
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
 
+    def checkIntegrity(self,firstSec=0,integrationTime=-1):
+        """
+        Checks the obs file for corrupted end-of-seconds
+        Corruption is indicated by timestamps greater than 1/tickDuration=1e6
+        returns 0 if no corruption found
+        """
+        corruptedPixels = []
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
+                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+                if np.any(timestamps > 1./self.tickDuration):
+                    print 'Corruption detected in pixel (',iRow,iCol,')'
+                    corruptedPixels.append((iRow,iCol))
+        corruptionFound = len(corruptedPixels) != 0
+        return corruptionFound
+#        exptime = self.getFromHeader('exptime')
+#        lastSec = firstSec + integrationTime
+#        if integrationTime == -1:
+#            lastSec = exptime-1
+#            
+#        corruptedSecs = []
+#        for pixelCoord in corruptedPixels:
+#            for sec in xrange(firstSec,lastSec):
+#                packetList = self.getPixelPacketList(pixelCoord[0],pixelCoord[1],sec,integrationTime=1)
+#                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
+#                if np.any(timestamps > 1./self.tickDuration):
+#                    pixelLabel = self.beamImage[iRow][iCol]
+#                    corruptedSecs.append(sec)
+#                    print 'Corruption in pixel',pixelLabel, 'at',sec
 
+    def convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True):
+        """
+        applies wavelength calibration to a list of photon pulse heights
+        if excludeBad is True, wavelengths calculated as np.inf are excised from the array returned, as are wavelengths outside the fit limits of the wavecal
+        """
+
+        xOffset = self.wvlCalTable[iRow, iCol, 0]
+        yOffset = self.wvlCalTable[iRow, iCol, 1]
+        amplitude = self.wvlCalTable[iRow, iCol, 2]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
+        energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
+        
+        if excludeBad == True:
+            energies = energies[energies != 0]
+        wavelengths = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / energies
+        if excludeBad == True and self.wvlLowerLimit == -1:
+            wavelengths = wavelengths[wvlCalLowerLimit < wavelengths]
+        elif excludeBad == True and self.wvlLowerLimit != None:
+            wavelengths = wavelengths[self.wvlLowerLimit < wavelengths]
+        if excludeBad == True and self.wvlUpperLimit == -1:
+            wavelengths = wavelengths[wavelengths < wvlCalUpperLimit]
+        elif excludeBad == True and self.wvlUpperLimit != None:
+            wavelengths = wavelengths[wavelengths < self.wvlUpperLimit]
+#            if len(wavelengths) > 0 and self.flatCalFile != None:
+#                #filter out wavelengths without a valid flat weight
+#                pixelFlags = self.flatFlags[iRow,iCol]
+#                binIndices = np.digitize(wavelengths,self.flatCalWvlBins)-1
+#                wavelengths=wavelengths[np.logical_and(binIndices>=0,binIndices<len(pixelFlags))]
+#                binIndices=binIndices[np.logical_and(binIndices>=0,binIndices<len(pixelFlags))]
+#                flags = pixelFlags[binIndices]
+#                wavelengths = wavelengths[flags==1]
+
+        return wavelengths
+
+    def createEmptyPhotonListFile(self):
+        """
+        creates a photonList h5 file 
+        using header in headers.ArconsHeaders
+        """
+            
+        fileTimestamp = self.fileName.split('_')[1].split('.')[0]
+        fileDate = os.path.basename(os.path.dirname(self.fullFileName))
+        run = os.path.basename(os.path.dirname(os.path.dirname(self.fullFileName)))
+        fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
+        fullPhotonListFileName = fn.photonList()
+        if (os.path.exists(fullPhotonListFileName)):
+            if utils.confirm('Photon list file  %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
+                exit(0)
+        zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
+        try:
+            plFile = tables.openFile(fullPhotonListFileName, mode='w')
+            plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
+            plTable = plFile.createTable(plGroup, 'photons', ArconsHeaders.PhotonList, 'Photon List Data', filters=zlibFilter)
+        except:
+            plFile.close()
+            raise
+        return plFile
+        
+    def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
+                   fluxWeighted=False, plotTitle='', nSdevMax=2,
+                   scaleByEffInt=False):
+        """
+        plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
+        if integrationTime is -1, All time after firstSec is used.  
+        if weighted is True, flat cal weights are applied
+        if scaleByEffInt is True, then counts are scaled by effective exposure
+        time on a per-pixel basis.
+        """
+        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted,
+                                         fluxWeighted, scaleByEffInt=scaleByEffInt)['image']
+        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg), plotTitle=plotTitle)
+
+    def getFromHeader(self, name):
+        """
+        Returns a requested entry from the obs file header
+        If asked for exptime (exposure time) and some roaches have a timestamp offset
+        The returned exposure time will be shortened by the max offset, since ObsFile
+        will not retrieve data from seconds in which some roaches do not have data
+        """
+        entry = self.info[self.titles.index(name)]
+        if name=='exptime' and self.timeAdjustFile != None:
+            #shorten the effective exptime by the number of seconds that 
+            #does not have data from all roaches
+            maxDelay = np.max(self.roachDelays)
+            entry -= maxDelay
+        if name=='unixtime' and self.timeAdjustFile != None:
+            #the way getPixel retrieves data accounts for individual roach delay,
+            #but shifted everything by np.max(self.roachDelays), relabeling sec maxDelay as sec 0
+            #so, add maxDelay to the header start time, so all times will be correct relative to it
+            entry += np.max(self.roachDelays)
+            entry += self.firmwareDelay
+        return entry
+        
     def getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         Retrieves a pixel using the file's attached beammap.
@@ -312,8 +413,6 @@ class ObsFile:
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime}
             
-
-
     def getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,
                       weighted=False, fluxWeighted=False, getRawCount=False):
         """
@@ -335,8 +434,7 @@ class ObsFile:
             'effIntTime':float, effective integration time after time-masking is 
                      accounted for.
         """
-        
-
+    
         if getRawCount is True:
             x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
             #x2 = self.getTimedPacketList_old(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
@@ -354,8 +452,6 @@ class ObsFile:
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 
-
-
     def getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         returns a numpy array of 64-bit photon packets for a given pixel, integrated from firstSec to firstSec+integrationTime.
@@ -367,8 +463,6 @@ class ObsFile:
         pixelData = self.getPixel(iRow,iCol,firstSec,integrationTime)
         packetList = np.concatenate(pixelData)
         return packetList
-
-
 
     def getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
@@ -438,7 +532,6 @@ class ObsFile:
         peakHeights = np.concatenate(peakHeights)
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
-
 
     def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
@@ -525,8 +618,6 @@ class ObsFile:
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
 
-
-
     def getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,
                            fluxWeighted=False, getRawCount=False,
                            scaleByEffInt=False):
@@ -581,21 +672,6 @@ class ObsFile:
                 wvlBinEdges = x['wvlBinEdges']
         cube = np.array(cube)
         return {'cube':cube,'wvlBinEdges':wvlBinEdges}
-
-    def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
-                   fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False):
-        """
-        plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
-        if integrationTime is -1, All time after firstSec is used.  
-        if weighted is True, flat cal weights are applied
-        if scaleByEffInt is True, then counts are scaled by effective exposure
-        time on a per-pixel basis.
-        """
-        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted,
-                                         fluxWeighted, scaleByEffInt=scaleByEffInt)['image']
-        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg), plotTitle=plotTitle)
-
         
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
@@ -651,21 +727,6 @@ class ObsFile:
         return {'spectrum':spectrum, 'wvlBinEdges':wvlBinEdges, 'effIntTime':effIntTime}
         #else:
         #    return spectrum,wvlBinEdges
-    
-                
-    def plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
-                         weighted=False, fluxWeighted=False):
-        """
-        plots the wavelength calibrated spectrum of a given pixel integrated over a given time
-        if integrationTime is -1, All time after firstSec is used.  
-        if weighted is True, flat cal weights are applied
-        """
-        spectrum = (self.getPixelSpectrum(pixelRow, pixelCol, firstSec, integrationTime,
-                    weighted=weighted, fluxWeighted=fluxWeighted))['spectrum']
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(self.flatCalWvlBins[0:-1], spectrum, label='spectrum for pixel[%d][%d]' % (pixelRow, pixelCol))
-        plt.show()
         
     def getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False,
                             fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1):
@@ -741,124 +802,6 @@ class ObsFile:
     	for i in range(len(summed_array)):
     	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
     	return summed_array, wvlBinEdges
-    
-    def plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1):
-    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius1=radius1, radius2=radius2, weighted=weighted, fluxWeighted=fluxWeighted, lowCut=lowCut, highCut=highCut, firstSec=firstSec,integrationTime=integrationTime)
-    	fig = plt.figure()
-    	ax = fig.add_subplot(111)
-    	ax.plot(bin_edges[12:-2], summed_array[12:-1])
-    	plt.xlabel('Wavelength ($\AA$)')
-    	plt.ylabel('Counts')
-    	plt.show()
-        
-
-    def convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True):
-        """
-        applies wavelength calibration to a list of photon pulse heights
-        if excludeBad is True, wavelengths calculated as np.inf are excised from the array returned, as are wavelengths outside the fit limits of the wavecal
-        """
-
-        xOffset = self.wvlCalTable[iRow, iCol, 0]
-        yOffset = self.wvlCalTable[iRow, iCol, 1]
-        amplitude = self.wvlCalTable[iRow, iCol, 2]
-        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
-        energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
-        
-        if excludeBad == True:
-            energies = energies[energies != 0]
-        wavelengths = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / energies
-        if excludeBad == True and self.wvlLowerLimit == -1:
-            wavelengths = wavelengths[wvlCalLowerLimit < wavelengths]
-        elif excludeBad == True and self.wvlLowerLimit != None:
-            wavelengths = wavelengths[self.wvlLowerLimit < wavelengths]
-        if excludeBad == True and self.wvlUpperLimit == -1:
-            wavelengths = wavelengths[wavelengths < wvlCalUpperLimit]
-        elif excludeBad == True and self.wvlUpperLimit != None:
-            wavelengths = wavelengths[wavelengths < self.wvlUpperLimit]
-#            if len(wavelengths) > 0 and self.flatCalFile != None:
-#                #filter out wavelengths without a valid flat weight
-#                pixelFlags = self.flatFlags[iRow,iCol]
-#                binIndices = np.digitize(wavelengths,self.flatCalWvlBins)-1
-#                wavelengths=wavelengths[np.logical_and(binIndices>=0,binIndices<len(pixelFlags))]
-#                binIndices=binIndices[np.logical_and(binIndices>=0,binIndices<len(pixelFlags))]
-#                flags = pixelFlags[binIndices]
-#                wavelengths = wavelengths[flags==1]
-
-        return wavelengths
-
-
-    def parsePhotonPackets(self, packets, inter=interval(),
-                           doParabolaFitPeaks=True, doBaselines=True):
-        """
-        Parses an array of uint64 packets with the obs file format
-        inter is an interval of time values to mask out
-        returns a list of timestamps,parabolaFitPeaks,baselines
-        """
-
-        # first special case:  inter masks out everything so return zero-length
-        # numpy arrays
-        if (inter == self.intervalAll):
-            timestamps = np.arange(0)
-            parabolaFitPeaks = np.arange(0)
-            baselines = np.arange(0)
-        else:
-            # parse all packets
-            packetsAll = np.array(packets, dtype='uint64') #64 bit photon packet
-            timestampsAll = np.bitwise_and(packets, self.timestampMask)
-
-            if doParabolaFitPeaks:
-                parabolaFitPeaksAll = np.bitwise_and(\
-                    np.right_shift(packets, self.nBitsAfterParabolaPeak), \
-                        self.pulseMask)
-            else:
-                parabolaFitPeaksAll = np.arange(0)
-
-            if doBaselines:
-                baselinesAll = np.bitwise_and(\
-                    np.right_shift(packets, self.nBitsAfterBaseline), \
-                        self.pulseMask)
-            else:
-                baselinesAll = np.arange(0)
-
-            if inter == interval() or len(timestampsAll) == 0:
-                # nothing excluded or nothing to exclude
-                # so return all unpacked values
-                timestamps = timestampsAll
-                parabolaFitPeaks = parabolaFitPeaksAll
-                baselines = baselinesAll
-            else:
-                # there is a non-trivial set of times to mask. 
-                slices = calculateSlices(inter, timestampsAll)
-                timestamps = repackArray(timestampsAll, slices)
-                parabolaFitPeaks = repackArray(parabolaFitPeaksAll, slices)
-                baselines = repackArray(baselinesAll, slices)
-        # return the values filled in above
-        return timestamps, parabolaFitPeaks, baselines
-
-    def createEmptyPhotonListFile(self):
-        """
-        creates a photonList h5 file 
-        using header in headers.ArconsHeaders
-        """
-            
-        fileTimestamp = self.fileName.split('_')[1].split('.')[0]
-        fileDate = os.path.basename(os.path.dirname(self.fullFileName))
-        run = os.path.basename(os.path.dirname(os.path.dirname(self.fullFileName)))
-        fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
-        fullPhotonListFileName = fn.photonList()
-        if (os.path.exists(fullPhotonListFileName)):
-            if utils.confirm('Photon list file  %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
-                exit(0)
-        zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
-        try:
-            plFile = tables.openFile(fullPhotonListFileName, mode='w')
-            plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
-            plTable = plFile.createTable(plGroup, 'photons', ArconsHeaders.PhotonList, 'Photon List Data', filters=zlibFilter)
-        except:
-            plFile.close()
-            raise
-        return plFile
         
     def getPixelBadTimes(self, pixelRow, pixelCol):
         """
@@ -898,37 +841,6 @@ class ObsFile:
         if showMe == True:
             utils.plotArray(nonAllocArray)
         return nonAllocArray
-
-    def checkIntegrity(self,firstSec=0,integrationTime=-1):
-        """
-        Checks the obs file for corrupted end-of-seconds
-        Corruption is indicated by timestamps greater than 1/tickDuration=1e6
-        returns 0 if no corruption found
-        """
-        corruptedPixels = []
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                packetList = self.getPixelPacketList(iRow,iCol,firstSec,integrationTime)
-                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
-                if np.any(timestamps > 1./self.tickDuration):
-                    print 'Corruption detected in pixel (',iRow,iCol,')'
-                    corruptedPixels.append((iRow,iCol))
-        corruptionFound = len(corruptedPixels) != 0
-        return corruptionFound
-#        exptime = self.getFromHeader('exptime')
-#        lastSec = firstSec + integrationTime
-#        if integrationTime == -1:
-#            lastSec = exptime-1
-#            
-#        corruptedSecs = []
-#        for pixelCoord in corruptedPixels:
-#            for sec in xrange(firstSec,lastSec):
-#                packetList = self.getPixelPacketList(pixelCoord[0],pixelCoord[1],sec,integrationTime=1)
-#                timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
-#                if np.any(timestamps > 1./self.tickDuration):
-#                    pixelLabel = self.beamImage[iRow][iCol]
-#                    corruptedSecs.append(sec)
-#                    print 'Corruption in pixel',pixelLabel, 'at',sec
 
     def getRoachNum(self,iRow,iCol):
         pixelLabel = self.beamImage[iRow][iCol]
@@ -1079,6 +991,77 @@ class ObsFile:
         wvlBinEdges = np.array(ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / energyBins)
         wvlBinEdges = wvlBinEdges[::-1]
         return wvlBinEdges
+
+    def parsePhotonPackets(self, packets, inter=interval(),
+                           doParabolaFitPeaks=True, doBaselines=True):
+        """
+        Parses an array of uint64 packets with the obs file format
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
+        """
+
+        # first special case:  inter masks out everything so return zero-length
+        # numpy arrays
+        if (inter == self.intervalAll):
+            timestamps = np.arange(0)
+            parabolaFitPeaks = np.arange(0)
+            baselines = np.arange(0)
+        else:
+            # parse all packets
+            packetsAll = np.array(packets, dtype='uint64') #64 bit photon packet
+            timestampsAll = np.bitwise_and(packets, self.timestampMask)
+
+            if doParabolaFitPeaks:
+                parabolaFitPeaksAll = np.bitwise_and(\
+                    np.right_shift(packets, self.nBitsAfterParabolaPeak), \
+                        self.pulseMask)
+            else:
+                parabolaFitPeaksAll = np.arange(0)
+
+            if doBaselines:
+                baselinesAll = np.bitwise_and(\
+                    np.right_shift(packets, self.nBitsAfterBaseline), \
+                        self.pulseMask)
+            else:
+                baselinesAll = np.arange(0)
+
+            if inter == interval() or len(timestampsAll) == 0:
+                # nothing excluded or nothing to exclude
+                # so return all unpacked values
+                timestamps = timestampsAll
+                parabolaFitPeaks = parabolaFitPeaksAll
+                baselines = baselinesAll
+            else:
+                # there is a non-trivial set of times to mask. 
+                slices = calculateSlices(inter, timestampsAll)
+                timestamps = repackArray(timestampsAll, slices)
+                parabolaFitPeaks = repackArray(parabolaFitPeaksAll, slices)
+                baselines = repackArray(baselinesAll, slices)
+        # return the values filled in above
+        return timestamps, parabolaFitPeaks, baselines
+
+    def plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1):
+    	summed_array, bin_edges = self.getApertureSpectrum(pixelCol=pixelCol, pixelRow=pixelRow, radius1=radius1, radius2=radius2, weighted=weighted, fluxWeighted=fluxWeighted, lowCut=lowCut, highCut=highCut, firstSec=firstSec,integrationTime=integrationTime)
+    	fig = plt.figure()
+    	ax = fig.add_subplot(111)
+    	ax.plot(bin_edges[12:-2], summed_array[12:-1])
+    	plt.xlabel('Wavelength ($\AA$)')
+    	plt.ylabel('Counts')
+    	plt.show()
+        
+    def plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
+                         weighted=False, fluxWeighted=False):
+        """
+        plots the wavelength calibrated spectrum of a given pixel integrated over a given time
+        if integrationTime is -1, All time after firstSec is used.  
+        if weighted is True, flat cal weights are applied
+        """
+        spectrum = (self.getPixelSpectrum(pixelRow, pixelCol, firstSec, integrationTime,
+                    weighted=weighted, fluxWeighted=fluxWeighted))['spectrum']
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(self.flatCalWvlBins[0:-1], spectrum, label='spectrum for pixel[%d][%d]' % (pixelRow, pixelCol))
+        plt.show()
 
     def setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000):
         """
