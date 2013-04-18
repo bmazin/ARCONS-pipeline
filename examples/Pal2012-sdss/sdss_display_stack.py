@@ -38,15 +38,16 @@ gifFileName = param['gifFileName']
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 
 wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
-#wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
-#wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
-#flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
+
+##wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
+##wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
+##flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
 
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
-#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121206/flatsol_20121206.h5'
-#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
-#/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5
+#use for Dec8
+#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 frames = []
 showframes = []
@@ -71,6 +72,7 @@ for iSeq in range(len(seqs)):
         print 'loading',ts
         obsFn = FileName(run=run,date=sunsetDate,tstamp=ts).obs()
         ob = ObsFile(obsFn)
+        ob.loadTimeAdjustmentFile(FileName(run=run).timeAdjustments())
 	index1 = obsFn.find('_')
 	hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
         if not os.path.exists(hotPixFn):
