@@ -156,9 +156,9 @@ g=open(savePath+'frequencyData.txt','w')
 for time in range(len(timeArray)):
     f=open(savePath + 'timeData.txt','a')
     f.write(str(timeArray[time]) + '\t' + str(scaledCounts[time]) + '\n')
-for frequency in range(len(freqs)):
+for iFreq in range(len(freqs)):
     g=open(savePath + 'frequencyData.txt','a')
-    g.write(str(freqs[frequency]) + '\t' + str(periodogram[frequency]) + '\n')
+    g.write(str(freqs[iFreq]) + '\t' + str(periodogram[iFreq]) + '\n')
 f.close()
 g.close()
 
