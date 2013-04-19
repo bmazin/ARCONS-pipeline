@@ -8,6 +8,8 @@ Copyright (c) 2012 . All rights reserved.
 
 This header file contains the classes that hold the reduced photon list in HDF5 files.
 
+Updated, 4/19/2013, JvE.
+
 """
 
 import sys
@@ -23,9 +25,9 @@ class PhotonList(IsDescription):
     Xpix = UInt8Col()               # Xpixel the photon was recorded in, with the bottom left pixel being (0,0)
     Ypix = UInt8Col()               # Ypixel the photon was recorded in, with the bottom left pixel being (0,0)
     RA = Float32Col()               # Offset in arcseconds in RA from the observation center
-    RAErr = Float32Col()
+    RAErr = Float32Col()            # Error in RA
     Dec = Float32Col()              # Offset in arcseconds in Dec from the observation center
-    DecErr = Float32Col()
+    DecErr = Float32Col()           # Error in dec
     ArrivalTime = Float32Col()      # Time in seconds since the beginning of the observation
     Wavelength = Float32Col()       # Wavelength of the photon in Angstroms        
     WaveError = Float32Col()        # Estimated 1-sigma Wavelength error in Angstroms 
@@ -36,13 +38,7 @@ class PhotonList(IsDescription):
     FluxWeight = Float32Col()       # Flux cal. weighting for this photon.
     FluxWeightErr = Float32Col()    # Error
     Flag = UInt8Col()               # Photon quality flag.  0=good, 1=pixel has incomplete wavelength coverage, 2=...
-    BadPixFlag = EnumCol(TimeMask.timeMaskReason, 'none', base='uint8')
-    
-    #Possibly to add:
-    #RA error
-    #Dec error
-    #Bad pixel flag?
-    #Weights: flat weight; flux weight; (exposure time weight doesn't really apply to single photon).
-    #Combined weight?
-    #Errors in weights.
+    TimeMaskFlag = BoolCol()        # Set if photon is time-masked. True=bad, False=good.
+    TimeMaskReason = EnumCol(TimeMask.timeMaskReason, 'none', base='uint8')     # Time-mask reason ('none' if not time-masked)
+
     

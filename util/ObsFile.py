@@ -31,6 +31,7 @@ class ObsFile:
         self.flatCalFile = None
         self.fluxCalFile = None
         self.timeAdjustFile = None
+        self.hotPixFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
         self.wvlLowerLimit = None
@@ -818,7 +819,8 @@ class ObsFile:
         plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, recursive=True)
         plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, recursive=True)
         plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, recursive=True)
-        plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.file.root.header, newparent=plFile.root, newname='timemask', recursive=True)
         plFile.flush()
 
         for iRow in xrange(self.nRow):
@@ -977,7 +979,8 @@ class ObsFile:
             print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
             return
         
-        self.hotPixTimeMask = hotPixels.readHotPixels(fullHotPixCalFileName)
+        self.hotPixFile = tables.openFile(fullHotPixCalFileName)
+        self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile)
         
         if (os.path.basename(self.hotPixTimeMask['obsFileName'])
             != os.path.basename(self.fileName)):
