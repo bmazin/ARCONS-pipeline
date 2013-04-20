@@ -15,6 +15,7 @@ timeMaskReasonList.append("cosmic");
 timeMaskReasonList.append("poofing");
 timeMaskReasonList.append("hot pixel")
 timeMaskReasonList.append("cold pixel")
+timeMaskReasonList.append("none")   #To be used for photon lists where the photon is NOT time-masked.
 
 timeMaskReason = tables.Enum(timeMaskReasonList)
 

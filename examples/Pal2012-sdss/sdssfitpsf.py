@@ -39,14 +39,19 @@ giffitpsf = param['giffitpsf']
 
 FramesPerFile = param['FramesPerFile']
 NumFiles = param['NumFiles']
-NumFrames = [filenum*FramesPerFile for filenum in NumFiles]
-guessX = param['guessX']
-guessY = param['guessY']
+for filenum in range(len(NumFiles)):
+    if NumFiles[filenum] > 0:
+        NumFiles[filenum] = NumFiles[filenum]*FramesPerFile
+NumFrames = NumFiles
+print NumFrames
+guessx = param['guessX']
+guessy = param['guessY']
 
 stackDict = np.load(npzLoadFile)
 
 stack = stackDict['stack']
 jd = stackDict['jd']
+print len(jd)
 paramsList = []
 errorsList = []
 fitImgList = []
@@ -57,11 +62,13 @@ for iFrame in range(0,np.shape(stack)[2]):
     frame = stack[:,:,iFrame]
     nanMask = np.isnan(frame)
 
-    for interval in xrange(len(NumFrames)-1)
-        if NumFrames[interval] < iFrame < NumFrames[interval+1]
-            guessx = guessX[interval]
-            guessy = guessY[interval]
-
+    for interval in xrange(len(NumFrames)-1):
+        if NumFrames[interval] != NumFrames[interval+1]:
+            if NumFrames[interval] < iFrame <= NumFrames[interval+1]:
+                guessX = guessx[interval]
+                guessY = guessy[interval]
+#                print guessX, guessY
+ 
     apertureMask = aperture(guessX,guessY,radius=10)
     err = np.sqrt(frame)
     #err = np.ones(np.shape(frame))
@@ -115,7 +122,7 @@ for iFrame in range(0,np.shape(stack)[2]):
 #    ax.scatter(np.ravel(X)[linearMask],np.ravel(Y)[linearMask],np.ravel(frame)[linearMask],c='red')
 #
     fitimg[nanMask]=0
-    print fitimg[np.isnan(fitimg)]            
+#    print fitimg[np.isnan(fitimg)]            
     fitImgList.append(fitimg)
 
 #    utils.plotArray(frame,cbar=True)
