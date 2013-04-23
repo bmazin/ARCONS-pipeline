@@ -5,7 +5,11 @@
 #mkidDataDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/ScienceData'
 #intermDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Intermediate'
 mkidDataDir = '/ScienceData'
+<<<<<<< HEAD
 intermDir = '/Scratch'
+=======
+intermDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Intermediate'
+>>>>>>> a92e6d0af22026c01e2aed2311af957e3e95fca8
 
 
 #Path and names of output files.
