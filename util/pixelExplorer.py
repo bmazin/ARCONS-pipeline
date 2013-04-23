@@ -120,7 +120,7 @@ class AppForm(QMainWindow):
 
         
         #Load flat info for the current obs stack
-        flatSolnFileName = FileName(run=self.params['run'],date=self.params['obsFlatCalSunsetDate'],tstamp='').flatSoln()
+        flatSolnFileName = FileName(run=self.params['run'],date=self.params['obsFlatCalSunsetDate'],tstamp=self.params['obsFlatCalTimestamp']).flatSoln()
         flatInfoFileName =  os.path.splitext(flatSolnFileName)[0]+'.npz' 
         self.flatInfo= np.load(flatInfoFileName)
 
@@ -159,7 +159,7 @@ class AppForm(QMainWindow):
         print stackLabel,calTimestamp
         wvlSolnFileName = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln()
         wvlCalFileName = FileName(run=run,date=self.params[stackLabel+'WvlSunsetDate'],tstamp=calTimestamp).cal()
-        flatSolnFileName = FileName(run=run,date=self.params[stackLabel+'FlatCalSunsetDate'],tstamp='').flatSoln()
+        flatSolnFileName = FileName(run=run,date=self.params[stackLabel+'FlatCalSunsetDate'],tstamp=self.params[stackLabel+'FlatCalTimestamp']).flatSoln()
 
         obsFileNames = [FileName(run=run,date=sunsetDate,tstamp=timestamp).obs() for timestamp in timestampList]
         obList = [ObsFile(obsFn) for obsFn in obsFileNames]
@@ -308,16 +308,20 @@ class AppForm(QMainWindow):
 
     def showTwilightArrayReducedChisqImage(self):
         chisqImage = np.zeros((self.nRow,self.nCol))
+        nDeltaFromZero = np.zeros((self.nRow,self.nCol))
         for iRow in range(self.nRow):
             for iCol in range(self.nCol):
                 x = self.getChisq(iRow,iCol)
                 chisqImage[iRow,iCol] = x['reducedChisq']
+                nDeltaFromZero[iRow,iCol] = x['nDeltaFromZero']
         chisqImage[np.isnan(chisqImage)]=0
         chisqImage[chisqImage == np.inf]=0
+        nDeltaFromZero = np.ma.array(nDeltaFromZero,mask=np.logical_and(np.isnan(nDeltaFromZero),nDeltaFromZero==np.inf))
         hotPixMask = hotPixels.checkInterval(image=chisqImage)['mask']
         chisqImage[hotPixMask != 0] = 0
         #self.popUpArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
         PopUp(parent=self,title='showTwilightArrayReducedChisqImage').plotArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
+        #PopUp(parent=self,title='showTwilightArrayNDeltaFromZero').plotArray(image=nDeltaFromZero,title='Flat Cal n$\sigma$ from 0',normNSigma=3.)
 
     def showSkyArrayImage(self):
         image = self.skyFrame
@@ -448,27 +452,6 @@ class AppForm(QMainWindow):
         pop.axes.plot(wavelengths,redGaussFit,'r')
         pop.draw()
 
-        #Create simulated photons with quantization, then apply jitter
-#        quantizedGaussfit = bluePhaseAmp*np.exp(-1/2*((binEdges-bluePhaseOffset)/bluePhaseSigma)**2)
-#        quantizedGaussfit/=np.sum(quantizedGaussfit)#normalize pdf to 1
-#        gaussfit /= np.max(gaussfit) #scale to 1
-#        pop=PopUp(parent=self,title='test')
-#        
-#        cdf = np.add.accumulate(quantizedGaussfit)
-#        size = 1e6
-#        simulatedPhotons = binEdges[np.digitize(np.random.random_sample(size),cdf)]
-#        ditheredPhotons = simulatedPhotons+np.random.random_sample(size)
-#
-#        histPhotons,binEdges=np.histogram(simulatedPhotons,bins=phases)
-#        histPhotons = np.array(histPhotons,dtype=np.double)/np.max(histPhotons)#scale to 1
-#
-#        histDitheredPhotons,binDitherEdges = np.histogram(ditheredPhotons,bins=phases)
-#        histDitheredPhotons = np.array(histDitheredPhotons,dtype=np.double)/np.max(histDitheredPhotons)
-#        pop.axes.step(binDitherEdges[:-1],histDitheredPhotons,where='post')
-#        pop.axes.step(binEdges[:-1],histPhotons,where='post')
-#        pop.axes.plot(phases,gaussfit)
-#        pop.draw()
-
 
     def showPixelStdVsIntTime(self,row,col):
         intTimes = [1,2,3,5,10,15,30]
@@ -568,7 +551,7 @@ class AppForm(QMainWindow):
             deltaWeights = weights*deltaFlatSpectra/flatSpectra
             color=cm.jet((iFlat+1.)/len(self.flatInfos))
             wvlBinCenters = self.wvlBinEdges[:-1]+np.diff(self.wvlBinEdges)/2.
-            pop.axes.step(self.wvlBinEdges[:-1],weights,linestyle='-',label=self.params['flatInfoFiles'][iFlat],color=color,where='post')
+            pop.axes.plot(self.wvlBinEdges[:-1],weights,linestyle='-',label=self.params['flatInfoFiles'][iFlat],color=color,)
             pop.axes.errorbar(wvlBinCenters,weights,linestyle=',',yerr=deltaWeights,color=color)
         pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
         pop.axes.set_ylabel(r'Weights')
