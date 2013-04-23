@@ -1,35 +1,34 @@
 
 ######################## For display_stack.py ########################
 
-mkidDataDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/ScienceData'
+#Input data directory locations
+#mkidDataDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/ScienceData'
+#intermDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Intermediate'
+mkidDataDir = '/ScienceData'
 intermDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Intermediate'
 
-npzFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10ImageStackBlueUpdated.npz'
-gifFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10ImageStackBlueUpdated.gif'
+
+#Path and names of output files.
+npzFileName = '/home/vaneyken/dataProcessing/corot18/Apr23ImageStack.npz'
+gifFileName = '/home/vaneyken/dataProcessing/corot18/Apr23ImageStack.gif'
 
 integrationTime = 3
 expTime = 300
 
 #remember to change seqs! It's at the end
 wvlLowerCutoff = 3000
-wvlUpperCutoff = 5000
+wvlUpperCutoff = 8000
 
 run = 'PAL2012'
-
-# Date and cal time stamp arrays
-#utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212', '20121212']
-#sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211','20121211']
-#calTimestamps = ['20121209-131132','20121209-133419', '20121211-090613', '20121211-090613', '20121211-133056', '20121212-111847', '20121212-111847'] 
-
 
 # Single CoRoT 18 sequence (20121208 UTC)
 seq1 = ['070632', '071134', '071637', '072139', '072641', '073143', '073645', '074147', '074649', '075151', '075654', '080156', '080659', '081201', '081704', '082212', '082714', '083216', '083724', '084227', '084730', '085232', '085735', '090238', '090741', '091244', '091746', '092249', '092752', '093255', '093757', '094300', '094803', '095306', '095808', '100311', '100814']
 
-# December 10
-# Sequence during 2nd day on object. Moved to confirm position in 082422 between 90 and 105s.'080916' hot pix
-# seq2 = ['074405', '074907', '075410', '075912', '080414', '080916', '081418', '081920', '082422']
 
+#List of sequences to include.
 seqs = [seq1]
+
+# Date and cal time stamp arrays (one list entry per sequence)
 utcDates = ['20121208']
 sunsetDates = ['20121207']
 calTimestamps = ['20121208-070505']
