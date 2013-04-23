@@ -14,12 +14,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 from functools import partial
-import glob
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.backends.backend_pdf import PdfPages
+
 from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.backends.backend_pdf import PdfPages
 
 def onscroll_cbar(fig, event):
     if event.inaxes is fig.cbar.ax:
@@ -53,15 +53,13 @@ class FlatCal:
 
         run = self.params['run']
         sunsetDate = self.params['sunsetDate']
+        flatTstamp = self.params['flatTstamp']
         wvlSunsetDate = self.params['wvlSunsetDate']
         wvlTimestamp = self.params['wvlTimestamp']
         needTimeAdjust = self.params['needTimeAdjust']
         needHotPix = self.params['needHotPix']
         obsSequence = self.params['obsSequence']
 
-        #flatFileName = params['flatFileName']
-        #wvlCalFileName = params['wvlCalFileName']
-        #flatCalFileName = params['flatCalFileName']
         obsFNs = [FileName(run=run,date=sunsetDate,tstamp=obsTstamp) for obsTstamp in obsSequence]
         self.obsFileNames = [fn.obs() for fn in obsFNs]
         self.obsList = [ObsFile(obsFileName) for obsFileName in self.obsFileNames]
@@ -69,12 +67,13 @@ class FlatCal:
         timeAdjustFileName = FileName(run=run).timeAdjustments()
 
         print len(self.obsFileNames), 'flat files to co-add'
-        self.flatCalFileName = FileName(run=run,date=sunsetDate).flatSoln()
+        self.flatCalFileName = FileName(run=run,date=sunsetDate,tstamp=flatTstamp).flatSoln()
         wvlCalFileName = FileName(run=run,date=wvlSunsetDate,tstamp=wvlTimestamp).calSoln()
         for iObs,obs in enumerate(self.obsList):
            obs.loadWvlCalFile(wvlCalFileName)
            obs.loadTimeAdjustmentFile(timeAdjustFileName)
            obs.loadHotPixCalFile(timeMaskFileNames[iObs])
+        self.wvlFlags = self.obsList[0].wvlFlagTable
 
         self.nRow = self.obsList[0].nRow
         self.nCol = self.obsList[0].nCol
@@ -86,6 +85,7 @@ class FlatCal:
         self.wvlBinEdges = ObsFile.makeWvlBins(self.energyBinWidth,self.wvlStart,self.wvlStop)
         self.intTime = self.params['intTime']
         self.countRateCutoff = self.params['countRateCutoff']
+        self.fractionOfChunksToTrim = self.params['fractionOfChunksToTrim']
         #wvlBinEdges includes both lower and upper limits, so number of bins is 1 less than number of edges
         self.nWvlBins = len(self.wvlBinEdges)-1
 
@@ -95,7 +95,8 @@ class FlatCal:
         pass
 
     def loadFlatSpectra(self):
-        self.spectralCubes = []
+        self.spectralCubes = []#each element will be the spectral cube for a time chunk
+        self.cubeEffIntTimes = []
         self.frames = []
         for iObs,obs in enumerate(self.obsList):
             print 'obs',iObs
@@ -112,18 +113,17 @@ class FlatCal:
                 self.frames.append(frame)
                 #self.plotArray(frame)
                 self.spectralCubes.append(cube)
+                self.cubeEffIntTimes.append(effIntTime)
         self.spectralCubes = np.array(self.spectralCubes)
         #self.plotArray(self.frames[0])
-        print 'done load'
 
     def checkCountRates(self):
-        print 'check'
         medianCountRates = np.array([np.median(frame[frame!=0]) for frame in self.frames])
         boolIncludeFrames = medianCountRates <= self.countRateCutoff
         #mask out frames, or cubes from integration time chunks with count rates too high
         self.spectralCubes = np.array([cube for cube,boolIncludeFrame in zip(self.spectralCubes,boolIncludeFrames) if boolIncludeFrame==True])
         self.frames = [frame for frame,boolIncludeFrame in zip(self.frames,boolIncludeFrames) if boolIncludeFrame==True]
-        print boolIncludeFrames
+        print 'few enough counts in the chunk',boolIncludeFrames
 
     def calculateWeights(self):
         """
@@ -131,7 +131,10 @@ class FlatCal:
         """
         cubeWeightsList = []
         self.medianSpectra = []
+        deltaWeightsList = []
         for iCube,cube in enumerate(self.spectralCubes):
+            effIntTime = self.cubeEffIntTimes[iCube]
+            #for each time chunk
             wvlMedians = np.zeros(self.nWvlBins)
             spectra2d = np.reshape(cube,[self.nRow*self.nCol,self.nWvlBins ])
             for iWvl in xrange(self.nWvlBins):
@@ -142,10 +145,24 @@ class FlatCal:
             weights[weights==0] = np.nan
             weights[weights==np.inf] = np.nan
             cubeWeightsList.append(weights)
+
+            #Now to get uncertainty in weight:
+            #Assuming negligible uncertainty in medians compared to single pixel spectra,
+            #then deltaWeight=weight*deltaSpectrum/Spectrum
+            #deltaWeight=weight*deltaRawCounts/RawCounts
+            # with deltaRawCounts=sqrt(RawCounts)#Assuming Poisson noise
+            #deltaWeight=weight/sqrt(RawCounts)
+            # but 'cube' is in units cps, not raw counts 
+            # so multiply by effIntTime before sqrt
+            deltaWeights = weights/np.sqrt(effIntTime*cube)
+
+            deltaWeightsList.append(deltaWeights)
             self.medianSpectra.append(wvlMedians)
         cubeWeights = np.array(cubeWeightsList)
+        deltaCubeWeights = np.array(deltaWeightsList)
         cubeWeightsMask = np.isnan(cubeWeights)
         self.maskedCubeWeights = np.ma.array(cubeWeights,mask=cubeWeightsMask,fill_value=1.)
+        self.maskedCubeDeltaWeights = np.ma.array(deltaCubeWeights,mask=cubeWeightsMask)
 
         #sort maskedCubeWeights and rearange spectral cubes the same way
         sortedIndices = np.ma.argsort(self.maskedCubeWeights,axis=0)
@@ -153,15 +170,17 @@ class FlatCal:
 
         sortedWeights = self.maskedCubeWeights[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
         spectralCubesReordered = self.spectralCubes[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
+        cubeDeltaWeightsReordered = self.maskedCubeDeltaWeights[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
 
         #trim the beginning and end off the sorted weights for each wvl for each pixel, to exclude extriems from averages
         nCubes = np.shape(self.maskedCubeWeights)[0]
-        fractionToRemove=.15 #off both top and bottom
-        trimmedWeights = sortedWeights[fractionToRemove*nCubes:(1-fractionToRemove)*nCubes,:,:,:]
-        trimmedSpectralCubesReordered = spectralCubesReordered[fractionToRemove*nCubes:(1-fractionToRemove)*nCubes,:,:,:]
+        #fractionOfChunksToTrim=.15 #off both top and bottom
+        trimmedWeights = sortedWeights[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
+        trimmedSpectralCubesReordered = spectralCubesReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
+        trimmedCubeDeltaWeightsReordered = cubeDeltaWeightsReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
 
-        #self.flatWeights = np.ma.average(self.maskedCubeWeights,axis=0,weights=self.spectralCubes)
-        self.flatWeights = np.ma.average(trimmedWeights,axis=0,weights=trimmedSpectralCubesReordered)
+        self.flatWeights,summedAveragingWeights = np.ma.average(trimmedWeights,axis=0,weights=trimmedCubeDeltaWeightsReordered**-2.,returned=True)
+        self.deltaFlatWeights = np.sqrt(summedAveragingWeights**-1.)#Uncertainty in weighted average is sqrt(1/sum(averagingWeights))
         self.flatFlags = self.flatWeights.mask
         flagImage = np.shape(self.flatFlags)[2]-np.sum(self.flatFlags,axis=2)
         #self.plotArray(flagImage)
@@ -174,37 +193,118 @@ class FlatCal:
 #        fig.colorbar(handleScatter)
 #        plt.show()
         
-    def plotWeights(self):
-        print 'plotWeights'
+    def plotWeightsWvlSlices(self,verbose=True):
+        flatCalPath,flatCalBasename = os.path.split(self.flatCalFileName)
+        pdfBasename = os.path.splitext(flatCalBasename)[0]+'_wvlSlices.pdf'
+        pdfFullPath = os.path.join(flatCalPath,pdfBasename)
+        pp = PdfPages(pdfFullPath)
+        nPlotsPerRow = 3 
+        nPlotsPerCol = 4 
+        nPlotsPerPage = nPlotsPerRow*nPlotsPerCol
+        iPlot = 0 
+        if verbose:
+            print 'plotting weights in wavelength sliced images'
+
+        matplotlib.rcParams['font.size'] = 4 
+        wvls = self.wvlBinEdges[0:-1]
+
+        for iWvl,wvl in enumerate(wvls):
+            if verbose:
+                print 'wvl ',iWvl
+            if iPlot % nPlotsPerPage == 0:
+                fig = plt.figure(figsize=(10,10),dpi=100)
+
+            ax = fig.add_subplot(nPlotsPerCol,nPlotsPerRow,iPlot%nPlotsPerPage+1)
+            ax.set_title(r'%.0f $\AA$'%wvl)
+
+            image = self.flatWeights[:,:,iWvl]
+            cmap = matplotlib.cm.gnuplot2
+            cmap.set_bad('#222222')
+            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=2.)
+            cbar = fig.colorbar(handleMatshow)
+        
+            if iPlot%nPlotsPerPage == nPlotsPerPage-1:
+                pp.savefig(fig)
+            iPlot += 1
+
+        pp.savefig(fig)
+        pp.close()
+
+    def plotMaskWvlSlices(self,verbose=True):
+        flatCalPath,flatCalBasename = os.path.split(self.flatCalFileName)
+        pdfBasename = os.path.splitext(flatCalBasename)[0]+'_mask.pdf'
+        pdfFullPath = os.path.join(flatCalPath,pdfBasename)
+        pp = PdfPages(pdfFullPath)
+        nPlotsPerRow = 3 
+        nPlotsPerCol = 4 
+        nPlotsPerPage = nPlotsPerRow*nPlotsPerCol
+        iPlot = 0 
+        if verbose:
+            print 'plotting weights in wavelength sliced images'
+
+        matplotlib.rcParams['font.size'] = 4 
+        wvls = self.wvlBinEdges[0:-1]
+
+        for iWvl,wvl in enumerate(wvls):
+            if verbose:
+                print 'wvl ',iWvl
+            if iPlot % nPlotsPerPage == 0:
+                fig = plt.figure(figsize=(10,10),dpi=100)
+
+            ax = fig.add_subplot(nPlotsPerCol,nPlotsPerRow,iPlot%nPlotsPerPage+1)
+            ax.set_title(r'%.0f $\AA$'%wvl)
+
+            image = self.flatFlags[:,:,iWvl]
+            image += 2*self.wvlFlags
+            image = 3-image
+            cmap = matplotlib.cm.gnuplot2
+            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower')
+            cbar = fig.colorbar(handleMatshow)
+        
+            if iPlot%nPlotsPerPage == nPlotsPerPage-1:
+                pp.savefig(fig)
+            iPlot += 1
+
+        pp.savefig(fig)
+        pp.close()
+
+    def plotWeightsByPixel(self,verbose=True):
         flatCalPath,flatCalBasename = os.path.split(self.flatCalFileName)
         pdfBasename = os.path.splitext(flatCalBasename)[0]+'.pdf'
-        pp = PdfPages(os.path.join(flatCalPath,pdfBasename))
+        pdfFullPath = os.path.join(flatCalPath,pdfBasename)
+        pp = PdfPages(pdfFullPath)
         nPlotsPerRow = 2
         nPlotsPerCol = 4
         nPlotsPerPage = nPlotsPerRow*nPlotsPerCol
         iPlot = 0 
+        if verbose:
+            print 'plotting weights by pixel at ',pdfFullPath
 
         matplotlib.rcParams['font.size'] = 4 
         wvls = self.wvlBinEdges[0:-1]
         nCubes = len(self.maskedCubeWeights)
 
         for iRow in xrange(self.nRow):
-            print iRow
+            if verbose:
+                print 'row',iRow
             for iCol in xrange(self.nCol):
                 weights = self.flatWeights[iRow,iCol,:]
+                deltaWeights = self.deltaFlatWeights[iRow,iCol,:]
                 if weights.mask.all() == False:
                     if iPlot % nPlotsPerPage == 0:
                         fig = plt.figure(figsize=(10,10),dpi=100)
 
                     ax = fig.add_subplot(nPlotsPerCol,nPlotsPerRow,iPlot%nPlotsPerPage+1)
-                    ax.set_ylim(.5,1.5)
+                    ax.set_ylim(.5,2.)
 
                     for iCube in range(nCubes):
                         cubeWeights = self.maskedCubeWeights[iCube,iRow,iCol]
                         ax.plot(wvls,cubeWeights.data,label='weights %d'%iCube,alpha=.7,color=matplotlib.cm.Paired((iCube+1.)/nCubes))
-                    ax.plot(wvls,weights.data,label='weights',color='k')
+                    ax.errorbar(wvls,weights.data,yerr=deltaWeights.data,label='weights',color='k')
                 
                     ax.set_title('p %d,%d'%(iRow,iCol))
+                    ax.set_ylabel('weight')
+                    ax.set_xlabel(r'$\lambda$ ($\AA$)')
                     #ax.plot(wvls,flatSpectrum,label='pixel',alpha=.5)
 
                     #ax.legend(loc='lower left')
@@ -223,6 +323,8 @@ class FlatCal:
                         ax.plot(wvls,spectrum,label='spectrum %d'%iCube,alpha=.7,color=matplotlib.cm.Paired((iCube+1.)/nCubes))
                 
                     ax.set_title('p %d,%d'%(iRow,iCol))
+                    ax.set_xlabel(r'$\lambda$ ($\AA$)')
+                    ax.set_ylabel('twilight cps')
                     #ax.plot(wvls,flatSpectrum,label='pixel',alpha=.5)
 
                     #ax.legend(loc='lower left')
@@ -232,7 +334,6 @@ class FlatCal:
                         #plt.show()
                     iPlot += 1
         pp.close()
-        print 'done plotWeights'
 
     
 
@@ -240,7 +341,6 @@ class FlatCal:
         """
         Writes an h5 file to put calculated flat cal factors in
         """
-        print 'write'
         if os.path.isabs(self.flatCalFileName) == True:
             fullFlatCalFileName = self.flatCalFileName
         else:
@@ -273,7 +373,7 @@ class FlatCal:
             spectrum = spectra2d[:,iWvl]
             goodSpectrum = spectrum[spectrum != 0]#dead pixels need to be taken out before calculating medians
             wvlMedians[iWvl] = np.median(goodSpectrum)
-        np.savez(npzFileName,median=wvlMedians,medianSpectra=np.array(self.medianSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data))
+        np.savez(npzFileName,median=wvlMedians,medianSpectra=np.array(self.medianSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data),deltaWeights=np.array(self.deltaFlatWeights.data),mask=self.flatFlags)
 
     def plotArray(self,image,normNSigma=3,title=''):
         self.fig = plt.figure()
@@ -291,6 +391,8 @@ if __name__ == '__main__':
     flatcal.loadFlatSpectra()
     flatcal.checkCountRates()
     flatcal.calculateWeights()
-    flatcal.plotWeights()
     flatcal.writeWeights()
+    flatcal.plotWeightsByPixel()
+    flatcal.plotWeightsWvlSlices()
+    flatcal.plotMaskWvlSlices()
 
