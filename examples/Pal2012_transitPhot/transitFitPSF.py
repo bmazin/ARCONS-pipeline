@@ -1,7 +1,7 @@
 '''Julian's copy of sdssfitpsf.psf'''
 
 
-from sdssgaussfitter import gaussfit
+from examples.Pal2012_transitPhot.gaussfitter import gaussfit
 import numpy as np
 from util import utils
 from util.readDict import readDict
@@ -34,7 +34,7 @@ def aperture(startpx,startpy,radius=3):
 #utils.plotArray(testy,cbar=True)
 
 param = readDict()
-param.read_from_file('0926params.dict')
+param.read_from_file('/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/photometryParams.dict')
 
 npzLoadFile = param['npzLoadFile']
 npzfitpsf = param['npzfitpsf']
@@ -54,6 +54,9 @@ stackDict = np.load(npzLoadFile)
 
 stack = stackDict['stack']
 jd = stackDict['jd']
+
+stackDict.close()
+
 print len(jd)
 paramsList = []
 errorsList = []
@@ -70,7 +73,7 @@ for iFrame in range(0,np.shape(stack)[2]):
             if NumFrames[interval] < iFrame <= NumFrames[interval+1]:
                 guessX = guessx[interval]
                 guessY = guessy[interval]
-#                print guessX, guessY
+#               print guessX, guessY
  
     apertureMask = aperture(guessX,guessY,radius=10)
     err = np.sqrt(frame)
@@ -93,7 +96,10 @@ for iFrame in range(0,np.shape(stack)[2]):
     usemoments=[True,True,True,True,True] #doesn't use our guess values
     
     
-    out = gaussfit(data=maFrame,err=err,params=guessParams,returnfitimage=True,quiet=True,limitedmin=limitedmin,limitedmax=limitedmax,minpars=minpars,maxpars=maxpars,circle=1,usemoments=usemoments,returnmp=True)
+    out = gaussfit(data=maFrame,err=err,params=guessParams,returnfitimage=True,
+                   quiet=True,limitedmin=limitedmin,limitedmax=limitedmax,
+                   minpars=minpars,maxpars=maxpars,circle=1,
+                   usemoments=usemoments,returnmp=True)
     mp = out[0]
 
     outparams = mp.params
