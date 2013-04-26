@@ -1,0 +1,70 @@
+
+######################## For display_stack.py ########################
+
+#Input data directory locations
+#mkidDataDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/ScienceData'
+#intermDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Intermediate'
+mkidDataDir = '/ScienceData'
+intermDir = '/Scratch'
+
+
+
+#Path and names of output files.
+npzFileName = '/home/vaneyken/dataProcessing/corot18/Apr23ImageStack.npz'
+gifFileName = '/home/vaneyken/dataProcessing/corot18/Apr23ImageStack.gif'
+
+integrationTime = 3
+expTime = 300
+
+#remember to change seqs! It's at the end
+wvlLowerCutoff = 3000
+wvlUpperCutoff = 8000
+
+run = 'PAL2012'
+
+# Single CoRoT 18 sequence (20121208 UTC)
+seq1 = ['070632', '071134', '071637', '072139', '072641', '073143', '073645', '074147', '074649', '075151', '075654', '080156', '080659', '081201', '081704', '082212', '082714', '083216', '083724', '084227', '084730', '085232', '085735', '090238', '090741', '091244', '091746', '092249', '092752', '093255', '093757', '094300', '094803', '095306', '095808', '100311', '100814']
+
+
+#List of sequences to include.
+seqs = [seq1]
+
+# Date and cal time stamp arrays (one list entry per sequence)
+utcDates = ['20121208']
+sunsetDates = ['20121207']
+calTimestamps = ['20121208-070505']
+#NumFiles = [-1,-1,14,14,14]
+
+#seqs = [seq5,seq6]
+#utcDates = ['20121212', '20121212']
+#sunsetDates = ['20121211','20121211']
+#calTimestamps = ['20121212-111847', '20121212-111847']
+
+######################## For fitpsf.py ########################
+
+npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11ImageStackBlueUpdated.npz'
+npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11fitpsfBlueUpdated.npz'
+giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11fitpsfBlueUpdated.gif'
+
+#seq0:13
+#seq1:4
+#seq2:9
+#seq3:5
+#seq4:17
+#seq5:14
+#seq6:12
+
+FramesPerFile = expTime/integrationTime
+
+#seqCorr = [-1,seq0seq1,seq0seq1+seq2seq3,seq0seq1+seq2seq3+seq4,seq0seq1+seq2seq3+seq4+seq5seq6]
+
+NumFiles = [-1,-1,-1,-1,26]
+#NumFiles = [-1,17,31,48,74]
+guessX = [14,31,14,16]
+guessY = [8,30,8,15]
+
+######################## For lightcurve.py ########################
+
+npzLoadFitFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8fitpsfBlueUpdated.npz'
+TotalNumFiles = 74
+
