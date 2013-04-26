@@ -73,6 +73,7 @@ class ObsFile:
         self.flatCalFile = None
         self.fluxCalFile = None
         self.timeAdjustFile = None
+        self.hotPixFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
         self.wvlLowerLimit = None
@@ -434,7 +435,7 @@ class ObsFile:
             'effIntTime':float, effective integration time after time-masking is 
                      accounted for.
         """
-    
+        
         if getRawCount is True:
             x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
             #x2 = self.getTimedPacketList_old(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
@@ -672,7 +673,7 @@ class ObsFile:
                 wvlBinEdges = x['wvlBinEdges']
         cube = np.array(cube)
         return {'cube':cube,'wvlBinEdges':wvlBinEdges}
-        
+
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
                          wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None):
@@ -727,7 +728,7 @@ class ObsFile:
         return {'spectrum':spectrum, 'wvlBinEdges':wvlBinEdges, 'effIntTime':effIntTime}
         #else:
         #    return spectrum,wvlBinEdges
-        
+    
     def getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False,
                             fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1):
     	'''
@@ -802,7 +803,7 @@ class ObsFile:
     	for i in range(len(summed_array)):
     	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
     	return summed_array, wvlBinEdges
-        
+    
     def getPixelBadTimes(self, pixelRow, pixelCol):
         """
         Get the time interval(s) for which a given pixel is bad (hot/cold,
@@ -870,7 +871,7 @@ class ObsFile:
                 nphoton = pl['timestamps'].size
                 frame[iRow][iCol] += nphoton
         return frame
-        
+
     def loadFlatCalFile(self, flatCalFileName):
         """
         loads the flat cal factors from the given file
@@ -886,7 +887,7 @@ class ObsFile:
         self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
         self.nFlatCalWvlBins = self.flatWeights.shape[2]
-
+        
     def loadFluxCalFile(self, fluxCalFileName):
         """
         loads the flux cal factors from the given file
@@ -911,14 +912,15 @@ class ObsFile:
         Set switchOnMask=False to prevent switching on hot pixel masking.
         """
         import hotpix.hotPixels as hotPixels    #Here instead of at top to prevent circular import problems.
-        
+
         scratchDir = os.getenv('INTERM_PATH', '/')
         hotPixCalPath = os.path.join(scratchDir, 'hotPixCalFiles')
         fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
         if (not os.path.exists(fullHotPixCalFileName)):
             print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
             return
-        
+
+        self.hotPixFile = tables.openFile(fullHotPixCalFileName)
         self.hotPixTimeMask = hotPixels.readHotPixels(fullHotPixCalFileName)
         
         if (os.path.basename(self.hotPixTimeMask['obsFileName'])
@@ -1048,7 +1050,7 @@ class ObsFile:
     	plt.xlabel('Wavelength ($\AA$)')
     	plt.ylabel('Counts')
     	plt.show()
-        
+
     def plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False):
         """
@@ -1102,7 +1104,8 @@ class ObsFile:
         plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, recursive=True)
         plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, recursive=True)
         plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, recursive=True)
-        plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.file.root.header, newparent=plFile.root, newname='timemask', recursive=True)
         plFile.flush()
 
         for iRow in xrange(self.nRow):
@@ -1145,7 +1148,7 @@ class ObsFile:
                                 newRow.append()
         plTable.flush()
 
-        
+
             
 
 def calculateSlices_old(inter, timestamps):

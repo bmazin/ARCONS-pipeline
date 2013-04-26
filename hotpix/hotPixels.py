@@ -500,14 +500,14 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
 
 
     
-def readHotPixels(inputFileName):
+def readHotPixels(inputFile):
     '''
     To read in a hot-pixels HDF file as written by findHotPixels(). 
     (Note 'hot pixels' may later include cold 
     pixels and  possibly other such things as well).
     
     INPUTS:
-        inputFileName - pathname of the .h5 hot-pixel time-mask file to read in.
+        inputFile - pathname of the .h5 hot-pixel time-mask file to read in.
     
     OUTPUTS:
         Returns a dictionary with the following info:
@@ -597,7 +597,11 @@ def readHotPixels(inputFileName):
             
     '''
     
-    fileh = tables.openFile(inputFileName, mode='r')
+    if type(inputFile) is str:
+        fileh = tables.openFile(inputFile, mode='r')
+    elif type(inputFile) is tables.file.File:
+        fileh = inputFile
+    else: raise ValueError('inputFile must be either a pathname string or a PyTables file instance.')
     
     try:        
         #Get the header info
