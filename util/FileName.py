@@ -62,10 +62,28 @@ class FileName:
             "calsol_" + self.tstamp + '_drift.h5'
 
     def flatSoln(self):
-        return self.intermDir + os.sep + \
-            'flatCalSolnFiles' + os.sep + \
-            self.date + os.sep + \
-            "flatsol_" + self.date + '.h5'
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.tstamp + '.h5'
+
+    def flatInfo(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.tstamp + '.npz'
 
     def photonList(self):
         return self.intermDir + os.sep + \
