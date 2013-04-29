@@ -14,6 +14,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.backends.backend_pdf import PdfPages
 from functools import partial
 
 from util.ObsFile import ObsFile
@@ -95,6 +96,7 @@ class AppForm(QMainWindow):
         self.frame = data['frame']
         #self.obsTotalIntTime = data['totalIntTime']
         self.wvlBinEdges = data['wvlBinEdges']
+        self.wvlBinWidths = np.diff(self.wvlBinEdges)
         self.nRow,self.nCol,self.nWvlBins = np.shape(self.spectra)
         self.intTime = self.params['obsIntTime']
         
@@ -135,16 +137,21 @@ class AppForm(QMainWindow):
 
 
     def prepareForClickPlots(self):
+        matplotlib.rcParams['font.size'] = 10
         #create wavelength array more coarsely binned for use in showPixelWvlLightCurves and similar
         self.rebinSpecBins = self.params['nWvlBands']
         self.firstAfterConvolve = self.rebinSpecBins//2
         self.rebinnedWvlEdges = self.wvlBinEdges[::self.rebinSpecBins]
-        self.medianTwilightSpectrum = np.zeros(self.nWvlBins)
+        self.averageTwilightSpectrum = np.zeros(self.nWvlBins)
         spectra2d = np.reshape(self.twilightSpectra,[self.nRow*self.nCol,self.nWvlBins ])
+        fractionOfPixelsToTrim = .1
         for iWvl in xrange(self.nWvlBins):
             spectrum = spectra2d[:,iWvl]
             goodSpectrum = spectrum[spectrum != 0]#dead pixels need to be taken out before calculating medians
-            self.medianTwilightSpectrum[iWvl] = np.median(goodSpectrum)
+            goodSpectrum = np.sort(goodSpectrum)
+            nGoodPixels = len(goodSpectrum)
+            trimmedSpectrum = goodSpectrum[fractionOfPixelsToTrim*nGoodPixels:(1-fractionOfPixelsToTrim)*nGoodPixels]
+            self.averageTwilightSpectrum[iWvl] = np.mean(trimmedSpectrum)
 
     def loadObs(self,stackLabel):
         timestampList = self.params[stackLabel+'Sequence']
@@ -308,12 +315,12 @@ class AppForm(QMainWindow):
 
     def showTwilightArrayReducedChisqImage(self):
         chisqImage = np.zeros((self.nRow,self.nCol))
-        nDeltaFromZero = np.zeros((self.nRow,self.nCol))
+        nDeltaFromZero = np.zeros((self.nRow,self.nCol,self.nWvlBins))
         for iRow in range(self.nRow):
             for iCol in range(self.nCol):
                 x = self.getChisq(iRow,iCol)
                 chisqImage[iRow,iCol] = x['reducedChisq']
-                nDeltaFromZero[iRow,iCol] = x['nDeltaFromZero']
+                nDeltaFromZero[iRow,iCol,:] = x['nDeltaFromZero']
         chisqImage[np.isnan(chisqImage)]=0
         chisqImage[chisqImage == np.inf]=0
         nDeltaFromZero = np.ma.array(nDeltaFromZero,mask=np.logical_and(np.isnan(nDeltaFromZero),nDeltaFromZero==np.inf))
@@ -322,6 +329,41 @@ class AppForm(QMainWindow):
         #self.popUpArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
         PopUp(parent=self,title='showTwilightArrayReducedChisqImage').plotArray(image=chisqImage,title='Flat Cal $\chi^{2}_{red}$',normNSigma=1.)
         #PopUp(parent=self,title='showTwilightArrayNDeltaFromZero').plotArray(image=nDeltaFromZero,title='Flat Cal n$\sigma$ from 0',normNSigma=3.)
+#        verbose = True
+#        pdfFullPath='/Scratch/flatCalSolnFiles2/nDeltaWvlSlicesTwiAppliedToSky.pdf'
+#        pp = PdfPages(pdfFullPath)
+#        nPlotsPerRow = 3
+#        nPlotsPerCol = 4
+#        nPlotsPerPage = nPlotsPerRow*nPlotsPerCol
+#        iPlot = 0
+#        if verbose:
+#            print 'plotting weights in wavelength sliced images'
+#
+#        #matplotlib.rcParams['font.size'] = 4
+#        wvls = self.wvlBinEdges[0:-1]
+#
+#        for iWvl,wvl in enumerate(wvls):
+#            if verbose:
+#                print 'wvl ',iWvl
+#            if iPlot % nPlotsPerPage == 0:
+#                fig = plt.figure(figsize=(10,10),dpi=100)
+#
+#            ax = fig.add_subplot(nPlotsPerCol,nPlotsPerRow,iPlot%nPlotsPerPage+1)
+#            ax.set_title(r'%.0f $\AA$'%wvl)
+#            image = nDeltaFromZero[:,:,iWvl]
+#
+#            cmap = matplotlib.cm.gnuplot2
+#            cmap.set_bad('.1')
+#            
+#            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmin=-10.,vmax=10.)
+#            cbar = fig.colorbar(handleMatshow)
+#
+#            if iPlot%nPlotsPerPage == nPlotsPerPage-1:
+#                pp.savefig(fig)
+#            iPlot += 1
+#        pp.savefig(fig)
+#        pp.close()
+
 
     def showSkyArrayImage(self):
         image = self.skyFrame
@@ -626,18 +668,18 @@ class AppForm(QMainWindow):
         flatSpectra = self.flatInfo['spectra'][row,col]
         flatMedians = self.flatInfo['median']
         deltaFlatSpectra = np.sqrt(flatSpectra)
-        deltaWeights = weights*deltaFlatSpectra/flatSpectra
+        deltaWeights = self.flatInfo['deltaWeights'][row,col]#weights*deltaFlatSpectra/flatSpectra
         poissonDeltaSpectra = np.sqrt(spectrum)
 
         rawSpectrum = spectrum/weights
         deltaRawSpectrum = np.sqrt(rawSpectrum)
         deltaSpectra = spectrum*np.sqrt((deltaWeights/weights)**2+(deltaRawSpectrum/rawSpectrum)**2)
-        diffSpectrum = (spectrum-self.medianTwilightSpectrum)
-        percentDiffSpectrum = 100.* diffSpectrum/self.medianTwilightSpectrum
+        diffSpectrum = (spectrum-self.averageTwilightSpectrum)
+        percentDiffSpectrum = 100.* diffSpectrum/self.averageTwilightSpectrum
         #deltaDiffSpectrum = np.sqrt(deltaSpectra**2+deltaSpectra2**2)
         deltaDiffSpectrum = np.array(deltaSpectra)
         #deltaDiffSpectrum[np.isnan(deltaDiffSpectrum)] = 0
-        deltaPercentDiffSpectrum = 100.*deltaDiffSpectrum/self.medianTwilightSpectrum
+        deltaPercentDiffSpectrum = 100.*deltaDiffSpectrum/self.averageTwilightSpectrum
         nDeltaFromZero = diffSpectrum/deltaDiffSpectrum
         chisqSumTerms =diffSpectrum**2/deltaDiffSpectrum**2
         chisqSumTerms = chisqSumTerms[~np.isnan(chisqSumTerms)]
@@ -671,16 +713,19 @@ class AppForm(QMainWindow):
         axes2 = pop.axes.twinx()
         axes2.plot(self.wvlBinEdges[:-1],nDeltaFromZero,'m',alpha=.7)
         align_yaxis(pop.axes,0,axes2,0)
-        axes2.set_ylabel(r'# $\sigma$ from 0',color='m')
-        pop.axes.set_title('Diff Spectrum (%d,%d)'%(row,col))
+        axes2.set_ylabel(r'(pixelSpectrum-avgSpectrum)/$\sigma$',color='m')
+        pop.axes.set_title('Deviation from Avg Spectrum (%d,%d)'%(row,col))
         pop.draw()
 
         weights = self.flatInfo['weights'][row,col]
         pop = PopUp(parent=self,title='showTwilightPixelDeviationFromMedian')
-        pop.axes.plot(self.medianTwilightSpectrum,'k')
-        pop.axes.plot(self.twilightSpectra[row,col],'b')
-        pop.axes.plot(self.twilightSpectra[row,col]/weights,'r')
+        pop.axes.step(self.wvlBinEdges[:-1],self.averageTwilightSpectrum/self.wvlBinWidths,'k',label='avg')
+        pop.axes.step(self.wvlBinEdges[:-1],self.twilightSpectra[row,col]/self.wvlBinWidths,'b',label='weighted')
+        pop.axes.step(self.wvlBinEdges[:-1],(self.twilightSpectra[row,col]/weights)/self.wvlBinWidths,'r',label='raw')
+        pop.axes.set_xlabel(r'$\lambda$ ($\AA$)')
+        pop.axes.set_ylabel(r'counts per $\AA$')
         pop.axes.set_title('Twilight Spectrum (%d,%d)'%(row,col))
+        pop.axes.legend(loc='lower right')
         pop.draw()
 
 
