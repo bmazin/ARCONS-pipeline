@@ -42,9 +42,12 @@ calTimestamps = ['20121208-070505']
 
 ######################## For fitpsf.py ########################
 
-npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11ImageStackBlueUpdated.npz'
-npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11fitpsfBlueUpdated.npz'
-giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11fitpsfBlueUpdated.gif'
+#Input file:
+npzLoadFile = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Apr23ImageStack.npz'
+
+#Output files:
+npzfitpsf = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Apr23Photometry.npz'
+giffitpsf = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Apr23Photometry.gif'
 
 #seq0:13
 #seq1:4
@@ -58,13 +61,13 @@ FramesPerFile = expTime/integrationTime
 
 #seqCorr = [-1,seq0seq1,seq0seq1+seq2seq3,seq0seq1+seq2seq3+seq4,seq0seq1+seq2seq3+seq4+seq5seq6]
 
-NumFiles = [-1,-1,-1,-1,26]
-#NumFiles = [-1,17,31,48,74]
-guessX = [14,31,14,16]
-guessY = [8,30,8,15]
+#NumFiles = [-1,-1,-1,-1,26]
+NumFiles = [-1,37]
+guessX = [13,13]
+guessY = [30,30]
 
 ######################## For lightcurve.py ########################
 
-npzLoadFitFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8fitpsfBlueUpdated.npz'
-TotalNumFiles = 74
+npzLoadFitFile = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/Apr23Photometry.npz'
+TotalNumFiles = 'dummyvalue'
 

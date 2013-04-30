@@ -661,6 +661,8 @@ class ObsFile:
         If weighted is True, flat cal weights are applied.
         """
         cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
+        effIntTime = np.zeros((self.nRow,self.nCol))
+
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 x = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
@@ -669,9 +671,10 @@ class ObsFile:
                                   wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
                                   wvlBinEdges=wvlBinEdges)
                 cube[iRow][iCol] = x['spectrum']
+                effIntTime[iRow][iCol] = x['effIntTime']
                 wvlBinEdges = x['wvlBinEdges']
         cube = np.array(cube)
-        return {'cube':cube,'wvlBinEdges':wvlBinEdges}
+        return {'cube':cube,'wvlBinEdges':wvlBinEdges,'effIntTime':effIntTime}
         
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
