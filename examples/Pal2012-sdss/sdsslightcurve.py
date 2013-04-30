@@ -34,8 +34,12 @@ fwhm = widths
 
 meanXpos = utils.mean_filterNaN(xpos,size=7)
 meanYpos = utils.mean_filterNaN(ypos,size=7)
+jd = jd[curve<=500]
+curve = curve[curve<=500]
+jd = jd[curve>=100]
+curve = curve[curve>=100]
 
-curve/=np.median(curve)
+#curve/=np.median(curve)
 fwhm/=np.median(fwhm)
 ax.plot(jd,curve,'k.')
 ax.set_title(FileName)
