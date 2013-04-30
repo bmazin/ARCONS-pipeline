@@ -147,14 +147,14 @@ class FlatCal:
                 trimmedSpectrum = goodSpectrum[self.fractionOfPixelsToTrim*nGoodPixels:(1-self.fractionOfPixelsToTrim)*nGoodPixels]
 
                 #trimmedPixelWeights = 1/np.sqrt(trimmedSpectrum)
-                nBins=self.intTime*(np.max(goodSpectrum)-np.min(goodSpectrum))
-                histGood,binEdges = np.histogram(self.intTime*goodSpectrum,bins=nBins)
-                plt.plot(binEdges[0:-1],histGood)
-                histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
-                plt.plot(binEdges[0:-1],histTrim)
-                wvlAverages[iWvl] = np.mean(trimmedSpectrum)
-                print iCube,iWvl,self.intTime*wvlAverages[iWvl],self.intTime*np.median(goodSpectrum)
-                plt.show()
+#                nBins=self.intTime*(np.max(goodSpectrum)-np.min(goodSpectrum))
+#                histGood,binEdges = np.histogram(self.intTime*goodSpectrum,bins=nBins)
+#                plt.plot(binEdges[0:-1],histGood)
+#                histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
+#                plt.plot(binEdges[0:-1],histTrim)
+#                wvlAverages[iWvl] = np.mean(trimmedSpectrum)
+#                print iCube,iWvl,self.intTime*wvlAverages[iWvl],self.intTime*np.median(goodSpectrum)
+#                plt.show()
             weights = np.divide(wvlAverages,cube)
             weights[weights==0] = np.nan
             weights[weights==np.inf] = np.nan
