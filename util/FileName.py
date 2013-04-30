@@ -2,19 +2,31 @@
 Author:  Chris Stoughton   
 Build up complete file names from:
 
-MKDIR_DATA_DIR -- root of all raw
-INTERM_DIR -- root of all generated files
+mkidDataDir -- root of all raw. If not specified, looks for system variable
+                MKID_DATA_DIR, otherwise '/ScienceData'.
+intermDir -- root of all generated files. If not specified, looks for 
+                sys. variable INTERM_DIR, otherwise '/Scratch')
 run -- such as LICK201 or PAL2012
 date -- in format yyyymmdd -- the locat year, month, and date of sunset
 flavor -- obs or cal are the only ones I know about
 tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 
+NOTES
+Updated 4/25/2013, JvE - if root directory names not provided, looks for system variables.
+
 """
+
 import os
 class FileName:
     
     def __init__(self, run='', date='', tstamp='', \
-                 mkidDataDir="/ScienceData", intermDir="/Scratch"):
+                 mkidDataDir=None, intermDir=None):
+        
+        if mkidDataDir is None:
+            mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
+        if intermDir is None:
+            intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+        
         self.mkidDataDir = mkidDataDir
         self.intermDir = intermDir
         self.run = run
