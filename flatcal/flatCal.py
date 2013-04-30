@@ -152,7 +152,7 @@ class FlatCal:
 #                plt.plot(binEdges[0:-1],histGood)
 #                histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
 #                plt.plot(binEdges[0:-1],histTrim)
-#                wvlAverages[iWvl] = np.mean(trimmedSpectrum)
+                wvlAverages[iWvl] = np.mean(trimmedSpectrum)
 #                print iCube,iWvl,self.intTime*wvlAverages[iWvl],self.intTime*np.median(goodSpectrum)
 #                plt.show()
             weights = np.divide(wvlAverages,cube)
@@ -232,6 +232,7 @@ class FlatCal:
             ax.set_title(r'%.0f $\AA$'%wvl)
 
             image = self.flatWeights[:,:,iWvl]
+
             cmap = matplotlib.cm.gnuplot2
             cmap.set_bad('#222222')
             handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=2.)
