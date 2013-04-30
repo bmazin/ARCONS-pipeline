@@ -97,6 +97,19 @@ class FileName:
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
+
+    def oldFlatInfo(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles2' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles2' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.tstamp + '.npz'
+
     def photonList(self):
         return self.intermDir + os.sep + \
             'photonLists' + os.sep + \
