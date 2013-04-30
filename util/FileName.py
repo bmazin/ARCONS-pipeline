@@ -101,12 +101,12 @@ class FileName:
     def oldFlatInfo(self):
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
-                'flatCalSolnFiles2' + os.sep + \
+                'oldFlatCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.npz'
         else:
             return self.intermDir + os.sep + \
-                'flatCalSolnFiles2' + os.sep + \
+                'oldFlatCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
