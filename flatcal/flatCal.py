@@ -5,7 +5,11 @@ Opens a twilight flat h5 and makes the spectrum of each pixel.
 Then takes the median of each energy over all pixels
 A factor is then calculated for each energy in each pixel of its
 twilight count rate / median count rate
-The factors are written out in an h5 file
+The factors are written out in an h5 file.
+
+Flags are associated with each pixel - see headers/pipelineFlags
+for descriptions. Note some flags are set here, others are set
+later one when creating photon lists.
 """
 
 import sys,os
@@ -16,8 +20,10 @@ import glob
 from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
+from headers import pipelineFlags
 
 class FlatCal:
+     
     def __init__(self,paramFile):
         """
         opens flat file,sets wavelength binnning parameters, and calculates flat factors for the file
@@ -71,11 +77,15 @@ class FlatCal:
         finds flat cal factors as medians/pixelSpectra for each pixel
         """
         self.flatFactors = np.divide(self.wvlMedians,self.spectra)
-        self.flatFlags = np.zeros(np.shape(self.flatFactors),dtype='int')
+        #self.flatFlags = np.zeros(np.shape(self.flatFactors),dtype='int')
+        self.flatFlags = np.empty(np.shape(self.flatFactors),dtype='int')
+        self.flatFlags.fill(pipelineFlags.flatCal['good'])    #Initialise flag array filled with 'good' flags. JvE 5/1/2013.
         #set factors that will cause trouble to 1
-        self.flatFlags[self.flatFactors == np.inf] = 1
+        #self.flatFlags[self.flatFactors == np.inf] = 1
+        self.flatFlags[self.flatFactors == np.inf] = pipelineFlags.flatCal['infWeight']   #Modified to use flag dictionary - JvE 5/1/2013
         self.flatFactors[self.flatFactors == np.inf]=1.0
-        self.flatFlags[self.flatFactors == 0]=2
+        #self.flatFlags[self.flatFactors == 0]=2
+        self.flatFlags[self.flatFactors == 0]=pipelineFlags.flatCal['zeroWeight']   #Modified to use flag dictionary - JvE 5/1/2013
         self.flatFactors[self.flatFactors == 0]=1.0
         #np.save('/ScienceData/intermediate/factors.npy',self.flatFactors)
 
