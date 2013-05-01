@@ -54,9 +54,9 @@ def radians_to_arcsec(total_radians):
 # Specify input parameters.
 centroid_RA = '09:26:38.7'
 centroid_DEC = '36:24:02.4'
-HA_offset = 19.0
+HA_offset = 16.0
 guessTime = 300
-integrationTime=10
+integrationTime=30
 secondMaxCountsForDisplay = 500
 
 # Some useful conversions
@@ -68,7 +68,8 @@ app = QApplication(sys.argv)
 
 startingObsDirectory = '/ScienceData/PAL2012/'
 #obsFn =str(QFileDialog.getOpenFileName(None, 'Choose Observation File',startingObsDirectory, filter=str("H5 (*.h5)")))
-obsFn = '/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
+#obsFn = '/ScienceData/PAL2012/20121208/obs_20121209-130606.h5'
+obsFn = '/ScienceData/PAL2012/20121207/obs_20121208-071134.h5'
 
 index1 = obsFn.find('_')
 index2 = obsFn.find('-')
@@ -76,7 +77,8 @@ utcDate = int(obsFn[index1+1:index2])
 sunsetDate = utcDate-1
 startingWfnDirectory = '/Scratch/waveCalSolnFiles/' + str(sunsetDate)
 #wfn = str(QFileDialog.getOpenFileName(None, 'Choose Wavelength Calibration File',startingWfnDirectory, filter=str("H5 (*.h5)")))
-wfn = '/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5'
+#wfn = '/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5'
+wfn = '/Scratch/waveCalSolnFiles/20121207/calsol_20121208-070505.h5'
 
 startingFfnDirectory = '/Scratch/flatCalSolnFiles/'
 #ffn = str(QFileDialog.getOpenFileName(None, 'Choose Flat Calibration File',startingFfnDirectory, filter=str("H5 (*.h5)")))
@@ -140,7 +142,7 @@ deadMask = -1*deadMask + 1
 ccd = pg.CCDInfo(0,0.00001,1,2500)
 
 # Create output file to save centroid data
-outFn = '/home/pszypryt/Scratch/centroid_test/centroid_list.txt'
+outFn = '/home/pszypryt/Scratch/centroid_test/corot_primary/centroid_list_071134.txt'
 f = open(outFn,'w')
 f.write('Time\tX Center\tY Center\tHA\n')
 
