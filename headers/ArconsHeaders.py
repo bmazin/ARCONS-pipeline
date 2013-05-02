@@ -16,7 +16,7 @@ import sys
 import os
 import numpy as np
 from tables import *
-from cosmic import TimeMask
+from headers import TimeMask
 from headers import pipelineFlags as flags 
 
 

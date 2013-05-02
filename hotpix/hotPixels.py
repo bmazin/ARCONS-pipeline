@@ -37,7 +37,7 @@ checkInterval: creates a 2D mask for a given time interval within a given
 
 
 
-Dependencies: pytables; pyinterval; cosmic.TimeMask; util.ObsFile; numpy;
+Dependencies: pytables; pyinterval; headers.TimeMask; util.ObsFile; numpy;
               matplotlib; util.readDict
 
 To do:
@@ -70,7 +70,7 @@ import numpy.ma as ma
 import matplotlib.pylab as mpl
 import util.ObsFile as ObsFile
 import util.utils as utils
-import cosmic.TimeMask as tm
+import headers.TimeMask as tm
 import util.readDict as readDict
 
 
@@ -297,7 +297,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         pixel, e.g., for the pixel at x=12, y=34, the table name is 'x12y34'
     
         The structure of each pixel table is as specified in
-        cosmic.TimeMask.TimeMask - i.e., three columns, one row per 'bad' time
+        headers.TimeMask.TimeMask - i.e., three columns, one row per 'bad' time
         interval. The columns are tBegin, tEnd, reason,
         representing the start and end times for each 'bad' interval within the
         exposure, and a pytables Enum representing indicating the reason for 
@@ -523,7 +523,7 @@ def readHotPixels(inputFile):
                           since there may be different 'reasons' for the different
                           intervals!
             'reasons' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
-                        cosmic/TimeMask). Entries in these lists correspond directly 
+                        headers/TimeMask.py). Entries in these lists correspond directly 
                         to entries in the 'intervals' array.            
             'reasonEnum' - the enum instance for the 'reasons', so the 'concrete values'
                            stored in that array can be parsed back to their enum labels.
