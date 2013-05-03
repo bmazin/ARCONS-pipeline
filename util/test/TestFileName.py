@@ -20,7 +20,7 @@ class TestFileName(unittest.TestCase):
         fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
 
         obsFn = fn.obs()
-        self.assertTrue(os.path.exists(obsFn))
+        self.assertTrue(os.path.exists(obsFn), msg=obsFn+" does not exist")
 
         calFn = fn.cal()
         self.assertFalse(os.path.exists(calFn))
@@ -34,7 +34,7 @@ class TestFileName(unittest.TestCase):
         tstamp = '20120920-123900'
         fn = FileName.FileName(run, date, tstamp, mkidDataDir, intermDir)
         calSolnFn = fn.calSoln()
-        self.assertTrue(os.path.exists(calSolnFn))
+        self.assertTrue(os.path.exists(calSolnFn), msg=calSolnFn)
 
     def testTimeMask(self):
         mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
