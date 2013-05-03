@@ -15,7 +15,7 @@ from util.ObsFile import ObsFile
 from util import meanclip
 from util import FileName
 from interval import interval, inf, imath
-from cosmic import TimeMask
+from headers import TimeMask
 from cosmic import tsBinner
 import time
 class Cosmic:

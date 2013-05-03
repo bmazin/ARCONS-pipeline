@@ -73,6 +73,7 @@ class ObsFile:
         self.flatCalFile = None
         self.fluxCalFile = None
         self.timeAdjustFile = None
+        self.hotPixFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
         self.wvlLowerLimit = None
@@ -661,6 +662,8 @@ class ObsFile:
         If weighted is True, flat cal weights are applied.
         """
         cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
+        effIntTime = np.zeros((self.nRow,self.nCol))
+
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 x = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
@@ -669,9 +672,10 @@ class ObsFile:
                                   wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
                                   wvlBinEdges=wvlBinEdges)
                 cube[iRow][iCol] = x['spectrum']
+                effIntTime[iRow][iCol] = x['effIntTime']
                 wvlBinEdges = x['wvlBinEdges']
         cube = np.array(cube)
-        return {'cube':cube,'wvlBinEdges':wvlBinEdges}
+        return {'cube':cube,'wvlBinEdges':wvlBinEdges,'effIntTime':effIntTime}
         
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
@@ -919,6 +923,7 @@ class ObsFile:
             print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
             return
         
+        self.hotPixFile = tables.openFile(fullHotPixCalFileName)
         self.hotPixTimeMask = hotPixels.readHotPixels(fullHotPixCalFileName)
         
         if (os.path.basename(self.hotPixTimeMask['obsFileName'])
@@ -1102,7 +1107,8 @@ class ObsFile:
         plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, recursive=True)
         plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, recursive=True)
         plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, recursive=True)
-        plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, recursive=True)
+        plFile.copyNode(self.file.root.header, newparent=plFile.root, newname='timemask', recursive=True)
         plFile.flush()
 
         for iRow in xrange(self.nRow):
