@@ -59,6 +59,11 @@ class FileName:
             'timeMasks' + os.sep + \
             "timeMask_" + self.tstamp + '.h5'
 
+    def cosmicMask(self):
+        return self.intermDir + os.sep + \
+            'cosmicMasks' + os.sep + \
+            "cosmicMask_" + self.tstamp + '.h5'
+
     def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
