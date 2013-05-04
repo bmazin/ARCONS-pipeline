@@ -7,7 +7,7 @@ mkidDataDir -- root of all raw. If not specified, looks for system variable
 intermDir -- root of all generated files. If not specified, looks for 
                 sys. variable INTERM_DIR, otherwise '/Scratch')
 run -- such as LICK201 or PAL2012
-date -- in format yyyymmdd -- the locat year, month, and date of sunset
+date -- in format yyyymmdd -- the local year, month, and date of sunset
 flavor -- obs or cal are the only ones I know about
 tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 
