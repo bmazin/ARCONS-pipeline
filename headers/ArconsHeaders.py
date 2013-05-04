@@ -8,7 +8,7 @@ Copyright (c) 2012 . All rights reserved.
 
 This header file contains the classes that hold the reduced photon list in HDF5 files.
 
-Updated, 4/19/2013, JvE.
+**Under construction, subject to change!!** 5/3/2012 JvE
 
 """
 
@@ -42,7 +42,7 @@ class PhotonList(IsDescription):
     FluxWeight = Float32Col(dflt=np.nan)       # Flux cal. weighting for this photon.
     FluxWeightErr = Float32Col(dflt=np.nan)    # Error
     FluxFlag = UInt8Col(dflt=flags.fluxCal['undetermined'])    # Flux cal. flag. 255=undetermined.
-    QualityFlag = UInt8Col(dflt=255)           # Photon quality flag.  0=good, 1=pixel has incomplete wavelength coverage, 2=...; 255 indicates undetermined.
+    #QualityFlag = UInt8Col(dflt=255)           # Photon quality flag.  0=good, 1=pixel has incomplete wavelength coverage, 2=...; 255 indicates undetermined.
     TimeMaskFlag = BoolCol(dflt=False)         # Set if photon is time-masked. True=bad, False=good.
     TimeMaskReason = EnumCol(TimeMask.timeMaskReason, 'none', base='uint8')     # Time-mask reason ('none' if not time-masked)
 

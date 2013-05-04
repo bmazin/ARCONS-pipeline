@@ -503,11 +503,14 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
 def readHotPixels(inputFile):
     '''
     To read in a hot-pixels HDF file as written by findHotPixels(). 
-    (Note 'hot pixels' may later include cold 
-    pixels and  possibly other such things as well).
+    (Note 'hot pixels' may later include cold pixels and possibly other
+     such things as well).
     
     INPUTS:
-        inputFile - pathname of the .h5 hot-pixel time-mask file to read in.
+        inputFile - either a pytables file instance or pathname of the
+                    .h5 hot-pixel time-mask file to read in. Note in the
+                    former case the file will be left open; in the latter, 
+                    the file will be opened and then closed on completion.
     
     OUTPUTS:
         Returns a dictionary with the following info:
@@ -638,7 +641,8 @@ def readHotPixels(inputFile):
 
 
     finally:
-        fileh.close()
+        #If a filename was passed as a string (as opposed to a file instance) then close the file.
+        if type(inputFile) is str: fileh.close()
     
     
 
