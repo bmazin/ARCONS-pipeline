@@ -17,7 +17,7 @@ class TestMeanclip(unittest.TestCase):
         mean,sigma,nSurvived = meanclip.meanclip(s, clipsig=9.0)
         self.assertEqual(nSurvived, 997, \
                              "three should get cut nSurived=%d" % nSurvived)
-        self.assertAlmostEqual(mu, mean, delta=0.4, \
+        self.assertAlmostEqual(mu, mean, delta=0.7, \
                                    msg="mu=%f mean=%f" % (mu,mean))
         self.assertAlmostEqual(sig, sigma, delta=0.6, \
                                    msg="sig=%f sigma=%f" % (sig,sigma))
