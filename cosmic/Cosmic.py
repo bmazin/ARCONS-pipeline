@@ -33,9 +33,7 @@ class Cosmic:
         self.file.loadTimeAdjustmentFile(timeAdjustments)
         # apply Julian's time masks
         timeMaskFile = self.fn.timeMask();
-        print "timeMaskFile=",timeMaskFile
         self.file.loadHotPixCalFile(timeMaskFile,switchOnMask=True)
-        print "done loading ",timeMaskFile
         self._setRoachList()
         self._setAllSecs()
         self.exptime = self.file.getFromHeader('exptime')
@@ -64,7 +62,7 @@ class Cosmic:
         """
         Close any open files
         """
-        print "now in Cosmic.__del__ for ",self.fileName
+        #print "now in Cosmic.__del__ for ",self.fileName
         try:
             del self.file
         except:
@@ -174,13 +172,13 @@ class Cosmic:
         write intervals with flashes to the timeMask file
         """
         # get the output file name, and make the directory if you need to
-        tmFileName = self.fn.timeMask()
-        (tmDir,name) = os.path.split(tmFileName)
-        if not os.path.exists(tmDir):
-            os.makedirs(tmDir)
+        cmFileName = self.fn.cosmicMask()
+        (cmDir,name) = os.path.split(cmFileName)
+        if not os.path.exists(cmDir):
+            os.makedirs(cmDir)
 
         # write parameters used to find flashes
-        h5f = tables.openFile(tmFileName, 'w')
+        h5f = tables.openFile(cmFileName, 'w')
         fnode = filenode.newNode(h5f, where='/', name='timeMaskHdr')
         fnode.attrs.beginTime      = self.beginTime
         fnode.attrs.endTime        = self.endTime
@@ -329,7 +327,7 @@ class Cosmic:
         retval['frameSum'] = frameSum
         return retval
 
-    def getHgsForOneSec(self, iSec, inter, stride=1, populationMax=10, threshold=100):
+    def getHgsForOneSecDELETE(self, iSec, inter, stride=1, populationMax=10, threshold=100):
         """
         inputs:
         iSec = the second to consider
@@ -351,7 +349,10 @@ class Cosmic:
                 gtpl = self.file.getTimedPacketList(iRow,iCol)
                 timestamps = gtpl['timestamps']
                 if timestamps.size > 0:
-                    tsBinner.tsBinner(timestamps, timeHgValues)
+                    ts0 = timestamps[0]
+                    print "ts0=",ts0," type=",type(ts0)
+                    ts64 = (timestamps*1000000).astype(np.uint64)
+                    tsBinner.tsBinner(ts64, timeHgValues)
                     frameSum[iRow,iCol] += timestamps.size
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
