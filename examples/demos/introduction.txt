@@ -55,7 +55,7 @@ a)  File names depend on the observing run, date, time, and data
 type.  The class util/FileName.py does the string concatenation to
 accomplish this.  Look at util/test/TestFileName.py and then run it
 
-$python TestFileName.py
+$ python TestFileName.py
 
 This demonstrates how to find the absolute path to raw data,
 calibration solution files, and time mask files.  It tests to see
@@ -98,4 +98,33 @@ calls:
     parsePhotonPackets.  It creates a png file showing the photon
     peak and time for the photons returned with and without masking.
     
+c) The file util/utils.py contains useful utilities.  Run
+   util/test/TestUtils.py to see a few of them.
 
+--> testPlotArray demonstrates how to make a plot of a 2d array.
+    You can label values on the legend.  The methot plotArray has
+    an option to mark a list of pixels with a specified color:  pixel
+    (0,1) is red in the example.  The plot is in the file
+    testPlotArray.png
+
+--> testMakeMove0 makes a movie of all 0 and 1 values to movie0.gif
+
+--> testMakeMove1 makes a movie of all 0 and 1 values to movie1.gif
+    with some pixels marked in red
+
+d) We do sigma clipped means with the function in util/meanclip.py and
+it is demonstrated in util/test/TestMeanClip.py
+
+e) A collection of spectrophotometric standards is managed in
+   util/MKIDStd.py.  
+
+--> testPlot makes the file all.png which shows all the spectra
+
+--> testGetVega confirms that Vega is 0.03 in all bands
+
+--> testCalspecMags confirms that BD17 magnitudes and colors are as
+    expected
+
+--> testConvert tests converting between AB magnitudes and flux
+
+--> testGetIndex tests np.searchsorted
