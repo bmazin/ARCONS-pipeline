@@ -33,7 +33,8 @@ class Cosmic:
         self.file.loadTimeAdjustmentFile(timeAdjustments)
         # apply Julian's time masks
         timeMaskFile = self.fn.timeMask();
-        self.file.loadHotPixCalFile(timeMaskFile,switchOnMask=True)
+        if os.path.exists(timeMaskFile):
+            self.file.loadHotPixCalFile(timeMaskFile,switchOnMask=True)
         self._setRoachList()
         self._setAllSecs()
         self.exptime = self.file.getFromHeader('exptime')
