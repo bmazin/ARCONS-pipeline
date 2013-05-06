@@ -57,6 +57,7 @@ class FileName:
     def timeMask(self):
         return self.intermDir + os.sep + \
             'timeMasks' + os.sep + \
+            self.date + os.sep + \
             "timeMask_" + self.tstamp + '.h5'
 
     def cosmicMask(self):
