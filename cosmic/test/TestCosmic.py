@@ -30,8 +30,8 @@ class TestCosmic(unittest.TestCase):
             self.assertEqual(self.cosmic.file.beamImage[1][2], 
                              '/r7/p162/t1348133188')
         except:
-            pass
-#            self.fail("Trouble in TestCosmic.setUp")
+#            pass
+            self.fail("Trouble in TestCosmic.setUp for file="+self.fn.obs())
 
     def testBadEndTime(self):
         try:
