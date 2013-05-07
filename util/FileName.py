@@ -73,6 +73,8 @@ class FileName:
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
 
+    def centroid(self):
+
     def flatSoln(self):
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
