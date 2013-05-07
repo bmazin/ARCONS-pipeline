@@ -1,0 +1,130 @@
+1.  Get a copy of the code.  Use one of these two ways:
+
+a)  get an account on github.com, and have Ben Mazin add you to the
+people who can access ARCONS-pipeline and clone it like this:
+
+$ git clone git@github.com:/bmazin/ARCONS-pipeline.git
+
+
+b)  get kerberized access to des08.fnal.gov and do this, replacing
+username with your actual username:
+
+$ git clone username@des08.fnal.gov:/home/s1/stoughto/ARCONS-pipeline
+
+or, if you are already logged in to des08
+
+$ git clone ~stoughto/ARCONS-pipeline
+
+NOTE that you will want to do a "git pull" to update your version 
+of the code after the initial clone!
+
+You need to set PYTHONPATH to point to the version of ARCONS-pipeline
+you checked out.  This is what I do, and you need to modify it to
+point to the correct place for you:
+
+# The root of the ARCONS python software
+export PYTHONPATH=/home/s1/stoughto/ARCONS-pipeline
+
+2. This code base has several directories, named by the function each
+   provides to the pipeline.  There is not yet a single integrated
+   pipeline to "calibrate and combine all the raw data" but many of
+   the essential parts are done.
+
+The code relies on scipy and a number of other python packages.  On
+turk.physics.ucsb.edu the default version of phython works just fine.
+On des08, I am working to keep a copy up to date which you access by
+prepending to PATH:
+
+# For a good version of python
+export PATH=/data/des08.b/stoughton/anaconda/bin/:$PATH
+
+
+3. To run the code, you need to point to the root directory where data
+   and intermediate results are stored.  If you are logged in to
+   turk.physics.ucsb.edu this is taken care of by default.  On des08
+   you need to set these two environmental variables:
+
+# The root of ARCONS raw data
+export MKID_DATA_DIR=/data/des08.b/stoughton
+# The root of ARCONS intermdiate files
+export INTERM_DIR=/data/des08.b/stoughton/Scratch
+
+4.  There are some tests you can run and read to see how thing work.
+
+a)  File names depend on the observing run, date, time, and data
+type.  The class util/FileName.py does the string concatenation to
+accomplish this.  Look at util/test/TestFileName.py and then run it
+
+$ python TestFileName.py
+
+This demonstrates how to find the absolute path to raw data,
+calibration solution files, and time mask files.  It tests to see
+whether they exist.  Again, you need to have MKID_DATA_DIR and
+ITERM_DIR set (or be running on turk) for these to work.
+After making the file name, it checks to see that the file exists.
+
+b) The class util/ObsFile.py orchestrates reading data and applying
+calibrations.  In util/test run the tests like this:
+
+$ cd test
+$ python TestObsFile.py
+
+The specific tests check the following functions:
+
+--> testNegativeTimeIssue makes sure the "time adjustment file" exists
+and is used correctly.  A situation in the data acquisition system has
+been diagnosed, and a correction to times is applied with these two
+calls:
+
+        fileName = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        timeAdjustments = fileName.timeAdjustments()
+        obsFile = ObsFile.ObsFile(fileName.obs())
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+
+--> testGetTimedPacketList shows one way to use the
+    "getTimedPacketList" method of ObsFile.  It reads the timestamps
+    for one specific pixel and checks that these are the expected
+    values
+
+--> testGetFrame shows how to return a 2d array of numbers, and checks
+    that it has the expected dimension and that the sum of the values
+    is the expected value
+
+--> testCalculateSlices* demonstrates how the slices format of
+    numpy can be translated to intervals used in ObsFile
+
+--> testParsePhotonPacketsWithIntervalMask demonstrates how to "mask
+    out" a time region when calling the ObsFile method
+    parsePhotonPackets.  It creates a png file showing the photon
+    peak and time for the photons returned with and without masking.
+    
+c) The file util/utils.py contains useful utilities.  Run
+   util/test/TestUtils.py to see a few of them.
+
+--> testPlotArray demonstrates how to make a plot of a 2d array.
+    You can label values on the legend.  The methot plotArray has
+    an option to mark a list of pixels with a specified color:  pixel
+    (0,1) is red in the example.  The plot is in the file
+    testPlotArray.png
+
+--> testMakeMove0 makes a movie of all 0 and 1 values to movie0.gif
+
+--> testMakeMove1 makes a movie of all 0 and 1 values to movie1.gif
+    with some pixels marked in red
+
+d) We do sigma clipped means with the function in util/meanclip.py and
+it is demonstrated in util/test/TestMeanClip.py
+
+e) A collection of spectrophotometric standards is managed in
+   util/MKIDStd.py.  
+
+--> testPlot makes the file all.png which shows all the spectra
+
+--> testGetVega confirms that Vega is 0.03 in all bands
+
+--> testCalspecMags confirms that BD17 magnitudes and colors are as
+    expected
+
+--> testConvert tests converting between AB magnitudes and flux
+
+--> testGetIndex tests np.searchsorted

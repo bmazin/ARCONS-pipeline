@@ -7,7 +7,7 @@ mkidDataDir -- root of all raw. If not specified, looks for system variable
 intermDir -- root of all generated files. If not specified, looks for 
                 sys. variable INTERM_DIR, otherwise '/Scratch')
 run -- such as LICK201 or PAL2012
-date -- in format yyyymmdd -- the locat year, month, and date of sunset
+date -- in format yyyymmdd -- the local year, month, and date of sunset
 flavor -- obs or cal are the only ones I know about
 tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 
@@ -60,6 +60,11 @@ class FileName:
             self.date + os.sep + \
             "timeMask_" + self.tstamp + '.h5'
 
+    def cosmicMask(self):
+        return self.intermDir + os.sep + \
+            'cosmicMasks' + os.sep + \
+            "cosmicMask_" + self.tstamp + '.h5'
+
     def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
@@ -73,7 +78,21 @@ class FileName:
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
 
+<<<<<<< HEAD
     def centroid(self):
+=======
+    def fluxSoln(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'fluxCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "fluxsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'fluxCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "fluxsol_" + self.tstamp + '.h5'
+>>>>>>> 70830c2c6daff5df28ae5682c0532583502aea4a
 
     def flatSoln(self):
         if self.tstamp == '' or self.tstamp == None:

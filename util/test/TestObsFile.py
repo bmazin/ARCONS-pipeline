@@ -1,22 +1,27 @@
 import os
 import unittest
 import numpy as np
-from util import ObsFile, FileName
 from interval import interval, inf, imath
 import matplotlib.pyplot as plt
 import inspect
-from util.FileName import FileName
-from util.ObsFile import ObsFile
+from util import ObsFile, FileName
+#from util.FileName import FileName
+#from util.ObsFile import ObsFile
 
 class TestObsFile(unittest.TestCase):
     def testNegativeTimeIssue(self):
+        """
+        This particular sequence has a photon close to time=0.  Make sure
+        it returns a positive value after loadTimeAdjustmentFile fixes
+        everything else.
+        """
         run = 'PAL2012'
         sundownDate = '20121211'
         obsDate = '20121212'
         seq = '112709'
-        fileName = FileName(run, sundownDate, obsDate+"-"+seq)
+        fileName = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
         timeAdjustments = fileName.timeAdjustments()
-        obsFile = ObsFile(fileName.obs())
+        obsFile = ObsFile.ObsFile(fileName.obs())
         obsFile.loadTimeAdjustmentFile(timeAdjustments)
         iRow = 9
         iCol = 22
@@ -25,9 +30,14 @@ class TestObsFile(unittest.TestCase):
         gtpl = obsFile.getTimedPacketList(iRow, iCol, 
                                           firstSec, integrationTime)
         ts = gtpl['timestamps']
-        print "ts[0]=",ts[0]
+        self.assertTrue(ts[0] >= 0)
 
-    def testGetTimedPhotonPacket(self):
+    def testGetTimedPacketList(self):
+        """
+        Sample call for ObsFile method getTimedPacketList
+
+        Checks that some values are the same as they were on April 8
+        """
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
         exptime0 = obsFile.getFromHeader('exptime')
@@ -45,24 +55,27 @@ class TestObsFile(unittest.TestCase):
 
         # Chris S. found these values on April 8, 2012
         self.assertEquals(timestamps.size,145542)
-        self.assertEquals(timestamps[0],0.002847)
-        self.assertEquals(timestamps[-1],297.999737)
+        self.assertAlmostEquals(timestamps[0],0.0028879999999,places=10)
+        self.assertAlmostEquals(timestamps[-1],297.9997779999999, places=10)
 
         timestampsUint64 = (timestamps*1e6).astype(np.uint64)
         self.assertEquals(timestampsUint64.size,145542)
-        self.assertEquals(timestampsUint64[0],2847)
-        self.assertEquals(timestampsUint64[-1],297999737)
+        self.assertEquals(timestampsUint64[0],2888)
+        self.assertEquals(timestampsUint64[-1],297999778)
 
         del obsFile
 
     def testGetFrame(self):
+        """
+        Demonstrate the getFrame method of ObsFile and check a specific result
+        """
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
-        frame = obsFile.getFrame(0,-1)
+        frame = obsFile.getFrame(0,3)
         shape = frame.shape
         self.assertEquals(obsFile.nRow, shape[0])
         self.assertEquals(obsFile.nCol, shape[1])
-        print "frame=",frame
+        self.assertEquals(frame.sum(), 331994)
 
     def testCalculateSlicesMiddle(self):
         "one interval in the middle of the set of timestamps"

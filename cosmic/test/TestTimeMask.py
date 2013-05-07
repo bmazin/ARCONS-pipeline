@@ -1,6 +1,6 @@
 import os
 import unittest
-from cosmic import TimeMask
+from headers import TimeMask
 import tables
 from tables.nodes import filenode
 

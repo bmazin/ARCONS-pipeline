@@ -37,7 +37,7 @@ checkInterval: creates a 2D mask for a given time interval within a given
 
 
 
-Dependencies: pytables; pyinterval; cosmic.TimeMask; util.ObsFile; numpy;
+Dependencies: pytables; pyinterval; headers.TimeMask; util.ObsFile; numpy;
               matplotlib; util.readDict
 
 To do:
@@ -70,7 +70,7 @@ import numpy.ma as ma
 import matplotlib.pylab as mpl
 import util.ObsFile as ObsFile
 import util.utils as utils
-import cosmic.TimeMask as tm
+import headers.TimeMask as tm
 import util.readDict as readDict
 
 
@@ -297,7 +297,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         pixel, e.g., for the pixel at x=12, y=34, the table name is 'x12y34'
     
         The structure of each pixel table is as specified in
-        cosmic.TimeMask.TimeMask - i.e., three columns, one row per 'bad' time
+        headers.TimeMask.TimeMask - i.e., three columns, one row per 'bad' time
         interval. The columns are tBegin, tEnd, reason,
         representing the start and end times for each 'bad' interval within the
         exposure, and a pytables Enum representing indicating the reason for 
@@ -500,14 +500,17 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
 
 
     
-def readHotPixels(inputFileName):
+def readHotPixels(inputFile):
     '''
     To read in a hot-pixels HDF file as written by findHotPixels(). 
-    (Note 'hot pixels' may later include cold 
-    pixels and  possibly other such things as well).
+    (Note 'hot pixels' may later include cold pixels and possibly other
+     such things as well).
     
     INPUTS:
-        inputFileName - pathname of the .h5 hot-pixel time-mask file to read in.
+        inputFile - either a pytables file instance or pathname of the
+                    .h5 hot-pixel time-mask file to read in. Note in the
+                    former case the file will be left open; in the latter, 
+                    the file will be opened and then closed on completion.
     
     OUTPUTS:
         Returns a dictionary with the following info:
@@ -523,7 +526,7 @@ def readHotPixels(inputFileName):
                           since there may be different 'reasons' for the different
                           intervals!
             'reasons' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
-                        cosmic/TimeMask). Entries in these lists correspond directly 
+                        headers/TimeMask.py). Entries in these lists correspond directly 
                         to entries in the 'intervals' array.            
             'reasonEnum' - the enum instance for the 'reasons', so the 'concrete values'
                            stored in that array can be parsed back to their enum labels.
@@ -597,7 +600,11 @@ def readHotPixels(inputFileName):
             
     '''
     
-    fileh = tables.openFile(inputFileName, mode='r')
+    if type(inputFile) is str:
+        fileh = tables.openFile(inputFile, mode='r')
+    elif type(inputFile) is tables.file.File:
+        fileh = inputFile
+    else: raise ValueError('inputFile must be either a pathname string or a PyTables file instance.')
     
     try:        
         #Get the header info
@@ -634,7 +641,8 @@ def readHotPixels(inputFileName):
 
 
     finally:
-        fileh.close()
+        #If a filename was passed as a string (as opposed to a file instance) then close the file.
+        if type(inputFile) is str: fileh.close()
     
     
 

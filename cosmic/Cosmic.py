@@ -13,8 +13,9 @@ from headers import ArconsHeaders
 from util import utils
 from util.ObsFile import ObsFile
 from util import meanclip
+from util import FileName
 from interval import interval, inf, imath
-from cosmic import TimeMask
+from headers import TimeMask
 from cosmic import tsBinner
 import time
 class Cosmic:
@@ -27,6 +28,13 @@ class Cosmic:
         self.fn = fn
         self.fileName = fn.obs();
         self.file = ObsFile(self.fileName)
+        # apply Matt's time fix
+        timeAdjustments = self.fn.timeAdjustments()
+        self.file.loadTimeAdjustmentFile(timeAdjustments)
+        # apply Julian's time masks
+        timeMaskFile = self.fn.timeMask();
+        if os.path.exists(timeMaskFile):
+            self.file.loadHotPixCalFile(timeMaskFile,switchOnMask=True)
         self._setRoachList()
         self._setAllSecs()
         self.exptime = self.file.getFromHeader('exptime')
@@ -55,9 +63,10 @@ class Cosmic:
         """
         Close any open files
         """
+        #print "now in Cosmic.__del__ for ",self.fileName
         try:
-            self.file.close()
-        except AttributeError:
+            del self.file
+        except:
             pass
 
     def _setRoachList(self):
@@ -164,13 +173,13 @@ class Cosmic:
         write intervals with flashes to the timeMask file
         """
         # get the output file name, and make the directory if you need to
-        tmFileName = self.fn.timeMask()
-        (tmDir,name) = os.path.split(tmFileName)
-        if not os.path.exists(tmDir):
-            os.makedirs(tmDir)
+        cmFileName = self.fn.cosmicMask()
+        (cmDir,name) = os.path.split(cmFileName)
+        if not os.path.exists(cmDir):
+            os.makedirs(cmDir)
 
         # write parameters used to find flashes
-        h5f = tables.openFile(tmFileName, 'w')
+        h5f = tables.openFile(cmFileName, 'w')
         fnode = filenode.newNode(h5f, where='/', name='timeMaskHdr')
         fnode.attrs.beginTime      = self.beginTime
         fnode.attrs.endTime        = self.endTime
@@ -285,24 +294,41 @@ class Cosmic:
         interFullSec = interval[0, (1.0/tickDur)-1]
         allPopulationHgValues = np.zeros(populationMax)
         cosmicTimeLists = []
-        for iSec in range(self.beginTime, self.endTime):
-            if (iSec % 10) == 0:
-                print "findCosmics:  iSec=",iSec
-            inter = interval()
-            #inter = (self.flashInterval['all'] & \
-            #    interval[iSec/tickDur, ((iSec+1)/tickDur)-1]) - iSec/tickDur
+        binContentsList = []
+        hgs = self.getHgs(stride, threshold, populationMax)
+        return hgs
 
-            ghfos = self.getHgsForOneSec(iSec, inter, stride,\
-                                         populationMax, threshold)
-            populationHg = ghfos['populationHg']
-            allPopulationHgValues += populationHg[0]
-            cosmicTimeLists.append((iSec,ghfos['cosmicTimeList']))
+    def getHgs(self, stride=1, threshold=100, populationMax=10):
+        exptime = self.file.getFromHeader('exptime')
+        nBins = self.file.ticksPerSec*exptime
+        bins = np.arange(0, nBins, 1)
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        frameSum = np.zeros((self.file.nRow,self.file.nCol))
+        firstSec = self.beginTime
+        integrationTime = self.endTime - self.beginTime
+        for iRow in range(self.file.nRow):
+            if iRow%10 == 0:
+                print "Cosmic.getHgs:  iRow=",iRow
+            for iCol in range(self.file.nCol):
+                gtpl = self.file.getTimedPacketList(iRow,iCol,
+                                                    firstSec, integrationTime)
+                timestamps = gtpl['timestamps']
+                if timestamps.size > 0:
+                    timestamps *= self.file.ticksPerSec
+                    ts64 = timestamps.astype(np.uint64)
+                    tsBinner.tsBinner(ts64, timeHgValues)
+                    frameSum[iRow,iCol] += ts64.size
+        pfthgv = Cosmic.populationFromTimeHgValues\
+            (timeHgValues,populationMax,stride,threshold)
         retval = {}
-        retval['populationHg'] = (allPopulationHgValues,populationHg[1])
-        retval['cosmicTimeLists'] = cosmicTimeLists
+        retval['timeHgValues'] = timeHgValues
+        retval['populationHg'] = pfthgv['populationHg']
+        retval['cosmicTimeList'] = pfthgv['cosmicTimeList']
+        retval['binContents'] = pfthgv['binContents']
+        retval['frameSum'] = frameSum
         return retval
 
-    def getHgsForOneSec(self, iSec, inter, stride=1, populationMax=10, threshold=100):
+    def getHgsForOneSecDELETE(self, iSec, inter, stride=1, populationMax=10, threshold=100):
         """
         inputs:
         iSec = the second to consider
@@ -318,17 +344,17 @@ class Cosmic:
         bins = np.arange(0, self.file.ticksPerSec, 1)
         minLength = self.file.ticksPerSec
         timeHgValues = np.zeros(minLength, dtype=np.int64)
+        frameSum = np.zeros((self.file.nRow,self.file.nCol))
         for iRow in range(self.file.nRow):
             for iCol in range(self.file.nCol):
-                sec = self.allSecs[iRow,iCol][iSec]
-                if (sec.size > 0):
-                    timestamps,parabolaPeaks,baselines = \
-                        ObsFile.parsePhotonPackets(\
-                        self.file, sec, inter,\
-                            doParabolaFitPeaks=False,\
-                            doBaselines = False)
-                    tsBinner.tsBinner(timestamps, timeHgValues)
-        end = time.clock();
+                gtpl = self.file.getTimedPacketList(iRow,iCol)
+                timestamps = gtpl['timestamps']
+                if timestamps.size > 0:
+                    ts0 = timestamps[0]
+                    print "ts0=",ts0," type=",type(ts0)
+                    ts64 = (timestamps*1000000).astype(np.uint64)
+                    tsBinner.tsBinner(ts64, timeHgValues)
+                    frameSum[iRow,iCol] += timestamps.size
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
         populationHg = pfthgv['populationHg']
@@ -337,6 +363,8 @@ class Cosmic:
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = populationHg
         retval['cosmicTimeList'] = cosmicTimeList
+        retval['binContents'] = pfthgv['binContents']
+        retval['frameSum'] = frameSum
         return retval
     @staticmethod
     def populationFromTimeHgValues(timeHgValues,populationMax,stride,threshold):
@@ -356,6 +384,7 @@ class Cosmic:
             populationHg = np.histogram(\
                 timeHgValues, populationMax, range=popRange)
             cosmicTimeList = np.where(timeHgValues > threshold)[0]
+            binContents = np.extract(timeHgValues > threshold, timeHgValues)
         else:
             # rebin the timeHgValues before counting the populations
             length = timeHgValues.size
@@ -366,6 +395,8 @@ class Cosmic:
                 timeHgValuesRebinned0, populationMax, range=popRange)
             cosmicTimeList0 = stride*np.where(\
                 timeHgValuesRebinned0 > threshold)[0]
+            binContents0 = np.extract(timeHgValuesRebinned0 > threshold,
+                                      timeHgValuesRebinned0)
 
             timeHgValuesRebinned1 = np.reshape(
                 timeHgValues[stride/2:-stride/2], 
@@ -374,12 +405,53 @@ class Cosmic:
                 timeHgValuesRebinned1, populationMax, range=popRange)
             cosmicTimeList1 = (stride/2)+stride*np.where(\
                 timeHgValuesRebinned1 > threshold)[0]
+            binContents1 = np.extract(timeHgValuesRebinned1 > threshold,
+                                      timeHgValuesRebinned1)
 
             populationHg = (populationHg0[0]+populationHg1[0],\
                                 populationHg0[1])
             cosmicTimeList = np.concatenate((cosmicTimeList0,cosmicTimeList1))
+            binContents = np.concatenate((binContents0, binContents1))
+            args = np.argsort(cosmicTimeList)
+            cosmicTimeList = cosmicTimeList[args]
+            binContents = binContents[args]
+            cosmicTimeList.sort()
+            
         retval = {}
-        cosmicTimeList.sort()
         retval['populationHg'] = populationHg
         retval['cosmicTimeList'] = cosmicTimeList
+        retval['binContents'] = binContents
         return retval
+    def makeMovies(self,beginTick, endTick, backgroundFrame, accumulate=False):
+        tick0 = np.uint64(beginTick)
+        tick1 = np.uint64(endTick)
+        for iRow in range(cosmic.file.nRow):
+            for iCol in range(cosmic.file.nCol):
+                gtpl = self.getTimedPacketList(iRow,iCol,sec0,1)
+        timestamps = gtpl['timestamps']
+        timestamps *= cosmic.file.ticksPerSec
+        ts64 = timestamps.astype(np.uint64)
+        for ts in ts64:
+            tindex = ts-t0
+            try:
+                listOfPixelsToMark[tindex].append((iRow,iCol))
+            except IndexError:
+                pass
+            for tick in range(t0,t1):
+                frames.append(frameSum)
+                title = makeTitle(tick,t0,t1)
+                titles.append(title)
+
+                mfn0 = "m-%s-%s-%s-%s-%010d-%010d-i.gif"%(run,sundownDate,obsDate,seq,t0,t1)
+                utils.makeMovie(frames, titles, outName=mfn0, delay=0.1, colormap=mpl.cm.gray,
+                                listOfPixelsToMark=listOfPixelsToMark,
+                                pixelMarkColor='red')
+
+        for i in range(len(listOfPixelsToMark)-1):
+            listOfPixelsToMark[i+1].extend(listOfPixelsToMark[i])
+
+        mfn1 = "m-%s-%s-%s-%s-%010d-%010d-a.gif"%(run,sundownDate,obsDate,seq,t0,t1)
+        utils.makeMovie(frames, titles, outName=mfn1, delay=0.1, colormap=mpl.cm.gray,
+                        listOfPixelsToMark=listOfPixelsToMark,
+                        pixelMarkColor='green')
+

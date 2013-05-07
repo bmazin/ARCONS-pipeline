@@ -4,8 +4,15 @@ fluxCal.py
 
 Created by Seth Meeker on 11-21-2012
 
-Opens ARCONS observation of a spread out spectrophotometric standard star and associated wavelength cal file, reads in all photons and converts to energies. Bins photons to generate a spectrum, then divides this into the known spectrum of the object to create a Sensitivity curve.  This curve is then written out to h5 file.
+Opens ARCONS observation of a spread out spectrophotometric standard star and 
+associated wavelength cal file, reads in all photons and converts to energies. 
+Bins photons to generate a spectrum, then divides this into the known spectrum 
+of the object to create a Sensitivity curve.  This curve is then written out to 
+h5 file.
 
+Flags are associated with each pixel - see headers/pipelineFlags
+for descriptions. Note some flags are set here, others are set
+later one when creating photon lists.
 '''
 
 import sys,os
@@ -22,6 +29,8 @@ from scipy.optimize.minpack import curve_fit
 from scipy import interpolate
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
+from headers import pipelineFlags
+
 
 class FluxCal:
     def __init__(self, fluxFileName=None, skyFileName=None, wvlCalFileName=None,flatCalFileName=None, objectName=None, fluxCalFileName=None, plots=False):
@@ -302,13 +311,16 @@ class FluxCal:
         #Calculate FluxCal factors
         self.fluxFactors = self.binnedSpectra/self.subtractedSpectra
 
-        self.fluxFlags = np.zeros(np.shape(self.fluxFactors),dtype='int')
+        #self.fluxFlags = np.zeros(np.shape(self.fluxFactors),dtype='int')
+        self.fluxFlags = np.empty(np.shape(self.fluxFactors),dtype='int')
+        self.fluxFlags.fill(pipelineFlags.fluxCal['good'])   #Initialise flag array filled with 'good' flags. JvE 5/1/2013.
         #set factors that will cause trouble to 1
-        self.fluxFlags[self.fluxFactors == np.inf] = 1
+        #self.fluxFlags[self.fluxFactors == np.inf] = 1
+        self.fluxFlags[self.fluxFactors == np.inf] = pipelineFlags.fluxCal['infWeight']   #Modified to use flag dictionary - JvE 5/1/2013
         self.fluxFactors[self.fluxFactors == np.inf]=1.0
         self.fluxFactors[np.isnan(self.fluxFactors)]=1.0
-        self.fluxFlags[np.isnan(self.fluxFactors)] = 1
-        self.fluxFlags[self.fluxFactors <= 0]=2
+        self.fluxFlags[np.isnan(self.fluxFactors)] = pipelineFlags.fluxCal['nanWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+        self.fluxFlags[self.fluxFactors <= 0]=pipelineFlags.fluxCal['LEzeroWeight']   #Modified to use flag dictionary - JvE 5/1/2013
         self.fluxFactors[self.fluxFactors <= 0]=1.0
 
     def calculateMedian(self, spectra):
