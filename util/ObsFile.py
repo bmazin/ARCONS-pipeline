@@ -53,12 +53,14 @@ import sys, os
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
+from astropy import constants, units
 from headers import ArconsHeaders
 from headers import pipelineFlags
 from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
 import warnings
+
 
 class ObsFile:
     h = 4.135668e-15 #eV s
@@ -1108,7 +1110,7 @@ class ObsFile:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
 
-    def writePhotonList(self, filename=None):
+    def writePhotonList(self, filename=None, firstSec=0, integrationTime=-1):
         """
         writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
         currently cuts out photons outside the valid wavelength ranges from the wavecal
@@ -1122,17 +1124,35 @@ class ObsFile:
                        for photon list. If not supplied, default name/path is determined
                        using original obs. file name and standard directory paths (as per
                        util.FileName). Added 4/29/2013, JvE.
+            firstSec - Start time within the obs. file from which to begin the
+                       photon list (in seconds, from the beginning of the obs. file).
+            integrationTime - Length of exposure time to extract (in sec, starting from
+                       firstSec). -1 to extract to end of obs. file.
         
         """
+        
+        if self.flatCalFile is None: raise RuntimeError, "No flat cal. file loaded"
+        if self.fluxCalFile is None: raise RuntimeError, "No flux cal. file loaded"
+        if self.wvlCalFile is None: raise RuntimeError, "No wavelength cal. file loaded"
+        if self.hotPixFile is None: raise RuntimeError, "No hot pixel file loaded"
+        if self.file is None: raise RuntimeError, "No obs file loaded...?"
         
         plFile = self.createEmptyPhotonListFile(filename)
         #try:
         plTable = plFile.root.photons.photons
-        plFile.copyNode(self.flatCalFile.root, newparent=plFile.root, newname='flatcal', recursive=True)
-        plFile.copyNode(self.fluxCalFile.root, newparent=plFile.root, newname='fluxcal', recursive=True)
-        plFile.copyNode(self.wvlCalFile.root, newparent=plFile.root, newname='wavecal', recursive=True)
-        plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, newname='timemask', recursive=True)
-        plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+                
+        try:
+            plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, newname='flatcal', recursive=True)
+            plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, newname='fluxcal', recursive=True)
+            plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, newname='wavecal', recursive=True)
+            plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, newname='timemask', recursive=True)
+            plFile.copyNode(self.file.root.beammap, newparent=plFile.root, newname='beammap', recursive=True)
+            plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+        except:
+            plFile.flush()
+            plFile.close()
+            raise
+        
         plFile.flush()
 
         fluxWeights = self.fluxWeights      #Flux weights are independent of pixel location.
@@ -1145,9 +1165,8 @@ class ObsFile:
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 flag = self.wvlFlagTable[iRow, iCol]
-                if flag == 0:#only write photons in good pixels
-                    wvlError = self.wvlErrorTable[iRow, iCol]
-                    
+                if flag == 0:#only write photons in good pixels  ***NEED TO UPDATE TO USE DICTIONARY***
+                    energyError = self.wvlErrorTable[iRow, iCol] #Note wvlErrorTable is in eV !! Assume constant across all wavelengths. Not the best approximation, but a start....
                     flatWeights = self.flatWeights[iRow, iCol]
                     #Extend flat weight and flag arrays at beginning and end to include out-of-wavelength-calibration-range photons.
                     flatWeights = np.hstack((flatWeights[0],flatWeights,flatWeights[-1]))
@@ -1169,8 +1188,14 @@ class ObsFile:
                     #wavelengths = self.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
                     #------------------------------------------------------------
 
-                    x = self.getPixelWvlList(iRow,iCol,excludeBad=False,dither=True)
-                    timestamps, wavelengths = x['timestamps'], x['wavelengths']
+                    x = self.getPixelWvlList(iRow,iCol,excludeBad=False,dither=True,firstSec=firstSec,
+                                             integrationTime=integrationTime)
+                    timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
+                    
+                    #Convert errors in eV to errors in Angstroms (see notebook, May 7 2013)
+                    wvlErrors = ((( (energyError*units.eV) * (wavelengths*units.Angstrom)**2 ) /
+                                    (constants.h*constants.c) )
+                                 .to(units.Angstrom).value)
                         
                     #Calculate what wavelength bin each photon falls into to see which flat cal factor should be applied
                     if len(wavelengths) > 0:
@@ -1192,7 +1217,7 @@ class ObsFile:
                         newRow['Ypix'] = iRow
                         newRow['ArrivalTime'] = timestamps[iPhoton]
                         newRow['Wavelength'] = wavelengths[iPhoton]
-                        newRow['WaveError'] = wvlError
+                        newRow['WaveError'] = wvlErrors[iPhoton]
                         newRow['FlatFlag'] = flatFlags[flatBinIndices[iPhoton]]
                         newRow['FlatWeight'] = flatWeights[flatBinIndices[iPhoton]]
                         newRow['FluxFlag'] = fluxFlags[fluxBinIndices[iPhoton]]
@@ -1201,6 +1226,8 @@ class ObsFile:
         #finally:
         plTable.flush()
         plFile.close()
+
+
 
             
 
