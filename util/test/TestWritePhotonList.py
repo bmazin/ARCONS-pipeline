@@ -1,8 +1,15 @@
+'''
+Author: Julian van Eyken    Date: May 7 2013
+
+Test code for photon lists. Under construction....
+'''
 from util.FileName import FileName
 from util.ObsFile import ObsFile
+from util.utils import plotArray
+from photonlist import photlist
+import numpy as np
 
-
-def TestWritePhotonList(outputFilename=None):
+def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     '''
     Test run of obsFile.writePhotonList. fileName can be used
     to specify the output file name. If not specified, default
@@ -28,8 +35,17 @@ def TestWritePhotonList(outputFilename=None):
     obsFile.loadHotPixCalFile(FileName(run=run,date=date,tstamp=tstamp).timeMask())
     
     #And write out the results....
-    obsFile.writePhotonList(outputFilename)
+    obsFile.writePhotonList(outputFileName,firstSec,integrationTime)
     
+    #Read the results back in....
+    #photFile = photList.PhotFile(outputFilename)
+    
+    
+def testGetPhotonListImage(fileName=None):
+    
+    plFile = photlist.PhotList(fileName)
+    image = plFile.getImage()
+    plotArray(image)
     
 
     
