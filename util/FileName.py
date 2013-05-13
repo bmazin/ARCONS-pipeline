@@ -78,6 +78,18 @@ class FileName:
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
 
+    def centroidList(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'centroidListFiles' + os.sep + \
+                self.date + os.sep + \
+                "centroid_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'centroidListFiles' + os.sep + \
+                self.date + os.sep + \
+                "centroid_" + self.tstamp + '.h5'
+
     def fluxSoln(self):
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
@@ -89,6 +101,7 @@ class FileName:
                 'fluxCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.tstamp + '.h5'
+
 
     def flatSoln(self):
         if self.tstamp == '' or self.tstamp == None:
