@@ -6,8 +6,9 @@ Test code for photon lists. Under construction....
 from util.FileName import FileName
 from util.ObsFile import ObsFile
 from util.utils import plotArray
-from photonlist import photlist
 import numpy as np
+from photonlist import photlist
+
 
 def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     '''
@@ -41,13 +42,15 @@ def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     #photFile = photList.PhotFile(outputFilename)
     
     
-def testGetPhotonListImage(fileName=None):
+def testGetPhotonListImage(fileName=None,firstSec=0,integrationTime=-1):
     
     plFile = photlist.PhotList(fileName)
-    image = plFile.getImage()
+    try:
+        image = plFile.getImage(firstSec=firstSec,integrationTime=integrationTime)
+    finally:
+        #plFile.close()
+        del plFile
     plotArray(image)
-    
-
     
 if __name__ == "__main__":
     

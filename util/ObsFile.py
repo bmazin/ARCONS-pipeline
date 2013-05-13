@@ -50,16 +50,17 @@ repackArray(array, slices)
 '''
 
 import sys, os
+import warnings
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy import constants, units
-from headers import ArconsHeaders
-from headers import pipelineFlags
+#from astropy import constants, units
+#from headers import ArconsHeaders
+#from headers import pipelineFlags
 from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
-import warnings
+import photonlist.photlist
 
 
 class ObsFile:
@@ -264,38 +265,50 @@ class ObsFile:
 #                wavelengths = wavelengths[flags==1]
 
         return wavelengths
+    
+    
+    def createEmptyPhotonListFile(self,*nkwargs,**kwargs):
+        """
+        creates a photonList h5 file using header in headers.ArconsHeaders
+        Shifted functionality to photonlist/photlist.py, JvE May 10 2013.
+        See that function for input parameters and outputs.
+        """
+        photonlist.photlist.createEmptyPhotonListFile(self,*nkwargs,**kwargs)
 
-    def createEmptyPhotonListFile(self,fileName=None):
-        """
-        creates a photonList h5 file 
-        using header in headers.ArconsHeaders
-        
-        INPUTS:
-            fileName - string, name of file to write to. If not supplied, default is used
-                       based on name of original obs. file and standard directories etc.
-                       (see usil.FileName). Added 4/29/2013, JvE
-        """
-        
-        if fileName is None:    
-            fileTimestamp = self.fileName.split('_')[1].split('.')[0]
-            fileDate = os.path.basename(os.path.dirname(self.fullFileName))
-            run = os.path.basename(os.path.dirname(os.path.dirname(self.fullFileName)))
-            fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
-            fullPhotonListFileName = fn.photonList()
-        else:
-            fullPhotonListFileName = fileName
-        if (os.path.exists(fullPhotonListFileName)):
-            if utils.confirm('Photon list file  %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
-                exit(0)
-        zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
-        try:
-            plFile = tables.openFile(fullPhotonListFileName, mode='w')
-            plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
-            plTable = plFile.createTable(plGroup, 'photons', ArconsHeaders.PhotonList, 'Photon List Data', filters=zlibFilter)
-        except:
-            plFile.close()
-            raise
-        return plFile
+
+#    def createEmptyPhotonListFile(self,fileName=None):
+#        """
+#        creates a photonList h5 file 
+#        using header in headers.ArconsHeaders
+#        
+#        INPUTS:
+#            fileName - string, name of file to write to. If not supplied, default is used
+#                       based on name of original obs. file and standard directories etc.
+#                       (see usil.FileName). Added 4/29/2013, JvE
+#        """
+#        
+#        if fileName is None:    
+#            fileTimestamp = self.fileName.split('_')[1].split('.')[0]
+#            fileDate = os.path.basename(os.path.dirname(self.fullFileName))
+#            run = os.path.basename(os.path.dirname(os.path.dirname(self.fullFileName)))
+#            fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
+#            fullPhotonListFileName = fn.photonList()
+#        else:
+#            fullPhotonListFileName = fileName
+#        if (os.path.exists(fullPhotonListFileName)):
+#            if utils.confirm('Photon list file  %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
+#                exit(0)
+#        zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
+#        try:
+#            plFile = tables.openFile(fullPhotonListFileName, mode='w')
+#            plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
+#            plTable = plFile.createTable(plGroup, 'photons', ArconsHeaders.PhotonList, 'Photon List Data', 
+#                                         filters=zlibFilter, 
+#                                         expectedrows=300000)  #Temporary fudge to see if it helps!
+#        except:
+#            plFile.close()
+#            raise
+#        return plFile
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
@@ -1110,123 +1123,130 @@ class ObsFile:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
 
-    def writePhotonList(self, filename=None, firstSec=0, integrationTime=-1):
+    def writePhotonList(self,*nkwargs,**kwargs): #filename=None, firstSec=0, integrationTime=-1):                       
         """
-        writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
-        currently cuts out photons outside the valid wavelength ranges from the wavecal
-       
-        Currently being updated... JvE 4/26/2013.
-        This version should automatically reject time-masked photons assuming a hot pixel mask is
-        loaded and 'switched on'.
+        Write out the photon list for this obs file.
+        See photonlist/photlist.py for input parameters and outputs.
+        Shifted over to photonlist/, May 10 2013, JvE. All under construction at the moment.
+        """        
+        photonlist.photlist.writePhotonList(self,*nkwargs,**kwargs)
         
-        INPUTS:
-            filename - string, optionally use to specify non-default output file name
-                       for photon list. If not supplied, default name/path is determined
-                       using original obs. file name and standard directory paths (as per
-                       util.FileName). Added 4/29/2013, JvE.
-            firstSec - Start time within the obs. file from which to begin the
-                       photon list (in seconds, from the beginning of the obs. file).
-            integrationTime - Length of exposure time to extract (in sec, starting from
-                       firstSec). -1 to extract to end of obs. file.
         
-        """
-        
-        if self.flatCalFile is None: raise RuntimeError, "No flat cal. file loaded"
-        if self.fluxCalFile is None: raise RuntimeError, "No flux cal. file loaded"
-        if self.wvlCalFile is None: raise RuntimeError, "No wavelength cal. file loaded"
-        if self.hotPixFile is None: raise RuntimeError, "No hot pixel file loaded"
-        if self.file is None: raise RuntimeError, "No obs file loaded...?"
-        
-        plFile = self.createEmptyPhotonListFile(filename)
-        #try:
-        plTable = plFile.root.photons.photons
-                
-        try:
-            plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, newname='flatcal', recursive=True)
-            plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, newname='fluxcal', recursive=True)
-            plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, newname='wavecal', recursive=True)
-            plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, newname='timemask', recursive=True)
-            plFile.copyNode(self.file.root.beammap, newparent=plFile.root, newname='beammap', recursive=True)
-            plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
-        except:
-            plFile.flush()
-            plFile.close()
-            raise
-        
-        plFile.flush()
-
-        fluxWeights = self.fluxWeights      #Flux weights are independent of pixel location.
-        #Extend flux weight/flag arrays as for flat weight/flags.
-        fluxWeights = np.hstack((fluxWeights[0],fluxWeights,fluxWeights[-1]))
-        fluxFlags = np.hstack((pipelineFlags.fluxCal['belowWaveCalRange'], 
-                               self.fluxFlags, 
-                               pipelineFlags.fluxCal['aboveWaveCalRange']))
-
-        for iRow in xrange(self.nRow):
-            for iCol in xrange(self.nCol):
-                flag = self.wvlFlagTable[iRow, iCol]
-                if flag == 0:#only write photons in good pixels  ***NEED TO UPDATE TO USE DICTIONARY***
-                    energyError = self.wvlErrorTable[iRow, iCol] #Note wvlErrorTable is in eV !! Assume constant across all wavelengths. Not the best approximation, but a start....
-                    flatWeights = self.flatWeights[iRow, iCol]
-                    #Extend flat weight and flag arrays at beginning and end to include out-of-wavelength-calibration-range photons.
-                    flatWeights = np.hstack((flatWeights[0],flatWeights,flatWeights[-1]))
-                    flatFlags = np.hstack((pipelineFlags.flatCal['belowWaveCalRange'],
-                                           self.flatFlags[iRow, iCol],
-                                           pipelineFlags.flatCal['aboveWaveCalRange']))
-                    
-                    
-                    #wvlRange = self.wvlRangeTable[iRow, iCol]
-
-                    #---------- Replace with call to getPixelWvlList -----------
-                    #go through the list of seconds in a pixel dataset
-                    #for iSec, secData in enumerate(self.getPixel(iRow, iCol)):
-                        
-                    #timestamps, parabolaPeaks, baselines = self.parsePhotonPackets(secData)
-                    #timestamps = iSec + self.tickDuration * timestamps
-                 
-                    #pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
-                    #wavelengths = self.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
-                    #------------------------------------------------------------
-
-                    x = self.getPixelWvlList(iRow,iCol,excludeBad=False,dither=True,firstSec=firstSec,
-                                             integrationTime=integrationTime)
-                    timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
-                    
-                    #Convert errors in eV to errors in Angstroms (see notebook, May 7 2013)
-                    wvlErrors = ((( (energyError*units.eV) * (wavelengths*units.Angstrom)**2 ) /
-                                    (constants.h*constants.c) )
-                                 .to(units.Angstrom).value)
-                        
-                    #Calculate what wavelength bin each photon falls into to see which flat cal factor should be applied
-                    if len(wavelengths) > 0:
-                        flatBinIndices = np.digitize(wavelengths, self.flatCalWvlBins)      #- 1 - 
-                    else:
-                        flatBinIndices = np.array([])
-
-                    #Calculate which wavelength bin each photon falls into for the flux cal weight factors.
-                    if len(wavelengths) > 0:
-                        fluxBinIndices = np.digitize(wavelengths, self.fluxCalWvlBins)
-                    else:
-                        fluxBinIndices = np.array([])
-
-                    for iPhoton in xrange(len(timestamps)):
-                        #if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
-                        #create a new row for the photon list
-                        newRow = plTable.row
-                        newRow['Xpix'] = iCol
-                        newRow['Ypix'] = iRow
-                        newRow['ArrivalTime'] = timestamps[iPhoton]
-                        newRow['Wavelength'] = wavelengths[iPhoton]
-                        newRow['WaveError'] = wvlErrors[iPhoton]
-                        newRow['FlatFlag'] = flatFlags[flatBinIndices[iPhoton]]
-                        newRow['FlatWeight'] = flatWeights[flatBinIndices[iPhoton]]
-                        newRow['FluxFlag'] = fluxFlags[fluxBinIndices[iPhoton]]
-                        newRow['FluxWeight'] = fluxWeights[fluxBinIndices[iPhoton]]
-                        newRow.append()
-        #finally:
-        plTable.flush()
-        plFile.close()
-
+#        writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+#        currently cuts out photons outside the valid wavelength ranges from the wavecal
+#       
+#        Currently being updated... JvE 4/26/2013.
+#        This version should automatically reject time-masked photons assuming a hot pixel mask is
+#        loaded and 'switched on'.
+#        
+#        INPUTS:
+#            filename - string, optionally use to specify non-default output file name
+#                       for photon list. If not supplied, default name/path is determined
+#                       using original obs. file name and standard directory paths (as per
+#                       util.FileName). Added 4/29/2013, JvE.
+#            firstSec - Start time within the obs. file from which to begin the
+#                       photon list (in seconds, from the beginning of the obs. file).
+#            integrationTime - Length of exposure time to extract (in sec, starting from
+#                       firstSec). -1 to extract to end of obs. file.
+#        
+#        """
+#        
+#        if self.flatCalFile is None: raise RuntimeError, "No flat cal. file loaded"
+#        if self.fluxCalFile is None: raise RuntimeError, "No flux cal. file loaded"
+#        if self.wvlCalFile is None: raise RuntimeError, "No wavelength cal. file loaded"
+#        if self.hotPixFile is None: raise RuntimeError, "No hot pixel file loaded"
+#        if self.file is None: raise RuntimeError, "No obs file loaded...?"
+#        
+#        plFile = self.createEmptyPhotonListFile(filename)
+#        #try:
+#        plTable = plFile.root.photons.photons
+#                
+#        try:
+#            plFile.copyNode(self.flatCalFile.root.flatcal, newparent=plFile.root, newname='flatcal', recursive=True)
+#            plFile.copyNode(self.fluxCalFile.root.fluxcal, newparent=plFile.root, newname='fluxcal', recursive=True)
+#            plFile.copyNode(self.wvlCalFile.root.wavecal, newparent=plFile.root, newname='wavecal', recursive=True)
+#            plFile.copyNode(self.hotPixFile.root, newparent=plFile.root, newname='timemask', recursive=True)
+#            plFile.copyNode(self.file.root.beammap, newparent=plFile.root, newname='beammap', recursive=True)
+#            plFile.copyNode(self.file.root.header, newparent=plFile.root, recursive=True)
+#        except:
+#            plFile.flush()
+#            plFile.close()
+#            raise
+#        
+#        plFile.flush()
+#
+#        fluxWeights = self.fluxWeights      #Flux weights are independent of pixel location.
+#        #Extend flux weight/flag arrays as for flat weight/flags.
+#        fluxWeights = np.hstack((fluxWeights[0],fluxWeights,fluxWeights[-1]))
+#        fluxFlags = np.hstack((pipelineFlags.fluxCal['belowWaveCalRange'], 
+#                               self.fluxFlags, 
+#                               pipelineFlags.fluxCal['aboveWaveCalRange']))
+#
+#        for iRow in xrange(self.nRow):
+#            for iCol in xrange(self.nCol):
+#                flag = self.wvlFlagTable[iRow, iCol]
+#                if flag == 0:#only write photons in good pixels  ***NEED TO UPDATE TO USE DICTIONARY***
+#                    energyError = self.wvlErrorTable[iRow, iCol] #Note wvlErrorTable is in eV !! Assume constant across all wavelengths. Not the best approximation, but a start....
+#                    flatWeights = self.flatWeights[iRow, iCol]
+#                    #Extend flat weight and flag arrays at beginning and end to include out-of-wavelength-calibration-range photons.
+#                    flatWeights = np.hstack((flatWeights[0],flatWeights,flatWeights[-1]))
+#                    flatFlags = np.hstack((pipelineFlags.flatCal['belowWaveCalRange'],
+#                                           self.flatFlags[iRow, iCol],
+#                                           pipelineFlags.flatCal['aboveWaveCalRange']))
+#                    
+#                    
+#                    #wvlRange = self.wvlRangeTable[iRow, iCol]
+#
+#                    #---------- Replace with call to getPixelWvlList -----------
+#                    #go through the list of seconds in a pixel dataset
+#                    #for iSec, secData in enumerate(self.getPixel(iRow, iCol)):
+#                        
+#                    #timestamps, parabolaPeaks, baselines = self.parsePhotonPackets(secData)
+#                    #timestamps = iSec + self.tickDuration * timestamps
+#                 
+#                    #pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
+#                    #wavelengths = self.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
+#                    #------------------------------------------------------------
+#
+#                    x = self.getPixelWvlList(iRow,iCol,excludeBad=False,dither=True,firstSec=firstSec,
+#                                             integrationTime=integrationTime)
+#                    timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
+#                    
+#                    #Convert errors in eV to errors in Angstroms (see notebook, May 7 2013)
+#                    wvlErrors = ((( (energyError*units.eV) * (wavelengths*units.Angstrom)**2 ) /
+#                                    (constants.h*constants.c) )
+#                                 .to(units.Angstrom).value)
+#                        
+#                    #Calculate what wavelength bin each photon falls into to see which flat cal factor should be applied
+#                    if len(wavelengths) > 0:
+#                        flatBinIndices = np.digitize(wavelengths, self.flatCalWvlBins)      #- 1 - 
+#                    else:
+#                        flatBinIndices = np.array([])
+#
+#                    #Calculate which wavelength bin each photon falls into for the flux cal weight factors.
+#                    if len(wavelengths) > 0:
+#                        fluxBinIndices = np.digitize(wavelengths, self.fluxCalWvlBins)
+#                    else:
+#                        fluxBinIndices = np.array([])
+#
+#                    for iPhoton in xrange(len(timestamps)):
+#                        #if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
+#                        #create a new row for the photon list
+#                        newRow = plTable.row
+#                        newRow['Xpix'] = iCol
+#                        newRow['Ypix'] = iRow
+#                        newRow['ArrivalTime'] = timestamps[iPhoton]
+#                        newRow['Wavelength'] = wavelengths[iPhoton]
+#                        newRow['WaveError'] = wvlErrors[iPhoton]
+#                        newRow['FlatFlag'] = flatFlags[flatBinIndices[iPhoton]]
+#                        newRow['FlatWeight'] = flatWeights[flatBinIndices[iPhoton]]
+#                        newRow['FluxFlag'] = fluxFlags[fluxBinIndices[iPhoton]]
+#                        newRow['FluxWeight'] = fluxWeights[fluxBinIndices[iPhoton]]
+#                        newRow.append()
+#        #finally:
+#        plTable.flush()
+#        plFile.close()
+#
 
 
             

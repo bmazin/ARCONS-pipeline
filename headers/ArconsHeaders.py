@@ -27,6 +27,7 @@ class PhotonList(IsDescription):
     """
     Xpix = UInt8Col(dflt=255)                  # Xpixel the photon was recorded in, with the bottom left pixel being (0,0). Default value is an obviously bad value, since the detector is a lot smaller than 255 pixels.
     Ypix = UInt8Col(dflt=255)                  # Ypixel the photon was recorded in, with the bottom left pixel being (0,0)
+    XYpix = UInt16Col(dflt=65535)              # Packing of X and Y pixel into a single value for the purposes of query efficiency.
     RA = Float32Col(dflt=np.nan)               # Offset in arcseconds in RA from the observation center
     RAErr = Float32Col(dflt=np.nan)            # Error in RA
     Dec = Float32Col(dflt=np.nan)              # Offset in arcseconds in Dec from the observation center
