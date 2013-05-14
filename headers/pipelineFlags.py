@@ -27,3 +27,4 @@ fluxCal = {
            'undefined':20,          #Flagged, but reason is undefined.
            'undetermined':99        #Flag status is undetermined.
            }
+

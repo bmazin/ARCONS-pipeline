@@ -46,7 +46,7 @@ def testGetPhotonListImage(fileName=None,firstSec=0,integrationTime=-1):
     
     plFile = photlist.PhotList(fileName)
     try:
-        image = plFile.getImage(firstSec=firstSec,integrationTime=integrationTime)
+        image = plFile.getImageDet(firstSec=firstSec,integrationTime=integrationTime)
     finally:
         #plFile.close()
         del plFile

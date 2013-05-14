@@ -14,7 +14,7 @@ from util import utils
 xyPackMult = 100  #Multiplier factor for turning row,col coordinate pairs into single integers for storage in HDF file (see xyPack).
 
 
-class PhotList:
+class PhotList(object):
     '''
     Class to hold a fully calibrated photon list. Beginnings of a full
     library of operations similar to the ObsFile class.
@@ -100,10 +100,11 @@ class PhotList:
         pass
     
     
-    def getImage(self,firstSec=-np.Inf,integrationTime=-1,wvlMin=-np.Inf,
+    def getImageDet(self,firstSec=-np.Inf,integrationTime=-1,wvlMin=-np.Inf,
                  wvlMax=np.Inf):
         '''
-        Return a 2D image consisting of photon counts in each pixel.
+        Return a 2D image consisting of photon counts in each pixel, in the detector pixel
+        coordinate frame.
         '''
         if integrationTime==-1:
             lastSec=np.Inf
@@ -115,9 +116,9 @@ class PhotList:
         image.fill(np.NaN)
         
         #Step through pixels and fill em up.
-        for iCol in range(self.nCol):    #self.nCol):
-            print iCol
-            for iRow in range(self.nRow):
+        for iRow in range(self.nRow):    #self.nCol):
+            print 'Reading pixel row ', iRow
+            for iCol in range(self.nCol):
                 rowcol = xyPack(iRow,iCol)
                 #image[iRow,iCol] = len(self.photTable.getWhereList('(Xpix == iCol) & (Ypix == iRow) & (ArrivalTime >= firstSec) & (ArrivalTime < lastSec)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))
                 #image[iRow,iCol] = len(self.photTable.getWhereList(('XYpix==rowcol'))) # & (self.photTable.cols.Ypix == iRow) & (self.photTable.cols.ArrivalTime >= firstSec)
@@ -135,7 +136,13 @@ class PhotList:
         #That should be it....
         return image
 
-
+    def getImageSky(self,firstSec=-np.Inf,integrationTime=-1,wvlMin=-np.Inf,wvlMax=np.Inf):
+        '''
+        Get a 2D image in the sky frame - i.e, in RA, dec coordinate space, derotated and stacked
+        if necessary.
+        '''
+        
+        
 def createEmptyPhotonListFile(obsFile,fileName=None):
      """
      creates a photonList h5 file 
