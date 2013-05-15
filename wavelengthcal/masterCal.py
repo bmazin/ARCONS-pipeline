@@ -41,8 +41,8 @@ run = 'PAL2012'
 ## At present, picking which cal files to use based on the array plots for the wavecal solutions from that night.
 
 ## For Dec. 7, 2012.
-#calTimestamps = ['20121208-023522', '20121208-024054', '20121208-031248', '20121208-031719', '20121208-043620', '20121208-063741', '20121208-070505', '20121208-101613', '20121208-112506', '20121208-132558']
-#sunsetDates = ['20121207','20121207','20121207','20121207','20121207','20121207','20121207','20121207','20121207','20121207']
+calTimestamps = ['20121208-023522', '20121208-024054', '20121208-031248', '20121208-031719', '20121208-043620', '20121208-063741', '20121208-070505', '20121208-101613', '20121208-112506', '20121208-132558']
+sunsetDates = ['20121207','20121207','20121207','20121207','20121207','20121207','20121207','20121207','20121207','20121207']
 
 ## For Dec. 8, 2012.
 #calTimestamps = ['20121209-133419', '20121209-021609', '20121209-042051', '20121209-043937', '20121209-060704', '20121209-062404', '20121209-111730', '20121209-115205', '20121209-131132', '20121211-020441']
@@ -53,8 +53,8 @@ run = 'PAL2012'
 #sunsetDates = ['20121210','20121210','20121210','20121210','20121210','20121210','20121210','20121210','20121210']
 
 ## For Dec. 11, 2012.
-calTimestamps = ['20121212-023031', '20121212-032455', '20121212-063518', '20121212-065247', '20121212-073251', '20121212-091828', '20121212-102334', '20121212-105050', '20121212-111847']
-sunsetDates = ['20121211','20121211','20121211','20121211','20121211','20121211','20121211','20121211','20121211']
+#calTimestamps = ['20121212-023031', '20121212-032455', '20121212-063518', '20121212-065247', '20121212-073251', '20121212-091828', '20121212-102334', '20121212-105050', '20121212-111847']
+#sunsetDates = ['20121211','20121211','20121211','20121211','20121211','20121211','20121211','20121211','20121211']
 
 
 
@@ -70,6 +70,7 @@ wvlRangeTable = np.zeros([46, 44, 2])
 flagplot = np.zeros([46, 44])
 
 counter = 0
+n_pix = 0
 for file1 in wvlCalFiles:
         
     print file1
@@ -143,10 +144,11 @@ for i in range(46):
 
         if wvlFlagTable[i][j] == 0:
             flagplot[i][j] = 1
+            n_pix += 1
 
 caltable.flush()
 h5out.close()
 
-plotArray(flagplot, showMe=False, plotFileName='/Scratch/waveCalSolnFiles/'+sunsetDates[0]+'/figs/flags_combined_Dec'+sunsetDates[0][6:8]+'2012.png')
+plotArray(flagplot, showMe=False, plotFileName='/Scratch/waveCalSolnFiles/'+sunsetDates[0]+'/figs/flags_combined_Dec'+sunsetDates[0][6:8]+'2012.png', plotTitle=str(n_pix)+' pixels')
 plotArray(wvlErrorTable, showMe=False, cbar=True, plotFileName='/Scratch/waveCalSolnFiles/'+sunsetDates[0]+'/figs/combined_Dec'+sunsetDates[0][6:8]+'2012_arrayPlot.png',
                   plotTitle='Energy Resolution at 400nm')
