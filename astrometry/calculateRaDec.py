@@ -20,7 +20,8 @@ class calculateRaDec:
     radiansToDegrees = 180.0/np.pi
     platescale=0.44 # arcsec/pixel
 
-    def __init__(self,centroidListFileName,timestamp,xPhotonPixel,yPhotonPixel):
+    def __init__(self,centroidListFileName):
+        #timestamp,xPhotonPixel,yPhotonPixel
         # Check centroidListFileName
         if os.path.isabs(centroidListFileName) == True:
             fullCentroidListFileName = centroidListFileName
@@ -45,9 +46,25 @@ class calculateRaDec:
         self.yCentroids = np.array(self.centroidListFile.root.centroidlist.yPositions.read())
         self.centroidFlags = np.array(self.centroidListFile.root.centroidlist.flags.read())
         self.centroidListFile.close()
-
-        # Calculate total number of frames, time step durations, and bin a given timestamp.
         self.frames=len(self.times)
+
+
+        # Set origin to center of rotation. Calculate x and y centroid position in this new coordinate system.
+        self.xCentroidOffset = self.xCentroids - self.xCenterOfRotation
+        self.yCentroidOffset = self.yCentroids - self.yCenterOfRotation 
+
+        # Calculate rotation matrix for each frame
+        self.rotationMatrix = np.zeros(((self.frames,2,2)))
+        self.xCentroidRotated = np.zeros(self.frames)
+        self.yCentroidRotated = np.zeros(self.frames)
+        for iFrame in range(self.frames):
+            self.rotationMatrix[iFrame][0][0] = self.rotationMatrix[iFrame][1][1] = np.cos(self.hourAngles[iFrame])
+            self.rotationMatrix[iFrame][0][1] = -np.sin(self.hourAngles[iFrame])
+            self.rotationMatrix[iFrame][1][0] = -self.rotationMatrix[iFrame][0][1]
+            self.xCentroidRotated[iFrame] = self.xCentroidOffset[iFrame]*self.rotationMatrix[iFrame][0][0] + self.yCentroidOffset[iFrame]*self.rotationMatrix[iFrame][0][1]
+            self.yCentroidRotated[iFrame] = self.xCentroidOffset[iFrame]*self.rotationMatrix[iFrame][1][0] + self.yCentroidOffset[iFrame]*self.rotationMatrix[iFrame][1][1]
+      
+    def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
         self.deltaTime = self.times[1]-self.times[0]
         self.binNumber = int(timestamp/self.deltaTime)
 
@@ -55,26 +72,14 @@ class calculateRaDec:
         self.xPhotonOffset = xPhotonPixel - self.xCenterOfRotation
         self.yPhotonOffset = yPhotonPixel - self.yCenterOfRotation
 
-        # Calculate x and y centroid position in same new coordinate system.
-        self.xCentroidOffset = self.xCentroids[self.binNumber] - self.xCenterOfRotation
-        self.yCentroidOffset = self.yCentroids[self.binNumber] - self.yCenterOfRotation
-
-        # Calculate rotation matrix
-        self.rotationMatrix = np.zeros((2,2))
-        self.rotationMatrix[0][0] = self.rotationMatrix[1][1] = np.cos(self.hourAngles[self.binNumber])
-        self.rotationMatrix[0][1] = -np.sin(self.hourAngles[self.binNumber])
-        self.rotationMatrix[1][0] = -self.rotationMatrix[0][1]
-
         # Rotate by the hour angle at the origin.  This will lead to DEC = y and RA = -x?
-        self.xPhotonRotated = self.xPhotonOffset*self.rotationMatrix[0][0] + self.yPhotonOffset*self.rotationMatrix[0][1]
-        self.yPhotonRotated = self.xPhotonOffset*self.rotationMatrix[1][0] + self.yPhotonOffset*self.rotationMatrix[1][1]
-        self.xCentroidRotated = self.xCentroidOffset*self.rotationMatrix[0][0] + self.yCentroidOffset*self.rotationMatrix[0][1]
-        self.yCentroidRotated = self.xCentroidOffset*self.rotationMatrix[1][0] + self.yCentroidOffset*self.rotationMatrix[1][1]
+        self.xPhotonRotated = self.xPhotonOffset*self.rotationMatrix[self.binNumber][0][0] + self.yPhotonOffset*self.rotationMatrix[self.binNumber][0][1]
+        self.yPhotonRotated = self.xPhotonOffset*self.rotationMatrix[self.binNumber][1][0] + self.yPhotonOffset*self.rotationMatrix[self.binNumber][1][1]
 
         # Use the centroid as the zero point for ra and dec offsets
-        self.declinationOffset = calculateRaDec.platescale*(self.yPhotonRotated - self.yCentroidRotated)
-        self.rightAscensionOffset = -calculateRaDec.platescale*(self.xPhotonRotated - self.xCentroidRotated)
-        
+        self.declinationOffset = calculateRaDec.platescale*(self.yPhotonRotated - self.yCentroidRotated[self.binNumber])
+        self.rightAscensionOffset = -calculateRaDec.platescale*(self.xPhotonRotated - self.xCentroidRotated[self.binNumber])
+
         # Convert centroid positions in DD:MM:SS.S and HH:MM:SS.S format to radians.
         self.centroidDeclinationRadians = ephem.degrees(self.centroidDeclination).real
         self.centroidRightAscensionRadians = ephem.hours(self.centroidRightAscension).real        
@@ -97,22 +102,31 @@ class calculateRaDec:
         print 'Centroid RA: ' + self.centroidRightAscension + ', Centroid DEC: ' + self.centroidDeclination
         print 'Photon RA: ' + str(self.photonRightAscension) + ', Photon DEC: ' + str(self.photonDeclination)
 
-        # Return the right ascension and declination, in radians
-    def getRaDec(self):
-        return self.photonDeclinationRadians, self.photonRightAscensionRadians
+        # Return the right ascension and declination, in radians        
+        return self.photonDeclinationRadians, self.photonRightAscensionRadians    
 
-# Test Script, will eventually want to load this data with a params file
-run = 'PAL2012'
-sunsetDate='20121208'
-utcDate='20121209'
-centroidTimestamp = '20121209-120530'
-calTimestamp = '20121209-131132'
-centroidListFileName=FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).centroidList()
 
-# Test photon
-xPhotonPixel=25.0
-yPhotonPixel=25.0
-timestamp = 12.35223
 
-print calculateRaDec(centroidListFileName,timestamp,xPhotonPixel,yPhotonPixel).getRaDec()
+
+
+        
+
+    
+
+
+if __name__ == "__main__":
+    run = 'PAL2012'
+    sunsetDate='20121208'
+    utcDate='20121209'
+    centroidTimestamp = '20121209-120530'
+    calTimestamp = '20121209-131132'
+    centroidListFileName=FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).centroidList()
+
+    # Test photon
+    xPhotonPixel=25.0
+    yPhotonPixel=25.0
+    timestamp = 12.35223
+
+    raDecObject = calculateRaDec(centroidListFileName)
+    print raDecObject.getRaDec(timestamp=timestamp,xPhotonPixel=xPhotonPixel,yPhotonPixel=yPhotonPixel)
 
