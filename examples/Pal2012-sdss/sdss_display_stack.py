@@ -37,11 +37,9 @@ gifFileName = param['gifFileName']
 
 timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utcDates,seqs)]
 
-wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
+#wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 
-##wvlCalFilenames[0] = '/Scratch/waveCalSolnFiles/20121210/calsol_20121211-074031.h5'
-##wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
-##flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(['20121210','20121210'],['20121211-074031','20121211-074031'])]
+wvlCalFilenames = ['/Scratch/waveCalSolnFiles/%s/wvlCalFiles_combined_Dec%s2012.h5'%(sunsetDate,sunsetDate[6:]) for sunsetDate in sunsetDates]
 
 flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 
@@ -87,17 +85,17 @@ for iSeq in range(len(seqs)):
 	bad_count=0;
 	for y in range(46):
 	    for x in range(44):
-		if (ob.wvlRangeTable[y][x][1] < 11000):
+		if (ob.wvlRangeTable[y][x][1] < wvlUpperCutoff) or (ob.wvlRangeTable[y][x][0] > wvlLowerCutoff):
 		    bad_solution_mask[y][x] = 1
-		    bad_count = bad_count+1
 
-        startJD = ob.getFromHeader('jd')
+        unix = ob.getFromHeader('unixtime')
+        startJD = unix/86400.+2440587.5
         nSecInFile = ob.getFromHeader('exptime')
 	#tic = time()
         deadMask = ob.getDeadPixels()
 	#print 'Dead mask load time = ', time()-tic
         for sec in range(0,nSecInFile,integrationTime):
-            jd = startJD + sec/(24.*3600.)#add seconds offset to julian date
+            jd = startJD + sec/(24.*3600.) + integrationTime/2./(24.*3600.)#add seconds offset to julian date, move jd to center of bin
             print count,jd
             count+=1
             times.append(jd)
@@ -107,6 +105,7 @@ for iSeq in range(len(seqs)):
             showFrame = np.array(frame)
             showframes.append(showFrame)
             frame[deadMask == 0] = np.nan
+            frame[bad_solution_mask == 1] = np.nan
             frames.append(frame)
           
 cube = np.dstack(frames)
