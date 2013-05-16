@@ -8,8 +8,9 @@ from scipy import pi,sqrt,exp
 #WDp0=(1100,b0,np.average(data),(np.min(data)-np.max(data))/2.,1)
 
 #[npzDataFile,Int,BMJDfile,fitwidth,RatioBelow,RatioAbove,EclipseNum, cutoffmin,cutoffmax,b0,peakCutOffmin,peakCutOffmax,fit?]
+#BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
 BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
-BDec8txtBjd = RDec8txtBjd = IDec8txtBjd = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3MJD_TDB.txt'
+Dec8txtBjd = BDec8txtBjd = RDec8txtBjd = IDec8txtBjd = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3MJD_TDB.txt'
 BDec8Eclipse1 = [BDec8npzData,3,BDec8txtBjd,23,1/5.,4/5.,1,0,300,0,0,300,True]
 BDec8Eclipse2 = [BDec8npzData,3,BDec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,200,True] 
 BDec8Eclipse3 = [BDec8npzData,3,BDec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,0,300,True]
@@ -24,7 +25,7 @@ BDec10Eclipse3 = [BDec10npzData,10,BDec10txtBjd,7,1/3.,2/3.,3,820,910,.3,0,90,Tr
 BDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfBlueInt10.npz'
 BDec11txtBjd = RDec11txtBjd = IDec11txtBjd = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfBlueInt10MJD_TDB.txt'
 BDec11Eclipse0 = [BDec11npzData,10,BDec11txtBjd,6,0.,1/4.,0,0,90,5.5,0,40,True] 
-BDec11Eclipse1 = [BDec11npzData,10,BDec11txtBjd,7,2/5.,3/5.,1,130,220,.5,0,90,True]
+BDec11Eclipse1 = [BDec11npzData,10,BDec11txtBjd,7,3/7.,3/5.,1,130,220,.5,0,90,True]
 BDec11Eclipse2 = [BDec11npzData,10,BDec11txtBjd,7,1/3.,2/3.,2,300,390,.5,0,90,True]
 BDec11Eclipse3 = [BDec11npzData,10,BDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,0,90,True]
 BDec11Eclipse4 = [BDec11npzData,10,BDec11txtBjd,6,2/5.,3/5.,4,640,730,.7,40,90,True]
@@ -38,43 +39,58 @@ RDec8Eclipse3 = [RDec8npzData,3,RDec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,0,300,Tr
 RDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfRedInt10.npz'
 #RDec10txtBjd = '/Scratch/dataProcessing/SDSS_J0926/OlderData/Dec10fitpsfBlueInt10MJD-TDB.txt'
 RDec10Eclipse1 = [RDec10npzData,10,RDec10txtBjd,7,1/4.,3/4.,1,490,580,.5,40,70,True]
-RDec10Eclipse2 = [RDec10npzData,10,RDec10txtBjd,7,1/3.,2/3.,2,650,740,-.5,25,80,False]
+RDec10Eclipse2 = [RDec10npzData,10,RDec10txtBjd,7,3/8.,2/3.,2,650,740,-.5,25,80,False]
 RDec10Eclipse3 = [RDec10npzData,10,RDec10txtBjd,7,2/5.,2/3.,3,820,910,.3,0,90,True]
 
 RDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfRedInt10.npz'
 #RDec11txtBjd = '/Scratch/dataProcessing/SDSS_J0926/OlderData/Dec11fitpsfBlueInt10MJD-TDB.txt'
 RDec11Eclipse0 = [RDec11npzData,10,RDec11txtBjd,6,0.,1/3.,0,0,90,5.5,0,40,True] 
-RDec11Eclipse1 = [RDec11npzData,10,RDec11txtBjd,7,2/5.,3/5.,1,130,220,.5,0,90,False]
+RDec11Eclipse1 = [RDec11npzData,10,RDec11txtBjd,7,2/5.,3/5.,1,130,220,.5,0,90,True]
 RDec11Eclipse2 = [RDec11npzData,10,RDec11txtBjd,7,2/5.,3/5.,2,300,390,.5,0,90,True]
 RDec11Eclipse3 = [RDec11npzData,10,RDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,0,90,False]
 RDec11Eclipse4 = [RDec11npzData,10,RDec11txtBjd,7,2/5.,3/5.,4,640,730,.7,0,90,False]
 
-IDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfInfraInt3.npz'
-#IDec8txtBjd = '/Scratch/dataProcessing/SDSS_J0926/OlderData/Dec8fitpsfBlueMJD-TDB.txt'
-IDec8Eclipse1 = [IDec8npzData,3,IDec8txtBjd,23,1/5.,4/5.,1,3,303,0,0,300,False]
-IDec8Eclipse2 = [IDec8npzData,3,IDec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,200,False] 
-IDec8Eclipse3 = [IDec8npzData,3,IDec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,100,300,False]
+GDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfGreenInt3.npz'
+GDec8Eclipse1 = [GDec8npzData,3,Dec8txtBjd,23,1/5.,4/5.,1,3,303,0,0,300,True]
+GDec8Eclipse2 = [GDec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,200,True] 
+GDec8Eclipse3 = [GDec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,100,300,True]
 
-IDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfInfraInt10.npz'
+R_Dec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfRed-Int3.npz'
+R_Dec8Eclipse1 = [R_Dec8npzData,3,Dec8txtBjd,23,1/5.,4/5.,1,3,303,0,0,300,True]
+R_Dec8Eclipse2 = [R_Dec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,180,True] 
+R_Dec8Eclipse3 = [R_Dec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,100,300,True]
+
+I_Dec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfInfra-Int3.npz'
+I_Dec8Eclipse1 = [I_Dec8npzData,3,Dec8txtBjd,23,1/5.,4/5.,1,3,303,0,0,300,False]
+I_Dec8Eclipse2 = [I_Dec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,200,False] 
+I_Dec8Eclipse3 = [I_Dec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,100,300,False]
+
+#IDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfInfraInt3.npz'
+#IDec8Eclipse1 = [IDec8npzData,3,IDec8txtBjd,23,1/5.,4/5.,1,3,303,0,0,300,False]
+#IDec8Eclipse2 = [IDec8npzData,3,IDec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,200,False] 
+#IDec8Eclipse3 = [IDec8npzData,3,IDec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,100,300,False]
+
+#IDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfInfraInt10.npz'
 #IDec10txtBjd = '/Scratch/dataProcessing/SDSS_J0926/OlderData/Dec10fitpsfBlueInt10MJD-TDB.txt'
-IDec10Eclipse1 = [IDec10npzData,10,IDec10txtBjd,7,1/4.,3/4.,1,490,580,.5,40,70,False]
-IDec10Eclipse2 = [IDec10npzData,10,IDec10txtBjd,9,1/3.,2/3.,2,650,740,-.5,25,80,False]
-IDec10Eclipse3 = [IDec10npzData,10,IDec10txtBjd,9,1/3.,2/3.,3,820,910,.3,0,90,False]
+#IDec10Eclipse1 = [IDec10npzData,10,IDec10txtBjd,7,1/4.,3/4.,1,490,580,.5,40,70,False]
+#IDec10Eclipse2 = [IDec10npzData,10,IDec10txtBjd,9,1/3.,2/3.,2,650,740,-.5,25,80,False]
+#IDec10Eclipse3 = [IDec10npzData,10,IDec10txtBjd,9,1/3.,2/3.,3,820,910,.3,0,90,False]
 
-IDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfInfraInt10.npz'
+#IDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfInfraInt10.npz'
 #IDec11txtBjd = '/Scratch/dataProcessing/SDSS_J0926/OlderData/Dec11fitpsfBlueInt10MJD-TDB.txt'
-IDec11Eclipse0 = [IDec11npzData,10,IDec11txtBjd,6,0.,1/3.,0,0,90,5.5,0,40,False] 
-IDec11Eclipse1 = [IDec11npzData,10,IDec11txtBjd,9,2/5.,3/5.,1,130,220,.5,0,90,False]
-IDec11Eclipse2 = [IDec11npzData,10,IDec11txtBjd,7,3/7.,3/5.,2,300,390,.5,0,90,False]
-IDec11Eclipse3 = [IDec11npzData,10,IDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,0,90,False]
-IDec11Eclipse4 = [IDec11npzData,10,IDec11txtBjd,7,2/5.,3/5.,4,640,730,.7,0,90,False]
+#IDec11Eclipse0 = [IDec11npzData,10,IDec11txtBjd,6,0.,1/3.,0,0,90,5.5,0,40,False] 
+#IDec11Eclipse1 = [IDec11npzData,10,IDec11txtBjd,9,2/5.,3/5.,1,130,220,.5,0,90,False]
+#IDec11Eclipse2 = [IDec11npzData,10,IDec11txtBjd,7,3/7.,3/5.,2,300,390,.5,0,90,False]
+#IDec11Eclipse3 = [IDec11npzData,10,IDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,0,90,False]
+#IDec11Eclipse4 = [IDec11npzData,10,IDec11txtBjd,7,2/5.,3/5.,4,640,730,.7,0,90,False]
 
 #files = [BDec8Eclipse1,BDec8Eclipse2,BDec8Eclipse3,BDec10Eclipse1,BDec10Eclipse2,BDec10Eclipse3,BDec11Eclipse0,BDec11Eclipse1,BDec11Eclipse2,BDec11Eclipse3,BDec11Eclipse4]
-files = [RDec8Eclipse1,RDec8Eclipse2,RDec8Eclipse3,RDec10Eclipse1,RDec10Eclipse2,RDec10Eclipse3,RDec11Eclipse0,RDec11Eclipse1,RDec11Eclipse2,RDec11Eclipse3,RDec11Eclipse4]
-#files = [IDec8Eclipse1,IDec8Eclipse2,IDec8Eclipse3,IDec10Eclipse1,IDec10Eclipse2,IDec10Eclipse3,IDec11Eclipse0,IDec11Eclipse1,IDec11Eclipse2,IDec11Eclipse3,IDec11Eclipse4]
-plotdimy = 4
-plotdimx = 3
+#files = [RDec8Eclipse1,RDec8Eclipse2,RDec8Eclipse3,RDec10Eclipse1,RDec10Eclipse2,RDec10Eclipse3,RDec11Eclipse0,RDec11Eclipse1,RDec11Eclipse2,RDec11Eclipse3,RDec11Eclipse4]
+files = [GDec8Eclipse1,GDec8Eclipse2,GDec8Eclipse3,R_Dec8Eclipse1,R_Dec8Eclipse2,R_Dec8Eclipse3,I_Dec8Eclipse1,I_Dec8Eclipse2,I_Dec8Eclipse3]
 
+#files = [IDec8Eclipse1,IDec8Eclipse2,IDec8Eclipse3,IDec10Eclipse1,IDec10Eclipse2,IDec10Eclipse3,IDec11Eclipse0,IDec11Eclipse1,IDec11Eclipse2,IDec11Eclipse3,IDec11Eclipse4]
+plotdimy = 3
+plotdimx = 3
 
 def zero_if_negative(x):
     if isinstance(x, (int, long, float, complex))==True:
@@ -85,6 +101,18 @@ def zero_if_negative(x):
              if x[item] < 0 or item <len(x)*RatioBelow or item > len(x)*RatioAbove:
                  x[item]=0
     return x
+
+def removeOutliers(jd,data):
+    ave = np.average(data)
+    newjd=[]
+    newdata=[]
+    for index in range(len(data)):
+        if data[index]> ave-400 and data[index] < ave+400 and data[index] > 5:
+            newjd.append(jd[index])
+            newdata.append(data[index])
+    jd=np.array(newjd)
+    data=np.array(newdata)
+    return jd,data
 
 #theta =< pi/2 which implies mu = cos(theta) => 0
 #epsilon is a limb-darkening coefficient
@@ -141,8 +169,10 @@ for eclipse in range(len(files)):
 #    jd = [line[1] for line in BMJD]
     jd = BMJD
     jd = jd[cutoffmin:cutoffmax]
-    x=jd-jd[0]
     data=curve[cutoffmin:cutoffmax]
+
+    jd,data=removeOutliers(jd,data)
+    x=jd-jd[0]
 
     WDp0=(1100,b0,np.average(data),(np.min(data)-np.max(data))/2.,1)
 
@@ -153,7 +183,7 @@ for eclipse in range(len(files)):
     ax = fig.add_subplot(plotdimy,plotdimx,eclipse+1)
 
     ax.plot(jd,WhiteDwarf(x, WDp0[0],WDp0[1],WDp0[2],WDp0[3],WDp0[4]),'--')
-#    ax.plot([jd[fitstart],jd[fitend]],[np.average(data)]*2,'go')
+    ax.plot([jd[fitstart],jd[fitend]],[np.average(data)]*2,'go')
 #    ax.plot([jd[peakCutOffmin],jd[peakCutOffmax-1]],[np.average(data)]*2,'ro')
 #    ax.plot([jd[DataIndex_min]],[np.average(data)],'bo')
     ax.plot(jd,data,'k')
@@ -196,7 +226,7 @@ for eclipse in range(len(files)):
     ax.set_ylabel('Photon Count Rate per Sec',size='small')
 
 
-np.savez('/Scratch/dataProcessing/SDSS_J0926/AllDataRedfitresults.npz',EclipseTimes = EclipseTimes, FittedParams = FittedParams)
+#np.savez('/Scratch/dataProcessing/SDSS_J0926/Dec8AddColorsfitresults.npz',EclipseTimes = EclipseTimes, FittedParams = FittedParams)
 ax.legend(prop={'size':'small'})
 plt.show()
 
