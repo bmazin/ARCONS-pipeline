@@ -15,7 +15,7 @@ March 25, 2013 - Now calculates the hour angle using the right ascension of the 
 
 
 import numpy as np
-from tables import *
+import tables
 import sys
 import ephem
 import PyGuide as pg
@@ -27,6 +27,8 @@ from util.ObsFile import ObsFile
 import os
 from PyQt4.QtGui import *
 import hotpix.hotPixels as hp
+from tables import *
+from util.FileName import FileName
 
 
 # Class to allow clicking of a pixel in plt.matshow and storing the xy position of the click in an array.
@@ -35,7 +37,7 @@ class MouseMonitor():
         pass
 
     def on_click(self,event):
-	self.xyguess = [event.xdata,event.ydata]
+        self.xyguess = [event.xdata,event.ydata]
    
     def connect(self):
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
@@ -51,12 +53,47 @@ def radians_to_arcsec(total_radians):
     total_arcsec = total_degrees*3600.0
     return total_arcsec
 
+def saveTable(centroidListFileName,timeList,xPositionList,yPositionList,hourAngleList,flagList):
+
+    if os.path.isabs(centroidListFileName) == True:
+        fullCentroidListFileName = centroidListFileName
+    else:
+        scratchDir = os.getenv('INTERM_PATH')
+        centroidDir = os.path.join(scratchDir,'centroidListFiles')
+        fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
+    
+    try:
+        centroidListFile = tables.openFile(fullCentroidListFileName,mode='w')
+    except:
+        print 'Error: Couldn\'t create centroid list file, ',fullCentroidListFileName
+        return
+    print 'wrote to', centroidListFileName
+
+    centroidgroup = centroidListFile.createGroup(centroidListFile.root,'centroidlist','Table of times, x positions, y positions, hour angles, and flags')
+    caltable = tables.Array(centroidgroup,'times',object=timeList,title='Times at which centroids were calculated')
+    caltable = tables.Array(centroidgroup,'xPositions',object=xPositionList,title='X centroid positions')
+    caltable = tables.Array(centroidgroup,'yPositions',object=yPositionList,title='Y centroid positions')
+    caltable = tables.Array(centroidgroup,'hourAngles',object=hourAngleList,title='Hour angles at specified times')
+    caltable = tables.Array(centroidgroup,'flags',object=flagList,title='Flags whether or not guess had to be used, 1 for guess used')
+    centroidListFile.flush()
+    centroidListFile.close()
+
+#seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
+
+# Obs file info
+run = 'PAL2012'
+sunsetDate='20121208'
+utcDate='20121209'
+
+centroidTimestamp = '20121209-120530'
+calTimestamp = '20121209-131132'
+
 # Specify input parameters.
 centroid_RA = '09:26:38.7'
 centroid_DEC = '36:24:02.4'
-HA_offset = 19.0
+HA_offset = 16.0
 guessTime = 300
-integrationTime=10
+integrationTime=30
 secondMaxCountsForDisplay = 500
 
 # Some useful conversions
@@ -66,20 +103,10 @@ r2d = 180.0/np.pi
 # Choose obs, wavecal, and flatcal files
 app = QApplication(sys.argv)
 
-startingObsDirectory = '/ScienceData/PAL2012/'
-#obsFn =str(QFileDialog.getOpenFileName(None, 'Choose Observation File',startingObsDirectory, filter=str("H5 (*.h5)")))
-obsFn = '/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
+obsFn = FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).obs()
+wfn = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln()
+ffn = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln()
 
-index1 = obsFn.find('_')
-index2 = obsFn.find('-')
-utcDate = int(obsFn[index1+1:index2])
-sunsetDate = utcDate-1
-startingWfnDirectory = '/Scratch/waveCalSolnFiles/' + str(sunsetDate)
-#wfn = str(QFileDialog.getOpenFileName(None, 'Choose Wavelength Calibration File',startingWfnDirectory, filter=str("H5 (*.h5)")))
-wfn = '/Scratch/waveCalSolnFiles/20121208/calsol_20121209-131132.h5'
-
-startingFfnDirectory = '/Scratch/flatCalSolnFiles/'
-#ffn = str(QFileDialog.getOpenFileName(None, 'Choose Flat Calibration File',startingFfnDirectory, filter=str("H5 (*.h5)")))
 ffn = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 # Create ObsFile instance
@@ -91,6 +118,8 @@ ob.loadFlatCalFile(ffn)
 ob.setWvlCutoffs(3000,8000)
 
 # Load/generate hot pixel mask file
+index1 = obsFn.find('_')
+index2 = obsFn.find('-')
 hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
 if not os.path.exists(hotPixFn):
     hp.findHotPixels(obsFn,hotPixFn)
@@ -125,11 +154,11 @@ hotPixInfo = hp.readHotPixels(hotPixFn)
 intervalsMatrix = hotPixInfo['intervals']
 for t in range(nFrames):
     for x in range(gridHeight):
-	for y in range(gridWidth):
-	    if intervalsMatrix[y][x] == []:
-		pass
-	    else:
-		saturatedMask[t][y][x]=1
+        for y in range(gridWidth):
+            if intervalsMatrix[y][x] == []:
+                pass
+            else:
+                saturatedMask[t][y][x]=1
 
 # Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
 print 'Creating dead mask...'
@@ -140,17 +169,23 @@ deadMask = -1*deadMask + 1
 ccd = pg.CCDInfo(0,0.00001,1,2500)
 
 # Create output file to save centroid data
-outFn = '/home/pszypryt/Scratch/centroid_test/centroid_list.txt'
-f = open(outFn,'w')
-f.write('Time\tX Center\tY Center\tHA\n')
+centroidListFileName=FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).centroidList()
+print centroidListFileName
 
 norm = mpl.colors.Normalize(vmin=0,vmax=secondMaxCountsForDisplay*guessTime)
 
+timeList=[]
+xPositionList=[]
+yPositionList=[]
+hourAngleList=[]
+flagList=[]
+
+flag=0
 print 'Retrieving images...'
 for iFrame in range(exptime):
     # Integrate over the guess time.  Click a pixel in the plot corresponding to the xy center guess.  This will be used to centroid for the duration of guessTime.
     if iFrame%guessTime == 0:
-	# Use obsFile to get guessTime image.
+    # Use obsFile to get guessTime image.
         imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= guessTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
         image=imageInformation['image']
         map = MouseMonitor()
@@ -160,35 +195,41 @@ for iFrame in range(exptime):
         map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower',norm=norm)
         map.connect()
         plt.show()
-	try:
-    	    xyguess = map.xyguess
+        try:
+            xyguess = map.xyguess
         except AttributeError:
-	    pass
+            pass
         print 'Guess = ' + str(xyguess)
     # Centroid an image that has been integrated over integrationTime.
     if iFrame%integrationTime == 0:
-	# Use obsFile to get integrationTime image.
-	satMask=saturatedMask[int(iFrame/integrationTime)]
+        # Use obsFile to get integrationTime image.
+        satMask=saturatedMask[int(iFrame/integrationTime)]
         imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
         image=imageInformation['image']        
-	# Use PyGuide centroiding algorithm.
+        # Use PyGuide centroiding algorithm.
         pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,3,ccd,0,False)
-	# Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
+        # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
         try:
             xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
             print 'Calculated [x,y] center = ' + str((xycenter)) + ' for frame ' + str(iFrame) +'.'
+            flag = 0
         except TypeError:
             print 'Cannot centroid frame' + str(iFrame) + ', using guess instead'
             xycenter = xyguess
-	# Begin RA/DEC mapping
-	current_lst_seconds = original_lst_seconds + iFrame
+            flag = 1
+        # Begin RA/DEC mapping
+        current_lst_seconds = original_lst_seconds + iFrame
         current_lst_radians = arcsec_to_radians(current_lst_seconds*15.0)
-	HA_variable = current_lst_radians - centroid_RA_radians
+        HA_variable = current_lst_radians - centroid_RA_radians
         HA_static = HA_offset*d2r
         HA_current = HA_variable + HA_static
-	HA_degrees = HA_current * r2d
-        # Write data to file
-        f=open(outFn,'a')
-        f.write(str(iFrame) + '\t' + str(xycenter[0]) + '\t' + str(xycenter[1]) + '\t' + str(HA_degrees) + '\n')
-        f.close()
+        HA_degrees = HA_current * r2d
+        # Make lists to save to h5 file
+        timeList.append(iFrame)
+        xPositionList.append(xycenter[0])
+        yPositionList.append(xycenter[1])
+        hourAngleList.append(HA_degrees)
+        flagList.append(flag)
+# Save to h5 table
+saveTable(centroidListFileName=centroidListFileName,timeList=timeList,xPositionList=xPositionList,yPositionList=yPositionList,hourAngleList=hourAngleList,flagList=flagList)
 

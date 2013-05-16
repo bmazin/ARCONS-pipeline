@@ -109,4 +109,7 @@ Each directory contains a /test subdirectory, where code to test the module will
 
 ***
 
+A beginner's guide and the observing log for the Palomar 2012 run are in examples/demos
+
+***
 This document uses the markdown syntax, see http://daringfireball.net/projects/markdown/
