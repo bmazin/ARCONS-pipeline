@@ -12,16 +12,16 @@ import tables
 import os
 from util.FileName import FileName
 import ephem
+from time import time
 
 
-class calculateRaDec:
+class CalculateRaDec:
 
     degreesToRadians = np.pi/180.0
     radiansToDegrees = 180.0/np.pi
     platescale=0.44 # arcsec/pixel
 
     def __init__(self,centroidListFileName):
-        #timestamp,xPhotonPixel,yPhotonPixel
         # Check centroidListFileName
         if os.path.isabs(centroidListFileName) == True:
             fullCentroidListFileName = centroidListFileName
@@ -65,44 +65,47 @@ class calculateRaDec:
             self.yCentroidRotated[iFrame] = self.xCentroidOffset[iFrame]*self.rotationMatrix[iFrame][1][0] + self.yCentroidOffset[iFrame]*self.rotationMatrix[iFrame][1][1]
       
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
+        self.timestamp = np.array(timestamp)
+        self.xPhotonPixel = np.array(xPhotonPixel)
+        self.yPhotonPixel = np.array(yPhotonPixel)
+
+        self.inputLength = len(self.timestamp)
+                
         self.deltaTime = self.times[1]-self.times[0]
-        self.binNumber = int(timestamp/self.deltaTime)
+        self.binNumber = (self.timestamp/self.deltaTime).astype('int')
 
         # Set origin to center of rotation.  Calculate x and y photon position in this new coordinate system.
-        self.xPhotonOffset = xPhotonPixel - self.xCenterOfRotation
-        self.yPhotonOffset = yPhotonPixel - self.yCenterOfRotation
+        self.xPhotonOffset = self.xPhotonPixel - self.xCenterOfRotation
+        self.yPhotonOffset = self.yPhotonPixel - self.yCenterOfRotation
 
         # Rotate by the hour angle at the origin.  This will lead to DEC = y and RA = -x?
-        self.xPhotonRotated = self.xPhotonOffset*self.rotationMatrix[self.binNumber][0][0] + self.yPhotonOffset*self.rotationMatrix[self.binNumber][0][1]
-        self.yPhotonRotated = self.xPhotonOffset*self.rotationMatrix[self.binNumber][1][0] + self.yPhotonOffset*self.rotationMatrix[self.binNumber][1][1]
+        self.xPhotonRotated = np.zeros(self.inputLength)
+        self.yPhotonRotated = np.zeros(self.inputLength)
+        for i in range(self.inputLength):
+            self.xPhotonRotated[i] = self.xPhotonOffset[i]*self.rotationMatrix[self.binNumber[i]][0][0] + self.yPhotonOffset[i]*self.rotationMatrix[self.binNumber[i]][0][1]
+            self.yPhotonRotated[i] = self.xPhotonOffset[i]*self.rotationMatrix[self.binNumber[i]][1][0] + self.yPhotonOffset[i]*self.rotationMatrix[self.binNumber[i]][1][1]
 
         # Use the centroid as the zero point for ra and dec offsets
-        self.declinationOffset = calculateRaDec.platescale*(self.yPhotonRotated - self.yCentroidRotated[self.binNumber])
-        self.rightAscensionOffset = -calculateRaDec.platescale*(self.xPhotonRotated - self.xCentroidRotated[self.binNumber])
+        self.declinationOffset = CalculateRaDec.platescale*(self.yPhotonRotated - self.yCentroidRotated[self.binNumber])
+        self.rightAscensionOffset = -CalculateRaDec.platescale*(self.xPhotonRotated - self.xCentroidRotated[self.binNumber])
 
         # Convert centroid positions in DD:MM:SS.S and HH:MM:SS.S format to radians.
         self.centroidDeclinationRadians = ephem.degrees(self.centroidDeclination).real
         self.centroidRightAscensionRadians = ephem.hours(self.centroidRightAscension).real        
         
         # Convert centroid position radians to arcseconds.
-        self.centroidDeclinationArcseconds = self.centroidDeclinationRadians * calculateRaDec.radiansToDegrees * 3600.0
-        self.centroidRightAscensionArcseconds = self.centroidRightAscensionRadians * calculateRaDec.radiansToDegrees * 3600.0
+        self.centroidDeclinationArcseconds = self.centroidDeclinationRadians * CalculateRaDec.radiansToDegrees * 3600.0
+        self.centroidRightAscensionArcseconds = self.centroidRightAscensionRadians * CalculateRaDec.radiansToDegrees * 3600.0
         
         # Add the photon arcsecond offset to the centroid offset.
         self.photonDeclinationArcseconds = self.centroidDeclinationArcseconds + self.declinationOffset
         self.photonRightAscensionArcseconds = self.centroidRightAscensionArcseconds + self.rightAscensionOffset
         
         # Convert the photon positions from arcseconds to radians
-        self.photonDeclinationRadians = (self.photonDeclinationArcseconds / 3600.0) * calculateRaDec.degreesToRadians
-        self.photonRightAscensionRadians = (self.photonRightAscensionArcseconds / 3600.0) * calculateRaDec.degreesToRadians
+        self.photonDeclinationRadians = (self.photonDeclinationArcseconds / 3600.0) * CalculateRaDec.degreesToRadians
+        self.photonRightAscensionRadians = (self.photonRightAscensionArcseconds / 3600.0) * CalculateRaDec.degreesToRadians
 
-        # Print RA in more readable HH:MM:SS.S and DEC in DD:MM:SS.S format. Values not returned.
-        self.photonDeclination = ephem.degrees(self.photonDeclinationRadians)
-        self.photonRightAscension = ephem.hours(self.photonRightAscensionRadians)
-        print 'Centroid RA: ' + self.centroidRightAscension + ', Centroid DEC: ' + self.centroidDeclination
-        print 'Photon RA: ' + str(self.photonRightAscension) + ', Photon DEC: ' + str(self.photonDeclination)
-
-        # Return the right ascension and declination, in radians        
+        # Return the right ascension and declination, in radians               
         return self.photonDeclinationRadians, self.photonRightAscensionRadians    
 
 
@@ -123,10 +126,12 @@ if __name__ == "__main__":
     centroidListFileName=FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).centroidList()
 
     # Test photon
-    xPhotonPixel=25.0
-    yPhotonPixel=25.0
-    timestamp = 12.35223
-
-    raDecObject = calculateRaDec(centroidListFileName)
+    xPhotonPixel=np.linspace(0,43, num =1000000).astype('int')
+    yPhotonPixel=np.linspace(0,45,num = 1000000).astype('int')
+    timestamp = np.linspace(0,299,num=1000000)
+    
+    tic = time()
+    raDecObject = CalculateRaDec(centroidListFileName)
     print raDecObject.getRaDec(timestamp=timestamp,xPhotonPixel=xPhotonPixel,yPhotonPixel=yPhotonPixel)
+    print (time()-tic)
 
