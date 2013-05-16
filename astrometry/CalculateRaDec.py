@@ -48,7 +48,6 @@ class CalculateRaDec:
         self.centroidListFile.close()
         self.frames=len(self.times)
 
-
         # Set origin to center of rotation. Calculate x and y centroid position in this new coordinate system.
         self.xCentroidOffset = self.xCentroids - self.xCenterOfRotation
         self.yCentroidOffset = self.yCentroids - self.yCenterOfRotation 
@@ -73,6 +72,10 @@ class CalculateRaDec:
                 
         self.deltaTime = self.times[1]-self.times[0]
         self.binNumber = (self.timestamp/self.deltaTime).astype('int')
+
+        self.photonHourAngle = np.zeros(self.inputLength)
+        for i in range(self.inputLength):
+            self.photonHourAngle[i] = self.hourAngles[self.binNumber[i]]
 
         # Set origin to center of rotation.  Calculate x and y photon position in this new coordinate system.
         self.xPhotonOffset = self.xPhotonPixel - self.xCenterOfRotation
@@ -106,7 +109,7 @@ class CalculateRaDec:
         self.photonRightAscensionRadians = (self.photonRightAscensionArcseconds / 3600.0) * CalculateRaDec.degreesToRadians
 
         # Return the right ascension and declination, in radians               
-        return self.photonDeclinationRadians, self.photonRightAscensionRadians    
+        return self.photonDeclinationRadians, self.photonRightAscensionRadians, self.photonHourAngle
 
 
 
