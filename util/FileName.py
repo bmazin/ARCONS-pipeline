@@ -7,7 +7,7 @@ mkidDataDir -- root of all raw. If not specified, looks for system variable
 intermDir -- root of all generated files. If not specified, looks for 
                 sys. variable INTERM_DIR, otherwise '/Scratch')
 run -- such as LICK201 or PAL2012
-date -- in format yyyymmdd -- the locat year, month, and date of sunset
+date -- in format yyyymmdd -- the local year, month, and date of sunset
 flavor -- obs or cal are the only ones I know about
 tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 
@@ -60,6 +60,11 @@ class FileName:
             self.date + os.sep + \
             "timeMask_" + self.tstamp + '.h5'
 
+    def cosmicMask(self):
+        return self.intermDir + os.sep + \
+            'cosmicMasks' + os.sep + \
+            "cosmicMask_" + self.tstamp + '.h5'
+
     def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
@@ -73,11 +78,67 @@ class FileName:
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
 
+    def centroidList(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'centroidListFiles' + os.sep + \
+                self.date + os.sep + \
+                "centroid_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'centroidListFiles' + os.sep + \
+                self.date + os.sep + \
+                "centroid_" + self.tstamp + '.h5'
+
+    def fluxSoln(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'fluxCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "fluxsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'fluxCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "fluxsol_" + self.tstamp + '.h5'
+
+
     def flatSoln(self):
-        return self.intermDir + os.sep + \
-            'flatCalSolnFiles' + os.sep + \
-            self.date + os.sep + \
-            "flatsol_" + self.date + '.h5'
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.tstamp + '.h5'
+
+    def flatInfo(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.tstamp + '.npz'
+
+
+    def oldFlatInfo(self):
+        if self.tstamp == '' or self.tstamp == None:
+            return self.intermDir + os.sep + \
+                'oldFlatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'oldFlatCalSolnFiles' + os.sep + \
+                self.date + os.sep + \
+                "flatsol_" + self.tstamp + '.npz'
 
     def photonList(self):
         return self.intermDir + os.sep + \
