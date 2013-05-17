@@ -1,0 +1,79 @@
+
+######################## For display_stack.py ########################
+
+npzFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10ImageStackBlueUpdated.npz'
+gifFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10ImageStackBlueUpdated.gif'
+
+integrationTime = 3
+expTime = 300
+
+#remember to change seqs! It's at the end
+wvlLowerCutoff = 3000
+wvlUpperCutoff = 5000
+
+run = 'PAL2012'
+
+# Date and cal time stamp arrays
+#utcDates = ['20121209', '20121209', '20121211', '20121211', '20121211', '20121212', '20121212']
+#sunsetDates = ['20121208', '20121208', '20121210', '20121210', '20121210', '20121211','20121211']
+#calTimestamps = ['20121209-131132','20121209-133419', '20121211-090613', '20121211-090613', '20121211-133056', '20121212-111847', '20121212-111847'] 
+#'20121212-133821' is terrible! 
+#try replacing '20121211-074031' with '20121211-090613'
+
+# December 8
+# First sequence, possible reflections at 12:07, 1" SE move at 12:45.
+seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
+
+# Sequence during warming up, may need to omit.
+seq1 = ['131254', '131802', '132304', '132807']
+
+# December 10
+# Sequence during 2nd day on object. Moved to confirm position in 082422 between 90 and 105s.'080916' hot pix
+seq2 = ['074405', '074907', '075410', '075912', '080414', '080916', '081418', '081920', '082422']
+
+# Refocused and started guiding again at 8:37. Ommitting seq 083451, which occured during refocus.
+seq3 = ['084029', '084532', '085034', '085536', '090038']
+
+# Back toward end of night, not sure about whether to use cal file '20121211-115429' or '20121211-133056'.  Also, may need to cut out last 2 obs files
+seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '123712', '124215', '124809', '125312', '125814', '130316', '130818', '131320', '131822', '132324']
+
+# December 11
+# Final sequence, toward end of run, thin high clouds at around 12:50, moved to confirm position at '122234', also at '130752' at 125s.
+seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238']
+seq6 = ['123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
+
+#seqs = [seq0,seq1]
+#utcDates = ['20121209', '20121209']
+#sunsetDates = ['20121208', '20121208']
+#calTimestamps = ['20121209-131132','20121209-133419']
+#use flatCal from 20121207!
+
+seqs = [seq2,seq3,seq4]
+utcDates = ['20121211', '20121211', '20121211']
+sunsetDates = ['20121210', '20121210', '20121210']
+calTimestamps = ['20121211-090613', '20121211-090613', '20121211-133056']
+#NumFiles = [-1,-1,14,14,14]
+
+#seqs = [seq5,seq6]
+#utcDates = ['20121212', '20121212']
+#sunsetDates = ['20121211','20121211']
+#calTimestamps = ['20121212-111847', '20121212-111847']
+
+######################## For fitpsf.py ########################
+
+npzLoadFile = '/home/srmeeker/scratch/standards/Landolt9542_raw.npz'
+npzfitpsf = '/home/srmeeker/scratch/standards/Landolt9542_fit.npz'
+giffitpsf = '/home/srmeeker/scratch/standards/Landolt9542_fit.gif'
+
+FramesPerFile = 31
+
+NumFiles = [1]
+#NumFiles = [-1,17,31,48,74]
+guessX = [29]
+guessY = [29]
+
+######################## For lightcurve.py ########################
+
+npzLoadFitFile = '~/scratch/standards/Landolt9542_fit.npz'
+TotalNumFiles = 74
+
