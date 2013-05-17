@@ -77,7 +77,7 @@ class PhotList(object):
         self.nRow, self.nCol = self.file.root.beammap.beamimage.shape
 
         #Set the photon-list node shortcut
-        self.photTable = self.file.root.photons.sorted
+        self.photTable = self.file.root.photons.photons
 
         #get the header
         self.header = self.file.root.header.header
@@ -169,7 +169,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
      else:
          fullPhotonListFileName = fileName
      if (os.path.exists(fullPhotonListFileName)):
-         if utils.confirm('Photon list file  %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
+         if utils.confirm('Photon list file %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
              warnings.warn('No photon list file created')
              return
      zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
@@ -243,6 +243,9 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                            obsFile.fluxFlags, 
                            pipelineFlags.fluxCal['aboveWaveCalRange']))
 
+    #Initialise CalculateRaDec object with the right centroiding file for calculating RA/dec of photons.
+    raDecCalcObject = crd.CalculateRaDec(astrometryFileName)
+
     try:
         for iRow in xrange(obsFile.nRow):
             print 'Writing pixel row ', iRow, '...'
@@ -298,7 +301,7 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                         #create a new row for the photon list
                         #print 'Photon #',iPhoton
                         newRow = plTable.row
-                        newRow['xPix'] = iCol
+                        newRow['yPix'] = iCol
                         newRow['xPix'] = iRow
                         newRow['xyPix'] = xyPack(iRow,iCol)
                         newRow['arrivalTime'] = timestamps[iPhoton]
@@ -309,7 +312,7 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                         newRow['fluxFlag'] = fluxFlags[fluxBinIndices[iPhoton]]
                         newRow['fluxWeight'] = fluxWeights[fluxBinIndices[iPhoton]]
                         if astrometryFileName is not None:
-                            newRow['dec'],newRow['ra'] = crd.calculateRaDec(astrometryFileName,timestamps[iPhoton],iCol,iRow).getRaDec()
+                            newRow['dec'],newRow['ra'] = raDecCalcObject.getRaDec(timestamps[iPhoton],iCol,iRow)
                         else:
                             newRow['dec'],newRow['ra'] = (np.nan,np.nan)
                         newRow.append()
@@ -336,7 +339,7 @@ def indexPhotonList(photFile):
         If photFile is a file instance, the file is indexed, but not closed.
     '''
     
-    colsToIndex = ['xyPix', 'xPix', 'yPix', 'arrivalTime', 'wavelength']
+    colsToIndex = ['xyPix', 'xPix', 'yPix', 'arrivalTime', 'wavelength', 'ra', 'dec']
     
     if type(photFile) is str:
         photListFile = tables.openFile(photFile, mode='r+')
@@ -373,13 +376,14 @@ def xyPack(row,col):
     Pack an integer pair of pixel coordinates, x, y, into a single integer,
     stored in the 'XYpix' column of the photon list. Used for the purposes
     of access efficiency.
+    Note - INPUTS MUST BE INTEGER! Otherwise you're gonna get weird answers.
     '''
-    return xyPackMult * col + row
+    return xyPackMult * row + col
     
 def xyUnpack(rowCol):
     '''
     Inverse of xyPack. Returns an integer tuple, (row,col).
     '''
-    return rowCol % xyPackMult, rowCol // xyPackMult
+    return rowCol // xyPackMult, rowCol % xyPackMult
     
     
