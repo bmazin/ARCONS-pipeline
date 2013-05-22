@@ -13,6 +13,7 @@ tstamp -- in format yyyymmdd-hhmmss -- such as 20120920-123350
 
 NOTES
 Updated 4/25/2013, JvE - if root directory names not provided, looks for system variables.
+5/22/2013 - can now optionally supply an ObsFile instance on calling instead of run, date, and tstamp.
 
 """
 
@@ -20,18 +21,38 @@ import os
 class FileName:
     
     def __init__(self, run='', date='', tstamp='', \
-                 mkidDataDir=None, intermDir=None):
-        
+                 mkidDataDir=None, intermDir=None, obsFile=None):
+        '''
+        To create a FileName instance, supply:
+            run - string, name of folder which contains all obs files for this run
+            date - string, date (usually of sunset), name of folder in which obs files for this date are stored
+            tstamp - string, timestamp of the obs. file.
+            obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out the required parameters automatically.
+            mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_DATA_DIR' if not specified.)
+            intermDir - data reduction product directory (uses path pointed to by system variable 'INTERM_DIR' if not specified.
+        '''
+            
         if mkidDataDir is None:
             mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
         if intermDir is None:
             intermDir = os.getenv('INTERM_DIR', default="/Scratch")
         
+
         self.mkidDataDir = mkidDataDir
         self.intermDir = intermDir
-        self.run = run
-        self.date = date
-        self.tstamp = tstamp
+        if obsFile is None:
+            self.run = run
+            self.date = date
+            self.tstamp = tstamp
+        else:
+            #Split full file path of ObsFile instance into individual directory names
+            dirs = os.path.dirname(os.path.normpath(obsFile.fullFileName)).split(os.sep)
+            #Pull out the relevant bits
+            self.run = dirs[-2]
+            self.date = dirs[-1]
+            self.tstamp = (os.path.basename(obsFile.fullFileName)
+                           .partition('obs_')[2]
+                           .rpartition('.h5')[0])
 
     def makeName(self, prefix="plot_", suffix="png"):
         return prefix+self.tstamp+suffix
@@ -156,4 +177,13 @@ class FileName:
             'timeAdjust' + os.sep + \
             self.run + '.h5'
 
+    
+    ##################################
+    
+    def getComponents(self):
+        '''
+        Return a tuple of run, date, and timestamp.
+        Potentially useful if an obsFile instance was passed on creation instead of individual components
+        '''
+        return self.run, self.date, self.tstamp
                             
