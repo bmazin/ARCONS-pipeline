@@ -18,6 +18,7 @@ Updated 4/25/2013, JvE - if root directory names not provided, looks for system 
 """
 
 import os
+from util.ObsFile import ObsFile
 class FileName:
     
     def __init__(self, run='', date='', tstamp='', \
