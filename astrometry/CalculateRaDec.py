@@ -108,7 +108,7 @@ class CalculateRaDec:
         self.photonDeclinationRadians = (self.photonDeclinationArcseconds / 3600.0) * CalculateRaDec.degreesToRadians
         self.photonRightAscensionRadians = (self.photonRightAscensionArcseconds / 3600.0) * CalculateRaDec.degreesToRadians
 
-        return self.photonDeclinationRadians, self.photonRightAscensionRadians, self.photonHourAngle
+        return self.photonRightAscensionRadians, self.photonDeclinationRadians, self.photonHourAngle
 
 
 
