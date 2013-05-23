@@ -47,10 +47,10 @@ class CalculateRaDec:
         self.centroidFlags = np.array(self.centroidListFile.root.centroidlist.flags.read())
         self.centroidListFile.close()
         self.frames=len(self.times)
-
+        
         # Set origin to center of rotation. Calculate x and y centroid position in this new coordinate system.
         self.xCentroidOffset = self.xCentroids - self.xCenterOfRotation
-        self.yCentroidOffset = self.yCentroids - self.yCenterOfRotation 
+        self.yCentroidOffset = self.yCentroids - self.yCenterOfRotation
 
         # Calculate rotation matrix for each frame
         self.rotationMatrix = np.zeros(((self.frames,2,2)))
@@ -65,8 +65,12 @@ class CalculateRaDec:
       
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
         self.timestamp = np.array(timestamp)
-        self.xPhotonPixel = np.array(xPhotonPixel)
-        self.yPhotonPixel = np.array(yPhotonPixel)
+        self.xPhotonPixel = np.array(xPhotonPixel).astype('float')
+        self.yPhotonPixel = np.array(yPhotonPixel).astype('float')
+
+        # Offset to make 0.5 center of the pixel.
+        self.xPhotonPixel += 0.5
+        self.yPhotonPixel += 0.5
 
         self.inputLength = len(self.timestamp)
                 
@@ -128,12 +132,14 @@ if __name__ == "__main__":
     centroidListFileName=FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).centroidList()
 
     # Test photon
-    xPhotonPixel=np.linspace(0,43, num =1000000).astype('int')
-    yPhotonPixel=np.linspace(0,45,num = 1000000).astype('int')
-    timestamp = np.linspace(0,299,num=1000000)
+    xPhotonPixel=np.linspace(0,43, num =50).astype('int')
+    yPhotonPixel=np.linspace(0,45,num = 50).astype('int')
+    timestamp = np.linspace(0,299,num=50)
     
     tic = time()
     raDecObject = CalculateRaDec(centroidListFileName)
-    print raDecObject.getRaDec(timestamp=timestamp,xPhotonPixel=xPhotonPixel,yPhotonPixel=yPhotonPixel)
-    print (time()-tic)
+    #dec =  raDecObject.getRaDec(timestamp=timestamp,xPhotonPixel=xPhotonPixel,yPhotonPixel=yPhotonPixel)[1]
+    ra =  raDecObject.getRaDec(timestamp=timestamp,xPhotonPixel=xPhotonPixel,yPhotonPixel=yPhotonPixel)[0]
+
+    #print dec, ra
 
