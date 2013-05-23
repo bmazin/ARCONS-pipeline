@@ -1,6 +1,7 @@
-from util import FileName
 import unittest
 import os
+from util import FileName
+from util import ObsFile
 
 class TestFileName(unittest.TestCase):
     """
@@ -51,11 +52,11 @@ class TestFileName(unittest.TestCase):
         run = 'LICK2012'
         date = '20120919'
         tstamp = '20120920-123350'
-        fn = FileName.FileName(run, date, tstamp)
-        obsFile = ObsFile(fn1.obs())
-        fn2 = FileName.FileName(obsFile)
+        fn1 = FileName.FileName(run, date, tstamp)
+        obsFile = ObsFile.ObsFile(fn1.obs())
+        fn2 = FileName.FileName(obsFile=obsFile)
         self.assertTrue(fn1.obs()==fn2.obs())
-        self.assertTrue(fn2.components==(run,date,tstamp))
+        self.assertTrue(fn2.getComponents()==(run,date,tstamp))
 
 if __name__ == '__main__':
     unittest.main()
