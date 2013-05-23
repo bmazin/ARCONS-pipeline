@@ -1,7 +1,7 @@
 from util import FileName
 import unittest
 import os
-import util.FileName
+
 class TestFileName(unittest.TestCase):
     """
     Test getting the raw and the timeMask file names
