@@ -1,0 +1,13 @@
+datadir=/ScienceData/PAL2012/20121206
+flatdir=/Scratch/flatCalSolnFiles/20121211
+wvldir=/Scratch/waveCalSolnFiles/20121206
+fluxfile=obs_20121207-064926.h5
+skyfile=None
+flatfile=flatsol_combinedWvl_20121211.h5
+wvlfile=wvlCalFiles_combined_Dec062012.h5
+fluxdir=None
+fluxoutfile=None
+objectName=Landolt9542
+xpix = 29
+ypix = 29
+rad = 6

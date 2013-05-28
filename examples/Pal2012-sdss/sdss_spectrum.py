@@ -2,10 +2,19 @@ import numpy as np
 from util.ObsFile import ObsFile 
 from util.FileName import FileName
 from util import utils
+import os
+import hotpix.hotPixels as hp
 import tables
 import matplotlib.pyplot as plt
-from hotpix import hotPixels
 
+def getTimeMaskFileName(obsFileName):
+    scratchDir = os.getenv('INTERM_PATH')
+    hotPixDir = os.path.join(scratchDir,'timeMasks')
+    fileName = obsFileName.split('/')[-1]
+    fileNameBase = fileName.split('_')[-1]
+    newName = 'timeMask_'+fileNameBase
+    fullHotPixFileName = os.path.join(hotPixDir,newName)
+    return fullHotPixFileName
 
 run = 'PAL2012'
 
@@ -34,6 +43,7 @@ flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSo
 #wvlCalFilenames[1] = '/home/danica/optimusP/testing/forMatt/calsol_20121211-044853.h5'
 flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+fluxCalFileNames = ['/Scratch/fluxCalSolnFiles/20121206/fluxsol_20121207-124034.h5']
 
 obsFn = FileName(run=run,date=sunsetDates[0],tstamp='20121209-120530').obs()
 ob = ObsFile(obsFn)
@@ -41,12 +51,21 @@ print 'Loading wavelength calibration solution: ' + wvlCalFilenames[0]
 ob.loadWvlCalFile(wvlCalFilenames[0])
 print 'Loading flat calibration solution: ' + flatCalFilenames[0]
 ob.loadFlatCalFile(flatCalFilenames[0])
+ob.loadFluxCalFile(fluxCalFileNames[0])
+
+#load/generate hot pixel mask file
+HotPixFile = getTimeMaskFileName(obsFn)
+if not os.path.exists(HotPixFile):
+    hp.findHotPixels(obsFn,HotPixFile)
+    print "Flux file pixel mask saved to %s"%(HotPixFile)
+ob.loadHotPixCalFile(HotPixFile)
+print "Hot pixel mask loaded %s"%(HotPixFile)
 
 frame = ob.getPixelCountImage(firstSec=0,integrationTime=300,weighted=True)
-hotPixMask = hotPixels.checkInterval(image=frame, firstSec=0, intTime=300, weighted=True, display=False)['mask']
+#hotPixMask = hotPixels.checkInterval(image=frame, firstSec=0, intTime=300, weighted=True, display=False)['mask']
 
 #summed_array,bin_edges=ob.getApertureSpectrum(pixelCol=14,pixelRow=8,radius=7)
-ob.plotApertureSpectrum(pixelCol=14,pixelRow=8,radius=7,hotPixMask=hotPixMask,wvlStart=3000,wvlStop=9000)
+ob.plotApertureSpectrum(pixelCol=14,pixelRow=8,radius=7,weighted = True,fluxWeighted=True,lowCut=3000,highCut=9000)
 
 
 '''

@@ -53,7 +53,7 @@ def radians_to_arcsec(total_radians):
     total_arcsec = total_degrees*3600.0
     return total_arcsec
 
-def saveTable(centroidListFileName,timeList,xPositionList,yPositionList,hourAngleList,flagList):
+def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionList,hourAngleList,flagList):
 
     if os.path.isabs(centroidListFileName) == True:
         fullCentroidListFileName = centroidListFileName
@@ -70,11 +70,14 @@ def saveTable(centroidListFileName,timeList,xPositionList,yPositionList,hourAngl
     print 'wrote to', centroidListFileName
 
     centroidgroup = centroidListFile.createGroup(centroidListFile.root,'centroidlist','Table of times, x positions, y positions, hour angles, and flags')
-    caltable = tables.Array(centroidgroup,'times',object=timeList,title='Times at which centroids were calculated')
-    caltable = tables.Array(centroidgroup,'xPositions',object=xPositionList,title='X centroid positions')
-    caltable = tables.Array(centroidgroup,'yPositions',object=yPositionList,title='Y centroid positions')
-    caltable = tables.Array(centroidgroup,'hourAngles',object=hourAngleList,title='Hour angles at specified times')
-    caltable = tables.Array(centroidgroup,'flags',object=flagList,title='Flags whether or not guess had to be used, 1 for guess used')
+
+    paramstable = tables.Array(centroidgroup,'params', object=paramsList, title = 'Object and array params')
+    timestable = tables.Array(centroidgroup,'times',object=timeList,title='Times at which centroids were calculated')
+    xpostable = tables.Array(centroidgroup,'xPositions',object=xPositionList,title='X centroid positions')
+    ypostable = tables.Array(centroidgroup,'yPositions',object=yPositionList,title='Y centroid positions')
+    hatable = tables.Array(centroidgroup,'hourAngles',object=hourAngleList,title='Hour angles at specified times')
+    flagtable = tables.Array(centroidgroup,'flags',object=flagList,title='Flags whether or not guess had to be used, 1 for guess used')
+
     centroidListFile.flush()
     centroidListFile.close()
 
@@ -84,17 +87,20 @@ def saveTable(centroidListFileName,timeList,xPositionList,yPositionList,hourAngl
 run = 'PAL2012'
 sunsetDate='20121208'
 utcDate='20121209'
-
 centroidTimestamp = '20121209-120530'
 calTimestamp = '20121209-131132'
 
 # Specify input parameters.
 centroid_RA = '09:26:38.7'
 centroid_DEC = '36:24:02.4'
+centerX = '30.5'
+centerY = '30.5'
 HA_offset = 16.0
 guessTime = 300
 integrationTime=30
 secondMaxCountsForDisplay = 500
+
+paramsList = [centerX,centerY,centroid_RA,centroid_DEC]
 
 # Some useful conversions
 d2r = np.pi/180.0
@@ -223,13 +229,12 @@ for iFrame in range(exptime):
         HA_variable = current_lst_radians - centroid_RA_radians
         HA_static = HA_offset*d2r
         HA_current = HA_variable + HA_static
-        HA_degrees = HA_current * r2d
         # Make lists to save to h5 file
         timeList.append(iFrame)
         xPositionList.append(xycenter[0])
         yPositionList.append(xycenter[1])
-        hourAngleList.append(HA_degrees)
+        hourAngleList.append(HA_current)
         flagList.append(flag)
 # Save to h5 table
-saveTable(centroidListFileName=centroidListFileName,timeList=timeList,xPositionList=xPositionList,yPositionList=yPositionList,hourAngleList=hourAngleList,flagList=flagList)
+saveTable(centroidListFileName=centroidListFileName,paramsList=paramsList,timeList=timeList,xPositionList=xPositionList,yPositionList=yPositionList,hourAngleList=hourAngleList,flagList=flagList)
 
