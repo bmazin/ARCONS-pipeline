@@ -176,7 +176,7 @@ cube = np.dstack(frames)
 times = np.array(times)
 print 'average sky count', np.average(backgroundPerPixel)
 print 'standard deviation of sky count', np.std(backgroundPerPixel)
-np.savez(npzFileName,stack=cube,jd=times,lightcurve=LightCurve,AveSkyCount=np.average(backgroundPerPixel),StdSkyCout=np.std(backgroundPerPixel))
+np.savez(npzFileName,stack=cube,jd=times,lightcurve=LightCurve,AveSkyCount=np.average(backgroundPerPixel),StdSkyCount=np.std(backgroundPerPixel))
 print 'saved'
 utils.makeMovie(showframes,cbar=True,frameTitles=titles,outName=gifFileName)
 
