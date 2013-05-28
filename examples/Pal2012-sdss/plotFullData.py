@@ -4,12 +4,13 @@ from util import utils
 from scipy import pi,sqrt,exp
 from matplotlib.ticker import MultipleLocator
 
-BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
+#BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
+BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfAllInt.1newwvlcal.npz'
 RDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfRedInt3.npz'
 GDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfGreenInt3.npz'
 R_Dec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfRed-Int3.npz'
 I_Dec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfInfra-Int3.npz'
-intTime8 = 3
+intTime8 = 0.1
 #npzDataFile10 = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfBlue.npz'
 BDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfBlueInt10.npz'
 RDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfRedInt10.npz'
@@ -21,8 +22,8 @@ intTime11 = 10
 
 BDataFile8 = np.load(BDec8npzData)
 Bparams8 = BDataFile8['params']
-#jd8 = DataFile8['jd']
-jd8 = BMJD8=np.loadtxt('/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3MJD_TDB.txt')
+jd8 = BDataFile8['jd']
+#jd8 = BMJD8=np.loadtxt('/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3MJD_TDB.txt')
 #jd8 = np.array([line[1] for line in BMJD8])
 #print jd8[0],jd8[len(jd8)-1]
 #params[:,0] are the height offset of the gaussian (so the number of background pulses)
@@ -32,9 +33,9 @@ Bwidths8 = Bparams8[:,4]
 #ypos8 = params8[:,3]
 Bcurve8 = 2*pi*Bamps8*Bwidths8**2/intTime8
 hrs8= (jd8*24-int(jd8[0]*24))
-#MJD8 = np.array(jd8)-2400000.5
-#np.savetxt('/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueMJDlong.txt',MJD8,fmt='%.30f')
-#np.savez('/Scratch/dataProcessing/SDSS_J0926/Dec8BlueInt3lightcurve.npz',MJD_TDB = jd8,curve = curve8)
+jd8=MJD8 = np.array(jd8)-2400000.5
+np.savetxt('/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfAll.1MJDlong.txt',MJD8,fmt='%.30f')
+#np.savez('/Scratch/dataProcessing/SDSS_J0926/Dec8AllInt.1lightcurve.npz',MJD_TDB = jd8,curve = Bcurve8)
 
 RDataFile8 = np.load(RDec8npzData)
 Rparams8 = RDataFile8['params']
@@ -74,7 +75,7 @@ Bcurve10 = 2*pi*Bamps10*Bwidths10**2/intTime10
 Bcurve10 = Bcurve10[421:]
 jd10 = jd10[421:]
 hrs10= (jd10*24-int(jd10[0]*24))
-np.savez('/Scratch/dataProcessing/SDSS_J0926/Dec10BlueInt10lightcurve.npz',MJD_TDB = jd10,curve = Bcurve10)
+#np.savez('/Scratch/dataProcessing/SDSS_J0926/Dec10BlueInt10lightcurve.npz',MJD_TDB = jd10,curve = Bcurve10)
 
 RDataFile10 = np.load(RDec10npzData)
 Rparams10 = RDataFile10['params']
@@ -108,19 +109,21 @@ plt.subplots_adjust(hspace=0.001)
 
 ax1 = plt.subplot(311)
 ax1.plot(hrs8[:1300],Bcurve8[:1300],'b-',label="300 - 500 nm")
+print len(hrs8),len(Bcurve8)
+print len(hrs8[1301:]), len(Bcurve8[1301:])
 ax1.plot(hrs8[1301:],Bcurve8[1301:],'b-')
-ax1.plot(hrs8[:1300],Rcurve8[:1300],'r-',label="500 - 700 nm")
-ax1.plot(hrs8[1301:],Rcurve8[1301:],'r-')
-ax1.plot(hrs8[:1300],Gcurve8[:1300],'g-',label="500 - 600 nm")
-ax1.plot(hrs8[1301:],Gcurve8[1301:],'g-')
-ax1.plot(hrs8[:1300],R_curve8[:1300],'Coral',label="600 - 700 nm")
-ax1.plot(hrs8[1301:],R_curve8[1301:],'Coral')
-ax1.plot(hrs8[:1300],I_curve8[:1300],'m-',label="700 - 900 nm")
-ax1.plot(hrs8[1301:],I_curve8[1301:],'m-')
+#ax1.plot(hrs8[:1300],Rcurve8[:1300],'r-',label="500 - 700 nm")
+#ax1.plot(hrs8[1301:],Rcurve8[1301:],'r-')
+#ax1.plot(hrs8[:1300],Gcurve8[:1300],'g-',label="500 - 600 nm")
+#ax1.plot(hrs8[1301:],Gcurve8[1301:],'g-')
+#ax1.plot(hrs8[:1300],R_curve8[:1300],'Coral',label="600 - 700 nm")
+#ax1.plot(hrs8[1301:],R_curve8[1301:],'Coral')
+#ax1.plot(hrs8[:1300],I_curve8[:1300],'m-',label="700 - 900 nm")
+#ax1.plot(hrs8[1301:],I_curve8[1301:],'m-')
 #plt.yticks(np.arange(700, 1700, 200))
 plt.annotate('8th December 2012\nIntegration Time = 3 sec\nAverage Blue Gaussian Parameters:\nWidth = %.2f, Height = %.2f'%(np.average(Bwidths8),np.average(Bamps8)), xy=(0.7, 0.70), xycoords='axes fraction')
 #plt.ylim(700,1600)
-plt.ylim(100,1600)
+#plt.ylim(100,1600)
 plt.legend(loc="lower right")
 
 ax2 = plt.subplot(312, sharex=ax1)

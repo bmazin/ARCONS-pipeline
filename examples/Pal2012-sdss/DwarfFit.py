@@ -9,26 +9,29 @@ from scipy import pi,sqrt,exp
 
 #[npzDataFile,Int,BMJDfile,fitwidth,RatioBelow,RatioAbove,EclipseNum, cutoffmin,cutoffmax,b0,peakCutOffmin,peakCutOffmax,fit?]
 #BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
-BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
+#BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3.npz'
+BDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlue-Int3newwvlcal.npz'
 Dec8txtBjd = BDec8txtBjd = RDec8txtBjd = IDec8txtBjd = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlueInt3MJD_TDB.txt'
 BDec8Eclipse1 = [BDec8npzData,3,BDec8txtBjd,23,1/5.,4/5.,1,0,300,0,0,300,True]
 BDec8Eclipse2 = [BDec8npzData,3,BDec8txtBjd,23,2/5.,4/5.,2,550,850,-.5,0,200,True] 
 BDec8Eclipse3 = [BDec8npzData,3,BDec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,0,300,True]
 
 #Int=10. #so 23 => 7, 300 => 90
-BDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfBlueInt10.npz'
+#BDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfBlueInt10.npz'
+BDec10npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfBlue-Int10newwvlcal.npz'
 BDec10txtBjd = RDec10txtBjd = IDec10txtBjd = '/Scratch/dataProcessing/SDSS_J0926/Dec10fitpsfBlueInt10MJD_TDB.txt'
-BDec10Eclipse1 = [BDec10npzData,10,BDec10txtBjd,7,1/3.,2/3.,1,490,580,.5,0,90,True]
-BDec10Eclipse2 = [BDec10npzData,10,BDec10txtBjd,7,1/3.,2/3.,2,650,740,-.5,0,90,True]
-BDec10Eclipse3 = [BDec10npzData,10,BDec10txtBjd,7,1/3.,2/3.,3,820,910,.3,0,90,True]
+BDec10Eclipse1 = [BDec10npzData,10,BDec10txtBjd,7,1/3.,2/3.,1,490,580,.5,0,90,False]
+BDec10Eclipse2 = [BDec10npzData,10,BDec10txtBjd,7,2/5.,2/3.,2,650,740,-.5,0,80,True]
+BDec10Eclipse3 = [BDec10npzData,10,BDec10txtBjd,7,2/5.,2/3.,3,820,910,.3,0,90,True]
 
-BDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfBlueInt10.npz'
+#BDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfBlueInt10.npz'
+BDec11npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfBlue-Int10newwvlcal.npz'
 BDec11txtBjd = RDec11txtBjd = IDec11txtBjd = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfBlueInt10MJD_TDB.txt'
-BDec11Eclipse0 = [BDec11npzData,10,BDec11txtBjd,6,0.,1/4.,0,0,90,5.5,0,40,True] 
+BDec11Eclipse0 = [BDec11npzData,10,BDec11txtBjd,6,0.,1/5.,0,0,90,5.5,0,40,True] 
 BDec11Eclipse1 = [BDec11npzData,10,BDec11txtBjd,7,3/7.,3/5.,1,130,220,.5,0,90,True]
-BDec11Eclipse2 = [BDec11npzData,10,BDec11txtBjd,7,1/3.,2/3.,2,300,390,.5,0,90,True]
-BDec11Eclipse3 = [BDec11npzData,10,BDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,0,90,True]
-BDec11Eclipse4 = [BDec11npzData,10,BDec11txtBjd,6,2/5.,3/5.,4,640,730,.7,40,90,True]
+BDec11Eclipse2 = [BDec11npzData,10,BDec11txtBjd,7,1/3.,2/3.,2,300,390,.5,0,90,False]
+BDec11Eclipse3 = [BDec11npzData,10,BDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,20,90,True]
+BDec11Eclipse4 = [BDec11npzData,10,BDec11txtBjd,6,2/5.,3/5.,4,640,730,.7,40,90,False]
 
 RDec8npzData = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfRedInt3.npz'
 #RDec8txtBjd = '/Scratch/dataProcessing/SDSS_J0926/OlderData/Dec8fitpsfBlueMJD-TDB.txt'
@@ -84,12 +87,12 @@ I_Dec8Eclipse3 = [I_Dec8npzData,3,Dec8txtBjd,23,2/5.,4/5.,3,1100,1400,-1,100,300
 #IDec11Eclipse3 = [IDec11npzData,10,IDec11txtBjd,7,2/5.,3/5.,3,470,560,.7,0,90,False]
 #IDec11Eclipse4 = [IDec11npzData,10,IDec11txtBjd,7,2/5.,3/5.,4,640,730,.7,0,90,False]
 
-#files = [BDec8Eclipse1,BDec8Eclipse2,BDec8Eclipse3,BDec10Eclipse1,BDec10Eclipse2,BDec10Eclipse3,BDec11Eclipse0,BDec11Eclipse1,BDec11Eclipse2,BDec11Eclipse3,BDec11Eclipse4]
+files = [BDec8Eclipse1,BDec8Eclipse2,BDec8Eclipse3,BDec10Eclipse1,BDec10Eclipse2,BDec10Eclipse3,BDec11Eclipse0,BDec11Eclipse1,BDec11Eclipse2,BDec11Eclipse3,BDec11Eclipse4]
 #files = [RDec8Eclipse1,RDec8Eclipse2,RDec8Eclipse3,RDec10Eclipse1,RDec10Eclipse2,RDec10Eclipse3,RDec11Eclipse0,RDec11Eclipse1,RDec11Eclipse2,RDec11Eclipse3,RDec11Eclipse4]
-files = [GDec8Eclipse1,GDec8Eclipse2,GDec8Eclipse3,R_Dec8Eclipse1,R_Dec8Eclipse2,R_Dec8Eclipse3,I_Dec8Eclipse1,I_Dec8Eclipse2,I_Dec8Eclipse3]
+#files = [GDec8Eclipse1,GDec8Eclipse2,GDec8Eclipse3,R_Dec8Eclipse1,R_Dec8Eclipse2,R_Dec8Eclipse3,I_Dec8Eclipse1,I_Dec8Eclipse2,I_Dec8Eclipse3]
 
 #files = [IDec8Eclipse1,IDec8Eclipse2,IDec8Eclipse3,IDec10Eclipse1,IDec10Eclipse2,IDec10Eclipse3,IDec11Eclipse0,IDec11Eclipse1,IDec11Eclipse2,IDec11Eclipse3,IDec11Eclipse4]
-plotdimy = 3
+plotdimy = 4
 plotdimx = 3
 
 def zero_if_negative(x):
@@ -124,9 +127,8 @@ def WhiteDwarf(x,a,b,c,amp,epsilon):
     mu=zero_if_negative(mu)
     return amp*mu*(1-epsilon+epsilon*mu)+c # Intensity is proportional to mu*(1-epsilon+epsilon*mu)
 
-def fitWhiteDwarf(x,data):
-    sigma= [10]*fitstart+[1]*(2*fitwidth)+[10]*(len(data)-fitend)
-
+def fitWhiteDwarf(x,data): 
+    sigma= [10]*fitstart+[1]*(fitend-fitstart)+[10]*(len(data)-fitend)
     popt, pcov = optimize.curve_fit(WhiteDwarf, x, data, p0=WDp0,sigma=sigma)
 #    print WDp0
 #    print pcov
@@ -166,6 +168,7 @@ for eclipse in range(len(files)):
     xpos = params[:,2]
     ypos = params[:,3]
     curve = 2*pi*amps*widths**2/Int
+    print len(curve)
 #    jd = [line[1] for line in BMJD]
     jd = BMJD
     jd = jd[cutoffmin:cutoffmax]
@@ -179,9 +182,11 @@ for eclipse in range(len(files)):
     DataIndex_min = data[peakCutOffmin:peakCutOffmax].argmin()+peakCutOffmin
     fitstart = DataIndex_min-fitwidth
     fitend = fitstart+2*fitwidth
+    if fitend > len(jd)-1:
+        fitend = len(jd)-1
 
     ax = fig.add_subplot(plotdimy,plotdimx,eclipse+1)
-
+    print fitstart,fitend
     ax.plot(jd,WhiteDwarf(x, WDp0[0],WDp0[1],WDp0[2],WDp0[3],WDp0[4]),'--')
     ax.plot([jd[fitstart],jd[fitend]],[np.average(data)]*2,'go')
 #    ax.plot([jd[peakCutOffmin],jd[peakCutOffmax-1]],[np.average(data)]*2,'ro')
@@ -190,6 +195,8 @@ for eclipse in range(len(files)):
 #    plt.show()
 
     if fit == True:
+        print 'x',len(x)
+        print 'data',len(data)
         TFparams = fitWhiteDwarf(x,data)
         print TFparams
 
@@ -226,7 +233,7 @@ for eclipse in range(len(files)):
     ax.set_ylabel('Photon Count Rate per Sec',size='small')
 
 
-#np.savez('/Scratch/dataProcessing/SDSS_J0926/Dec8AddColorsfitresults.npz',EclipseTimes = EclipseTimes, FittedParams = FittedParams)
+np.savez('/Scratch/dataProcessing/SDSS_J0926/AllDataBlue-fitresults.npz',EclipseTimes = EclipseTimes, FittedParams = FittedParams)
 ax.legend(prop={'size':'small'})
 plt.show()
 

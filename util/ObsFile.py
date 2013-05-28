@@ -23,6 +23,7 @@ getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
+getAperturePixelCountImage(self, firstSec=0, integrationTime= -1, y_values=range(46), x_values=range(44), y_sky=[], x_sky=[], apertureMask=np.ones((46,44)), skyMask=np.zeros((46,44)), weighted=False, fluxWeighted=False, getRawCount=False, scaleByEffInt=False)
 getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None)
 getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000, wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None)
 getPixelBadTimes(self, pixelRow, pixelCol)
@@ -61,6 +62,7 @@ from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
 import photonlist.photlist
+from scipy import pi
 
 
 class ObsFile:
@@ -476,8 +478,7 @@ class ObsFile:
             return {'counts':counts, 'effIntTime':effIntTime}
 
         else:
-            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,
-                                          weighted=weighted, fluxWeighted=fluxWeighted)
+            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted)
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 
@@ -682,6 +683,66 @@ class ObsFile:
         return{'image':secImg, 'effIntTimes':effIntTimes}
         #else:
         #    return secImg
+
+    def getAperturePixelCountImage(self, firstSec=0, integrationTime= -1, y_values=range(46), x_values=range(44), y_sky=[], x_sky=[], apertureMask=np.ones((46,44)), skyMask=np.zeros((46,44)), weighted=False, fluxWeighted=False, getRawCount=False, scaleByEffInt=False):
+
+        """
+        Return a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime 
+        This aperture version subtracts out the average sky counts/pixel and includes scaling due to circular apertures. GD 5/27/13
+        If integration time is -1, all time after firstSec is used.
+        If weighted is True, flat cal weights are applied. JvE 12/28/12
+        If fluxWeighted is True, flux cal weights are applied. SM 2/7/13
+        If getRawCount is True then the raw non-wavelength-calibrated image is
+        returned with no wavelength cutoffs applied (in which case no wavecal
+        file need be loaded). JvE 3/1/13
+        If scaleByEffInt is True, any pixels that have 'bad' times masked out
+        will have their counts scaled up to match the equivalent integration 
+        time requested.
+        RETURNS:
+            Dictionary with keys:
+                'image' - a 2D array representing the image
+                'effIntTimes' - a 2D array containing effective integration 
+                                times for each pixel.
+        """
+        secImg = np.zeros((self.nRow, self.nCol))
+        effIntTimes = np.zeros((self.nRow, self.nCol), dtype=np.float64)
+        effIntTimes.fill(np.nan)   #Just in case an element doesn't get filled for some reason.
+        skyValues=[]
+        objValues=[]
+        AreaSky=[]
+        AreaObj=[]
+#        print len(y_sky),len(x_sky)
+#        print len(y_values),len(x_values)
+        for pix in xrange(len(y_sky)):
+                pcount = self.getPixelCount(y_sky[pix], x_sky[pix], firstSec, integrationTime,weighted, fluxWeighted, getRawCount)
+#                print skyMask[iRow][iCol]
+                skyValue=pcount['counts']*skyMask[y_sky[pix]][x_sky[pix]]
+                skyValues.append(skyValue)
+                AreaSky.append(skyMask[y_sky[pix]][x_sky[pix]])
+#        print 'theoretical area = ', pi*(radius2**2-radius1**2)
+#        print 'actual area = ', np.sum(AreaSky)
+        skyCountPerPixel = np.sum(skyValues)/(np.sum(AreaSky))
+#        print 'sky count per pixel =',skyCountPerPixel
+        for pix in xrange(len(y_values)):
+                pcount = self.getPixelCount(y_values[pix], x_values[pix], firstSec, integrationTime,
+                                          weighted, fluxWeighted, getRawCount)
+#                print pcount['counts']
+                secImg[y_values[pix],x_values[pix]] = (pcount['counts']-skyCountPerPixel)*apertureMask[y_values[pix]][x_values[pix]]
+                AreaObj.append(apertureMask[y_values[pix]][x_values[pix]])
+                effIntTimes[y_values[pix],x_values[pix]] = pcount['effIntTime']
+                objValues.append(pcount['counts']*apertureMask[y_values[pix]][x_values[pix]])
+        AveObj=np.sum(objValues)/(np.sum(AreaObj))
+#        print 'theoretical area = ', pi*(radius1**2)
+#        print 'actual area = ', np.sum(AreaObj)
+#        print 'ave obj per pixel (not sub) = ',AveObj
+        NumObjPhotons = np.sum(secImg)
+#        print 'lightcurve = ',NumObjPhotons
+        if scaleByEffInt is True:
+            secImg *= (integrationTime / effIntTimes)                    
+        #if getEffInt is True:
+        return{'image':secImg, 'effIntTimes':effIntTimes, 'SkyCountSubtractedPerPixel':skyCountPerPixel,'lightcurve':NumObjPhotons}
+        #else:
+        #    return secImg
     
     def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
         """
@@ -853,8 +914,7 @@ class ObsFile:
         1's for pixels with counts, 0's for pixels without counts
         if showMe is True, a plot of the mask pops up
         """
-        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts']
-                                 for iCol in range(self.nCol)] for iRow in range(self.nRow)])
+        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts'] for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow, self.nCol))
         deadArray[countArray == 0] = 0
         if showMe == True:
