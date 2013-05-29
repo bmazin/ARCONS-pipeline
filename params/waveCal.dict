@@ -1,16 +1,16 @@
 ## Files and Dirs
 
 #calfileslist = 'calfile_list_Lick.txt'                                 # generated with script list_calfiles.sh/list_calfiles.py 
-#calfileslist = 'calfile_list_Palo.txt'
+calfileslist = 'calfile_list_Palo.txt'
 #calfileslist = 'calfile_list_labtesting2013.txt'
-calfileslist = 'calfile_list_labtesting2013_2.txt'
+#calfileslist = 'calfile_list_labtesting2013_2.txt'
 
 #files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
 #files2run = '/ScienceData/PAL2012/20121204/obs_20121204-233549.h5'
 #files2run = '/Scratch/matchedData/cal_20121208-023522.h5'
-#files2run = '20121205'
+files2run = '20121211'
 #files2run = 'all'
-files2run = '20130220'
+#files2run = '20130220'
 
 ## For Matt's NLTT anal
 #files2run = '/ScienceData/PAL2012/20121210/cal_20121211-133056.h5'
@@ -64,9 +64,13 @@ timeMask = int(n_bits_time*'1',2)
 
 ## Laser light wavelengths
 
-bluelambda = 4009.4      # Angstroms
-redlambda  = 6560.4 
-irlambda   = 9744.9
+#bluelambda = 4009.4      # Angstroms
+#redlambda  = 6560.4 
+#irlambda   = 9744.9
+
+bluelambda = 4066.      # Angstroms; New box - Dec 2012 Palomar run
+redlambda  = 6710. 
+irlambda   = 9821.
 
 n_lasers = 3
 
