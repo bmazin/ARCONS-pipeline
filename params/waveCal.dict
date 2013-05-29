@@ -22,9 +22,9 @@ files2run = '20121211'
                                              
 
 #outdir = '/ScienceData/waveCalSolnFiles/'
-#outdir = '/Scratch/waveCalSolnFiles/'
+outdir = '/Scratch/waveCalSolnFiles/'
 #outdir = '/Scratch/newArrayData/20130201/'
-outdir = '/Scratch/newArrayData/'
+#outdir = '/Scratch/newArrayData/'
 
 
 figdir = 'figs/'
