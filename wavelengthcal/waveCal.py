@@ -59,6 +59,7 @@ class DriftObj(IsDescription):
     gaussparams = tables.Float64Col(6)         # polynomial to convert from phase amplitude to wavelength,
                                                #    double precision
     perrors = tables.Float64Col(6)             # the errors on the fits
+
     
 def failure(row, xyrarray, xyrrarray, xylarray, roacharr, pixi, pixj, flagnum):
     row['wave_flag'] = flagnum
@@ -108,7 +109,6 @@ def fitTwo(peaks, peak_locations, xarr, yarr):
         
     for k,p in enumerate(mpp):
         parinfo[k]['value'] = p
-        #print parinfo[k]['parname'],p," +/- ",mpperr[j]
         if k==0: sigma1 = p
         if k==1: x_offset1 = p
         if k==2: amplitude1 = p
@@ -294,8 +294,8 @@ def wavelengthCal(paramFile):
                 row['wave_flag'] = 0                      # 0 until flagged
 
                 # Cut non-allocated pixels
-                #if (roach==0) & (pixel==params['non_alloc_pix']):
-                if ((roach==0) & (pixel==params['non_alloc_pix'])) | (roach > 3):
+                if (roach==0) & (pixel==params['non_alloc_pix']):
+                #if ((roach==0) & (pixel==params['non_alloc_pix'])) | (roach > 3):   # lab testing - just roaches 0-3
                     failure(row, xyrarray, xyrrarray, xylarray, roacharr, i, j, 1)
                     continue
 
