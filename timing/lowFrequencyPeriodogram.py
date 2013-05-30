@@ -80,7 +80,7 @@ flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSo
 flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 # Specify the amount of time bins to make per second of observations.  E.g. binsPerSecond = 10**6 corresponds to microsecond binning.
-binsPerSecond = 1
+binsPerSecond = 0.1
 
 # Specify frequencies for which the periodogram algorithm should find transform components.
 freqs = np.linspace(10**-4,10**-3,num=10**4)
@@ -104,40 +104,40 @@ for iSeq in range(len(seqs)):
     sunsetDate = sunsetDates[iSeq]
     for i,ts in enumerate(timestampList):
         print 'Loading',ts
-	timestamps =[]
-	# Create ObsFile instance.
+        timestamps =[]
+        # Create ObsFile instance.
         obsFn = FileName(run=run,date=sunsetDate,tstamp=ts).obs()
         ob = ObsFile(obsFn)
-	# Load roach time delay corrections.
-	ob.loadTimeAdjustmentFile(FileName(run=run).timeAdjustments())
-	# Retrieve exposure time and unix time from obs file header.
-	exptime = ob.getFromHeader('exptime')
-	unixtime= ob.getFromHeader('unixtime')
-	# Set unix time of first obs file as the zero point.
-	if i == 0 and iSeq == 0:
-	    unixOffset = unixtime
-	# Search for time mask for given observation file.  If the time mask does not exist, create it.
-	index1 = obsFn.find('_')
-	hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
+        # Load roach time delay corrections.
+        ob.loadTimeAdjustmentFile(FileName(run=run).timeAdjustments())
+        # Retrieve exposure time and unix time from obs file header.
+        exptime = ob.getFromHeader('exptime')
+        unixtime= ob.getFromHeader('unixtime')
+        # Set unix time of first obs file as the zero point.
+        if i == 0 and iSeq == 0:
+            unixOffset = unixtime
+        # Search for time mask for given observation file.  If the time mask does not exist, create it.
+        index1 = obsFn.find('_')
+        hotPixFn = '/Scratch/timeMasks/timeMask' + obsFn[index1:]
         if not os.path.exists(hotPixFn):
             hp.findHotPixels(obsFn,hotPixFn)
             print "Flux file pixel mask saved to %s"%(hotPixFn)
-	# Load time mask, wavelength calibration, and flat calibration and set wavelenth cutoffs.
+        # Load time mask, wavelength calibration, and flat calibration and set wavelenth cutoffs.
         ob.loadHotPixCalFile(hotPixFn,switchOnMask=True)
         ob.loadWvlCalFile(wfn)
         ob.loadFlatCalFile(ffn)
-	ob.setWvlCutoffs(3000,5000)
-	# Get a list of timestamps with photons from each pixel in the aperture.
-	for j in range(len(xValues)):
-	    x=ob.getPixelWvlList(iRow=yValues[j],iCol=xValues[j])
-	    timestamps = np.append(timestamps,x['timestamps'])
-	# Histogram the timestamps with bins corresponding to the binsPerSecond variable.
-	binnedCounts, binEdges = np.histogram(timestamps,range=[0,exptime],bins = binsPerSecond*exptime)
-	# Append photon count data to a total list across multiple obs files.
-	countsPerTimestep = np.append(countsPerTimestep,binnedCounts)
-	# Use the unix time to determine the delay between observations and create an accurately spaced time axis.
-	binEdges=binEdges[0:-1]
-	timeArray=np.append(timeArray, (unixtime-unixOffset) + binEdges)
+        ob.setWvlCutoffs(3000,8000)
+        # Get a list of timestamps with photons from each pixel in the aperture.
+        for j in range(len(xValues)):
+            x=ob.getPixelWvlList(iRow=yValues[j],iCol=xValues[j])
+            timestamps = np.append(timestamps,x['timestamps'])
+        # Histogram the timestamps with bins corresponding to the binsPerSecond variable.
+        binnedCounts, binEdges = np.histogram(timestamps,range=[0,exptime],bins = binsPerSecond*exptime)
+        # Append photon count data to a total list across multiple obs files.
+        countsPerTimestep = np.append(countsPerTimestep,binnedCounts)
+        # Use the unix time to determine the delay between observations and create an accurately spaced time axis.
+        binEdges=binEdges[0:-1]
+        timeArray=np.append(timeArray, (unixtime-unixOffset) + binEdges)
 	   			
 print 'Loaded files in',time()-tic, 'seconds.'
 
@@ -151,28 +151,32 @@ periodogram = spectral.lombscargle(timeArray, scaledCounts, angularFreqs)
 print 'Calculated Fourier components in',time()-tic, 'seconds.'
 
 # Save data to txt files.
-f=open(savePath+'timeData.txt','w')
-g=open(savePath+'frequencyData.txt','w')
+f=open(savePath+'timeDataTest.txt','w')
+g=open(savePath+'frequencyDataTest.txt','w')
 for time in range(len(timeArray)):
-    f=open(savePath + 'timeData.txt','a')
+    f=open(savePath + 'timeDataTest.txt','a')
     f.write(str(timeArray[time]) + '\t' + str(scaledCounts[time]) + '\n')
 for iFreq in range(len(freqs)):
-    g=open(savePath + 'frequencyData.txt','a')
+    g=open(savePath + 'frequencyDataTest.txt','a')
     g.write(str(freqs[iFreq]) + '\t' + str(periodogram[iFreq]) + '\n')
 f.close()
 g.close()
 
-# Plot the periodogram transform components (power?) vs frequencies.
 fig = plt.figure()
-ax = fig.add_subplot(111)
+# Plot light curve
+ax = fig.add_subplot(211)
+ax.plot(timeArray,scaledCounts,'b.')
+ax.set_title('Light Curve')
+plt.xlabel('Julian Date')
+plt.ylabel('Scaled Counts')
+# Plot fourier transform
+ax = fig.add_subplot(212)
 ax.plot(freqs,periodogram)
 #ax.set_xscale('log')
 #ax.set_yscale('log')
 ax.set_title('Periodogram')
-plt.xlabel('Frequency (Hz)')
-plt.ylabel('Transform Component')
-for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
-    item.set_fontsize(16)
+plt.xlabel('Frequency (Cycles/Day)')
+plt.ylabel('Power')
 plt.show()
 
 
