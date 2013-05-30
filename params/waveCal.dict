@@ -8,7 +8,7 @@ calfileslist = 'calfile_list_Palo.txt'
 #files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
 #files2run = '/ScienceData/PAL2012/20121204/obs_20121204-233549.h5'
 #files2run = '/Scratch/matchedData/cal_20121208-023522.h5'
-files2run = '20121208'
+files2run = '20121207'
 #files2run = 'all'
 #files2run = '20130220'
 
