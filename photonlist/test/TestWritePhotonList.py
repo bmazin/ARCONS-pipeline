@@ -3,6 +3,7 @@ Author: Julian van Eyken    Date: May 7 2013
 
 Test code for photon lists. Under construction....
 '''
+import time
 from util.FileName import FileName
 from util.ObsFile import ObsFile
 from util.utils import plotArray
@@ -51,17 +52,7 @@ def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     #photFile = photList.PhotFile(outputFilename)
     
     
-def testGetImageDet(fileName=None,firstSec=0,integrationTime=-1):
-    
-    plFile = photlist.PhotList(fileName)
-    try:
-        image = plFile.getImageDet(firstSec=firstSec,integrationTime=integrationTime)
-    finally:
-        #plFile.close()
-        print 'Deleting file instance'
-        del plFile
-    plotArray(image)
-    
+
     
 if __name__ == "__main__":
     

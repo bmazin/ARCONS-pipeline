@@ -10,7 +10,8 @@ import tables
 from astropy import constants, units
 from headers import pipelineFlags, ArconsHeaders
 from util import utils
-from astrometry import calculateRaDec as crd
+from astrometry import CalculateRaDec as crd
+from util.FileName import FileName
 
 xyPackMult = 100  #Multiplier factor for turning row,col coordinate pairs into single integers for storage in HDF file (see xyPack).
 
@@ -102,42 +103,58 @@ class PhotList(object):
     
     
     def getImageDet(self,firstSec=-np.Inf,integrationTime=-1,wvlMin=-np.Inf,
-                 wvlMax=np.Inf):
+                 wvlMax=np.Inf,newMethod=True):
         '''
         Return a 2D image consisting of photon counts in each pixel, in the detector pixel
         coordinate frame.
+        
+        newMethod=True to use numpy histogram for creating image. Runs faster for short integration times,
+        but just a little slower for full images.
         '''
         if integrationTime==-1:
             lastSec=np.Inf
         else:  
             lastSec = firstSec+integrationTime
-        
-        #Initialise an empty image
-        image = np.empty((self.nRow,self.nCol),dtype=float)
-        image.fill(np.NaN)
-        
-        #Step through pixels and fill em up.
-        for iRow in range(self.nRow):    #self.nCol):
-            print 'Reading pixel row ', iRow
-            for iCol in range(self.nCol):
-                rowcol = xyPack(iRow,iCol)
-                #image[iRow,iCol] = len(self.photTable.getWhereList('(Xpix == iCol) & (Ypix == iRow) & (ArrivalTime >= firstSec) & (ArrivalTime < lastSec)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))
-                #image[iRow,iCol] = len(self.photTable.getWhereList(('XYpix==rowcol'))) # & (self.photTable.cols.Ypix == iRow) & (self.photTable.cols.ArrivalTime >= firstSec)
-                                                                    #& (self.photTable.cols.ArrivalTime < lastSec) & (self.photTable.cols.Wavelength >= wvlMin) & (self.photTable.cols.Wavelength < wvlMax) ))
 
-                photons = (self.photTable.readWhere('xyPix==rowcol'))
-                image[iRow,iCol] = np.sum((photons['arrivalTime'] >= firstSec) & (photons['arrivalTime'] < lastSec)
-                                          & (photons['wavelength'] >= wvlMin) & (photons['wavelength'] < wvlMax))
-                #rowcolplus=rowcol+1
-                #rowcolminus=rowcol-1
-                #arrTimes = self.photTable.getWhereList('(xyPix<rowcolplus) & (xyPix>rowcolminus)')
-                #image[iRow,iCol] = np.sum((arrTimes >= firstSec) & (arrTimes < lastSec))
-                
-                #image[iRow,iCol] = len(photons.where('ArrivalTime >= firstSec) & ArrivalTime < lastSec)'))
-                #image[iRow,iCol] = len(photons)
-                
-                #image[iRow,iCol] = len(self.photTable.getWhereList('(ArrivalTime >= firstSec) & (ArrivalTime < lastSec) & (Ypix == iRow) & (Xpix == iCol)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))                
-                #image[iRow,iCol] = len(self.photTable.getWhereList('(Ypix == iRow)' ))
+        if newMethod:
+            #Should be more efficient....
+            print 'Searching photons'
+            #ind = self.photTable.getWhereList('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+            photons = self.photTable.readWhere('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+            #print 'Getting coordinates'
+            #photX = self.photTable.readCoordinates(ind,field='xPix')
+            #photY = self.photTable.readCoordinates(ind,field='yPix')
+            print 'Building 2D histogram'
+            image, y,x = np.histogram2d(photons['xPix'],photons['yPix'],bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
+            #image, y,x = np.histogram2d(photX,photY,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
+
+        else:
+            #Initialise an empty image
+            image = np.empty((self.nRow,self.nCol),dtype=float)
+            image.fill(np.NaN)
+           
+            #Step through pixels and fill em up.
+            for iRow in range(self.nRow):    #self.nCol):
+                print 'Reading pixel row ', iRow
+                for iCol in range(self.nCol):
+                    rowcol = xyPack(iRow,iCol)
+                    #image[iRow,iCol] = len(self.photTable.getWhereList('(Xpix == iCol) & (Ypix == iRow) & (ArrivalTime >= firstSec) & (ArrivalTime < lastSec)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))
+                    #image[iRow,iCol] = len(self.photTable.getWhereList(('XYpix==rowcol'))) # & (self.photTable.cols.Ypix == iRow) & (self.photTable.cols.ArrivalTime >= firstSec)
+                                                                        #& (self.photTable.cols.ArrivalTime < lastSec) & (self.photTable.cols.Wavelength >= wvlMin) & (self.photTable.cols.Wavelength < wvlMax) ))
+    
+                    photons = (self.photTable.readWhere('xyPix==rowcol'))
+                    image[iRow,iCol] = np.sum((photons['arrivalTime'] >= firstSec) & (photons['arrivalTime'] < lastSec)
+                                              & (photons['wavelength'] >= wvlMin) & (photons['wavelength'] < wvlMax))
+                    #rowcolplus=rowcol+1
+                    #rowcolminus=rowcol-1
+                    #arrTimes = self.photTable.getWhereList('(xyPix<rowcolplus) & (xyPix>rowcolminus)')
+                    #image[iRow,iCol] = np.sum((arrTimes >= firstSec) & (arrTimes < lastSec))
+                    
+                    #image[iRow,iCol] = len(photons.where('ArrivalTime >= firstSec) & ArrivalTime < lastSec)'))
+                    #image[iRow,iCol] = len(photons)
+                    
+                    #image[iRow,iCol] = len(self.photTable.getWhereList('(ArrivalTime >= firstSec) & (ArrivalTime < lastSec) & (Ypix == iRow) & (Xpix == iCol)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))                
+                    #image[iRow,iCol] = len(self.photTable.getWhereList('(Ypix == iRow)' ))
                 
         #That should be it....
         return image
@@ -147,7 +164,8 @@ class PhotList(object):
         Get a 2D image in the sky frame - i.e, in RA, dec coordinate space, derotated and stacked
         if necessary.
         '''
-        
+        pass #Fix me!!!
+    
         
 def createEmptyPhotonListFile(obsFile,fileName=None):
      """
@@ -161,11 +179,12 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
      """
      
      if fileName is None:    
-         fileTimestamp = obsFile.fileName.split('_')[1].split('.')[0]
-         fileDate = os.path.basename(os.path.dirname(self.fullFileName))
-         run = os.path.basename(os.path.dirname(os.path.dirname(self.fullFileName)))
-         fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
-         fullPhotonListFileName = fn.photonList()
+         #fileTimestamp = obsFile.fileName.split('_')[1].split('.')[0]
+         #fileDate = os.path.basename(os.path.dirname(obsFile.fullFileName))
+         #run = os.path.basename(os.path.dirname(os.path.dirname(obsFile.fullFileName)))
+         #fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
+         #fullPhotonListFileName = fn.photonList()
+         fullPhotonListFileName = FileName(obsFile=obsFile).photonList()
      else:
          fullPhotonListFileName = fileName
      if (os.path.exists(fullPhotonListFileName)):
@@ -173,13 +192,13 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
              warnings.warn('No photon list file created')
              return
      zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
-     bloscFilter = tables.Filters(complib='blosc', fletcher32=False)
+     bloscFilter = tables.Filters(complevel=5, complib='blosc', fletcher32=False)    #May be more efficient to use - needs some experimenting with compression level etc.
      try:
          plFile = tables.openFile(fullPhotonListFileName, mode='w')
          plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
          plTable = plFile.createTable(plGroup, 'photons', ArconsHeaders.PhotonList, 'Photon List Data', 
-                                      filters=zlibFilter, 
-                                      expectedrows=300000)  #Temporary fudge to see if it helps!
+                                      filters=bloscFilter) 
+                                      #expectedrows=300000)
      except:
          plFile.close()
          raise
@@ -188,7 +207,8 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
 
 
 
-def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astrometryFileName=None):
+def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, 
+                    astrometryFileName=None, doIndex=True):
     """
     writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
     currently cuts out photons outside the valid wavelength ranges from the wavecal
@@ -209,6 +229,8 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                    firstSec). -1 to extract to end of obs. file.
         astrometryFileName - name of centroid list file, as created by Paul's code, 
                    - see astrometry/centroidCalc.py.
+        doIndex - boolean. If True, then index the main columns of the photon list table
+                   for efficient access.
     
     """
     
@@ -218,7 +240,10 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
     if obsFile.hotPixFile is None: raise RuntimeError, "No hot pixel file loaded"
     if obsFile.file is None: raise RuntimeError, "No obs file loaded...?"
     
-    print 'Initialising empty photon list file '+filename
+    if filename is None:
+        filename=FileName(obsFile=obsFile).photonList()
+    
+    print 'Initialising empty photon list file'
     plFile = createEmptyPhotonListFile(obsFile,filename)
     plTable = plFile.root.photons.photons
             
@@ -244,7 +269,10 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                            pipelineFlags.fluxCal['aboveWaveCalRange']))
 
     #Initialise CalculateRaDec object with the right centroiding file for calculating RA/dec of photons.
-    raDecCalcObject = crd.CalculateRaDec(astrometryFileName)
+    if astrometryFileName is None:
+        warnings.warn('No astrometry file provided - all RA/Dec values will be NaN')
+    else:
+        raDecCalcObject = crd.CalculateRaDec(astrometryFileName)
 
     try:
         for iRow in xrange(obsFile.nRow):
@@ -296,6 +324,15 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                     else:
                         fluxBinIndices = np.array([])
     
+                    iCols = np.empty(len(timestamps),dtype=int)
+                    iRows = np.empty(len(timestamps),dtype=int)
+                    iCols.fill(iCol)
+                    iRows.fill(iRow)
+    
+                    #assert 1==0
+                    if astrometryFileName is not None:
+                        ras,decs,hourAngles = raDecCalcObject.getRaDec(timestamps,np.array(iCols),np.array(iRows))
+    
                     for iPhoton in xrange(len(timestamps)):
                         #if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
                         #create a new row for the photon list
@@ -312,15 +349,24 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, astr
                         newRow['fluxFlag'] = fluxFlags[fluxBinIndices[iPhoton]]
                         newRow['fluxWeight'] = fluxWeights[fluxBinIndices[iPhoton]]
                         if astrometryFileName is not None:
-                            newRow['dec'],newRow['ra'] = raDecCalcObject.getRaDec(timestamps[iPhoton],iCol,iRow)
+                            newRow['ra']=ras[iPhoton]
+                            newRow['dec']=decs[iPhoton]
+                            newRow['ha']=hourAngles[iPhoton]
                         else:
-                            newRow['dec'],newRow['ra'] = (np.nan,np.nan)
+                            newRow['dec'] = np.nan
+                            newRow['ra'] = np.nan
+                            newRow['ha'] = np.nan
                         newRow.append()
                     
     finally:
         print 'Flushing and closing...'
         plTable.flush()
         plFile.close()
+
+    if doIndex is True:
+        #Index the table that's just been written out.
+        indexPhotonList(filename)
+    
     print 'Done.'
 
 
