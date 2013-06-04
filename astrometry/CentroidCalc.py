@@ -113,7 +113,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
         centroidListFileName=outputFileName
     print 'Saving to: ',centroidListFileName
     
-    app = QApplication(sys.argv)
+    #app = QApplication(sys.argv)    #Commented out for now to avoid possible issues with x-forwarding if running remotely.
     
     #----------------------------------------------------
     

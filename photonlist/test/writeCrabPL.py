@@ -166,7 +166,7 @@ def main():
                 
     print '---------Writing photon lists----------'
     for iSeq,obList in enumerate(obLists):
-        for iOb,ob in enumerate(obList):
+        for ob in obList:
 #            ob.loadTimeAdjustmentFile(FileName(run='PAL2012').timeAdjustments())
 #            ob.loadWvlCalFile(wvlFileNames[iSeq])
 #            ob.loadFlatCalFile(flatFileNames[iSeq])
@@ -175,22 +175,26 @@ def main():
 #            ob.loadHotPixCalFile(timeMaskFileName)
 #            ob.setWvlCutoffs(None,None)
 #                        timeAdjFileName = FileName(run='PAL2012').timeAdjustments()
-            wvlCalFileName = wvlFileNames[iSeq]
-            flatCalFileName = flatFileNames[iSeq]
-            fluxCalFileName = fluxFileNames[iSeq]
-            timeMaskFileName = FileName(obsFile=ob).timeMask() #timeMaskFileNames[iSeq][iOb]
-            centroidFileName = FileName(obsFile=ob).centroidList()
-            print 'Loading calibration files:'
-            print [os.path.basename(x) for x in [timeAdjFileName,wvlCalFileName,flatCalFileName, \
-                  fluxCalFileName,timeMaskFileName, centroidFileName]]
-            ob.loadTimeAdjustmentFile(timeAdjFileName)
-            ob.loadWvlCalFile(wvlCalFileName)
-            ob.loadFlatCalFile(flatCalFileName)
-            ob.loadFluxCalFile(fluxCalFileName)
-            ob.loadHotPixCalFile(timeMaskFileName)
-            ob.setWvlCutoffs(None,None)
-            print 'Writing: '+FileName(obsFile=ob).photonList()
-            ob.writePhotonList(astrometryFileName=centroidFileName)
+            photListFileName = FileName(obsFile=ob).photonList()
+            if os.path.exists(photListFileName):
+                print 'Phot. list file already exists - skipping: ',photListFileName
+            else:
+                wvlCalFileName = wvlFileNames[iSeq]
+                flatCalFileName = flatFileNames[iSeq]
+                fluxCalFileName = fluxFileNames[iSeq]
+                timeMaskFileName = FileName(obsFile=ob).timeMask() #timeMaskFileNames[iSeq][iOb]
+                centroidFileName = FileName(obsFile=ob).centroidList()
+                print 'Loading calibration files:'
+                print [os.path.basename(x) for x in [timeAdjFileName,wvlCalFileName,flatCalFileName, \
+                      fluxCalFileName,timeMaskFileName, centroidFileName]]
+                ob.loadTimeAdjustmentFile(timeAdjFileName)
+                ob.loadWvlCalFile(wvlCalFileName)
+                ob.loadFlatCalFile(flatCalFileName)
+                ob.loadFluxCalFile(fluxCalFileName)
+                ob.loadHotPixCalFile(timeMaskFileName)
+                ob.setWvlCutoffs(None,None)
+                print 'Writing: '+FileName(obsFile=ob).photonList()
+                ob.writePhotonList(astrometryFileName=centroidFileName)
 
     print '-----------All done--------------'
 
