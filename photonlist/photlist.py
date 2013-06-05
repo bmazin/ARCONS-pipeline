@@ -192,7 +192,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
              warnings.warn('No photon list file created')
              return
      zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
-     bloscFilter = tables.Filters(complevel=5, complib='blosc', fletcher32=False)    #May be more efficient to use - needs some experimenting with compression level etc.
+     bloscFilter = tables.Filters(complevel=9, complib='blosc', fletcher32=False)    #May be more efficient to use - needs some experimenting with compression level etc.
      try:
          plFile = tables.openFile(fullPhotonListFileName, mode='w')
          plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
