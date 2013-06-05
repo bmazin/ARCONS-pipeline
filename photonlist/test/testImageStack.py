@@ -9,7 +9,7 @@ import photonlist.RADecImage as rdi
 import os.path
 import glob
 
-def makeImageStack(fileNames='photon_*.h5',dir='/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/Intermediate/photonLists/20121211'):
+def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211'):
     '''
     Create an image stack
     INPUTS:
@@ -29,7 +29,7 @@ def makeImageStack(fileNames='photon_*.h5',dir='/Users/vaneyken/Data/UCSB/ARCONS
             for line in f:
                 files.append(os.path.join(dir,line))
     else:
-        files = glob.glob(os.path.join(dir, '*.h5'))
+        files = glob.glob(os.path.join(dir, fileNames))
 
     virtualImage = rdi.RADecImage()
     for eachFile in files:
