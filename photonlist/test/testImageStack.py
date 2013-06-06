@@ -8,6 +8,7 @@ import photonlist.photlist as pl
 import photonlist.RADecImage as rdi
 import os.path
 import glob
+from util.FileName import FileName
 
 def makeImageStack(fileNames='photon_*.h5',dir='/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/Intermediate/photonLists/20121211'):
     '''
@@ -43,4 +44,22 @@ def makeImageStack(fileNames='photon_*.h5',dir='/Users/vaneyken/Data/UCSB/ARCONS
             print 'File doesn''t exist: ',eachFile
     
     return virtualImage
+
+
+
+def checkRotationDirection():
+    '''
+    Just create two Crab images which should be rotated by a significant
+    amount with respect to each other on the detector, and see if they're 
+    properly de-rotated
+    '''
+    
+    plFN1 = FileName(run='PAL2012',date='20121211',tstamp='20121212-033323').photonList()
+    plFN2 = FileName(run='PAL2012',date='20121211',tstamp='20121212-045902').photonList()
+    
+    vIm1 = rdi.RADecImage(pl.PhotList(plFN1))
+    vIm2 = rdi.RADecImage(pl.PhotList(plFN2))
+    vIm1.display()
+    vIm2.display()
+    return vIm1,vIm2
 

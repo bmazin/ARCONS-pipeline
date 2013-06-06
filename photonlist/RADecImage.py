@@ -19,11 +19,30 @@ class RADecImage(object):
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
-                 vPlateScale=0.1, detPlatescale=None, firstSec=0, integrationTime=-1):
+                 vPlateScale=0.1, detPlatescale=None, firstSec=0, integrationTime=-1,
+                 expWeightTimeStep=1.0):
         '''
-        Initialise an empty RA-dec coordinate frame image.
-        vPlateScale in arcsec per pix
+        Initialise a (possibly empty) RA-dec coordinate frame image.
+
+        INPUTS:
+            photList: optionally provide a PhotList object from which to create an
+                        image (see photonlist.photlist)
+            nPixRA, nPixDec: integers, Number of pixels in RA and Dec directions
+                        for the virtual image.
+            cenRA, cenDec: floats, location of center of virtual image in RA and
+                        dec (both in radians)
+            vPlateScale: float, plate scale for virtual image (arcseconds per 
+                        virtual image pixel)
+            detPlateScale: override the assumed detector plate scale (arcseconds
+                        per detector pixel)
+            firstSec: float, time from beginning of photon-list file at which to
+                        begin integration 
+            integrationTime: float, length of time to integrate for in seconds. If
+                        -1, integrate to end of photon list.
+            expWeightTimeStep: float, time step to use when calculating exposure
+                        time weights for the virtual pixels (seconds).
         '''
+        
         self.nPixRA = nPixRA                    #No. of virtual pixels in RA direction
         self.nPixDec = nPixDec                  #No. of virtual pixels in dec. direction
         self.cenRA = cenRA                      #RA location of center of field (radians)
@@ -64,7 +83,7 @@ class RADecImage(object):
         self.gridDec = self.cenDec + (self.vPlateScale*(np.arange(self.nPixDec) - (self.nPixDec//2)))
     
     def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=-np.inf,wvlMax=np.inf,
-                  vPlateScale=None,stack=False):
+                  vPlateScale=None,stack=False,expWeightTimeStep=None):
         '''
         Build a de-rotated stacked image from a photon list (PhotList) object.
         If the RADecImage instance already contains an image, the new image is added to it.
@@ -75,12 +94,15 @@ class RADecImage(object):
             integrationTime - duration of integration time to include in the image (in seconds; -1 => to end of exposure)
             wvlMin, wvlMax - min and max wavelengths of photons to include in the image (Angstroms).
             stack - boolean; if True, then stack the image to be loaded on top of any image data already present.
+            expWeightTimeStep - see __init__. If set here, overrides any value already set in the RADecImage object.
         '''
         
-        posErr = 0.8    #Approx. position error in arcsec (just a fixed estimate for now, will improve later)
-        posErr *= 2*np.pi/(60.*60.*360.)  #Convert to radians
+        #posErr = 0.8    #Approx. position error in arcsec (just a fixed estimate for now, will improve later)
+        #posErr *= 2*np.pi/(60.*60.*360.)  #Convert to radians
         
         photTable = photList.file.root.photons.photons   #Shortcut to table
+        if expWeightTimeStep is not None:
+            self.expWeightTimeStep=expWeightTimeStep
         
         #Get RA/dec range:
         if integrationTime==-1:
@@ -116,21 +138,24 @@ class RADecImage(object):
         #the time of observation.
         xRand = np.random.rand(nPhot)*self.detPlatescale-self.detPlatescale/2.0
         yRand = np.random.rand(nPhot)*self.detPlatescale-self.detPlatescale/2.0       #Not the same array!
-        ditherRAs = xRand*np.cos(photHAs) + yRand*np.sin(photHAs)
-        ditherDecs = yRand*np.cos(photHAs) - xRand*np.sin(photHAs)
-        
-        #mpl.plot(ditherRAs[0:1000],ditherDecs[0:1000],'o')
-        
-        #ditherDists = np.random.rand(nPhot)*posErr
-        #ditherAngles = np.random.rand(nPhot)*2*np.pi
-        #ditherRAs = ditherDists*np.cos(ditherAngles)
-        #ditherDecs = ditherDists*np.sin(ditherAngles)
+        ditherRAs = xRand*np.cos(photHAs) - yRand*np.sin(photHAs)
+        ditherDecs = yRand*np.cos(photHAs) + xRand*np.sin(photHAs)
         
         photRAs=photRAs+ditherRAs
         photDecs=photDecs+ditherDecs
         
+        #Make the image for this integration
         print 'Making image'
-        thisImage, thisGridRA, thisGridDec = np.histogram2d(photRAs-self.cenRA,photDecs-self.cenDec,[self.gridRA-self.cenRA,self.gridDec-self.cenDec])
+        thisImage,thisGridRA,thisGridDec = np.histogram2d(photRAs-self.cenRA,photDecs-self.cenDec,
+                                                          [self.gridRA-self.cenRA,self.gridDec-self.cenDec])
+        
+        if 1==0:
+            #And now figure out the exposure time weights....
+            tStartFrames = np.arange(start=firstSec,stop=lastSec,
+                                     step=self.expWeightTimeStep)
+            tEndFrames = (tStartFrames+self.expWeightTimeStep).clip(max=lastSec)    #Clip so that the last value doesn't go beyond the end of the exposure.
+        
+        
         
         if self.image is None or stack is False:
             self.image = thisImage
