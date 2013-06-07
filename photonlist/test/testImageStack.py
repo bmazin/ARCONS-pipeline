@@ -28,7 +28,7 @@ def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211')
         files=[]
         with open(fileNames[1:]) as f:
             for line in f:
-                files.append(os.path.join(dir,line))
+                files.append(os.path.join(dir,line.strip()))
     else:
         files = glob.glob(os.path.join(dir, fileNames))
 
@@ -38,10 +38,13 @@ def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211')
             print 'Loading: ',os.path.basename(eachFile)
             #fullFileName=os.path.join(dir,eachFile)
             phList = pl.PhotList(eachFile)
-            virtualImage.loadImage(phList,stack=True)
+            baseSaveName,ext=os.path.splitext(os.path.basename(eachFile))
+            imSaveName=baseSaveName+'.tif'
+            virtualImage.loadImage(phList,stack=True,savePreStackImage=imSaveName)
             virtualImage.display()
         else:
             print 'File doesn''t exist: ',eachFile
+            assert 1==0
     
     return virtualImage
 

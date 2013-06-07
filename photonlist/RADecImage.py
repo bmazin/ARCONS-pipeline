@@ -10,7 +10,7 @@ from util import utils
 from astrometry.CalculateRaDec import CalculateRaDec
 import numpy as np
 import tables
-#import matplotlib.pyplot as mpl
+import matplotlib.pyplot as mpl
 
 class RADecImage(object): 
     '''
@@ -83,7 +83,8 @@ class RADecImage(object):
         self.gridDec = self.cenDec + (self.vPlateScale*(np.arange(self.nPixDec) - (self.nPixDec//2)))
     
     def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=-np.inf,wvlMax=np.inf,
-                  vPlateScale=None,stack=False,expWeightTimeStep=None):
+                  vPlateScale=None,stack=False,expWeightTimeStep=None,
+                  savePreStackImage=None):  #savePreStackImage is temporary for test purposes
         '''
         Build a de-rotated stacked image from a photon list (PhotList) object.
         If the RADecImage instance already contains an image, the new image is added to it.
@@ -95,6 +96,7 @@ class RADecImage(object):
             wvlMin, wvlMax - min and max wavelengths of photons to include in the image (Angstroms).
             stack - boolean; if True, then stack the image to be loaded on top of any image data already present.
             expWeightTimeStep - see __init__. If set here, overrides any value already set in the RADecImage object.
+            savePreStackImage - temporary fudge, set to a file-name to save the image out to a file prior to stacking.
         '''
         
         #posErr = 0.8    #Approx. position error in arcsec (just a fixed estimate for now, will improve later)
@@ -155,7 +157,11 @@ class RADecImage(object):
                                      step=self.expWeightTimeStep)
             tEndFrames = (tStartFrames+self.expWeightTimeStep).clip(max=lastSec)    #Clip so that the last value doesn't go beyond the end of the exposure.
         
-        
+        #Temporary for testing-------------
+        if savePreStackImage is not None:
+            print 'Saving pre-stacked image to '+savePreStackImage
+            mpl.imsave(fname=savePreStackImage,arr=thisImage)  #,vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
+        #---------------------------------
         
         if self.image is None or stack is False:
             self.image = thisImage
