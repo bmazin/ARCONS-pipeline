@@ -78,16 +78,16 @@ def main():
     """
 
     run = 'PAL2012'
-    #obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
+    obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
     #TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES...
-    obsSequences = ['9999999',
-                    '''
-                    033323
-                    045902
-                    '''
-                    '9999999',
-                    '9999999']
+    #obsSequences = ['9999999',
+    #                '''
+    #                033323
+    #                045902
+    #                '''
+    #                '9999999',
+    #                '9999999']
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']

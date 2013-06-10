@@ -200,7 +200,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
             imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
             image=imageInformation['image']        
             # Use PyGuide centroiding algorithm.
-            pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,4,ccd,0,False,
+            pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,6,ccd,0,False,
                                         verbosity=2, doDS9=True)     #Added by JvE May 31 2013
             # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
             try:
