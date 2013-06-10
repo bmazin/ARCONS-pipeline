@@ -78,7 +78,7 @@ def main():
     """
 
     run = 'PAL2012'
-    #obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
+    obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
     #TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES...
     obsSequences = ['9999999',

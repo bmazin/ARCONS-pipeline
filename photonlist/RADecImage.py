@@ -112,21 +112,23 @@ class RADecImage(object):
         else:
             lastSec = firstSec+integrationTime
        
-        print 'Finding RA/dec ranges' 
-        #Take advantage of the fact that the ra/dec columns are (or should be) indexed....
-        self.raMin = photTable.cols.ra[photTable.colindexes['ra'][0]]
-        self.raMax = photTable.cols.ra[photTable.colindexes['ra'][-1]]
-        self.decMin = photTable.cols.dec[photTable.colindexes['dec'][0]]
-        self.decMax = photTable.cols.dec[photTable.colindexes['dec'][-1]]
-        self.cenRA = (self.raMin+self.raMax)/2.0
-        self.cenDec = (self.decMin+self.decMax)/2.0
-        
-        #Set size of virtual grid to accommodate.
-        if self.nPixRA is None:
-            self.nPixRA = int((self.raMax-self.raMin)//self.vPlateScale + 2)     #+1 for round up; +1 because coordinates are the boundaries of the virtual pixels, not the centers.
-        if self.nPixDec is None:
-            self.nPixDec = int((self.decMax-self.decMin)//self.vPlateScale + 2)
-        self.setCoordGrid()
+        if self.gridRA is None or self.gridDec is None:
+            #If virtual coordinate grid is not yet defined, figure it out.
+            #Find RA/dec range needed, taking advantage of the fact that the ra/dec columns are (or should be) indexed....
+            print 'Finding RA/dec ranges' 
+            self.raMin = photTable.cols.ra[photTable.colindexes['ra'][0]]
+            self.raMax = photTable.cols.ra[photTable.colindexes['ra'][-1]]
+            self.decMin = photTable.cols.dec[photTable.colindexes['dec'][0]]
+            self.decMax = photTable.cols.dec[photTable.colindexes['dec'][-1]]
+            self.cenRA = (self.raMin+self.raMax)/2.0
+            self.cenDec = (self.decMin+self.decMax)/2.0
+            #Set size of virtual grid to accommodate.
+            if self.nPixRA is None:
+                self.nPixRA = int((self.raMax-self.raMin)//self.vPlateScale + 2)     #+1 for round up; +1 because coordinates are the boundaries of the virtual pixels, not the centers.
+            if self.nPixDec is None:
+                self.nPixDec = int((self.decMax-self.decMin)//self.vPlateScale + 2)
+            self.setCoordGrid()
+            
                 
         print 'Getting photon coords'
         photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')
@@ -148,8 +150,7 @@ class RADecImage(object):
         
         #Make the image for this integration
         print 'Making image'
-        thisImage,thisGridRA,thisGridDec = np.histogram2d(photRAs-self.cenRA,photDecs-self.cenDec,
-                                                          [self.gridRA-self.cenRA,self.gridDec-self.cenDec])
+        thisImage,thisGridRA,thisGridDec = np.histogram2d(photRAs,photDecs,[self.gridRA,self.gridDec])
         
         if 1==0:
             #And now figure out the exposure time weights....
@@ -169,13 +170,17 @@ class RADecImage(object):
             print 'Stacking'
             self.image+=thisImage
         
-        assert all(thisGridRA==self.gridRA-self.cenRA) and all(thisGridDec==self.gridDec-self.cenDec)
+        assert all(thisGridRA==self.gridRA) and all(thisGridDec==self.gridDec)
         
         print 'Done.'
 
 
 
     def display(self,normMin=None,normMax=None):
+        '''
+        Display the current image. Currently just a short-cut to utils.plotArray,
+        but needs updating to mark RA and Dec on the axes.
+        '''
         utils.plotArray(self.image,cbar=True,normMin=normMin,normMax=normMax)
 
 
