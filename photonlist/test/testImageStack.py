@@ -3,14 +3,17 @@ Author: Julian van Eyken            Date: May 31 2013
 A bit of photon-list image stacking testing....
 '''
 
-
-import photonlist.photlist as pl
-import photonlist.RADecImage as rdi
 import os.path
 import glob
+import matplotlib.pyplot as mpl
+import photonlist.photlist as pl
+import photonlist.RADecImage as rdi
 from util.FileName import FileName
+from util import utils
 
-def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211'):
+
+def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211',
+                   detImage=False):
     '''
     Create an image stack
     INPUTS:
@@ -20,6 +23,9 @@ def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211')
                     a list of file names to stack. (e.g.,
                     'mydirectory/@myfilelist.txt', where myfilelist.txt 
                     is a simple text file with one file name per line.)
+        dir - to provide name of a directory in which to find the files
+        detImage - if True, show the images in detector x,y coordinates instead
+                    of transforming to RA/dec space.
     '''
     
     #Get the list of filenames
@@ -39,9 +45,21 @@ def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211')
             #fullFileName=os.path.join(dir,eachFile)
             phList = pl.PhotList(eachFile)
             baseSaveName,ext=os.path.splitext(os.path.basename(eachFile))
-            imSaveName=baseSaveName+'.tif'
-            virtualImage.loadImage(phList,stack=True,savePreStackImage=imSaveName)
-            virtualImage.display()
+            
+            if detImage is True:
+                imSaveName=baseSaveName+'det.tif'
+                im = phList.getImageDet()
+                utils.plotArray(im)
+                mpl.imsave(fname=imSaveName,arr=im)
+                if eachFile==files[0]:
+                    virtualImage=im
+                else:
+                    virtualImage+=im
+            else:
+                imSaveName=baseSaveName+'.tif'
+                virtualImage.loadImage(phList,stack=True,savePreStackImage=imSaveName)
+                virtualImage.display()
+        
         else:
             print 'File doesn''t exist: ',eachFile
             assert 1==0
