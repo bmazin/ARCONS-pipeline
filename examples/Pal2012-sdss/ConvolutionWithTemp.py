@@ -4,15 +4,14 @@ from util import utils
 import mpfit
 import scipy.optimize as optimize
 
+#This program slides a template across the data to try to improve the data quality. This convultion was not very successful. The program bins the data if neccessary so the template and data have the same point/time ratio. "Trunc" means the template does not cover the entire period, just the area around the eclipse. The number in the template filenames indicate the number of bins per period. dataTemplate.py makes a template by binning and averaging the data. fitTemplate.py makes a template by fitting a skewed gaussian to the "data template" that results from templateMaker.py
+
 FileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8fitpsfBlueUpdated.npz'
 NumFrames = 1700
 IntTime = 3
 TimeCutOff = 1300
 
 template = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8BlueTruncTemplateFitted560.npz')
-#template = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8BlueTruncTemplateUpdated155short.npz')
-#template = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8BlueTemplateUpdated155.npz')
-template2 = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8BlueTruncTemplateMirrorFitted560.npz')
 template3 = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8BlueTruncTemplateUpdated560.npz')
 
 tempValues = template['template']
