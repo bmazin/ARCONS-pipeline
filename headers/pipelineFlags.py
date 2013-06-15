@@ -28,3 +28,12 @@ fluxCal = {
            'undetermined':99        #Flag status is undetermined.
            }
 
+#Wavelength calibration flags
+waveCal = {
+           'good':0,                #No flagging.
+           'belowWaveCalRange':10,  #Derived wavelength is below formal validity range of calibration
+           'aboveWaveCalRange':11,  #Derived wavelength is above formal validity range of calibration
+           'noWaveCalSolution':12,  #Due to a bad pixel... or whatever....
+           'undefined':20,          #Flagged, but reason is undefined.
+           'undetermined':99        #Flag status is undetermined.
+           }

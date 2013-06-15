@@ -59,8 +59,9 @@ class CalculateRaDec:
         # Account for 0.5 offset in centroiding algorithm
         self.xCentroids -= 0.5
         self.yCentroids -= 0.5
-
-        self.rotationMatrix = np.array([[np.cos(self.hourAngles),np.sin(self.hourAngles)],[-np.sin(self.hourAngles),np.cos(self.hourAngles)]]).T    
+        
+        #Note - changed rotation direction here - JvE 6/5/2013
+        self.rotationMatrix = np.array([[np.cos(self.hourAngles),-np.sin(self.hourAngles)],[np.sin(self.hourAngles),np.cos(self.hourAngles)]]).T  
         self.centroidRotated = np.dot(self.rotationMatrix,np.array([self.xCentroids,self.yCentroids])).diagonal(axis1=0,axis2=2)
       
         self.pixelCount = 44*46
