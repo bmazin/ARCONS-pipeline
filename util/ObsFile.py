@@ -711,29 +711,20 @@ class ObsFile:
         objValues=[]
         AreaSky=[]
         AreaObj=[]
-#        print len(y_sky),len(x_sky)
-#        print len(y_values),len(x_values)
         for pix in xrange(len(y_sky)):
-                pcount = self.getPixelCount(y_sky[pix], x_sky[pix], firstSec, integrationTime,weighted, fluxWeighted, getRawCount)
-#                print skyMask[iRow][iCol]
-                skyValue=pcount['counts']*skyMask[y_sky[pix]][x_sky[pix]]
-                skyValues.append(skyValue)
-                AreaSky.append(skyMask[y_sky[pix]][x_sky[pix]])
-#        print 'theoretical area = ', pi*(radius2**2-radius1**2)
-#        print 'actual area = ', np.sum(AreaSky)
+            pcount = self.getPixelCount(y_sky[pix], x_sky[pix], firstSec, integrationTime,weighted, fluxWeighted, getRawCount)
+            skyValue=pcount['counts']*skyMask[y_sky[pix]][x_sky[pix]]
+            skyValues.append(skyValue)
+            AreaSky.append(skyMask[y_sky[pix]][x_sky[pix]])
         skyCountPerPixel = np.sum(skyValues)/(np.sum(AreaSky))
 #        print 'sky count per pixel =',skyCountPerPixel
         for pix in xrange(len(y_values)):
-                pcount = self.getPixelCount(y_values[pix], x_values[pix], firstSec, integrationTime,
-                                          weighted, fluxWeighted, getRawCount)
-#                print pcount['counts']
-                secImg[y_values[pix],x_values[pix]] = (pcount['counts']-skyCountPerPixel)*apertureMask[y_values[pix]][x_values[pix]]
-                AreaObj.append(apertureMask[y_values[pix]][x_values[pix]])
-                effIntTimes[y_values[pix],x_values[pix]] = pcount['effIntTime']
-                objValues.append(pcount['counts']*apertureMask[y_values[pix]][x_values[pix]])
+            pcount = self.getPixelCount(y_values[pix], x_values[pix], firstSec, integrationTime,weighted, fluxWeighted, getRawCount)
+            secImg[y_values[pix],x_values[pix]] = (pcount['counts']-skyCountPerPixel)*apertureMask[y_values[pix]][x_values[pix]]
+            AreaObj.append(apertureMask[y_values[pix]][x_values[pix]])
+            effIntTimes[y_values[pix],x_values[pix]] = pcount['effIntTime']
+            objValues.append(pcount['counts']*apertureMask[y_values[pix]][x_values[pix]])
         AveObj=np.sum(objValues)/(np.sum(AreaObj))
-#        print 'theoretical area = ', pi*(radius1**2)
-#        print 'actual area = ', np.sum(AreaObj)
 #        print 'ave obj per pixel (not sub) = ',AveObj
         NumObjPhotons = np.sum(secImg)
 #        print 'lightcurve = ',NumObjPhotons

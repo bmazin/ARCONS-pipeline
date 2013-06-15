@@ -1,5 +1,7 @@
 #!/bin/python
 
+### see 0926params.dict to change variables. This program creates an image stack of the data which is then input into sdssfitpsf.py. There a 2-d gaussian is fit to each image, and the resulting file is used to create a lightcurve using sdsslightcurve.py, or plotFullData.py
+
 import numpy as np
 from util.ObsFile import ObsFile 
 from util.FileName import FileName
@@ -39,13 +41,15 @@ timestampLists = [[utcDate+'-'+str(ts) for ts in seq] for utcDate,seq in zip(utc
 
 #wvlCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
 
-wvlCalFilenames = ['/Scratch/waveCalSolnFiles/%s/wvlCalFiles_combined_Dec%s2012.h5'%(sunsetDate,sunsetDate[6:]) for sunsetDate in sunsetDates]
+wvlCalFilenames = ['/Scratch/waveCalSolnFiles/%s/calsol_%s.h5'%(sunsetDate,sunsetDate) for sunsetDate in sunsetDates]
 
-flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
+#flatCalFilenames = [FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln() for sunsetDate,calTimestamp in zip(sunsetDates,calTimestamps)]
+
+flatCalFilenames = ['/Scratch/flatCalSolnFiles/%s/flatsol_%s.h5'%(sunsetDate,sunsetDate) for sunsetDate in sunsetDates]
 
 #use for Dec8
-#flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
-#flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+flatCalFilenames[0] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+flatCalFilenames[1] = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
 
 frames = []
 showframes = []
@@ -94,7 +98,7 @@ for iSeq in range(len(seqs)):
 	#tic = time()
         deadMask = ob.getDeadPixels()
 	#print 'Dead mask load time = ', time()-tic
-        for sec in range(0,nSecInFile,integrationTime):
+        for sec in np.arange(0,nSecInFile,integrationTime):
             jd = startJD + sec/(24.*3600.) + integrationTime/2./(24.*3600.)#add seconds offset to julian date, move jd to center of bin
             print count,jd
             count+=1

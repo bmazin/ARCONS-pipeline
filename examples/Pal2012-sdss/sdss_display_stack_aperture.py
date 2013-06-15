@@ -1,5 +1,6 @@
 #!/bin/python
 
+#see 0926params.dict to change variables. This program uses an aperture to create a lightcurve.
 import numpy as np
 from util.ObsFile import ObsFile 
 from util.FileName import FileName
