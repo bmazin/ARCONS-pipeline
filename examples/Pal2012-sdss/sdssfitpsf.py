@@ -5,6 +5,7 @@ from util.readDict import readDict
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
+### see 0926params.dict to change variables. sdss_display_stack.py must be done before this program can be used.
 
 def aperture(startpx,startpy,radius=3):
     r = radius

@@ -2,221 +2,262 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize as optimize
 from scipy import pi
+import matplotlib
+
+### np.polyfit is better at optimizing than scipy.optimize.curvefit
+### there is a optimizing bug/confusion. Using PdotLimit.py which finds the optimum Pdot by finding the minimum reduduced chi-squared I found fDot=-1.2623365827*10**-9,Pdot=4.88*10**-13 is the best with chi-sq= 1.09. Using curvefit, fitted fDot=-3.20872712971*10**-10,Pdot=1.24*10**-13, chi-sq=1.15. Using polyfit, fDot=-1.25949536823*10**-9, Pdot=4.87*10**-13, chi-sq=1.18.
+### so I don't know which is best. I'm going to have the program stick with the polyfit for now... 
+
+#This program loads the eclipse times saved from DwarfFit.py and the data from Copperwheat and calculates and plots the observed - calculated eclipse times for each eclipse using copperwheat's ephemeris, fitted linear ephemeris, fitted quadratic ephemeris as the models for the calculated eclipse time. The fits are weighted by the error of the measurements which is the std of each set of data. The reduced chi-squared is given for each model.
+
+#Load up the right fit results, check that Eclipse/EclipseShort (line 68/69) has the eclipse numbers in the right form. Alter EclipseTimes, EclipseNum to match what you want, and make sure you change lines 78-94 if you are using more than one fits file. The rest should be fine unchanged.
+
+def Ephem(t,jd0,f,fDot):
+    return f*(t-jd0) + 0.5 * fDot * (t-jd0)**2
+
+def FixedEphem(t,jd0,f):
+#    jd0 = 53795.9455191
+    fDot=-1.2623365827*10**-9
+    return f*(t-jd0) + 0.5 * fDot * (t-jd0)**2
+
+def fitModel(t):
+    return iNumber - Ephem(t,jd0,f,fDot)
+
+def fitFixedEphem(t,data,sigma):
+    p0=(ReportedOffset,1/ReportedPeriod)
+    popt, pcov = optimize.curve_fit(FixedEphem, t, data, p0=p0,sigma=sigma)
+    return popt
+
+def fitEphem(t,data,sigma):
+    p0=(ReportedOffset,1/ReportedPeriod,-10**-13/ReportedPeriod**2)
+    popt, pcov = optimize.curve_fit(Ephem, t, data, p0=p0,sigma=sigma)
+    return popt
+
+def RedChiSq(diff,sigma,DoF):
+    return np.sum([diff[ind]**2/(1.*sigma[ind]**2*DoF) for ind in range(len(diff))]) 
+#    DoF = N(num of points)-v(num variables)-1
+
+def linearEphem(x,jd0,Period):
+    return jd0+Period*x
 
 ReportedPeriod = 0.01966127289
-#non barycentered JD: [2456271.0095138885081,2456271.0292013883591,2456271.0488194441423,2456273.0148495365866,2456273.0343981478363,
-#2456273.0540740732104,2456273.9977083327249,2456274.0174305550754,2456274.0370833328925,2456274.0567824067548]
-#blue converted jd:
-#np.array([56270.5136024671228,56270.533291445470240,56270.552910979538865,56272.519043940577831,56272.538617096048256, 56272.558294544789533,56273.482310350409534,56273.501987395095057,56273.521699506782170,56273.541376890119864, 56273.561088993898011]) +3/2./3600/24 -17.584978980497891758816768/24./3600.
+ReportedOffset = 53795.9455191
 
-OldData = np.loadtxt('/Scratch/dataProcessing/SDSS_J0926/CopperwheatResults.dat')
-OldEclipseNum = np.array([line[0] for line in OldData])
-OldEclipseTime = np.array([line[1] for line in OldData])
-OldEclipseError = np.array([line[2] for line in OldData])
- 
-DataFileBlue = np.load('/Scratch/dataProcessing/SDSS_J0926/AllDataBluefitresults.npz')
+DataFileAll = np.load('/Scratch/dataProcessing/SDSS_J0926/AllDataAllwvlfitresults.npz')
+paramsAll = DataFileAll['FittedParams']
+EclipseTimesAll = DataFileAll['EclipseTimes']
+
+DataFileBlue_ = np.load('/Scratch/dataProcessing/SDSS_J0926/AllDataBlue-fitresults.npz')
+paramsBlue_ = DataFileBlue_['FittedParams']
+EclipseTimesBlue_ = DataFileBlue_['EclipseTimes']
+DataFileBlue = np.load('/Scratch/dataProcessing/SDSS_J0926/AllDataBluefitresultsPaper.npz')
+#DataFileBlue = np.load('/Scratch/dataProcessing/SDSS_J0926/AllDataBluefitresults.npz')
 paramsBlue = DataFileBlue['FittedParams']
 EclipseTimesBlue = DataFileBlue['EclipseTimes']
 DataFileRed = np.load('/Scratch/dataProcessing/SDSS_J0926/AllDataRedfitresults.npz')
 paramsRed = DataFileRed['FittedParams']
 EclipseTimesRed = DataFileRed['EclipseTimes']
-#DataFileMult = np.load('/Scratch/dataProcessing/SDSS_J0926/Dec8AddColorsfitresults.npz')
-#paramsMult = DataFileMult['FittedParams']
-#EclipseTimesMult = DataFileMult['EclipseTimes']
-#EclipseNumMult = [0,1,2,0,1,2,0,1,2]
+
+OldData = np.loadtxt('/Scratch/dataProcessing/SDSS_J0926/CopperwheatResults.dat')
+OldEclipseNum = np.array([line[0] for line in OldData])
+OldEclipseTime = np.array([line[1] for line in OldData])
+OldEclipseError = np.array([line[2] for line in OldData])
 
 gap1=100
 gap2=47
-
-
-def Ephem(x,Period,Pdot):
-#    return 53795.9455191+Period*(x)+.5*(Pdot)*(x)**2
-
-#    Period = ReportedPeriod
-    jd0 = 53795.9455191
-    return jd0+Period*x/(1.-Pdot*x)
-
-def fitEphemeris(x,data,sigma):
-    p0=(ReportedPeriod,-10**-7)
-    popt, pcov = optimize.curve_fit(Ephem, x, data, p0=p0,sigma=sigma)
-    print p0
-    return popt
-
-jd = np.array([Dec8Eclipse1,Dec8Eclipse2,Dec8Eclipse3,Dec10Eclipse1,Dec10Eclipse2,Dec10Eclipse3,Dec11Eclipse0,Dec11Eclipse1,Dec11Eclipse2,Dec11Eclipse3,Dec11Eclipse4])
 Eclipse=[0,1,2,gap1+2,gap1+3,gap1+4,gap1+4+gap2,gap1+5+gap2,gap1+6+gap2,gap1+7+gap2,gap1+8+gap2]
+EclipseShort=[0,1,2,gap1+4+gap2,gap1+5+gap2,gap1+6+gap2,gap1+7+gap2,gap1+8+gap2] #doesn't include Dec10 eclipses
 
-MJDTDB = []
-OurEclipseNum = []
-Dec8EclipseTimes = []
-Dec8EclipseNum = []
-Dec10EclipseTimes = []
-Dec10EclipseNum = []
-Dec11EclipseTimes = []
-Dec11EclipseNum = []
-EclipseTimes = [EclipseTimesBlue,EclipseTimesRed]
-EclipseNum = [Eclipse,Eclipse]
+#EclipseTimes = [EclipseTimesAll,EclipseTimesBlue]
+#EclipseNum = [Eclipse,EclipseShort]
+#FixedEclipseTimes = [[],[]]
+#FixedEclipseNum = [[],[]]
+
+EclipseTimes = [EclipseTimesBlue]
+EclipseNum = [EclipseShort]
+FixedEclipseTimes = [[]]
+FixedEclipseNum = [[]]
 
 for ind in range(len(EclipseTimes)):
     for eclipse in range(len(EclipseTimes[ind])):
         if np.isnan(EclipseTimes[ind][eclipse])==False:
-#            print EclipseTimes[ind][eclipse]
-            MJDTDB.append(EclipseTimes[ind][eclipse])
-            OurEclipseNum.append(EclipseNum[ind][eclipse])
-            if EclipseNum[ind][eclipse] < 3:
-                Dec8EclipseTimes.append(EclipseTimes[ind][eclipse])
-                Dec8EclipseNum.append(EclipseNum[ind][eclipse])
-            elif EclipseNum[ind][eclipse] < 120:
-                Dec10EclipseTimes.append(EclipseTimes[ind][eclipse])
-                Dec10EclipseNum.append(EclipseNum[ind][eclipse])  
-            else:
-                Dec11EclipseTimes.append(EclipseTimes[ind][eclipse])
-                Dec11EclipseNum.append(EclipseNum[ind][eclipse])
-
-ii = np.where(np.array(OurEclipseNum) == 0)[0]
-print [MJDTDB[index] for index in ii]
-Dec81 = np.median([MJDTDB[index] for index in ii])
-print Dec81
-ii = np.where(np.array(OurEclipseNum) == 1)[0]
-Dec82 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 2)[0]
-Dec83 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 102)[0]
-Dec101 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 103)[0]
-Dec102 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 104)[0]
-Dec103 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 151)[0]
-Dec110 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 152)[0]
-Dec111 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 153)[0]
-Dec112 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 154)[0]
-Dec113 = np.median([MJDTDB[index] for index in ii])
-ii = np.where(np.array(OurEclipseNum) == 155)[0]
-Dec114 = np.median([MJDTDB[index] for index in ii])
-
-MedianEclipseTime = np.array([Dec81,Dec82,Dec83,Dec101,Dec102,Dec103,Dec110,Dec111,Dec112,Dec113,Dec114])
+            FixedEclipseTimes[ind].append(EclipseTimes[ind][eclipse])
+            FixedEclipseNum[ind].append(EclipseNum[ind][eclipse])
 
 x0=125860
-Eclipse = np.array(OurEclipseNum)+x0 
-MJDTDB = np.array(MJDTDB)
-Dec8EclipseTimes = np.array(Dec8EclipseTimes)
-Dec8EclipseNum = np.array(Dec8EclipseNum)+x0
-Dec10EclipseTimes = np.array(Dec10EclipseTimes)
-Dec10EclipseNum = np.array(Dec10EclipseNum)+x0
-Dec11EclipseTimes = np.array(Dec11EclipseTimes)
-Dec11EclipseNum = np.array(Dec11EclipseNum)+x0     
+FixedEclipseNum = np.array([np.array(line)+x0 for line in FixedEclipseNum])
 
-#x0 = fitEclipseNum(Eclipse,jd)
-#print x0
-#x0=np.around(x0)
-Std = np.std(MJDTDB-Ephem(Eclipse,ReportedPeriod,0))*24*60*60
-ave = np.average((MJDTDB-Ephem(Eclipse,ReportedPeriod,0))*24*60*60)
-Std8 = np.std(Dec8EclipseTimes-Ephem(Dec8EclipseNum,ReportedPeriod,0))*24*60*60
-ave8 = np.average(Dec8EclipseTimes-Ephem(Dec8EclipseNum,ReportedPeriod,0))*24*60*60
-Std10 = np.std(Dec10EclipseTimes-Ephem(Dec10EclipseNum,ReportedPeriod,0))*24*60*60
-ave10 = np.average(Dec10EclipseTimes-Ephem(Dec10EclipseNum,ReportedPeriod,0))*24*60*60
-Std11 = np.std(Dec11EclipseTimes-Ephem(Dec11EclipseNum,ReportedPeriod,0))*24*60*60
-ave11 = np.average(Dec11EclipseTimes-Ephem(Dec11EclipseNum,ReportedPeriod,0))*24*60*60
+TotalEclipseNum = np.hstack((OldEclipseNum,FixedEclipseNum[0]))
+TotalEclipseTime = np.hstack((OldEclipseTime,FixedEclipseTimes[0]))
 
-print Std,ave
-print Std8,ave8
-print Std10,ave10
-print Std11,ave11
+OurEclipseNum = FixedEclipseNum[0]
+OurEclipseTime = FixedEclipseTimes[0]
 
-TotalEclipseNum = np.hstack((np.hstack((OldEclipseNum,Dec8EclipseNum)),np.hstack((Dec10EclipseNum,Dec11EclipseNum))))
+Std2006 = np.std(OldEclipseTime[:49]-linearEphem(OldEclipseNum[:49],ReportedOffset,ReportedPeriod))*24*60*60
+Std2009 = np.std(OldEclipseTime[51:]-linearEphem(OldEclipseNum[51:],ReportedOffset,ReportedPeriod))*24*60*60
 
-TotalEclipseTime = np.hstack((np.hstack((OldEclipseTime,Dec8EclipseTimes)),np.hstack((Dec10EclipseTimes,Dec11EclipseTimes))))
+Std = np.std(OurEclipseTime-linearEphem(OurEclipseNum,ReportedOffset,ReportedPeriod))*24*60*60
+ave = np.average(OurEclipseTime-linearEphem(OurEclipseNum,ReportedOffset,ReportedPeriod))*24*60*60
 
-TotalEclipseError = np.hstack((OldEclipseError,np.array([Std8]*len(Dec8EclipseNum)+[Std10]*len(Dec10EclipseNum)+[Std11]*len(Dec11EclipseNum))))
-print 'Eclipse Num = ',TotalEclipseNum
-print 'Eclipse Times = ',TotalEclipseTime
+print 'std', Std2006
+print Std2009,Std
 
-pOpt = fitEphemeris(TotalEclipseNum,TotalEclipseTime,TotalEclipseError)
-print pOpt
+sigma = np.hstack(([Std2006]*len(OldEclipseNum[:51]),np.hstack(([Std2009]*len(OldEclipseNum[51:]),[Std]*len(OurEclipseNum)))))
 
-#StdFit = np.std(MJDTDB-Ephem(Eclipse,pOpt[0],pOpt[1]))*24*60*60
-#aveFit = np.average((MJDTDB-Ephem(Eclipse,pOpt[0],pOpt[1]))*24*60*60)
 
-fig=plt.figure()
+linearOpt = np.polyfit(TotalEclipseNum,TotalEclipseTime,1)
+linearOffset = linearOpt[1]
+linearPeriod = linearOpt[0]
+print linearOpt
 
-#ax=fig.add_subplot(311)
+FixedOpt = fitFixedEphem(TotalEclipseTime,TotalEclipseNum,sigma)
+QuadOffset = jd0 = FixedOpt[0]
+f = FixedOpt[1]
+#fDot = FixedOpt[2]
+fDot=-1.2623365827*10**-9
+QuadPdot = - fDot/(f**2)
+QuadPeriod = 1/f
+print "With fDot fixed:"
+print f,fDot
+#print 'offset %.15g'%QuadOffset
+#print 'fixed period',QuadPeriod
+print 'fixed pdot',QuadPdot
 
-#ax.set_title(' Reported Period = 0.01966127289\nAverage Period = %.10f, std of Period = %.10f days or %.10f seconds\nPeriod Difference (Reported - Average) = %.10f days or %.10f seconds'%(AveEph,std,std*24*60*60,ReportedPeriod-AveEph,(ReportedPeriod-AveEph)*24*3600))
-#ax.plot(np.array(eclipseNum)+x0,times,'bo',label="data")
-#ax.plot(np.array([3+x0,int(gap1)+2+x0]),[Gap108,Gap108],'k:')
-#ax.plot(np.array([int(gap1)+5+x0,int(gap1)+4+int(gap2)+x0]),[Gap1110,Gap1110],'k:',label="Average Period Between Observations")
-#ax.plot([1,int(gap1)+7+int(gap2)],[0.01966127289,0.01966127289],'r-')
-#ax.plot([1+x0,int(gap1)+7+int(gap2)+x0],[AveEph,AveEph],'r*',label="Average Period")
-#ax.set_ylabel('Period Between Eclipses')
-#plt.legend(loc=4)
+TimeDiff = []
+for ind in range(len(TotalEclipseNum)):
+    iNumber = TotalEclipseNum[ind]
+    time = optimize.fsolve(fitModel,56000)
+    TimeDiff.append((TotalEclipseTime[ind]-time[0])*24*3600)
 
-#fullEclipseNum = np.arange(0,126000,1000.)
-#ax2=fig.add_subplot(211)
-#ax2.plot(Eclipse,MJDTDB,'ro')
-#ax2.plot(Eclipse,Ephem(Eclipse,ReportedPeriod,0),'b-',label="Ephemeris Formula")
-#ax2.plot(Eclipse,Ephem(Eclipse,pOpt[0],pOpt[1]),'r:',label="Ephemeris Fit")
-#ax2.set_ylabel('MJD(TDB)')
-#ax2.set_title('Data vs. Ephemeris Formula')
+ReducedChiSq3 = RedChiSq(TimeDiff,sigma,len(TotalEclipseTime)-3-1)
+print 'red chi-sq',ReducedChiSq3
 
-ax3=fig.add_subplot(211)
-ax3.set_title(' Reported Period = 0.01966127289, Fitted Period = %.10f, Fitted Pdot = %.15f\nPeriod Difference (Reported-Fitted) = %.10f days or %.10f seconds\nFit uses std as the error of our data\n\nDivergence from Reported Ephemeris: Data - Equation'%(pOpt[0],pOpt[1],ReportedPeriod-pOpt[0],(ReportedPeriod-pOpt[0])*24*60*60))
-ax3.errorbar(OldEclipseNum,(OldEclipseTime-Ephem(OldEclipseNum,ReportedPeriod,0))*24*60*60, yerr=OldEclipseError, fmt='g^',label="Copperwheat Data")
-ax3.plot(Eclipse,(MJDTDB-Ephem(Eclipse,ReportedPeriod,0))*24*60*60,'bo',label="Our Data (from 300-500nm)")
-ax3.plot(Eclipse[:11],(jd-Ephem(Eclipse[:11],ReportedPeriod,0))*24*60*60,'r.',label = "Our Old Data")
-ax3.errorbar(np.average(Eclipse),ave,yerr=Std,fmt='b>',label = "Average Difference of Our Data with total error = std = %f seconds"%(Std))
-ax3.errorbar(np.average(Dec8EclipseNum),ave8,yerr=Std8,fmt='r>',label = "Average Difference of Our Dec 8 Data with error = std = %f seconds"%(Std8))
-ax3.errorbar(np.average(Dec10EclipseNum),ave10,yerr=Std10,fmt='m>',label = "Average Difference of Our Dec 10 Data with error = std = %f seconds"%(Std10))
-ax3.errorbar(np.average(Dec11EclipseNum),ave11,yerr=Std11,fmt='c>',label = "Average Difference of Our Dec 11 Data with error = std = %f seconds"%(Std11))
-ax3.errorbar(np.average(Eclipse[:11]),np.average(MedianEclipseTime-Ephem(Eclipse[:11],ReportedPeriod,0))*24*3600,yerr=np.std(MedianEclipseTime-Ephem(Eclipse[:11],ReportedPeriod,0))*24*3600,fmt='ro',label = "Average Difference of Median Data with error = std = %f seconds"%(np.std(MedianEclipseTime-Ephem(Eclipse[:11],ReportedPeriod,0))*24*3600))
-ax3.plot(Eclipse[:11],(MedianEclipseTime-Ephem(Eclipse[:11],ReportedPeriod,0))*24*60*60,'go')
-ax3.plot(Eclipse[:11],(MedianEclipseTime-Ephem(Eclipse[:11],ReportedPeriod,0))*24*60*60,'go')
-ax3.set_ylabel('O-C (s)')
-#ax3.set_title('Divergence from Reported Ephemeris: Data - Equation, std = %f'%(np.std((jd-Ephem(Eclipse,ReportedPeriod,0))*24*60*60)))
-plt.legend(loc='upper left',prop={'size':'small'})
-ax4=fig.add_subplot(212)
-ax4.plot(Eclipse,(MJDTDB-Ephem(Eclipse,pOpt[0],pOpt[1]))*24*60*60,'bo',label="Our Data (from 300-500nm)")
-ax4.plot(OldEclipseNum,(OldEclipseTime-Ephem(OldEclipseNum,pOpt[0],pOpt[1]))*24*60*60,'g^',label="Copperwheat Data")
-#ax4.errorbar(np.average(Eclipse),aveFit,yerr=StdFit,fmt='b>',label ="Average Difference of Our Data with error = std = %f seconds"%(StdFit))
-plt.xlabel('Cycle')
+FixedOpt = fitEphem(TotalEclipseTime,TotalEclipseNum,sigma)
+QuadOffset = jd0 = FixedOpt[0]
+f = FixedOpt[1]
+fDot = FixedOpt[2]
+QuadPdot = - fDot/(f**2)
+QuadPeriod = 1/f
+print "With fDot fit using curvefit:"
+print f,fDot
+#print 'offset %.15g'%QuadOffset
+#print 'fixed period',QuadPeriod
+print 'fixed pdot',QuadPdot
+
+TimeDiff = []
+for ind in range(len(TotalEclipseNum)):
+    iNumber = TotalEclipseNum[ind]
+    time = optimize.fsolve(fitModel,56000)
+    TimeDiff.append((TotalEclipseTime[ind]-time[0])*24*3600)
+
+ReducedChiSq3 = RedChiSq(TimeDiff,sigma,len(TotalEclipseTime)-3-1)
+print 'red chi-sq',ReducedChiSq3
+
+    
+coeff=np.polyfit(TotalEclipseTime,TotalEclipseNum,2)
+a=coeff[2]
+b=coeff[1]
+c=coeff[0]
+#N=f*(t-jd0)+fDot(t-jd0)**2
+#N=(0.5*jd0**2*fDot-jd0*f)+(f-jd0*fDot)*t+(0.5*fDot)*t**2= a +b*t+ c*t**2
+jd0=((b**2-4*a*c)**.5-b)/(2.*c)
+fDot=2*c
+f=(b**2-4*a*c)**.5
+#print 'poly',jd0
+QuadPeriod = 1/f
+QuadPdot = - fDot/(f**2)
+print "With fDot fit using polyfit:"
+print f,fDot
+print 'fixed pdot',QuadPdot
+
+TimeDiff = []
+for ind in range(len(TotalEclipseNum)):
+    iNumber = TotalEclipseNum[ind]
+    time = optimize.fsolve(fitModel,56000)
+    TimeDiff.append((TotalEclipseTime[ind]-time[0])*24*3600)
+ReducedChiSq3 = RedChiSq(TimeDiff,sigma,len(TotalEclipseTime)-3-1)
+print 'red chi-sq',ReducedChiSq3
+
+fig=plt.figure(figsize=(8.5,11))
+plt.subplots_adjust(wspace=.3,hspace=.7)
+font = {'size'   : 10}
+matplotlib.rc('font', **font)
+
+
+ReducedChiSq1 = RedChiSq((TotalEclipseTime-linearEphem(TotalEclipseNum,ReportedOffset,ReportedPeriod))*24*60*60,sigma,len(TotalEclipseTime)-2-1)
+
+ax1=fig.add_subplot(331)
+ax1.errorbar(OldEclipseNum[:49],(OldEclipseTime[:49]-linearEphem(OldEclipseNum[:49],ReportedOffset,ReportedPeriod))*24*60*60,yerr= [Std2006]*len(OldEclipseError[:49]),fmt='g^')
+ax1.set_ylabel('O-C (s)')
+
+ax2=fig.add_subplot(332, sharey=ax1)
+ax2.errorbar(OldEclipseNum[51:],(OldEclipseTime[51:]-linearEphem(OldEclipseNum[51:],ReportedOffset,ReportedPeriod))*24*60*60,yerr= [Std2009]*len(OldEclipseError[51:]),fmt='g^')
+ax2.set_title('Divergence from Reported Linear Ephemeris\n(Observed - Calculated)',fontsize=11)
+ax2.xaxis.labelpad = 5
+ax2.set_xlabel('Cycle Number')
+
+ax3=fig.add_subplot(333, sharey=ax1)
+ax3.errorbar(np.average(OurEclipseNum),ave,yerr=Std/(1.*np.sqrt(len(OurEclipseNum))),fmt='r*',label="average of our data = %f with std = %f\nReduced Chi-Squared (X^2)= %.3g"%(ave,Std,ReducedChiSq1))
+ax3.errorbar(OurEclipseNum,(OurEclipseTime-linearEphem(OurEclipseNum,ReportedOffset,ReportedPeriod))*24*60*60,yerr=[Std]*len(OurEclipseNum),fmt='ro')
+plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, borderaxespad=0.,prop={'size':'small'})
+yticklabels = ax2.get_yticklabels()+ax3.get_yticklabels()
+plt.setp(yticklabels, visible=False)
+
+
+
+ReducedChiSq2 = RedChiSq((TotalEclipseTime-linearEphem(TotalEclipseNum,linearOffset,linearPeriod))*24*60*60,sigma,len(TotalEclipseTime)-2-1)
+
+#Std2 = np.std(OurEclipseTime-Ephem(OurEclipseNum,linearPeriod,0))*24*60*60
+ave2 = np.average(OurEclipseTime-linearEphem(OurEclipseNum,linearOffset,linearPeriod))*24*60*60
+
+ax4=fig.add_subplot(334, sharex=ax1)
+ax4.errorbar(OldEclipseNum[:49],(OldEclipseTime[:49]-linearEphem(OldEclipseNum[:49],linearOffset,linearPeriod))*24*60*60,yerr= [Std2006]*len(OldEclipseError[:49]),fmt='g^')
 ax4.set_ylabel('O-C (s)')
-ax4.set_title('Divergence from Fitted Ephemeris')
-plt.legend(loc='upper left',prop={'size':'small'})
+
+ax5=fig.add_subplot(335, sharex=ax2,sharey=ax4)
+ax5.errorbar(OldEclipseNum[51:],(OldEclipseTime[51:]-linearEphem(OldEclipseNum[51:],linearOffset,linearPeriod))*24*60*60,yerr= [Std2006]*len(OldEclipseError[51:]),fmt='g^')
+plt.annotate('Divergence from Fitted Linear Ephemeris', xy=(0.5, 1.27), xycoords='axes fraction',ha='center',fontsize=11)
+plt.annotate('Reported Period = 0.01966127289, Fitted Period = %.10f\nPeriod Difference (Reported-Fitted) = %.5g seconds\n t0 Difference = %.5g seconds '%(linearPeriod,(ReportedPeriod-linearPeriod)*24*60*60,(ReportedOffset-linearOffset)*24*60*60), xy=(0.5, 1.05), xycoords='axes fraction',ha='center',fontsize=9)
+ax5.xaxis.labelpad = 5
+ax5.set_xlabel('Cycle Number')
+
+ax6=fig.add_subplot(336, sharex=ax3, sharey=ax4)
+ax6.errorbar(np.average(OurEclipseNum),ave2,yerr=Std/(1.*np.sqrt(len(OurEclipseNum))),fmt='r*',label="average of our data = %f, X^2 = %.3g"%(ave2,ReducedChiSq2))
+ax6.errorbar(OurEclipseNum,(OurEclipseTime-linearEphem(OurEclipseNum,linearOffset,linearPeriod))*24*60*60,yerr=[Std]*len(OurEclipseNum),fmt='ro')
+plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, borderaxespad=0.,prop={'size':'small'})
+
+yticklabels2 = ax5.get_yticklabels()+ax6.get_yticklabels()
+plt.setp(yticklabels2, visible=False)
+
+
+
+ReducedChiSq3 = RedChiSq(TimeDiff,sigma,len(TotalEclipseTime)-3-1)
+
+#Std3 = np.std(TimeDiff[-len(OurEclipseNum):])
+ave3 = np.average(TimeDiff[-len(OurEclipseNum):])
+
+ax7=fig.add_subplot(337, sharex=ax1)
+ax7.errorbar(OldEclipseNum[:49],TimeDiff[:49],yerr= [Std2006]*len(OldEclipseError[:49]),fmt='g^')
+ax7.set_ylabel('O-C (s)')
+
+ax8=fig.add_subplot(338, sharex=ax2,sharey=ax7)
+ax8.errorbar(OldEclipseNum[51:],TimeDiff[51:-len(OurEclipseNum)],yerr= [Std2006]*len(OldEclipseError[51:]),fmt='g^')
+plt.annotate('Divergence from Fitted Quadratic Ephemeris', xy=(0.5, 1.27), xycoords='axes fraction',ha='center',fontsize=11)
+plt.annotate('Fitted Period = %.10f, Fitted Pdot = %.5g\nPeriod Difference (Reported-Fitted) = %.5g seconds\nt0 Difference = %.5g seconds'%(QuadPeriod,QuadPdot,(ReportedPeriod-QuadPeriod)*24*60*60,(ReportedOffset-QuadOffset)*24*60*60), xy=(0.5, 1.05), xycoords='axes fraction',ha='center',fontsize=9)
+ax8.xaxis.labelpad = 5
+ax8.set_xlabel('Cycle Number')
+
+ax9=fig.add_subplot(339, sharex=ax3, sharey=ax7)
+ax9.errorbar(np.average(OurEclipseNum),ave3,yerr=Std/(1.*np.sqrt(len(OurEclipseNum))),fmt='r*',label="average of our data = %f, X^2 = %.3g"%(ave3,ReducedChiSq3))
+ax9.errorbar(OurEclipseNum,TimeDiff[-len(OurEclipseNum):],yerr=[Std]*len(OurEclipseNum),fmt='ro')
+plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, borderaxespad=0.,prop={'size':'small'})
+
+yticklabels3 = ax8.get_yticklabels()+ax9.get_yticklabels()
+plt.setp(yticklabels3, visible=False)
+
 plt.show()
 
-##############################
 
 
-def fitEclipseNum(x,data):
-    p0=(125860)
-    popt, pcov = optimize.curve_fit(ephem, x, data, p0=p0)
-    print p0
-    return popt
 
-#MJD =JD-2400000.5
-#MJDtdb = MJDtcb+(-1.550519768*10**-8*(MJDtcb+2400000.5-2443144.5003725)*86400-6.55*10**-5)/(24.*3600.)
-#(56270.5136024671228-53795.9455191)/0.01966127289=125860.014110567731
-#fit and x0=125860.01136206
-#times = [Dec8Eclipse2-Dec8Eclipse1,Dec8Eclipse3-Dec8Eclipse2,Dec10Eclipse2-Dec10Eclipse1,Dec10Eclipse3-Dec10Eclipse2,Dec11Eclipse1-Dec11Eclipse0,Dec11Eclipse2-Dec11Eclipse1,Dec11Eclipse3-Dec11Eclipse2,Dec11Eclipse4-Dec11Eclipse3]
-#print times
-#eph = np.average(times)
-#std = np.std(times)
-#print 'look', np.average(Dec8Eclipse2-Dec8Eclipse1,Dec8Eclipse3-Dec8Eclipse2)
-#print eph,std,std*24*60*60
-#gap1 = (Dec10Eclipse1-Dec8Eclipse3)/eph
-#gap2 = (Dec11Eclipse0-Dec10Eclipse3)/eph
-#print gap1,gap2
-#gap1=np.around(gap1)
-#gap2=np.around(gap2)
-#Gap108 = (Dec10Eclipse1-Dec8Eclipse3)/gap1
-#Gap1110= (Dec11Eclipse0-Dec10Eclipse3)/gap2
-#print Gap108, Gap1110
-#AveEph = np.average(times+[Gap108]*gap1+[Gap1110]*gap2) 
-#print AveEph
-#eclipseNum = [1,2,gap1+3,gap1+4,gap1+5+gap2,gap1+6+gap2,gap1+7+gap2,gap1+8+gap2]
-#print eclipseNum,times
 
-def ephem(x,x0):
-    return 53795.9455191+ReportedPeriod*(x+x0)

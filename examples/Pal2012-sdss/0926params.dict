@@ -15,7 +15,7 @@ ObjPosFile=[[1,14,8]] #Dec8
 npzFileName = '/Scratch/dataProcessing/SDSS_J0926/Dec8ImageStackAllInt3Aperture510.npz'
 gifFileName = '/Scratch/dataProcessing/SDSS_J0926/Dec8ImageStackAllInt3Aperture510.gif'
 
-integrationTime = 3
+integrationTime = 10
 expTime = 300
 
 #remember to change seqs! It's at the end
@@ -69,9 +69,9 @@ calTimestamps = ['20121209-131132','20121209-133419']
 
 ######################## For fitpsf.py ########################
 
-npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/Dec8ImageStackAllInt.1newwvlcal.npz'
-npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfAllInt.1newwvlcal.npz'
-giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfAllInt.1newwvlcal.gif'
+npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/Dec11ImageStackAllInt10newwvlcal.npz'
+npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfAllInt10newwvlcal.npz'
+giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfAllInt10newwvlcal.gif'
 
 #Dec8 
 #seq0:13
@@ -88,9 +88,9 @@ FramesPerFile = expTime/integrationTime
 
 #seqCorr = [-1,seq0seq1,seq0seq1+seq2seq3,seq0seq1+seq2seq3+seq4,seq0seq1+seq2seq3+seq4+seq5seq6]
 
-NumFiles = [-1,17,17,17,17]
+#NumFiles = [-1,17,17,17,17]
 #NumFiles = [-1,-1,14,31,31]
-#NumFiles = [-1,-1,-1,-1,26]
+NumFiles = [-1,-1,-1,-1,26]
 #NumFiles = [-1,17,31,48,74]
 guessX = [14,31,14,16]
 guessY = [8,30,8,15]

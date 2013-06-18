@@ -1,5 +1,7 @@
 import numpy as np
 
+#This is used to combine multiple Image Stack npz files into one large file.
+
 npzfile = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8ShortIntImageStackRed.npz')
 npzfile2 = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10SIImageStackRednewCal.npz')
 npzfile3 = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIImageStackRed.npz')
