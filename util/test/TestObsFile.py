@@ -123,6 +123,42 @@ class TestObsFile(unittest.TestCase):
         plt.title("mask times from %d to %d ticks" % (xs[0],xs[1]))
         plt.savefig(fn.makeName(inspect.stack()[0][3]+"_",""))
 
+    def testNumpyPytablesConflict(self):
+        '''
+        Author: Julian van Eyken                Date: June 17 2013
+        
+        Test for Numpy/PyTables version conflict: it seems a bug shows
+        up when using Numpy 1.7.1 with PyTables 2.3.1 and 2.4 (at least -
+        and maybe other versions of PyTables too?). Most likely it
+        appears to be related to a change to the way Numpy handles
+        integer overflows in v. 1.7.1. It appears to cause occasional
+        random failures when calling the pytables getNode() function.
+        This test just tries to recreate the error as a check to make
+        sure the conflict is not happening.
+        
+        Note that this is not 100% guaranteed to pick up the bug
+        every time, since it's not deterministic.... But it seems
+        to usually do the trick.
+        '''
+        
+        fn = FileName.FileName(run='PAL2012',date='20121211',
+                               tstamp='20121212-033323').obs()
+        obsFile = ObsFile.ObsFile(fn)
+        #Just try to get an empty image - that should call
+        #getNode() on every pixel....
+        
+        print 'Getting a test image...' 
+        try:
+            dummyImage = obsFile.getPixelCountImage(firstSec=0,integrationTime=-1,
+                                                getRawCount=True)
+        except AttributeError:
+            print '!!! Looks like the Numpy/PyTables bug probably showed up.'
+            print '!!! Probably because you''re running Numpy 1.7.1 with PyTables...?'
+            raise
+        
+        print 'Done. Seemed to work okay that time....'
+
+
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False
