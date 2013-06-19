@@ -108,7 +108,7 @@ for iSeq in range(len(seqs)):
             count+=1
             times.append(jd)
             titles.append('%.6f'%jd)
-            frameData = ob.getPixelCountImage(firstSec=sec,integrationTime=integrationTime,weighted=True)
+            frameData = ob.getPixelCountImage(firstSec=sec,integrationTime=integrationTime,weighted=True,scaleByEffInt=True)
             frame = frameData['image']         
             showFrame = np.array(frame)
             showframes.append(showFrame)
