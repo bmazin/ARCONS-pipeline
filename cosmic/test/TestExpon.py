@@ -54,7 +54,7 @@ class TestExpon(unittest.TestCase):
         nBins = 400
         size = 100
         taulist = []
-        for i in range(100):
+        for i in range(1000):
             x = range(nBins)
             timeHgValues = np.zeros(nBins, dtype=np.int64)
             timeStamps = expon.rvs(loc=0, scale=tau, size=size)
@@ -68,16 +68,11 @@ class TestExpon(unittest.TestCase):
             taulist.append(param[1])
             #mu, sigma = 
             #P.figure()
-        n, bins, patches = P.hist(taulist, 10, normed=1, histtype='step')
-        P.setp(patches, 'facecolor', 'g', 'alpha', 1)
-        #y = P.normpdf(bins, mu, sigma)
-        #line = P.plot(bins, y, 'k--', linewidth=1.5)
-            
-        #fig  = plt.figure()
-        #ax = fig.add_subplot(111)
-        #x = taulist
-        #numBins = 10
-        #ax.hist(x, numBins, color='green', alpha=0.8)
+
+        hist,bins = np.histogram(taulist, bins=20)
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        plt.bar(center, hist, align = 'center', width = width)
         plt.savefig(inspect.stack()[0][3]+".png")
 
     def histDemo(self):
