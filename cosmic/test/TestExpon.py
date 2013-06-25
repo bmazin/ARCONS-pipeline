@@ -64,11 +64,11 @@ class TestExpon(unittest.TestCase):
             param = expon.fit(timeStamps)
             fit = expon.pdf(x,loc=param[0],scale=param[1])
             fit *= size
-            #print "i=",i," param=",param
+            print "i=",i," param[1]=",param[1]
             taulist.append(param[1])
             #mu, sigma = 
             #P.figure()
-        n, bins, patches = P.hist(x, 10, normed=1, histtype='step')
+        n, bins, patches = P.hist(taulist, 10, normed=1, histtype='step')
         P.setp(patches, 'facecolor', 'g', 'alpha', 1)
         #y = P.normpdf(bins, mu, sigma)
         #line = P.plot(bins, y, 'k--', linewidth=1.5)
@@ -79,6 +79,17 @@ class TestExpon(unittest.TestCase):
         #numBins = 10
         #ax.hist(x, numBins, color='green', alpha=0.8)
         plt.savefig(inspect.stack()[0][3]+".png")
+
+    def histDemo(self):
+        mu, sigma = 200, 25
+        x = mu + sigma*P.randn(10000)
+        n, bins, patches = P.hist(x, 50, normed=1, histtype='stepfilled')
+        P.setp(patches, 'facecolor', 'g', 'alpha', 0.75)
+        
+        y = P.normpdf( bins, mu, sigma)
+        l = P.plot(bins, y, 'k--', linewidth=1.5)
+        P.savefig(inspect.stack()[0][3]+".png")
+
 
 if __name__ == '__main__':
     unittest.main()
