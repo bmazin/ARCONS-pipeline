@@ -9,6 +9,8 @@ import inspect
 import numpy as np
 import pylab as P
 from util import hgPlot
+from scipy import optimize
+from scipy.optimize import curve_fit
 from scipy.stats import poisson,expon
 from cosmic import tsBinner
 class TestExpon(unittest.TestCase):
@@ -67,10 +69,10 @@ class TestExpon(unittest.TestCase):
             print "i=",i," param[1]=",param[1]
             taulist.append(param[1]) 
 
-        hist,bins = np.histogram(taulist, bins=20)
+        hist,bins = np.histogram(taulist, bins=20, range=(15,25))
         width = 0.7*(bins[1]-bins[0])
         center = (bins[:-1]+bins[1:])/2
-        plt.step(center, hist, where = 'mid')
+        plt.step(center, hist, where = 'post')
         plt.savefig(inspect.stack()[0][3]+".png")
 
     def testExponaverage(self):
@@ -84,7 +86,6 @@ class TestExpon(unittest.TestCase):
         nBins = 400
         size = 100
         taulist = []
-        average = []
         for i in range(1000):
             x = range(nBins)
             timeHgValues = np.zeros(nBins, dtype=np.int64)
@@ -99,13 +100,111 @@ class TestExpon(unittest.TestCase):
           
             taulist.append(param) 
 
-        hist,bins = np.histogram(taulist, bins=20)
+        hist,bins = np.histogram(taulist, bins=20, range=(15,35))
         width = 0.7*(bins[1]-bins[0])
         center = (bins[:-1]+bins[1:])/2
         #plt.bar(center, hist, align = 'center', width = width) produces bar graph
-        plt.step(center, hist, where = 'mid')
+        plt.step(center, hist, where = 'post')
         plt.savefig(inspect.stack()[0][3]+".png")
+
+    def displayFits(self):
+        """
+        generates two histograms on the same plot. One uses maximum likelihood to fit
+        the data while the other uses the average time.
+        """
+        tau = 25.0
+        nBins = 400
+        size = 100
+        taulist = []
+        taulistavg = []
+        for i in range(1000):
+            x = range(nBins)
+            timeHgValues = np.zeros(nBins, dtype=np.int64)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size)
+            ts64 = timeStamps.astype(np.uint64)
+            tsBinner.tsBinner(ts64, timeHgValues)
+            
+            param = sum(timeStamps)/len(timeStamps)
+            fit = expon.pdf(x,param)
+            fit *= size
+            
+            taulistavg.append(param)
+
+        for i in range(1000):
+            x = range(nBins)
+            timeHgValues = np.zeros(nBins, dtype=np.int64)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size)
+            ts64 = timeStamps.astype(np.uint64)
+            tsBinner.tsBinner(ts64, timeHgValues)
+            
+            param = expon.fit(timeStamps)
+            fit = expon.pdf(x,loc=param[0],scale=param[1])
+            fit *= size
+            taulist.append(param[1]) 
+
+
+        hist,bins = np.histogram(taulistavg, bins=20, range=(15,35))
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        plt.step(center, hist, where = 'post', label="averagetime", color='g')
+        hist,bins = np.histogram(taulist, bins=20, range=(15,35))
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        plt.step(center, hist, where = 'post', label="maxlikelihood")
+        plt.legend()
+        plt.savefig(inspect.stack()[0][3]+".png")
+    
+    def chisquaredDemo(self):
+
+            
+        def func(x, a, b, c):
+            return a*np.exp(-b*x) + c
+
+        x = np.linspace(0, 4, 50)
+        y = func(x, 2.5, 1.3, 0.5)
+        yn = y + 0.2*np.random.normal(size=len(x))
+            
+        popt, pcov = curve_fit(func, x, yn)
+        print 'optimal parameters: ', popt
+        print 'uncertainties of parameters: ', pcov
+
         
+    def testExponchisquared(self):
+       
+        tau = 25.0
+        nBins = 400
+        size = 100
+        taulist = []
+        for i in range(1000):
+            timeHgValues = np.zeros(nBins, dtype=np.int64)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size)
+            ts64 = timeStamps.astype(np.uint64)
+            tsBinner.tsBinner(ts64, timeHgValues)
+       
+            def func(x, a):
+                return a**x
+            
+            x = np.linspace(timeStamps[0], timeStamps[1])
+            y = func(x, 1)
+            yn = y**1/2
+            popt, pcov = curve_fit(func, x, yn)
+            xfit = np.linspace(timeStamps[0], timeStamps[1])
+            yfit = func(x,*popt)
+
+            #print 'optimal parameters: ', popt
+            #print 'uncertainties of parameters: ', pcov
+
+            param = yfit
+            taulist.append(param)
+            
+        hist,bins = np.histogram(taulist, bins=20)
+        width = 1
+        center = (bins[:-1]+bins[1:])/2
+        plt.step(center, hist, where = 'post')
+        plt.xlabel('timeStamps')
+        plt.ylabel('number of events')
+        plt.savefig(inspect.stack()[0][3]+".png")
+
 
     def histDemo(self):
         mu, sigma = 200, 25
