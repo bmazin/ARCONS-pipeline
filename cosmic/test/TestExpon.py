@@ -65,29 +65,47 @@ class TestExpon(unittest.TestCase):
             fit = expon.pdf(x,loc=param[0],scale=param[1])
             fit *= size
             print "i=",i," param[1]=",param[1]
-            taulist.append(param[1])
-<<<<<<< HEAD
-        n, bins, patches = P.hist(taulist, 10, normed=1, histtype='step')
-        P.setp(patches, 'facecolor', 'g', 'alpha', 1)
-        #y = P.normpdf(bins, mu, sigma)
-        #line = P.plot(bins, y, 'k--', linewidth=1.5)
-            
-        #fig  = plt.figure()
-        #ax = fig.add_subplot(111)
-        #x = taulist
-        #numBins = 10
-        #ax.hist(x, numBins, color='green', alpha=0.8)
-        P.savefig(inspect.stack()[0][3]+".png")
-=======
-            #mu, sigma = 
-            #P.figure()
+            taulist.append(param[1]) 
 
         hist,bins = np.histogram(taulist, bins=20)
         width = 0.7*(bins[1]-bins[0])
         center = (bins[:-1]+bins[1:])/2
-        plt.bar(center, hist, align = 'center', width = width)
+        plt.step(center, hist, where = 'mid')
         plt.savefig(inspect.stack()[0][3]+".png")
->>>>>>> 107e4c6ad99b5339dd1044ff217f340858a50c27
+
+    def testExponaverage(self):
+
+        """
+        generate and fit a histogram of an exponential distribution with many
+        events using the average time to find the fit. The histogram is then
+        saved in testExponaverage.png
+        """
+        tau = 25.0
+        nBins = 400
+        size = 100
+        taulist = []
+        average = []
+        for i in range(1000):
+            x = range(nBins)
+            timeHgValues = np.zeros(nBins, dtype=np.int64)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size)
+            ts64 = timeStamps.astype(np.uint64)
+            tsBinner.tsBinner(ts64, timeHgValues)
+            
+            
+            param = sum(timeStamps)/len(timeStamps)
+            fit = expon.pdf(x,param)
+            fit *= size
+          
+            taulist.append(param) 
+
+        hist,bins = np.histogram(taulist, bins=20)
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        #plt.bar(center, hist, align = 'center', width = width) produces bar graph
+        plt.step(center, hist, where = 'mid')
+        plt.savefig(inspect.stack()[0][3]+".png")
+        
 
     def histDemo(self):
         mu, sigma = 200, 25
