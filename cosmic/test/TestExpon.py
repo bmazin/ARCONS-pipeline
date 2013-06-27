@@ -216,57 +216,61 @@ class TestExpon(unittest.TestCase):
         plt.title(inspect.stack()[0][3])
         plt.savefig(inspect.stack()[0][3]+".png")
         
-    def testExponchisquared(self):
+    def testExponFitOne(self):
        
         def funcExpon(x, a, b, c):
             return a*np.exp(-b*x) + c
 
         tau = 25.0
-        nBins = 400
+        nBins = 800
         size = 10000
         taulist = []
-        for i in range(10):
+        for i in range(100):
             timeHgValues = np.zeros(nBins, dtype=np.int64)
             timeStamps = expon.rvs(loc=0, scale=tau, size=size)
             ts64 = timeStamps.astype(np.uint64)
             tsBinner.tsBinner(ts64, timeHgValues)
            
-            if (i == 0):
-                print "first iteration"
-                plt.clf()
-                plt.plot(timeHgValues)
-                plt.savefig("junk.png")
-
            
-                xPoints = []
-                yPoints = []
-                print "now collect good points for nBins=",nBins
-                for x in range(nBins):
-                    y = timeHgValues[x]
-                    if y > 2:
-                        xPoints.append(x)
-                        yPoints.append(y)
-                print "after collectin good points:  len(xPoints)=",len(xPoints)
-                xArray = np.array(xPoints)
-                print "done making xArray with size=",xArray.size
-                yArray = np.array(yPoints)
-                ySigma = (yArray ** 1/2)
-                print "now call curve_fit with xArray.size=",xArray.size," len(xPoints)=",len(xPoints)
-                popt, pcov = curve_fit(funcExpon, xArray, yArray, sigma=ySigma)
-                print "popt=",popt
-                print 'optimal parameters: ', popt
-                print 'uncertainties of parameters: ', pcov
+            xPoints = []
+            yPoints = []
+            for x in range(nBins):
+                y = timeHgValues[x]
+                if y > 2:
+                    xPoints.append(x)
+                    yPoints.append(y)
+            xArray = np.array(xPoints) #must be in array for not list to use curve_fit
+            yArray = np.array(yPoints)
+            ySigma = (yArray ** 1/2)
+            popt, pcov = curve_fit(funcExpon, xArray, yArray, sigma=ySigma)
+            taulist.append(1/popt[1]) #B is 1/tau
+            
+            if (i == 0):
+                plt.clf()
+                plt.plot(xArray, yArray, 'ro')
+                xPlot = np.linspace(xArray[0], xArray[-1], 1000)
+                yPlot = funcExpon(xPlot, *popt)
+                plt.plot(xPlot, yPlot, color='g')
+                plt.savefig("junk.png") #first iteration
 
 
-        #xFit = xPoints
-        #yFit = funcExpon(xFit, *popt)
-        #plt.clf()
-        #plt.plot(xPoints, yPoints, 'ro', label="data")
-        #plt.plot(xFit, yFit, color='g', label="fit")
+        xPlot = np.linspace(xArray[0], xArray[-1], 1000)
+        yPlot = funcExpon(xPlot, *popt)
+        plt.clf()
+        plt.plot(xArray, yArray, 'ro')
+        plt.plot(xPlot, yPlot, color='g')
         #plt.errorbar(yerr,  color='g', label='error')
-        #plt.legend()
-        #plt.title(inspect.stack()[0][3])
-        #plt.savefig(inspect.stack()[0][3]+".png")
+        plt.title(inspect.stack()[0][3])
+        plt.savefig(inspect.stack()[0][3]+".png") #saves plot
+        plt.clf()
+        hist,bins = np.histogram(taulist, bins=20)
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        plt.step(center, hist, where = 'post', color='g')
+        plt.title(inspect.stack()[0][3])
+        plt.savefig("chisquaredhistogram"+".png") #saves histogram
+
+       
 
 
     def histDemo(self):
