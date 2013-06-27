@@ -180,26 +180,82 @@ class TestExpon(unittest.TestCase):
 
         # plot the fit line
         xFit = np.linspace(0,4,100)
-        yFit = func(xFit, popt[0], popt[1], popt[2])
+        yFit = func(xFit, *popt)
+        plt.plot(xFit,yFit)
+        plt.title(inspect.stack()[0][3])
+        plt.savefig(inspect.stack()[0][3]+".png")
+        
+    def chisquaredDemo2(self):
+        """
+        Demonstrate how to use curve_fit.  Generate data points with an
+        exponential function, deviating with random gausian numbers.
+
+        Use curve_fit to fit to these data points.
+
+        Plot the data points and the fit curve to a png file
+        """
+            
+        def func(x, a, b, c):
+            return a*np.exp(-b*x) + c
+
+        x = np.linspace(0, 4, 50)
+        y = func(x, 2.5, 1.3, 0.5)
+        yn = y + 0.2*np.random.normal(size=len(x))
+            
+        popt, pcov = curve_fit(func, x, yn)
+        print 'optimal parameters: ', popt
+        print 'uncertainties of parameters: ', pcov
+
+        # plot the data points
+        plt.plot(x,yn,'ro')
+
+        # plot the fit line
+        xFit = np.linspace(0,4,100)
+        yFit = func(xFit, *popt)
         plt.plot(xFit,yFit)
         plt.title(inspect.stack()[0][3])
         plt.savefig(inspect.stack()[0][3]+".png")
         
     def testExponchisquared(self):
        
+        def funcExpon(x, a, b, c):
+            return a*np.exp(-b*x) + c
+
         tau = 25.0
         nBins = 400
-        size = 100
+        size = 10000
         taulist = []
-        for i in range(1000):
+        for i in range(10):
             timeHgValues = np.zeros(nBins, dtype=np.int64)
             timeStamps = expon.rvs(loc=0, scale=tau, size=size)
             ts64 = timeStamps.astype(np.uint64)
             tsBinner.tsBinner(ts64, timeHgValues)
        
-            def func(x, a):
-                return a**x
-            
+            xPoints = []
+            yPoints = []
+            ySigma = []
+            for x in range(nBins):
+                y = timeHgValues[x]
+                if y > 2:
+                    xPoints.append(x)
+                    yPoints.append(y)
+                    ySigma.append(math.sqrt(y))
+            bGuess = timeStamps.mean()
+            aGuess = bGuess/timeStamps.size
+            cGuess = 0
+            pGuess = [ aGuess, bGuess, cGuess ]
+            print "before call to curve_fit:  xPoints length=",len(xPoints)
+            print "before call to curve_fit:  yPoints length=",len(yPoints)
+            print "before call to curve_fit:  ySigma length=",len(ySigma)
+            popt, pcov = curve_fit(funcExpon, xPoints, yPoints)
+            print "popt=",popt
+
+            if (i == 0):
+                print "first iteration"
+                plt.clf()
+                plt.plot(timeHgValues)
+                plt.savefig("junk.png")
+
             x = np.linspace(timeStamps[0], timeStamps[1])
             y = func(x, 1)
             yn = y**1/2
@@ -211,10 +267,12 @@ class TestExpon(unittest.TestCase):
             #print 'uncertainties of parameters: ', pcov
             param = yfit
             taulist.append(param)
-            
+
+
         hist,bins = np.histogram(taulist, bins=20)
         width = 1
         center = (bins[:-1]+bins[1:])/2
+        plt.clf()
         plt.figure()
         plt.step(center, hist,  where = 'post', label='fit')
         #plt.errorbar(yerr,  color='g', label='error') 
