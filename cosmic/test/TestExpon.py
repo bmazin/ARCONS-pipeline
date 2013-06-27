@@ -155,7 +155,14 @@ class TestExpon(unittest.TestCase):
         plt.savefig(inspect.stack()[0][3]+".png")
     
     def chisquaredDemo(self):
+        """
+        Demonstrate how to use curve_fit.  Generate data points with an
+        exponential function, deviating with random gausian numbers.
 
+        Use curve_fit to fit to these data points.
+
+        Plot the data points and the fit curve to a png file
+        """
             
         def func(x, a, b, c):
             return a*np.exp(-b*x) + c
@@ -168,6 +175,15 @@ class TestExpon(unittest.TestCase):
         print 'optimal parameters: ', popt
         print 'uncertainties of parameters: ', pcov
 
+        # plot the data points
+        plt.plot(x,yn,'ro')
+
+        # plot the fit line
+        xFit = np.linspace(0,4,100)
+        yFit = func(xFit, popt[0], popt[1], popt[2])
+        plt.plot(xFit,yFit)
+        plt.title(inspect.stack()[0][3])
+        plt.savefig(inspect.stack()[0][3]+".png")
         
     def testExponchisquared(self):
        
