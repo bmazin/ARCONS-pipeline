@@ -225,60 +225,44 @@ class TestExpon(unittest.TestCase):
         nBins = 400
         size = 10000
         taulist = []
+        xPoints = []
+        yPoints = []
         for i in range(10):
             timeHgValues = np.zeros(nBins, dtype=np.int64)
             timeStamps = expon.rvs(loc=0, scale=tau, size=size)
             ts64 = timeStamps.astype(np.uint64)
             tsBinner.tsBinner(ts64, timeHgValues)
-       
-            xPoints = []
-            yPoints = []
-            ySigma = []
-            for x in range(nBins):
-                y = timeHgValues[x]
-                if y > 2:
-                    xPoints.append(x)
-                    yPoints.append(y)
-                    ySigma.append(math.sqrt(y))
-            bGuess = timeStamps.mean()
-            aGuess = bGuess/timeStamps.size
-            cGuess = 0
-            pGuess = [ aGuess, bGuess, cGuess ]
-            print "before call to curve_fit:  xPoints length=",len(xPoints)
-            print "before call to curve_fit:  yPoints length=",len(yPoints)
-            print "before call to curve_fit:  ySigma length=",len(ySigma)
-            popt, pcov = curve_fit(funcExpon, xPoints, yPoints)
-            print "popt=",popt
+           
+        if (i == 0):
+            print "first iteration"
+            plt.clf()
+            plt.plot(timeHgValues)
+            plt.savefig("junk.png")
 
-            if (i == 0):
-                print "first iteration"
-                plt.clf()
-                plt.plot(timeHgValues)
-                plt.savefig("junk.png")
-
-            x = np.linspace(timeStamps[0], timeStamps[1])
-            y = func(x, 1)
-            yn = y**1/2
-            popt, pcov = curve_fit(func, x, yn)
-            xfit = np.linspace(timeStamps[0], timeStamps[1])
-            yfit = func(x,*popt)
-
-            #print 'optimal parameters: ', popt
-            #print 'uncertainties of parameters: ', pcov
-            param = yfit
-            taulist.append(param)
-
-
-        hist,bins = np.histogram(taulist, bins=20)
-        width = 1
-        center = (bins[:-1]+bins[1:])/2
+           
+        for x in range(nBins):
+            y = timeHgValues[x]
+            if y > 2:
+                xPoints.append(range(nBins))
+                yPoints.append(timeHgValues)
+                xArray = np.asarray(xPoints, dtype=list)
+                yArray = np.asarray(yPoints, dtype=list)
+                ySigma = (yArray ** 1/2)
+                print "before call to curve_fit:  xArray",xArray
+                print "before call to curve_fit:  yArray", yArray
+                print "before call to curve_fit:  ySigmaArray",ySigma
+                popt, pcov = curve_fit(funcExpon, xArray, yArray, sigma=ySigma)
+                print "popt=",popt
+                print 'optimal parameters: ', popt
+                print 'uncertainties of parameters: ', pcov
+        xFit = xPoints
+        yFit = funcExpon(xFit, *popt)
         plt.clf()
-        plt.figure()
-        plt.step(center, hist,  where = 'post', label='fit')
-        #plt.errorbar(yerr,  color='g', label='error') 
-        plt.xlabel('timeStamps')
-        plt.ylabel('number of events')
+        plt.plot(xPoints, yPoints, 'ro', label="data")
+        plt.plot(xFit, yFit, color='g', label="fit")
+        #plt.errorbar(yerr,  color='g', label='error')
         plt.legend()
+        plt.title(inspect.stack()[0][3])
         plt.savefig(inspect.stack()[0][3]+".png")
 
 
