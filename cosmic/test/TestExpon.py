@@ -225,45 +225,48 @@ class TestExpon(unittest.TestCase):
         nBins = 400
         size = 10000
         taulist = []
-        xPoints = []
-        yPoints = []
         for i in range(10):
             timeHgValues = np.zeros(nBins, dtype=np.int64)
             timeStamps = expon.rvs(loc=0, scale=tau, size=size)
             ts64 = timeStamps.astype(np.uint64)
             tsBinner.tsBinner(ts64, timeHgValues)
            
-        if (i == 0):
-            print "first iteration"
-            plt.clf()
-            plt.plot(timeHgValues)
-            plt.savefig("junk.png")
+            if (i == 0):
+                print "first iteration"
+                plt.clf()
+                plt.plot(timeHgValues)
+                plt.savefig("junk.png")
 
            
-        for x in range(nBins):
-            y = timeHgValues[x]
-            if y > 2:
-                xPoints.append(range(nBins))
-                yPoints.append(timeHgValues)
-                xArray = np.asarray(xPoints, dtype=list)
-                yArray = np.asarray(yPoints, dtype=list)
+                xPoints = []
+                yPoints = []
+                print "now collect good points for nBins=",nBins
+                for x in range(nBins):
+                    y = timeHgValues[x]
+                    if y > 2:
+                        xPoints.append(x)
+                        yPoints.append(y)
+                print "after collectin good points:  len(xPoints)=",len(xPoints)
+                xArray = np.array(xPoints)
+                print "done making xArray with size=",xArray.size
+                yArray = np.array(yPoints)
                 ySigma = (yArray ** 1/2)
-                print "before call to curve_fit:  xArray",xArray
-                print "before call to curve_fit:  yArray", yArray
-                print "before call to curve_fit:  ySigmaArray",ySigma
+                print "now call curve_fit with xArray.size=",xArray.size," len(xPoints)=",len(xPoints)
                 popt, pcov = curve_fit(funcExpon, xArray, yArray, sigma=ySigma)
                 print "popt=",popt
                 print 'optimal parameters: ', popt
                 print 'uncertainties of parameters: ', pcov
-        xFit = xPoints
-        yFit = funcExpon(xFit, *popt)
-        plt.clf()
-        plt.plot(xPoints, yPoints, 'ro', label="data")
-        plt.plot(xFit, yFit, color='g', label="fit")
+
+
+        #xFit = xPoints
+        #yFit = funcExpon(xFit, *popt)
+        #plt.clf()
+        #plt.plot(xPoints, yPoints, 'ro', label="data")
+        #plt.plot(xFit, yFit, color='g', label="fit")
         #plt.errorbar(yerr,  color='g', label='error')
-        plt.legend()
-        plt.title(inspect.stack()[0][3])
-        plt.savefig(inspect.stack()[0][3]+".png")
+        #plt.legend()
+        #plt.title(inspect.stack()[0][3])
+        #plt.savefig(inspect.stack()[0][3]+".png")
 
 
     def histDemo(self):
