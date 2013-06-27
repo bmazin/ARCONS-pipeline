@@ -193,16 +193,18 @@ class TestExpon(unittest.TestCase):
 
             #print 'optimal parameters: ', popt
             #print 'uncertainties of parameters: ', pcov
-
             param = yfit
             taulist.append(param)
             
         hist,bins = np.histogram(taulist, bins=20)
         width = 1
         center = (bins[:-1]+bins[1:])/2
-        plt.step(center, hist, where = 'post')
+        plt.figure()
+        plt.step(center, hist,  where = 'post', label='fit')
+        #plt.errorbar(yerr,  color='g', label='error') 
         plt.xlabel('timeStamps')
         plt.ylabel('number of events')
+        plt.legend()
         plt.savefig(inspect.stack()[0][3]+".png")
 
 
