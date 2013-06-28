@@ -216,22 +216,25 @@ class TestExpon(unittest.TestCase):
         plt.title(inspect.stack()[0][3])
         plt.savefig(inspect.stack()[0][3]+".png")
         
-    def testExponFitOne(self):
-       
-        def funcExpon(x, a, b, c):
-            return a*np.exp(-b*x) + c
+    def testExponchisquared(self):
+        
+        def funcExpon(x, a, b, c, d):
+            retval = a*np.exp(-b*(x-d)) + c
+            retval[x < d] = 0
+            return retval
 
         tau = 25.0
+        t0 = 40
         nBins = 800
         size = 10000
         taulist = []
+
         for i in range(100):
             timeHgValues = np.zeros(nBins, dtype=np.int64)
-            timeStamps = expon.rvs(loc=0, scale=tau, size=size)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size) + t0
             ts64 = timeStamps.astype(np.uint64)
             tsBinner.tsBinner(ts64, timeHgValues)
-           
-           
+            
             xPoints = []
             yPoints = []
             for x in range(nBins):
@@ -239,10 +242,16 @@ class TestExpon(unittest.TestCase):
                 if y > 2:
                     xPoints.append(x)
                     yPoints.append(y)
+            
+            bGuess = 1/(np.mean(timeStamps))
+            aGuess = bGuess*(size)
+            cGuess = 0
+            dGuess = t0
+            pGuess = [aGuess, bGuess, cGuess, dGuess]
             xArray = np.array(xPoints) #must be in array for not list to use curve_fit
             yArray = np.array(yPoints)
             ySigma = (yArray ** 1/2)
-            popt, pcov = curve_fit(funcExpon, xArray, yArray, sigma=ySigma)
+            popt, pcov = curve_fit(funcExpon, xArray, yArray, sigma=ySigma, p0=pGuess)
             taulist.append(1/popt[1]) #B is 1/tau
             
             if (i == 0):
@@ -252,7 +261,7 @@ class TestExpon(unittest.TestCase):
                 yPlot = funcExpon(xPlot, *popt)
                 plt.plot(xPlot, yPlot, color='g')
                 plt.savefig("junk.png") #first iteration
-
+        print "popt=", popt
 
         xPlot = np.linspace(xArray[0], xArray[-1], 1000)
         yPlot = funcExpon(xPlot, *popt)
