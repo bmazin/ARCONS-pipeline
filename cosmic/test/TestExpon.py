@@ -13,6 +13,9 @@ from scipy import optimize
 from scipy.optimize import curve_fit
 from scipy.stats import poisson,expon
 from cosmic import tsBinner
+
+from util.FileName import FileName
+
 class TestExpon(unittest.TestCase):
     
     def test1(self):
@@ -293,5 +296,28 @@ class TestExpon(unittest.TestCase):
         P.savefig(inspect.stack()[0][3]+".png")
 
 
+    def testFitExponRealData(self):
+        """
+        Read timestamps from part of one data file where there was an event.
+        """
+
+        # We imported FileName at the top of this file.  Use this to
+        # locate the file for this specific observation.          
+        # on turk, the file with the observation is this one:
+        # /ScienceData/PAL2012/20121211/obs_20121212-1333303.h5
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '133303'
+        fn = FileName(run, sundownDate, obsDate+"-"+seq)
+        # The class Cosmic is in ARCONS-pipeline/cosmic/Cosmic.py
+        cosmic = Cosmic(fn)
+        # This is the method that you need to write!
+        t0 = 138595580
+        t1 = 138595650
+        dictionary = cosmic.fitExpon(t0,t1)
+        print "pFit=",dictionary['pFit']
+        print "chi2=",dictionary['chi2']
+        print "number of photons=",dictionary['timeHgValues'].sum()
 if __name__ == '__main__':
     unittest.main()

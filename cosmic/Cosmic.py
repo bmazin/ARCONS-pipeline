@@ -455,3 +455,39 @@ class Cosmic:
                         listOfPixelsToMark=listOfPixelsToMark,
                         pixelMarkColor='green')
 
+    def fitDecayTime(self,t0Sec,lengthSec=200,plotFileName='none'):
+        print "hello from fitDecayTime"
+        timedPacketList = self.file.getTimedPacketList(
+            iRow, iCol, sec0, lengthSec)
+
+    
+    def fitExpon(self, t0, t1):
+        """
+        Fit an exponential to all photons from time t0 to time t1
+        t0 and t1 are in ticks, 1e6 ticks per second
+        return a dictionary of:  timeStamps,fitParams,chi2
+
+        """
+        print "hello from Cosmic.fitExpon:  t0=",t0," t1=",t1
+        firstSec = int(t0/1e6)  # in seconds
+        integrationTime = 1+int((t1-t0)/1e6) # in seconds
+        print "firstSec=",firstSec," integrationTime=",integrationTime
+        nBins = integrationTime*1e6 # number of microseconds; one bin per microsecond
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        for iRow in range(self.file.nRow):
+            for iCol in range(self.file.nCol):
+                timedPacketList = self.file.getTimedPacketList(
+                    iRow, iCol, firstSec=firstSec, 
+                    integrationTime=integrationTime)
+                timeStamps = timedPacketList['timestamps']
+                if (len(timeStamps) > 0):
+                    # covert the time values to microseconds, and
+                    # make it the type np.uint64
+                    ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
+                    # add these timestamps to the histogram timeHgValues
+                    tsBinner.tsBinner(ts64, timeHgValues)
+        ### do some actual fits instead of making things up here
+        pFit = [1,2,3,4]
+        chi2 = 1.234
+        retval = {'timeHgValues':timeHgValues, 'pFit':pFit, 'chi2':chi2}
+        return retval
