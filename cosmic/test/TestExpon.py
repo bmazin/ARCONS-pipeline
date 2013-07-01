@@ -11,7 +11,7 @@ import pylab as P
 from util import hgPlot
 from scipy import optimize
 from scipy.optimize import curve_fit
-from scipy.stats import poisson,expon
+from scipy.stats import poisson,expon,chisquare
 from cosmic import tsBinner
 
 from util.FileName import FileName
@@ -91,6 +91,7 @@ class TestExpon(unittest.TestCase):
         taulist = []
         for i in range(1000):
             x = range(nBins)
+            yPlot = funcExpon(xPlot, *popt)
             timeHgValues = np.zeros(nBins, dtype=np.int64)
             timeStamps = expon.rvs(loc=0, scale=tau, size=size)
             ts64 = timeStamps.astype(np.uint64)
@@ -282,8 +283,104 @@ class TestExpon(unittest.TestCase):
         plt.title(inspect.stack()[0][3])
         plt.savefig("chisquaredhistogram"+".png") #saves histogram
 
-       
+    def printReducedChi(self):
+        
+        def funcExpon(x, a, b, c, d):
+            retval = a*np.exp(-b*(x-d)) + c
+            retval[x < d] = 0
+            return retval
+        
+        tau = 25.0
+        t0 = 40
+        nBins = 800
+        size = 10000
+        taulist = []
+        
+        for i in range(100):
+            timeHgValues = np.zeros(nBins, dtype=np.int64)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size) + t0
+            ts64 = timeStamps.astype(np.uint64)
+            tsBinner.tsBinner(ts64, timeHgValues)
+            
+            xPoints = []
+            yPoints = []
+            for x in range(nBins):
+                y = timeHgValues[x]
+                if y > 2:
+                    xPoints.append(x)
+                    yPoints.append(y)
+            
+            bGuess = 1/(np.mean(timeStamps))
+            aGuess = bGuess*(size)
+            cGuess = 0
+            dGuess = t0
+            pGuess = [aGuess, bGuess, cGuess, dGuess]
+            xArray = np.array(xPoints) #must be in array for not list to use curve_fit
+            yArray = np.array(yPoints)
+            ySigma = (yArray ** 1/2)
+            popt, pcov = curve_fit(funcExpon, xArray, yArray, p0=pGuess, sigma=ySigma)
+        xPlot = np.linspace(xArray[0], xArray[-1], 1000)
+        yPlot = funcExpon(xPlot, *popt)
+        yPlotAtPoints = funcExpon(xArray, *popt)
 
+        chi_2 = sum(((yArray-yPlotAtPoints)**2)/ySigma)
+        red_chi_2 = chi_2/(len(yArray)-len(popt))
+       
+        print red_chi_2
+
+    def reducedChiHist(self):
+        
+        def funcExpon(x, a, b, c, d):
+            retval = a*np.exp(-b*(x-d)) + c
+            retval[x < d] = 0
+            return retval
+        
+        tau = 25.0
+        t0 = 40
+        nBins = 800
+        size = 10000
+        taulist = []
+        
+        for i in range(100):
+            timeHgValues = np.zeros(nBins, dtype=np.int64)
+            timeStamps = expon.rvs(loc=0, scale=tau, size=size) + t0
+            ts64 = timeStamps.astype(np.uint64)
+            tsBinner.tsBinner(ts64, timeHgValues)
+            
+            xPoints = []
+            yPoints = []
+            for x in range(nBins):
+                y = timeHgValues[x]
+                if y > 2:
+                    xPoints.append(x)
+                    yPoints.append(y)
+            
+            bGuess = 1/(np.mean(timeStamps))
+            aGuess = bGuess*(size)
+            cGuess = 0
+            dGuess = t0
+            pGuess = [aGuess, bGuess, cGuess, dGuess]
+            xArray = np.array(xPoints) #must be in array for not list to use curve_fit
+            yArray = np.array(yPoints)
+            ySigma = (yArray ** 1/2)
+            popt, pcov = curve_fit(funcExpon, xArray, yArray, p0=pGuess, sigma=ySigma)
+        xPlot = np.linspace(xArray[0], xArray[-1], 1000)
+        yPlot = funcExpon(xPlot, *popt)
+
+        yPlotAtPoints = funcExpon(xArray, *popt)
+
+        chi_2 = sum(((yArray-yPlotAtPoints)**2)/ySigma)
+        red_chi_2 = chi_2/(len(yArray)-len(popt))
+       
+       
+        print red_chi_2
+        hist,bins = np.histogram(red_chi_2, bins=20)
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        plt.step(center, hist, where = 'post')
+        plt.savefig(inspect.stack()[0][3]+".png")
+    
+        
 
     def histDemo(self):
         mu, sigma = 200, 25
@@ -312,12 +409,19 @@ class TestExpon(unittest.TestCase):
         fn = FileName(run, sundownDate, obsDate+"-"+seq)
         # The class Cosmic is in ARCONS-pipeline/cosmic/Cosmic.py
         cosmic = Cosmic(fn)
-        # This is the method that you need to write!
         t0 = 138595580
         t1 = 138595650
         dictionary = cosmic.fitExpon(t0,t1)
+        tAverage = dictionary['tAverage']
+        
         print "pFit=",dictionary['pFit']
-        print "chi2=",dictionary['chi2']
         print "number of photons=",dictionary['timeHgValues'].sum()
+        hist = np.histogram(pFit)
+        width = 0.7*(bins[1]-bins[0])
+        center = (bins[:-1]+bins[1:])/2
+        plt.step(center, hist, where = 'post')
+       
+        plt.savefig(inspect.stack()[0][3]+".png")
+
 if __name__ == '__main__':
     unittest.main()
