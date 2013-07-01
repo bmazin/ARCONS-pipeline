@@ -14,9 +14,12 @@ from util import utils
 from util.ObsFile import ObsFile
 from util import meanclip
 from util import FileName
+import inspect
 from interval import interval, inf, imath
 from headers import TimeMask
 from cosmic import tsBinner
+from scipy.optimize import curve_fit
+from scipy.stats import expon
 import time
 class Cosmic:
 
@@ -468,6 +471,14 @@ class Cosmic:
         return a dictionary of:  timeStamps,fitParams,chi2
 
         """
+        xPoints = []
+        yPoints = []
+         
+        def funcExpon(x, a, b, c, d):
+            retval = a*np.exp(-b*(x-d)) + c
+            retval[x < d] = 0
+            return retval
+       
         print "hello from Cosmic.fitExpon:  t0=",t0," t1=",t1
         firstSec = int(t0/1e6)  # in seconds
         integrationTime = 1+int((t1-t0)/1e6) # in seconds
@@ -486,8 +497,24 @@ class Cosmic:
                     ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
                     # add these timestamps to the histogram timeHgValues
                     tsBinner.tsBinner(ts64, timeHgValues)
-        ### do some actual fits instead of making things up here
-        pFit = [1,2,3,4]
-        chi2 = 1.234
-        retval = {'timeHgValues':timeHgValues, 'pFit':pFit, 'chi2':chi2}
+        tAverage = sum(ts64)/len(ts64)
+        remain0 = int(t0%1e6)
+        remain1 = int(t1%1e6)
+        timeHgValues = timeHgValues[remain0:remain1]
+        x = np.arange(nBins)
+        y = timeHgValues
+        xPoints.append(x)
+        yPoints.append(y)
+        
+        bGuess = 1/(np.mean(ts64))
+        aGuess = bGuess*len(timeHgValues)
+        cGuess = 0
+        dGuess = 0
+        pGuess = [aGuess, bGuess, cGuess, dGuess]
+        yArray = np.array(yPoints)
+        xArray = np.array(xPoints)
+        ySigma = (yArray ** 1/2)
+        pFit, pcov = curve_fit(funcExpon, xArray, yArray, p0=pGuess, sigma=ySigma)
+        
+        retval = {'timeHgValues':timeHgValues, 'pFit':pFit, 'tAverage':tAverage}
         return retval
