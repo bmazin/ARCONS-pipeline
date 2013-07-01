@@ -501,20 +501,33 @@ class Cosmic:
         remain0 = int(t0%1e6)
         remain1 = int(t1%1e6)
         timeHgValues = timeHgValues[remain0:remain1]
-        x = np.arange(nBins)
+        print "lenght of timeHgValues = ",len(timeHgValues)
+        x = np.arange(len(timeHgValues))
         y = timeHgValues
-        xPoints.append(x)
-        yPoints.append(y)
         
-        bGuess = 1/(np.mean(ts64))
-        aGuess = bGuess*len(timeHgValues)
+        xArray = np.arange(0, dtype=np.int64)
+        yArray = np.arange(0, dtype=np.int64)
+
+        for i in range(len(x)):
+            if y[i] > 2:
+                xArray = np.append(xArray,i)
+                yArray = np.append(yArray,y[i])
+        ySigma = np.sqrt(yArray)
+        
+        bGuess = 1/timeHgValues.mean()
+        aGuess = bGuess*timeHgValues.sum()
         cGuess = 0
         dGuess = 0
         pGuess = [aGuess, bGuess, cGuess, dGuess]
-        yArray = np.array(yPoints)
-        xArray = np.array(xPoints)
-        ySigma = (yArray ** 1/2)
-        pFit, pcov = curve_fit(funcExpon, xArray, yArray, p0=pGuess, sigma=ySigma)
+        print "length of xArray=",len(xArray)
+        print "length of y=Array",len(yArray)
+        print "length of ySigma=",len(ySigma)
+        for i in range(len(xArray)):
+            print "arrays:  i=%d x=%f y=%f ySigma=%f"%(i,xArray[i],yArray[i],ySigma[i])
+        print "length of pGuess=",len(pGuess)
+
+        #pFit, pcov = curve_fit(funcExpon, xArray, yArray, 
+        #                       p0=pGuess, sigma=ySigma)
         
-        retval = {'timeHgValues':timeHgValues, 'pFit':pFit, 'tAverage':tAverage}
+        retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 'tAverage':tAverage}
         return retval

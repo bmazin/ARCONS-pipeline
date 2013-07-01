@@ -416,11 +416,26 @@ class TestExpon(unittest.TestCase):
         
         print "pFit=",dictionary['pFit']
         print "number of photons=",dictionary['timeHgValues'].sum()
-        hist = np.histogram(pFit)
+        
+        hist = dictionary['timeHgValues']
+        bins = np.arange(len(hist))
         width = 0.7*(bins[1]-bins[0])
         center = (bins[:-1]+bins[1:])/2
-        plt.step(center, hist, where = 'post')
-       
+        #plt.step(center, hist, where = 'post')       
+        plt.plot(bins,hist)
+
+        xFit = np.linspace(0,len(hist),10*len(hist))
+        pFit = dictionary['pFit']        
+
+        def funcExpon(x, a, b, c, d):
+            retval = a*np.exp(-b*(x-d)) + c
+            retval[x < d] = 0
+            return retval
+
+        yFit = funcExpon(xFit,*pFit)
+        plt.plot(xFit,yFit)
+        print "xFit[0]=",xFit[0]
+        print "yFit[0]=",yFit[0]
         plt.savefig(inspect.stack()[0][3]+".png")
 
 if __name__ == '__main__':
