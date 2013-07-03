@@ -144,6 +144,16 @@ class TestCosmic(unittest.TestCase):
         plt.legend()
         plt.title("true tau=%.1f   fit tau=%.1f"%(tau,param[1]))
         plt.savefig(inspect.stack()[0][3]+".png")
-        
+
+    def testFitDecayTime(self):
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '133303'
+        t0 = 138595580
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        cosmic = Cosmic(fn, endTime='exptime')
+        cosmic.fitDecayTime()
+
 if __name__ == '__main__':
     unittest.main()

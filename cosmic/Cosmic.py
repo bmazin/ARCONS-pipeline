@@ -14,9 +14,12 @@ from util import utils
 from util.ObsFile import ObsFile
 from util import meanclip
 from util import FileName
+import inspect
 from interval import interval, inf, imath
 from headers import TimeMask
 from cosmic import tsBinner
+from scipy.optimize import curve_fit
+from scipy.stats import expon
 import time
 class Cosmic:
 
@@ -455,3 +458,76 @@ class Cosmic:
                         listOfPixelsToMark=listOfPixelsToMark,
                         pixelMarkColor='green')
 
+    def fitDecayTime(self,t0Sec,lengthSec=200,plotFileName='none'):
+        print "hello from fitDecayTime"
+        timedPacketList = self.file.getTimedPacketList(
+            iRow, iCol, sec0, lengthSec)
+
+    
+    def fitExpon(self, t0, t1):
+        """
+        Fit an exponential to all photons from time t0 to time t1
+        t0 and t1 are in ticks, 1e6 ticks per second
+        return a dictionary of:  timeStamps,fitParams,chi2
+
+        """
+        xPoints = []
+        yPoints = []
+         
+        def funcExpon(x, a, b, c, d):
+            retval = a*np.exp(-b*(x-d)) + c
+            retval[x < d] = 0
+            return retval
+       
+        print "hello from Cosmic.fitExpon:  t0=",t0," t1=",t1
+        firstSec = int(t0/1e6)  # in seconds
+        integrationTime = 1+int((t1-t0)/1e6) # in seconds
+        print "firstSec=",firstSec," integrationTime=",integrationTime
+        nBins = integrationTime*1e6 # number of microseconds; one bin per microsecond
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        for iRow in range(self.file.nRow):
+            for iCol in range(self.file.nCol):
+                timedPacketList = self.file.getTimedPacketList(
+                    iRow, iCol, firstSec=firstSec, 
+                    integrationTime=integrationTime)
+                timeStamps = timedPacketList['timestamps']
+                if (len(timeStamps) > 0):
+                    # covert the time values to microseconds, and
+                    # make it the type np.uint64
+                    ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
+                    # add these timestamps to the histogram timeHgValues
+                    tsBinner.tsBinner(ts64, timeHgValues)
+        tAverage = sum(ts64)/len(ts64)
+        remain0 = int(t0%1e6)
+        remain1 = int(t1%1e6)
+        timeHgValues = timeHgValues[remain0:remain1]
+        print "lenght of timeHgValues = ",len(timeHgValues)
+        x = np.arange(len(timeHgValues))
+        y = timeHgValues
+        
+        xArray = np.arange(0, dtype=np.int64)
+        yArray = np.arange(0, dtype=np.int64)
+
+        for i in range(len(x)):
+            if y[i] > 2:
+                xArray = np.append(xArray,i)
+                yArray = np.append(yArray,y[i])
+        ySigma = np.sqrt(yArray)
+        
+        bGuess = 1/timeHgValues.mean()
+        aGuess = bGuess*timeHgValues.sum()
+        cGuess = 0
+        dGuess = 0
+        pGuess = [aGuess, bGuess, cGuess, dGuess]
+        print "length of xArray=",len(xArray)
+        print "length of y=Array",len(yArray)
+        print "length of ySigma=",len(ySigma)
+        for i in range(len(xArray)):
+            print "arrays:  i=%d x=%f y=%f ySigma=%f"%(i,xArray[i],yArray[i],ySigma[i])
+        print "length of pGuess=",len(pGuess)
+
+        #pFit, pcov = curve_fit(funcExpon, xArray, yArray, 
+        #                       p0=pGuess, sigma=ySigma)
+        
+        retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 'tAverage':tAverage}
+        return retval
