@@ -21,6 +21,7 @@ from cosmic import tsBinner
 from scipy.optimize import curve_fit
 from scipy.stats import expon
 import time
+import pickle
 class Cosmic:
 
     def __init__(self, fn, beginTime=0, endTime='exptime', \
@@ -471,6 +472,7 @@ class Cosmic:
         return a dictionary of:  timeStamps,fitParams,chi2
 
         """
+        
         xPoints = []
         yPoints = []
          
@@ -478,11 +480,11 @@ class Cosmic:
             retval = a*np.exp(-b*(x-d)) + c
             retval[x < d] = 0
             return retval
+        def funcGauss(x, a, b, c):
+            return a*np.exp(-(x-b)**2/(2.*c**2))
        
-        print "hello from Cosmic.fitExpon:  t0=",t0," t1=",t1
         firstSec = int(t0/1e6)  # in seconds
         integrationTime = 1+int((t1-t0)/1e6) # in seconds
-        print "firstSec=",firstSec," integrationTime=",integrationTime
         nBins = integrationTime*1e6 # number of microseconds; one bin per microsecond
         timeHgValues = np.zeros(nBins, dtype=np.int64)
         for iRow in range(self.file.nRow):
@@ -501,7 +503,6 @@ class Cosmic:
         remain0 = int(t0%1e6)
         remain1 = int(t1%1e6)
         timeHgValues = timeHgValues[remain0:remain1]
-        print "lenght of timeHgValues = ",len(timeHgValues)
         x = np.arange(len(timeHgValues))
         y = timeHgValues
         
@@ -519,15 +520,14 @@ class Cosmic:
         cGuess = 0
         dGuess = 0
         pGuess = [aGuess, bGuess, cGuess, dGuess]
-        print "length of xArray=",len(xArray)
-        print "length of y=Array",len(yArray)
-        print "length of ySigma=",len(ySigma)
-        for i in range(len(xArray)):
-            print "arrays:  i=%d x=%f y=%f ySigma=%f"%(i,xArray[i],yArray[i],ySigma[i])
-        print "length of pGuess=",len(pGuess)
-
-        #pFit, pcov = curve_fit(funcExpon, xArray, yArray, 
-        #                       p0=pGuess, sigma=ySigma)
+        bGaussGuess = timeHgValues.mean()
+        aGaussGuess = bGuess*timeHgValues.sum()
+        cGaussGuess = 0
+        pGaussGuess = [aGuess, bGuess, cGuess]
+        pGaussFit, pcov = curve_fit(funcGauss, xArray, yArray, p0=pGaussGuess)
         
-        retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 'tAverage':tAverage}
+        retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 
+                  'tAverage':tAverage, 'pGaussFit':pGaussFit}
         return retval
+
+ 
