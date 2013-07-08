@@ -35,20 +35,20 @@ for seq in seq5:
             run = 'PAL2012'
             sundownDate = '20121211'
             obsDate = '20121212'
-            t0 = ct+25
-            t1 = t0-25
+            average = ct.mean()
+            t0 = average-25
+            t1 = t0+50
             plotfn = "cp-%05d-%5s-%5s-%5s-%5s-%010d"%(bc,run,sundownDate,obsDate,seq,t0)
             fn = FileName(run, sundownDate, obsDate+"-"+seq)
             cosmic = Cosmic(fn)
             dictionary = cosmic.fitExpon(t0, t1)
             plt.clf()
             hist = dictionary['timeHgValues']
-            hist, bins = np.histogram(dictionary['timeHgValues'], 
-                                      np.arange(len(hist))) 
-            plt.step(bins, hist, where='post', label="event histogram")
-            mean = hist.mean()
+            bins = np.arange(len(hist)) 
+            plt.plot(bins, hist, label="event histogram")
+            #mean = hist.mean()
             #plots the mean of the histogram
-            plt.vlines(mean, 0, 50, label='mean', color='r')
+            #plt.vlines(mean, 0, 50, label='mean')
             
 
             xFit = np.linspace(0,len(hist),10*len(hist))
@@ -62,15 +62,15 @@ for seq in seq5:
             def funcGauss(x, a, b, c):
                 return a*np.exp(-(x-b)**2/(2.*c**2))
 
-            center = (bins[:-1] + bins[1:])/2
-            pGaussGuess = dictionary['pGaussGuess']
-            pGaussFit, pcov = curve_fit(funcGauss, center, hist, 
-                                        p0=pGaussGuess)
+            pGaussFit = dictionary['pGaussFit']
+            #pGaussFit, pcov = curve_fit(funcGauss, center, hist, 
+             #                           p0=pGaussGuess)
        
-            histGaussFit = funcGauss(center, *pGaussFit)
+            center = (bins[:-1]+bins[1:])/2
+            histGaussFit = funcGauss(center,*pGaussFit)
             yFit = funcExpon(xFit,*pFit)
             plt.plot(xFit,yFit, label="exponential fit")
-            plt.plot(center, histGaussFit, label="gaussian fit")
+            plt.plot(center,histGaussFit, label="gaussian fit")
             plt.legend()
             plt.title(plotfn)
             plt.savefig(plotfn+".png")
