@@ -521,13 +521,12 @@ class Cosmic:
         dGuess = 0
         pGuess = [aGuess, bGuess, cGuess, dGuess]
         bGaussGuess = timeHgValues.mean()
-        aGaussGuess = bGuess*timeHgValues.sum()
-        cGaussGuess = 0
-        pGaussGuess = [aGuess, bGuess, cGuess]
-        pGaussFit, pcov = curve_fit(funcGauss, xArray, yArray, p0=pGaussGuess)
+        cGaussGuess = timeHgValues.std()
+        aGaussGuess = (timeHgValues.sum()/(cGuess*np.sqrt(2*np.pi)))
+        pGaussGuess = [aGaussGuess, bGaussGuess, cGaussGuess]
         
         retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 
-                  'tAverage':tAverage, 'pGaussFit':pGaussFit}
+                  'tAverage':tAverage, 'pGaussGuess':pGaussGuess}
         return retval
 
  
