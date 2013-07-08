@@ -472,17 +472,9 @@ class Cosmic:
         return a dictionary of:  timeStamps,fitParams,chi2
 
         """
-        
         xPoints = []
         yPoints = []
          
-        def funcExpon(x, a, b, c, d):
-            retval = a*np.exp(-b*(x-d)) + c
-            retval[x < d] = 0
-            return retval
-        def funcGauss(x, a, b, c):
-            return a*np.exp(-(x-b)**2/(2.*c**2))
-       
         firstSec = int(t0/1e6)  # in seconds
         integrationTime = 1+int((t1-t0)/1e6) # in seconds
         nBins = integrationTime*1e6 # number of microseconds; one bin per microsecond
@@ -499,7 +491,6 @@ class Cosmic:
                     ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
                     # add these timestamps to the histogram timeHgValues
                     tsBinner.tsBinner(ts64, timeHgValues)
-        tAverage = sum(ts64)/len(ts64)
         remain0 = int(t0%1e6)
         remain1 = int(t1%1e6)
         timeHgValues = timeHgValues[remain0:remain1]
@@ -515,18 +506,34 @@ class Cosmic:
                 yArray = np.append(yArray,y[i])
         ySigma = np.sqrt(yArray)
         
-        bGuess = 1/timeHgValues.mean()
-        aGuess = bGuess*timeHgValues.sum()
-        cGuess = 0
-        dGuess = 0
-        pGuess = [aGuess, bGuess, cGuess, dGuess]
-        bGaussGuess = timeHgValues.mean()
-        cGaussGuess = timeHgValues.std()
-        aGaussGuess = (timeHgValues.sum()/(cGuess*np.sqrt(2*np.pi)))
+        temp = x*y
+        mean = (x*y).sum()/float(y.sum())
+        bExponGuess = 1/mean
+        aExponGuess = bExponGuess*timeHgValues.sum()
+        cExponGuess = 0
+        dExponGuess = 0
+        pExponGuess = [aExponGuess, bExponGuess, cExponGuess, dExponGuess]
+
+        bGaussGuess = mean
+        avgx2 = (x*x*y).sum()/float(y.sum())        
+        cGaussGuess = np.sqrt(avgx2-bGaussGuess*bGaussGuess)
+        
+        aGaussGuess = (timeHgValues.sum()/(cGaussGuess*np.sqrt(2*np.pi)))
         pGaussGuess = [aGaussGuess, bGaussGuess, cGaussGuess]
         
-        retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 
-                  'tAverage':tAverage, 'pGaussGuess':pGaussGuess}
+        xLimit = [bGaussGuess-5*cGaussGuess, bGaussGuess+5*cGaussGuess]
+        retval = {'timeHgValues':timeHgValues, 'pExponFit':pExponGuess, 
+                  'pGaussFit':pGaussGuess, 'xLimit':xLimit}
         return retval
 
  
+    @staticmethod
+    def funcExpon(x, a, b, c, d):
+        retval = a*np.exp(-b*(x-d)) + c
+        retval[x < d] = 0
+        return retval
+
+    @staticmethod
+    def funcGauss(x, a, b, c):
+        return a*np.exp(-(x-b)**2/(2.*c**2))
+       
