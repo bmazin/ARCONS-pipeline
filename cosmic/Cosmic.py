@@ -522,11 +522,11 @@ class Cosmic:
         pGuess = [aGuess, bGuess, cGuess, dGuess]
         bGaussGuess = timeHgValues.mean()
         cGaussGuess = timeHgValues.std()
-        aGaussGuess = (timeHgValues.sum()/(cGuess*np.sqrt(2*np.pi)))
+        aGaussGuess = timeHgValues.sum()/(cGaussGuess*np.sqrt(2*np.pi))
         pGaussGuess = [aGaussGuess, bGaussGuess, cGaussGuess]
         
         retval = {'timeHgValues':timeHgValues, 'pFit':pGuess, 
-                  'tAverage':tAverage, 'pGaussGuess':pGaussGuess}
+                  'tAverage':tAverage, 'pGaussFit':pGaussGuess}
         return retval
 
  
