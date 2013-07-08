@@ -20,11 +20,14 @@ seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '1
 stride = 10
 threshold = 600
 nAboveThreshold = 0
-
+npList = []
+sigList = []
+   
 for seq in seq5:
     inFile = open("cosmicTimeList-%s.pkl"%(seq),"rb")
     cosmicTimeList = pickle.load(inFile)
     binContents = pickle.load(inFile)
+       
     for i in range(cosmicTimeList.size):
         bc = binContents[i]
         if bc > threshold:
@@ -36,8 +39,8 @@ for seq in seq5:
             sundownDate = '20121211'
             obsDate = '20121212'
             average = ct.mean()
-            t0 = average-25
-            t1 = t0+50
+            t0 = average-50
+            t1 = t0+100
             plotfn = "cp-%05d-%5s-%5s-%5s-%5s-%010d"%(bc,run,sundownDate,obsDate,seq,t0)
             fn = FileName(run, sundownDate, obsDate+"-"+seq)
             cosmic = Cosmic(fn)
@@ -45,32 +48,39 @@ for seq in seq5:
             plt.clf()
             hist = dictionary['timeHgValues']
             bins = np.arange(len(hist)) 
-            plt.plot(bins, hist, label="event histogram")
+            plt.plot(bins, hist, label="Event Histogram")
             #mean = hist.mean()
             #plots the mean of the histogram
             #plt.vlines(mean, 0, 50, label='mean')
-            
 
-            xFit = np.linspace(0,len(hist),10*len(hist))
-            pFit = dictionary['pFit']
-
-
-            def funcExpon(x, a, b, c, d):
-                retval = a*np.exp(-b*(x-d)) + c
-                retval[x < d] = 0
-                return retval
-            def funcGauss(x, a, b, c):
-                return a*np.exp(-(x-b)**2/(2.*c**2))
 
             pGaussFit = dictionary['pGaussFit']
             #pGaussFit, pcov = curve_fit(funcGauss, center, hist, 
              #                           p0=pGaussGuess)
        
-            center = (bins[:-1]+bins[1:])/2
-            histGaussFit = funcGauss(center,*pGaussFit)
-            yFit = funcExpon(xFit,*pFit)
-            plt.plot(xFit,yFit, label="exponential fit")
-            plt.plot(center,histGaussFit, label="gaussian fit")
+            xFit = np.linspace(0,len(hist),10*len(hist))
+            pFit = dictionary['pGaussFit']
+            yFit = Cosmic.funcGauss(xFit,*pFit)
+            cGaussGuess = dictionary['cGaussGuess']
+           
+            plt.plot(xFit, yFit, label="sigma=%.1f"%cGaussGuess)
             plt.legend()
+            xLimit = dictionary['xLimit']
+            plt.axvline(x=xLimit[0], color='magenta', linestyle='-.')
+            plt.axvline(x=xLimit[1], color='magenta', linestyle='-.')
             plt.title(plotfn)
+            plt.xlim(-20,120)
             plt.savefig(plotfn+".png")
+            npList.append(bc)
+            sigList.append(cGaussGuess)
+
+plt.clf()
+
+plt.scatter(sigList, npList)
+plt.ylabel(number of photons)
+plt.xlabel(sigma)
+
+plt.title('Number of Photons vs. ySigma')
+plt.savefig('photonsvysigma.png')
+
+       
