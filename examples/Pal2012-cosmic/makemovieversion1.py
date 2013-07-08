@@ -42,8 +42,9 @@ for seq in seq5:
             cosmic = Cosmic(fn)
             dictionary = cosmic.fitExpon(t0, t1)
             plt.clf()
-            hist = dictionary['timeHgValues'] 
-            bins = np.arange(len(hist))
+            hist = dictionary['timeHgValues']
+            hist, bins = np.histogram(dictionary['timeHgValues'], 
+                                      np.arange(len(hist))) 
             plt.step(bins, hist, where='post', label="event histogram")
             mean = hist.mean()
             #plots the mean of the histogram
@@ -61,8 +62,11 @@ for seq in seq5:
             def funcGauss(x, a, b, c):
                 return a*np.exp(-(x-b)**2/(2.*c**2))
 
-            pGaussFit = dictionary['pGaussFit']
             center = (bins[:-1] + bins[1:])/2
+            pGaussGuess = dictionary['pGaussGuess']
+            pGaussFit, pcov = curve_fit(funcGauss, center, hist, 
+                                        p0=pGaussGuess)
+       
             histGaussFit = funcGauss(center, *pGaussFit)
             yFit = funcExpon(xFit,*pFit)
             plt.plot(xFit,yFit, label="exponential fit")
