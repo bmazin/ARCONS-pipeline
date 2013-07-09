@@ -64,9 +64,9 @@ for seq in seq5:
 
             center = (bins[:-1] + bins[1:])/2
             pGaussGuess = dictionary['pGaussGuess']
-            pGaussFit, pcov = curve_fit(funcGauss, center, hist, 
-                                        p0=pGaussGuess)
-       
+            #pGaussFit, pcov = curve_fit(funcGauss, center, hist, 
+            #                            p0=pGaussGuess)
+            pGaussFit = pGaussGuess
             histGaussFit = funcGauss(center, *pGaussFit)
             yFit = funcExpon(xFit,*pFit)
             plt.plot(xFit,yFit, label="exponential fit")
