@@ -77,10 +77,10 @@ for seq in seq5:
 plt.clf()
 
 plt.scatter(sigList, npList)
-plt.ylabel(number of photons)
-plt.xlabel(sigma)
+plt.ylabel('number of photons')
+plt.xlabel('sigma')
 
-plt.title('Number of Photons vs. ySigma')
-plt.savefig('photonsvysigma.png')
+plt.title('Sigma_time vs. Number of Photons')
+plt.savefig('sigma_timevnumberofphotons.png')
 
        
