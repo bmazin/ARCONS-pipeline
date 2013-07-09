@@ -164,7 +164,7 @@ class PhotList(object):
         Get a 2D image in the sky frame - i.e, in RA, dec coordinate space, derotated and stacked
         if necessary.
         '''
-        pass #Fix me!!!
+        pass #Place holder for now! (Should point to the RADecImage.py code).
     
         
 def createEmptyPhotonListFile(obsFile,fileName=None):
@@ -217,6 +217,8 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
     This version should automatically reject time-masked photons assuming a hot pixel mask is
     loaded and 'switched on'.
     
+    Added saving of associated time-adjustment file if present - NEEDS TESTING. JvE 7/8/2013
+    
     INPUTS:
         obsFile - the obsFile instance from which the list is to be created.
         filename - string, optionally use to specify non-default output file name
@@ -254,6 +256,12 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
         plFile.copyNode(obsFile.hotPixFile.root, newparent=plFile.root, newname='timemask', recursive=True)
         plFile.copyNode(obsFile.file.root.beammap, newparent=plFile.root, newname='beammap', recursive=True)
         plFile.copyNode(obsFile.file.root.header, newparent=plFile.root, recursive=True)
+        if obsFile.timeAdjustFile is not None:
+            #If there's any time adjustment file associated, store that too in the photon list 
+            #file, and also correct the exptime in the output header info (which is generally not updated in the original obs file).
+            plFile.copyNode(obsFile.timeAdjustFile,newparent=plFile.root,newName='timeAdjust',recursive=True)
+            plFile.root.header.header.exptime[0] = obsFile.getFromHeader('exptime')
+            
     except:
         plFile.flush()
         plFile.close()
@@ -274,72 +282,115 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
     else:
         raDecCalcObject = crd.CalculateRaDec(astrometryFileName)
 
-    try:
-        for iRow in xrange(obsFile.nRow):
-            print 'Writing pixel row ', iRow, '...'
-            for iCol in xrange(obsFile.nCol):
-                print 'Writing column position', iCol
-                flag = obsFile.wvlFlagTable[iRow, iCol]
-                if flag == 0:#only write photons in good pixels  ***NEED TO UPDATE TO USE DICTIONARY***
-                    energyError = obsFile.wvlErrorTable[iRow, iCol] #Note wvlErrorTable is in eV !! Assume constant across all wavelengths. Not the best approximation, but a start....
-                    flatWeights = obsFile.flatWeights[iRow, iCol]
-                    #Extend flat weight and flag arrays at beginning and end to include out-of-wavelength-calibration-range photons.
-                    flatWeights = np.hstack((flatWeights[0],flatWeights,flatWeights[-1]))
-                    flatFlags = np.hstack((pipelineFlags.flatCal['belowWaveCalRange'],
-                                           obsFile.flatFlags[iRow, iCol],
-                                           pipelineFlags.flatCal['aboveWaveCalRange']))
+    #Make a numpy structured array dtype from the photon-list description header.
+    #Currently uses somewhat undocumented hack in order to easily get a numpy 'dtype' from the headers.ArconsHeaders.PhotonList description.
+    #See http://pytables.github.io/usersguide/libref/declarative_classes.html?highlight=isdescription#tables.IsDescription
+    # and specifically http://pytables.github.io/_modules/tables/description.html#dtype_from_descr
+    #Newer versions of pytables (some time after v2.3.1?) should have a dtype_from_descr() function to pull this out directly....
+    photListDescription = ArconsHeaders.PhotonList()
+    photListDtype = tables.Description(photListDescription.columns)._v_dtype   #Kind of a somewhat undocumented hack.... See  
+
+    #try:
+    for iRow in xrange(obsFile.nRow):
+        print 'Pixel row ', iRow, '...'
+        for iCol in xrange(obsFile.nCol):
+            print 'Pixel column ', iCol
+            flag = obsFile.wvlFlagTable[iRow, iCol]
+            if flag == 0:#only write photons in good pixels  ***NEED TO UPDATE TO USE DICTIONARY***
+                energyError = obsFile.wvlErrorTable[iRow, iCol] #Note wvlErrorTable is in eV !! Assume constant across all wavelengths. Not the best approximation, but a start....
+                flatWeights = obsFile.flatWeights[iRow, iCol]
+                #Extend flat weight and flag arrays at beginning and end to include out-of-wavelength-calibration-range photons.
+                flatWeights = np.hstack((flatWeights[0],flatWeights,flatWeights[-1]))
+                flatFlags = np.hstack((pipelineFlags.flatCal['belowWaveCalRange'],
+                                       obsFile.flatFlags[iRow, iCol],
+                                       pipelineFlags.flatCal['aboveWaveCalRange']))
+                
+                
+                #wvlRange = obsFile.wvlRangeTable[iRow, iCol]
+
+                #---------- Replace with call to getPixelWvlList -----------
+                #go through the list of seconds in a pixel dataset
+                #for iSec, secData in enumerate(obsFile.getPixel(iRow, iCol)):
                     
+                #timestamps, parabolaPeaks, baselines = obsFile.parsePhotonPackets(secData)
+                #timestamps = iSec + obsFile.tickDuration * timestamps
+             
+                #pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
+                #wavelengths = obsFile.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
+                #------------------------------------------------------------
+
+                x = obsFile.getPixelWvlList(iRow,iCol,excludeBad=False,dither=True,firstSec=firstSec,
+                                         integrationTime=integrationTime)
+                timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
+                
+                if len(timestamps)==0: continue     #If there's no photons for this pixel, don't waste any more time on it.
+                
+                #Convert errors in eV to errors in Angstroms (see notebook, May 7 2013)
+                wvlErrors = ((( (energyError*units.eV) * (wavelengths*units.Angstrom)**2 ) /
+                                (constants.h*constants.c) )
+                             .to(units.Angstrom).value)
                     
-                    #wvlRange = obsFile.wvlRangeTable[iRow, iCol]
-    
-                    #---------- Replace with call to getPixelWvlList -----------
-                    #go through the list of seconds in a pixel dataset
-                    #for iSec, secData in enumerate(obsFile.getPixel(iRow, iCol)):
-                        
-                    #timestamps, parabolaPeaks, baselines = obsFile.parsePhotonPackets(secData)
-                    #timestamps = iSec + obsFile.tickDuration * timestamps
-                 
-                    #pulseHeights = np.array(parabolaPeaks, dtype='double') - np.array(baselines, dtype='double')
-                    #wavelengths = obsFile.convertToWvl(pulseHeights, iRow, iCol, excludeBad=False)
-                    #------------------------------------------------------------
-    
-                    x = obsFile.getPixelWvlList(iRow,iCol,excludeBad=False,dither=True,firstSec=firstSec,
-                                             integrationTime=integrationTime)
-                    timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
+                #Calculate what wavelength bin each photon falls into to see which flat cal factor should be applied
+                if len(wavelengths) > 0:
+                    flatBinIndices = np.digitize(wavelengths, obsFile.flatCalWvlBins)      #- 1 - 
+                else:
+                    flatBinIndices = np.array([])
+
+                #Calculate which wavelength bin each photon falls into for the flux cal weight factors.
+                if len(wavelengths) > 0:
+                    fluxBinIndices = np.digitize(wavelengths, obsFile.fluxCalWvlBins)
+                else:
+                    fluxBinIndices = np.array([])
+
+                iCols = np.empty(len(timestamps),dtype=int)
+                iRows = np.empty(len(timestamps),dtype=int)
+                iCols.fill(iCol)
+                iRows.fill(iRow)
+
+                print 'Calculating RA/Decs...'
+                if astrometryFileName is not None:
+                    ras,decs,hourAngles = raDecCalcObject.getRaDec(timestamps,np.array(iCols),np.array(iRows))
+
+                if 1==1:     #(Temporary switch to use new code vs. old code - remove when satisfied it's working!)
+                    #New method to writing -- avoid looping over each photon.   
+                    #Create rows to append for this pixel in memory, *then* write out.
+                    print 'Appending photon block'
                     
-                    #Convert errors in eV to errors in Angstroms (see notebook, May 7 2013)
-                    wvlErrors = ((( (energyError*units.eV) * (wavelengths*units.Angstrom)**2 ) /
-                                    (constants.h*constants.c) )
-                                 .to(units.Angstrom).value)
-                        
-                    #Calculate what wavelength bin each photon falls into to see which flat cal factor should be applied
-                    if len(wavelengths) > 0:
-                        flatBinIndices = np.digitize(wavelengths, obsFile.flatCalWvlBins)      #- 1 - 
-                    else:
-                        flatBinIndices = np.array([])
-    
-                    #Calculate which wavelength bin each photon falls into for the flux cal weight factors.
-                    if len(wavelengths) > 0:
-                        fluxBinIndices = np.digitize(wavelengths, obsFile.fluxCalWvlBins)
-                    else:
-                        fluxBinIndices = np.array([])
-    
-                    iCols = np.empty(len(timestamps),dtype=int)
-                    iRows = np.empty(len(timestamps),dtype=int)
-                    iCols.fill(iCol)
-                    iRows.fill(iRow)
-    
-                    #assert 1==0
+                    #Create an empty table ('sub-list') in memory for this pixel:
+                    newRows = np.zeros(len(timestamps), dtype=photListDtype)
+                    
+                    #And fill all the columns:
+                    newRows['xPix'] = iCol  #***Check to see if it broadcasts properly - may need to broadcast manually***
+                    newRows['yPix'] = iRow
+                    newRows['xyPix'] = xyPack(iRow,iCol)
+                    newRows['arrivalTime'] = timestamps
+                    newRows['wavelength'] = wavelengths
+                    newRows['waveError'] = wvlErrors
+                    newRows['flatFlag'] = flatFlags[flatBinIndices]
+                    newRows['flatWeight'] = flatWeights[flatBinIndices]
+                    newRows['fluxFlag'] = fluxFlags[fluxBinIndices]
+                    newRows['fluxWeight'] = fluxWeights[fluxBinIndices]
                     if astrometryFileName is not None:
-                        ras,decs,hourAngles = raDecCalcObject.getRaDec(timestamps,np.array(iCols),np.array(iRows))
-    
+                        newRows['ra']=ras
+                        newRows['dec']=decs
+                        newRows['ha']=hourAngles
+                    else:
+                        newRows['dec'] = np.nan     #***Check for proper broadcasting!***
+                        newRows['ra'] = np.nan      # ""
+                        newRows['ha'] = np.nan      # ""
+                    plTable.append(newRows)
+                    plTable.flush()
+                
+                else:
+                    #Old row-by-row method.
+                    print 'Appending row-by-row'
                     for iPhoton in xrange(len(timestamps)):
                         #if wavelengths[iPhoton] > wvlRange[0] and wavelengths[iPhoton] < wvlRange[1] and binIndices[iPhoton] >= 0 and binIndices[iPhoton] < len(flatWeights):
                         #create a new row for the photon list
                         #print 'Photon #',iPhoton
                         newRow = plTable.row
-                        newRow['yPix'] = iCol
-                        newRow['xPix'] = iRow
+                        newRow['xPix'] = iCol
+                        newRow['yPix'] = iRow
                         newRow['xyPix'] = xyPack(iRow,iCol)
                         newRow['arrivalTime'] = timestamps[iPhoton]
                         newRow['wavelength'] = wavelengths[iPhoton]
@@ -357,11 +408,11 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
                             newRow['ra'] = np.nan
                             newRow['ha'] = np.nan
                         newRow.append()
-                    
-    finally:
-        print 'Flushing and closing...'
-        plTable.flush()
-        plFile.close()
+                
+    #finally:
+    print 'Flushing and closing...'
+    plTable.flush()
+    plFile.close()
 
     if doIndex is True:
         #Index the table that's just been written out.

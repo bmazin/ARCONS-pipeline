@@ -177,6 +177,9 @@ def hotPixelsTest3():
     getPixelCountImage are correct by comparing the returned values 
     with estimates made by counting the number of non-zero bins
     in a histogram of photon arrival times.
+    
+    Jun 21 2013 - Now also incorporates test of new hotpixels.getEffIntTimeImage()
+    function.
     '''
     
     dir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/hotPixTest2/'
@@ -185,9 +188,9 @@ def hotPixelsTest3():
     flatCalFileName = 'flatsol_20121210.h5'
     hotPixFileName = 'hotPix_20121209-044636.h5'
 
-    startTime = 0
-    integrationTime = 13
-    timeBinSize = 0.25               #Time bin size for histogramming up photon times for a pixel to check that calculated effective exposure times are correct (to within ~ a bin size)
+    startTime = 10
+    integrationTime = 13            #Note - for now, don't set to -1, as it won't work with getEffIntTimeImage()
+    timeBinSize = 0.25              #Time bin size for histogramming up photon times for a pixel to check that calculated effective exposure times are correct (to within ~ a bin size)
     testPixRow = 0                  #Just prints out some stats on this particular pixel location for sanity checking
     testPixCol = 14
     
@@ -197,7 +200,7 @@ def hotPixelsTest3():
     print 'Loading hot pixel file into obsFile...'
     obsFile.loadHotPixCalFile(dir + hotPixFileName)
     obsFile.setWvlCutoffs()
-    
+        
     #Test one pixel
     badInt = obsFile.getPixelBadTimes(testPixRow, testPixCol)
     gpc = obsFile.getPixelCount(testPixRow, testPixCol, firstSec=startTime, integrationTime=integrationTime,
@@ -211,6 +214,13 @@ def hotPixelsTest3():
     #Test an image (approximately)
     print 'Getting image...'
     im = obsFile.getPixelCountImage(startTime, integrationTime)
+    print 'Testing output against getEffIntTimeImage() function'
+    effIntTimeImage = hp.getEffIntTimeImage(obsFile.hotPixTimeMask, integrationTime=integrationTime, firstSec=startTime)
+    assert np.all(effIntTimeImage == im['effIntTimes'])
+    print 'Output matches.'
+    print
+    print 'Comparing effective integration times against photon timestamps...'
+    print
     print 'iRow, iCol, getPixelCountImage eff. int time, estimated actual eff. int time (approx):'
     for iRow in range(np.shape(im['image'])[0]):
         for iCol in range(np.shape(im['image'])[1]):

@@ -50,7 +50,7 @@ def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211',
                 imSaveName=baseSaveName+'det.tif'
                 im = phList.getImageDet()
                 utils.plotArray(im)
-                mpl.imsave(fname=imSaveName,arr=im)
+                mpl.imsave(fname=imSaveName,arr=im,colormap=mpl.cm.gnuplot2,origin='lower')
                 if eachFile==files[0]:
                     virtualImage=im
                 else:

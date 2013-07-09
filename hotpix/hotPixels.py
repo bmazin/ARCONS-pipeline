@@ -91,10 +91,10 @@ def constructDataTableName(x, y):
 class headerDescription(tables.IsDescription):
     """Description of header info structure for the output hot-pixel .h5 file."""
     obsFileName = tables.StringCol(40)  #To record associated obs file name
-    nCol = tables.UInt32Col()   #To record how many pixel columns/rows were in
-    nRow = tables.UInt32Col()   #the data used to construct the mask.
-    ticksPerSec = tables.Float64Col()    #So that code which reads in the file can back out intervals in seconds if needed.
- 
+    nCol = tables.UInt32Col(dflt=-1)   #To record how many pixel columns/rows were in
+    nRow = tables.UInt32Col(dflt=-1)   #the data used to construct the mask.
+    ticksPerSec = tables.Float64Col(dflt=np.nan)    #So that code which reads in the file can back out intervals in seconds if needed.
+    exptime = tables.Float64Col(dflt=np.nan)        #So that per-pixel effective exposure times can be calculated any time without having to refer to the original obs file. Added 6/21/2013, JvE, although not yet used elsewhere in the code.
  
  
 def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
@@ -469,6 +469,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
         header[nColColName] = max([x[0] for x in timeMaskData]) + 1  #Assume max. x value represents number of columns
         header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
         header[ticksPerSecColName] = obsFile.ticksPerSec
+        header[expTime] = obsFile.getFromHeader('exptime')      #NEWLY IMPLEMENTED - should double check... JvE 7/08/2013.
         header.append()
         headerTable.flush()
         headerTable.close()
@@ -534,6 +535,10 @@ def readHotPixels(inputFile):
                             hot pixel masking info was derived.
             'ticksPerSecond' - number of clock ticks per second assumed in creating
                                the output file.
+                               
+        Note - would probably make more sense to return an object here at some point, instead
+        of a dictionary....
+    
     
     EXAMPLES:
         
@@ -631,8 +636,7 @@ def readHotPixels(inputFile):
                 timeIntervals[iRow, iCol] = \
                     [interval([eachRow['tBegin'], eachRow['tEnd']]) / ticksPerSec for eachRow
                       in eventListTable]        #Get the times in seconds (not ticks). No doubt this can be sped up if necessary...
-                reasons[iRow, iCol] = [eachRow['reason'] for eachRow 
-                                      in eventListTable]
+                reasons[iRow, iCol] = [eachRow['reason'] for eachRow in eventListTable]
                     
         #Return a simple dictionary
         return {"intervals":timeIntervals, "reasons":reasons,
@@ -644,7 +648,54 @@ def readHotPixels(inputFile):
         #If a filename was passed as a string (as opposed to a file instance) then close the file.
         if type(inputFile) is str: fileh.close()
     
+
+
+def getEffIntTimeImage(hotPixDict,integrationTime,firstSec=0):
+    '''    
+    Get the total effective exposure time for each pixel after subtracting 
+    any intervals where a pixel was masked as hot or bad.
     
+    INPUTS:
+        hotPixDict -  a hot pixels dictionary as returned by hotPixels.readHotPixels()
+        either the name of a hot pixel (time mask) file, or
+                    an already-opened file instance of the same, from which
+                    eff. exposure times will be calculated.
+        firstSec - Start time (sec) to start calculations from, starting from
+                    the beginning of the exposure to which timeMask refers.
+        integrationTime - Length of integration time (sec) from firstSec to include
+                    in the calculation. NOTE - Don't give an integration time
+                    that goes beyond the end of the exposure! Currently does not (always)
+                    have direct access to the total exposure time, so you can't set 
+                    integrationTime=-1 and hope to integrate to the end of the 
+                    exposure for this routine. As it stands, this function just
+                    subtracts off the hot-pixel intervals from whatever integration
+                    start/length you provide it without regard to the exposure length.
+
+    RETURNS:
+        A 2D array representing the total effective exposure time
+        in seconds for each pixel in the detector array.
+    '''
+    
+    #Figure out what time represents the end of the integration
+    #if integrationTime == -1 or integerIntTime > len(pixelData):
+    #    lastSec = int(np.floor(firstSec))+len(pixelData)
+    #else:
+    lastSec = firstSec + integrationTime
+    outsideIntegration = interval([-np.inf, firstSec], [lastSec, np.inf])
+    integrationInterval = interval([firstSec, lastSec])
+    effectiveIntTimes = np.zeros((hotPixDict['nRow'],hotPixDict['nCol']),dtype=float)
+    effectiveIntTimes.fill(np.nan)
+    
+    for iRow in np.arange(hotPixDict['nRow']):
+        for iCol in np.arange(hotPixDict['nCol']):
+            #Get the unioned (possibly multi-component) bad interval for this pixel.
+            #(As in ObsFile.getPixelBadTimes)
+            allBadIntervals = interval.union(hotPixDict['intervals'][iRow, iCol])
+            #Get intersection of integration time interval and the bad time intervals.
+            maskedIntervals = allBadIntervals & integrationInterval
+            effectiveIntTimes[iRow,iCol] = integrationTime - utils.intervalSize(maskedIntervals)
+    
+    return effectiveIntTimes
 
 
 
