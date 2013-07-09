@@ -155,5 +155,20 @@ class TestCosmic(unittest.TestCase):
         cosmic = Cosmic(fn, endTime='exptime')
         cosmic.fitDecayTime()
 
+    def testFindCosmicRays(self):
+        
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '121229'
+        t0 = '123247835'
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        cosmic = Cosmic(fn)
+        dictionary = cosmic.findCosmics()
+        for key in dictionary:
+            print key
+        
+        
+
 if __name__ == '__main__':
     unittest.main()
