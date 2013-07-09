@@ -291,7 +291,22 @@ class Cosmic:
         track of the hisogram of the number of photons per stride
         timeStamps.
 
-        return a dictionary of 'populationHg' and 'cosmicTimeLists'
+        return a dictionary of 'populationHg', 'cosmicTimeLists',
+        'binContents', 'timeHgValues',  and 'frameSum'
+      
+        populationHg is a histogram of the number of entries per time bin
+        
+        cosmicTimeLists is a list of all the sequences that are suspects
+        for cosmic rays
+        
+        binContents is a list of the total number of photons in each bin
+        
+        timeHgValues is a histogram of the number of photons in each time
+        interval
+        
+        frameSum is a two dimensional  numpy array of the number of photons
+        detected by each pixel
+
         """
 
         tickDur = self.file.tickDuration
