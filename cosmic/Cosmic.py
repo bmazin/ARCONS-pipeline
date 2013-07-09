@@ -472,8 +472,6 @@ class Cosmic:
         return a dictionary of:  timeStamps,fitParams,chi2
 
         """
-        xPoints = []
-        yPoints = []
          
         firstSec = int(t0/1e6)  # in seconds
         integrationTime = 1+int((t1-t0)/1e6) # in seconds
