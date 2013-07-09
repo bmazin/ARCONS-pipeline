@@ -28,6 +28,7 @@ class Cosmic:
                      nBinsPerSec=10, flashMergeTime=1.0):
         """
         Opens fileName in MKID_DATA_DIR, sets roachList
+        endTime is exclusive
         """
         self.fn = fn
         self.fileName = fn.obs();
@@ -296,8 +297,8 @@ class Cosmic:
       
         populationHg is a histogram of the number of entries per time bin
         
-        cosmicTimeLists is a list of all the sequences that are suspects
-        for cosmic rays
+        cosmicTimeLists is a numpy array  of all the sequences that are
+        suspects for cosmic rays
         
         binContents is a list of the total number of photons in each bin
         
