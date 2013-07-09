@@ -380,7 +380,7 @@ class ObsFile:
                 lastSec = pixelNode.nrows
             else:
                 lastSec = firstSec + integrationTime
-            
+        
         pixelData = pixelNode.read(firstSec, lastSec)
         #return {'pixelData':pixelData,'firstSec':firstSec,'lastSec':lastSec}
         return pixelData
@@ -612,7 +612,7 @@ class ObsFile:
         if (type(firstSec) is not int) or (type(integrationTime) is not int):
             #Also exclude times outside firstSec to lastSec. Allows for sub-second
             #(floating point) values in firstSec and integrationTime
-            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
+            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits (??? REDUNDANT? JvE 6/19/2013)
 
         #Inter now contains a single 'interval' instance, which contains a list of
         #times to exclude, in seconds, including all times outside the requested
@@ -636,9 +636,10 @@ class ObsFile:
             baselines.append(bases)
             peakHeights.append(peaks)
             
-        timestamps = np.concatenate(timestamps)
-        baselines = np.concatenate(baselines)
-        peakHeights = np.concatenate(peakHeights)
+        if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
+            timestamps = np.concatenate(timestamps)
+            baselines = np.concatenate(baselines)
+            peakHeights = np.concatenate(peakHeights)
 
 #        if self.timeAdjustFile != None:
 #            timestamps += self.firmwareDelay
