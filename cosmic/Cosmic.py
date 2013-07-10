@@ -291,7 +291,22 @@ class Cosmic:
         track of the hisogram of the number of photons per stride
         timeStamps.
 
-        return a dictionary of 'populationHg' and 'cosmicTimeLists'
+        return a dictionary of 'populationHg', 'cosmicTimeLists',
+        'binContents', 'timeHgValues',  and 'frameSum'
+      
+        populationHg is a histogram of the number of entries per time bin
+        
+        cosmicTimeLists is a list of all the sequences that are suspects
+        for cosmic rays
+        
+        binContents is a list of the total number of photons in each bin
+        
+        timeHgValues is a histogram of the number of photons in each time
+        interval
+        
+        frameSum is a two dimensional  numpy array of the number of photons
+        detected by each pixel
+
         """
 
         tickDur = self.file.tickDuration
@@ -319,7 +334,8 @@ class Cosmic:
                 timestamps = gtpl['timestamps']
                 if timestamps.size > 0:
                     timestamps *= self.file.ticksPerSec
-                    ts64 = timestamps.astype(np.uint64)
+                    # per Matt S. suggestion 2013-07-09
+                    ts64 = np.round(timestamps).astype(np.uint64)
                     tsBinner.tsBinner(ts64, timeHgValues)
                     frameSum[iRow,iCol] += ts64.size
         pfthgv = Cosmic.populationFromTimeHgValues\
@@ -503,8 +519,8 @@ class Cosmic:
                 xArray = np.append(xArray,i)
                 yArray = np.append(yArray,y[i])
         ySigma = np.sqrt(yArray)
-        
-        temp = x*y
+
+
         mean = (x*y).sum()/float(y.sum())
         bExponGuess = 1/mean
         aExponGuess = bExponGuess*timeHgValues.sum()
@@ -519,9 +535,11 @@ class Cosmic:
         aGaussGuess = (timeHgValues.sum()/(cGaussGuess*np.sqrt(2*np.pi)))
         pGaussGuess = [aGaussGuess, bGaussGuess, cGaussGuess]
         
-        xLimit = [bGaussGuess-5*cGaussGuess, bGaussGuess+5*cGaussGuess]
+        xLimit = [bGaussGuess-4*cGaussGuess, bGaussGuess+4*cGaussGuess]
         retval = {'timeHgValues':timeHgValues, 'pExponFit':pExponGuess, 
-                  'pGaussFit':pGaussGuess, 'xLimit':xLimit}
+                  'pGaussFit':pGaussGuess, 'xLimit':xLimit, 
+                  'cGaussGuess':cGaussGuess, 'timeStamps':timeStamps}
+
         return retval
 
  

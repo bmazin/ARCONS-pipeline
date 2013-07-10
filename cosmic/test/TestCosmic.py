@@ -8,6 +8,7 @@ from interval import interval, inf, imath
 import inspect
 import numpy as np
 from util import hgPlot
+from util import ObsFile
 from scipy.stats import poisson,expon
 from cosmic import tsBinner
 class TestCosmic(unittest.TestCase):
@@ -154,6 +155,66 @@ class TestCosmic(unittest.TestCase):
         fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
         cosmic = Cosmic(fn, endTime='exptime')
         cosmic.fitDecayTime()
+
+    def testFindCosmicRays(self):
+        
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '121229'
+        t0 = '123247835'
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        cosmic = Cosmic(fn)
+        dictionary = cosmic.findCosmics()
+        for key in dictionary:
+            print key
+        
+    def testRound(self):
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '115722'
+        fileName = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        timeAdjustments = fileName.timeAdjustments()
+        obsFile = ObsFile.ObsFile(fileName.obs())
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+        firstSec=49.163775
+        integrationTime = 100.e-6
+        times = np.array([])
+        for iRow in range(46):
+            for iCol in range(44):
+                gtpl = obsFile.getTimedPacketList(iRow, iCol, firstSec, integrationTime)
+                ts = gtpl['timestamps']
+                times = np.append(times,ts)
+
+        times -= firstSec
+        #times *= 1.e6
+        times *= 1000000
+
+        timesOriginal = times.copy()
+
+        nBins = 100
+
+        hist,edges = np.histogram(times,bins=nBins,range=(0,100))
+        plt.plot(edges[0:-1],hist, label="no rounding np.histogram")
+
+        times = np.round(times)
+        hist,edges = np.histogram(times,bins=nBins,range=(0,100))
+        plt.plot(edges[0:-1],hist, label="yes rounding np.histogram")
+
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        ts64 = timesOriginal.astype(np.uint64)
+        tsBinner.tsBinner(ts64,timeHgValues)
+        plt.plot(edges[0:-1],timeHgValues, 'r+', label="no rounding tsBinner")
+
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        ts64 = np.round(timesOriginal).astype(np.uint64)
+        tsBinner.tsBinner(ts64,timeHgValues)
+        plt.plot(edges[0:-1],timeHgValues, 'cx', label="yes rounding tsBinner")
+
+        plt.legend()
+        plt.savefig(inspect.stack()[0][3]+".png")
+
 
 if __name__ == '__main__':
     unittest.main()
