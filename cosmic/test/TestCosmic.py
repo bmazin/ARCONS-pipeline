@@ -164,10 +164,12 @@ class TestCosmic(unittest.TestCase):
         seq = '121229'
         t0 = '123247835'
         fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
-        cosmic = Cosmic(fn)
-        dictionary = cosmic.findCosmics()
+        cosmic = Cosmic(fn, beginTime=123, endTime=124)
+        dictionary = cosmic.findCosmics(stride=10, threshold=40, 
+                                        populationMax=2000)
         for key in dictionary:
             print key
+        print "cosmicTimeList=", dictionary['cosmicTimeList']
         
     def testRound(self):
         run = 'PAL2012'
