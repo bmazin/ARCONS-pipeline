@@ -170,6 +170,7 @@ class TestCosmic(unittest.TestCase):
         for key in dictionary:
             print key
         print "cosmicTimeList=", dictionary['cosmicTimeList']
+        print "interval=", dictionary['interval']
         
     def testRound(self):
         run = 'PAL2012'
@@ -216,6 +217,20 @@ class TestCosmic(unittest.TestCase):
 
         plt.legend()
         plt.savefig(inspect.stack()[0][3]+".png")
+
+
+    def writeandReadIntervals(self):
+      i = interval()
+      i = i | interval[5, 10]
+      run = 'PAL2012'
+      sundownDate = '20121211'
+      obsDate = '20121212'
+      seq = '121229'
+      fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+      cosmic = Cosmic(fn)
+      i = cosmic.writeIntervaltoFile(i)
+      interval = cosmic.readIntervalfromFile(i)
+      print "interval=", interval
 
 
 if __name__ == '__main__':
