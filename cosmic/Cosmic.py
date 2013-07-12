@@ -341,13 +341,35 @@ class Cosmic:
                     frameSum[iRow,iCol] += ts64.size
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
+        i = interval()
+        for cosmicTime in pfthgv['cosmicTimeList']:
+            print "cosmicTime=", cosmicTime
+            t0 = (cosmicTime-50)/1.e6
+            t1 = (cosmicTime+50)/1.e6
+            intTime = t1-t0
+        tempTs = np.array([])
+        for iRow in range(self.file.nRow):
+            for iCol in range(self.file.nCol):
+                gtpl = self.file.getTimedPacketList(iRow, iCol, t0, intTime)
+                tempTs = np.append(tempTs, gtpl['timestamps'])
+
+        print "tempTs=", tempTs
+        
+        mean = tempTs.mean()
+        sigma = tempTs.std()
+        left = mean-5*sigma
+        right = mean+5*sigma
+        i = i | interval[left, right]
+           
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = pfthgv['populationHg']
         retval['cosmicTimeList'] = pfthgv['cosmicTimeList']
         retval['binContents'] = pfthgv['binContents']
         retval['frameSum'] = frameSum
+        retval['interval'] = i
         return retval
+
 
     def getHgsForOneSecDELETE(self, iSec, inter, stride=1, populationMax=10, threshold=100):
         """
@@ -503,9 +525,12 @@ class Cosmic:
                 if (len(timeStamps) > 0):
                     # covert the time values to microseconds, and
                     # make it the type np.uint64
-                    ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
+                    # round per Matt S. suggestion 2013-07-09
+                    #ts64 = (timeStamps).astype(np.uint64)
+                    ts64round = np.round(timeStamps).astype(np.uint64)
+                    
                     # add these timestamps to the histogram timeHgValues
-                    tsBinner.tsBinner(ts64, timeHgValues)
+                    tsBinner.tsBinner(ts64round, timeHgValues)
         remain0 = int(t0%1e6)
         remain1 = int(t1%1e6)
         timeHgValues = timeHgValues[remain0:remain1]
