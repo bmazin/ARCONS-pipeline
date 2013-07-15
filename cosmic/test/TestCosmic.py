@@ -224,14 +224,17 @@ class TestCosmic(unittest.TestCase):
       i = i | interval[5, 10]
       i = i | interval[100, 110.123]
       i = i | interval[4.5, 6.543]
+      i = i | interval[3210.123, 3211.456]
       run = 'PAL2012'
       sundownDate = '20121211'
       obsDate = '20121212'
       seq = '121229'
       fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
-      cosmic = Cosmic(fn)
-      cosmic.writeIntervalToFile(i, fileName="intervalTest.h5")
-      i2 = cosmic.readIntervalFromFile(fileName="intervalTest.h5")
+      ticksPerSec = 1000000
+
+      ObsFile.ObsFile.writeCosmicIntervalToFile(
+          i, ticksPerSec, fileName="intervalTest.h5")
+      i2 = ObsFile.ObsFile.readCosmicIntervalFromFile(fileName="intervalTest.h5")
 
       self.assertEquals(len(i),len(i2))
 
