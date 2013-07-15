@@ -465,6 +465,37 @@ class Cosmic:
         retval['cosmicTimeList'] = cosmicTimeList
         retval['binContents'] = binContents
         return retval
+
+    def writeIntervalToFile(self, intervals, fileName=None):
+        h5f = tables.openFile(fileName, 'w')
+        fnode = filenode.newNode(h5f, where='/', name="cosmicMaskHdr")
+        fnode.close()
+
+        tbl = h5f.createTable("/", "cosmicMaskData", TimeMask.TimeMask, "Cosmic Mask")
+        for interval in intervals:
+            row = tbl.row
+            row['tBegin'] = interval[0]
+            row['tEnd'] = interval[1]
+            row['reason'] = TimeMask.timeMaskReason["cosmic"]
+            row.append()
+            tbl.flush()
+        tbl.close()
+        h5f.close()
+
+
+    def readIntervalFromFile(self, fileName=None):
+        fid = tables.openFile(fileName, mode='r')
+        node = fid.root.cosmicMaskHdr
+        table = fid.getNode("/cosmicMaskData")
+        enum = table.getEnum('reason')
+
+        retval = interval()
+        for i in range(table.nrows):
+            retval = retval | interval[table[i]['tBegin'],table[i]['tEnd']]
+
+        fid.close()
+        return retval
+
     def makeMovies(self,beginTick, endTick, backgroundFrame, accumulate=False):
         tick0 = np.uint64(beginTick)
         tick1 = np.uint64(endTick)
@@ -516,6 +547,7 @@ class Cosmic:
         integrationTime = 1+int((t1-t0)/1e6) # in seconds
         nBins = integrationTime*1e6 # number of microseconds; one bin per microsecond
         timeHgValues = np.zeros(nBins, dtype=np.int64)
+        print "firstSec=",firstSec," integrationTime=",integrationTime
         for iRow in range(self.file.nRow):
             for iCol in range(self.file.nCol):
                 timedPacketList = self.file.getTimedPacketList(
@@ -525,10 +557,19 @@ class Cosmic:
                 if (len(timeStamps) > 0):
                     # covert the time values to microseconds, and
                     # make it the type np.uint64
+<<<<<<< HEAD
                     # round per Matt S. suggestion 2013-07-09
                     #ts64 = (timeStamps).astype(np.uint64)
                     ts64round = np.round(timeStamps).astype(np.uint64)
                     
+=======
+                    temp = 1e6*(timeStamps-firstSec)
+                    if iRow==45 and iCol==40:
+                        print "iRow=",iRow," iCol=",iCol," len(timeStamps)=",len(timeStamps), "  nBins=",nBins
+                        for i in range(len(timeStamps)):
+                            print "i=%6d  timeStamps=%13.9f"%(i,timeStamps[i])
+                    ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
+>>>>>>> 67a22a33b83fb58bca86330d9bc4a604271c0b9d
                     # add these timestamps to the histogram timeHgValues
                     tsBinner.tsBinner(ts64round, timeHgValues)
         remain0 = int(t0%1e6)

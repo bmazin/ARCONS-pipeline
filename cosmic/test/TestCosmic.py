@@ -219,18 +219,30 @@ class TestCosmic(unittest.TestCase):
         plt.savefig(inspect.stack()[0][3]+".png")
 
 
-    def writeandReadIntervals(self):
+    def testWriteAndReadIntervals(self):
       i = interval()
       i = i | interval[5, 10]
+      i = i | interval[100, 110.123]
+      i = i | interval[4.5, 6.543]
       run = 'PAL2012'
       sundownDate = '20121211'
       obsDate = '20121212'
       seq = '121229'
       fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
       cosmic = Cosmic(fn)
-      i = cosmic.writeIntervaltoFile(i)
-      interval = cosmic.readIntervalfromFile(i)
-      print "interval=", interval
+      cosmic.writeIntervalToFile(i, fileName="intervalTest.h5")
+      i2 = cosmic.readIntervalFromFile(fileName="intervalTest.h5")
+
+      self.assertEquals(len(i),len(i2))
+
+    def testCosmicTimeMasking(self):
+      run = 'PAL2012'
+      sundownDate = '20121211'
+      obsDate = '20121212'
+      seq = '121229'
+      fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+      cosmic = Cosmic(fn)
+      
 
 
 if __name__ == '__main__':

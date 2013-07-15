@@ -47,7 +47,7 @@ for seq in seq5:
             dictionary = cosmic.fitExpon(t0, t1)
             plt.clf()
             hist = dictionary['timeHgValues']
-            bins = np.arange(len(hist)) 
+            bins = np.arange(len(hist))
             plt.plot(bins, hist, label="Event Histogram")
             #mean = hist.mean()
             #plots the mean of the histogram
