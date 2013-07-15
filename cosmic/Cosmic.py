@@ -293,7 +293,7 @@ class Cosmic:
         timeStamps.
 
         return a dictionary of 'populationHg', 'cosmicTimeLists',
-        'binContents', 'timeHgValues',  and 'frameSum'
+        'binContents', 'timeHgValues', 'interval'  and 'frameSum'
       
         populationHg is a histogram of the number of entries per time bin
         
@@ -307,6 +307,8 @@ class Cosmic:
         
         frameSum is a two dimensional  numpy array of the number of photons
         detected by each pixel
+
+        interval is the interval of data to be masked out
 
         """
 
@@ -527,19 +529,16 @@ class Cosmic:
                 if (len(timeStamps) > 0):
                     # covert the time values to microseconds, and
                     # make it the type np.uint64
-<<<<<<< HEAD
                     # round per Matt S. suggestion 2013-07-09
                     #ts64 = (timeStamps).astype(np.uint64)
                     ts64round = np.round(timeStamps).astype(np.uint64)
                     
-=======
                     temp = 1e6*(timeStamps-firstSec)
                     if iRow==45 and iCol==40:
                         print "iRow=",iRow," iCol=",iCol," len(timeStamps)=",len(timeStamps), "  nBins=",nBins
                         for i in range(len(timeStamps)):
                             print "i=%6d  timeStamps=%13.9f"%(i,timeStamps[i])
                     ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
->>>>>>> 67a22a33b83fb58bca86330d9bc4a604271c0b9d
                     # add these timestamps to the histogram timeHgValues
                     tsBinner.tsBinner(ts64round, timeHgValues)
         remain0 = int(t0%1e6)
