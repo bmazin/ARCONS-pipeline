@@ -244,9 +244,32 @@ class TestCosmic(unittest.TestCase):
       obsDate = '20121212'
       seq = '121229'
       fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
-      cosmic = Cosmic(fn)
+      cosmic = Cosmic(fn, beginTime=123, endTime=133)
+      dictionary0 = cosmic.findCosmics()
       
+      plt.subplot(211)
+      hist = dictionary0['timeHgValues']
+      bins = np.arange(len(hist))
+      plt.plot(bins, hist)
+      plt.ylabel("no mask")
 
-
+      fn = FileName.FileName(run='PAL2012', date='20121211',
+                             tstamp='20121212-121229').obs()
+      obsFile = ObsFile.ObsFile(fn)
+      interval = dictionary0['interval']
+      ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
+                                                obsFile.ticksPerSec,
+                                                'junk.h5')
+      
+      cosmic.file.loadCosmicMask('junk.h5')
+      dictionary1 = cosmic.findCosmics()
+    
+      plt.subplot(212)
+      hist = dictionary1['timeHgValues']
+      bins = np.arange(len(hist))
+      plt.plot(bins, hist)
+      plt.ylabel("cosmic mask")
+      plt.savefig("testCosmicTimeMasking.png")
+      
 if __name__ == '__main__':
     unittest.main()
