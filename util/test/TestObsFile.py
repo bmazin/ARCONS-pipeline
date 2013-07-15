@@ -5,6 +5,8 @@ from interval import interval, inf, imath
 import matplotlib.pyplot as plt
 import inspect
 from util import ObsFile, FileName
+from cosmic.Cosmic import Cosmic
+import interval
 #from util.FileName import FileName
 #from util.ObsFile import ObsFile
 
@@ -158,7 +160,76 @@ class TestObsFile(unittest.TestCase):
         
         print 'Done. Seemed to work okay that time....'
 
+    def testCosmicTimeMask(self):
+        """
 
+Test applying time masks to one file.
+Note that this file has some hot pixels detected for some seconds,
+for example, this one:
+iRow= 44  iCol= 43
+   interval= interval([0.0, 29.0])
+   interval= interval([59.0, 61.0])
+   interval= interval([62.0, 220.0])
+   interval= interval([225.0, 283.0])
+   interval= interval([286.0, 300.0])
+"""
+
+        fn = FileName.FileName(run='PAL2012',date='20121211',
+                               tstamp='20121212-033323').obs()
+        obsFile = ObsFile.ObsFile(fn)
+
+        fileName = FileName.FileName(obsFile=fn)
+        timeAdjustments = fileName.timeAdjustments()
+
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+
+        iRow = 44
+        iCol = 43
+        firstSec = 58
+        integrationTime = 5
+        obsFile.switchOffHotPixTimeMask()
+        gtpl0 = obsFile.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+        times0 = gtpl0['timestamps']
+        peaks0 = gtpl0['peakHeights']
+
+        hotPixCalFileName = fileName.timeMask()
+        obsFile.loadHotPixCalFile(hotPixCalFileName)
+        obsFile.switchOnHotPixTimeMask()
+
+        gtpl1 = obsFile.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+        times1 = gtpl1['timestamps']
+        peaks1 = gtpl1['peakHeights']
+
+        cosmicInterval = interval.interval()
+        cosmicInterval = cosmicInterval | interval.interval[58.25,58.75]
+        ObsFile.ObsFile.writeCosmicIntervalToFile(cosmicInterval, 
+                                                  obsFile.ticksPerSec, 
+                                                  'temp.h5')
+
+        obsFile.loadCosmicMask('temp.h5')
+        gtpl2 = obsFile.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
+        times2 = gtpl2['timestamps']
+        peaks2 = gtpl2['peakHeights']
+
+        plt.clf()
+        plt.subplot(311)
+        plt.scatter(times0, peaks0, marker='o', s=1)
+        plt.ylabel("no mask")
+        plt.xlim(firstSec, firstSec+integrationTime)
+
+        plt.subplot(312)
+        plt.scatter(times1, peaks1, marker='o', s=1)
+        plt.ylabel("hot pixel mask")
+        plt.xlim(firstSec, firstSec+integrationTime)
+
+        plt.subplot(313)
+        plt.scatter(times2, peaks2, marker='o', s=1) 
+        plt.ylabel("hot pix + cosmic")
+        plt.xlim(firstSec, firstSec+integrationTime)
+
+        plt.savefig(inspect.stack()[0][3]+".png")
+
+        
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False

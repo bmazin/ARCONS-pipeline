@@ -45,12 +45,17 @@ class FileName:
             self.date = date
             self.tstamp = tstamp
         else:
-            #Split full file path of ObsFile instance into individual directory names
-            dirs = os.path.dirname(os.path.normpath(obsFile.fullFileName)).split(os.sep)
+            # Split full file path of ObsFile instance into 
+            # individual directory names
+
+            # Warning:  Chris S. changed obsFile.fullFile name to obsFile
+            # here and then again a few lines down.  July 11, 2013
+            dirs = os.path.dirname(os.path.normpath(obsFile)).split(os.sep)
             #Pull out the relevant bits
+
             self.run = dirs[-2]
             self.date = dirs[-1]
-            self.tstamp = (os.path.basename(obsFile.fullFileName)
+            self.tstamp = (os.path.basename(obsFile)
                            .partition('obs_')[2]
                            .rpartition('.h5')[0])
 

@@ -466,36 +466,6 @@ class Cosmic:
         retval['binContents'] = binContents
         return retval
 
-    def writeIntervalToFile(self, intervals, fileName=None):
-        h5f = tables.openFile(fileName, 'w')
-        fnode = filenode.newNode(h5f, where='/', name="cosmicMaskHdr")
-        fnode.close()
-
-        tbl = h5f.createTable("/", "cosmicMaskData", TimeMask.TimeMask, "Cosmic Mask")
-        for interval in intervals:
-            row = tbl.row
-            row['tBegin'] = interval[0]
-            row['tEnd'] = interval[1]
-            row['reason'] = TimeMask.timeMaskReason["cosmic"]
-            row.append()
-            tbl.flush()
-        tbl.close()
-        h5f.close()
-
-
-    def readIntervalFromFile(self, fileName=None):
-        fid = tables.openFile(fileName, mode='r')
-        node = fid.root.cosmicMaskHdr
-        table = fid.getNode("/cosmicMaskData")
-        enum = table.getEnum('reason')
-
-        retval = interval()
-        for i in range(table.nrows):
-            retval = retval | interval[table[i]['tBegin'],table[i]['tEnd']]
-
-        fid.close()
-        return retval
-
     def makeMovies(self,beginTick, endTick, backgroundFrame, accumulate=False):
         tick0 = np.uint64(beginTick)
         tick1 = np.uint64(endTick)
