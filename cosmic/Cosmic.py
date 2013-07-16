@@ -360,6 +360,7 @@ class Cosmic:
             left = mean-5*sigma
             right = mean+5*sigma
             print "cosmicTime=", cosmicTime, "mean=",mean, "left=",left," right=",right
+            i = i | interval[left,right]
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = pfthgv['populationHg']

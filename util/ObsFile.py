@@ -612,16 +612,11 @@ class ObsFile:
         else:
             inter = interval()
 
-        if iRow==44 and iCol==43:
-            print "ObsFile:  inter for iRow=44 iCol=43 is",inter
-
         if self.cosmicMaskIsApplied:
             inter = inter | self.cosmicMask
 
         
         if (type(firstSec) is not int) or (type(integrationTime) is not int):
-            if iRow==44 and iCol==43:
-                print "ObsFile:  non interger limits so doe something more"
             #Also exclude times outside firstSec to lastSec. Allows for sub-second
             #(floating point) values in firstSec and integrationTime
             inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
@@ -1242,6 +1237,7 @@ class ObsFile:
 
     @staticmethod
     def readCosmicIntervalFromFile(fileName):
+        print "ObsFile:  readCosmicIntervalFromFile fileName=",fileName
         fid = tables.openFile(fileName, mode='r')
         headerInfo = fid.getNode("/Header","Header")[0]
         ticksPerSec = headerInfo['ticksPerSec']
@@ -1249,8 +1245,10 @@ class ObsFile:
         enum = table.getEnum('reason')
 
         retval = interval()
+        print "table.nrows=",table.nrows
         for i in range(table.nrows):
             temp = (interval[table[i]['tBegin'],table[i]['tEnd']])/ticksPerSec
+            print "i=",i," temp=",temp
             retval = retval | temp
 
         fid.close()

@@ -246,12 +246,10 @@ class TestCosmic(unittest.TestCase):
         dictionary0 = cosmic.findCosmics(populationMax=1000)
         
         
-        fn = FileName.FileName(run='PAL2012', date='20121211',
-                             tstamp='20121212-121229').obs()
-        obsFile = ObsFile.ObsFile(fn)
         interval = dictionary0['interval']
+        print "interval=",interval
         ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
-                                                obsFile.ticksPerSec,
+                                                cosmic.file.ticksPerSec,
                                                 'junk.h5')
       
         cosmic.file.loadCosmicMask('junk.h5')
@@ -263,13 +261,15 @@ class TestCosmic(unittest.TestCase):
         bins = np.arange(len(hist))
         plt.plot(bins, hist)
         plt.ylabel("no mask")
+        plt.xscale('log')
         plt.yscale('log')
        
         plt.subplot(212)
         hist = dictionary1['populationHg'][0]
         bins = np.arange(len(hist))
         plt.plot(bins, hist)
-        plt.ylabel("cosmic mask")
+        plt.ylabel("cosmic mask") 
+        plt.xscale('log')
         plt.yscale('log')
         plt.savefig("testCosmicTimeMasking.png")
 
