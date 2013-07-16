@@ -345,24 +345,23 @@ class Cosmic:
             (timeHgValues,populationMax,stride,threshold)
         i = interval()
         for cosmicTime in pfthgv['cosmicTimeList']:
-            print "cosmicTime=", cosmicTime
             t0 = (cosmicTime-50)/1.e6
             t1 = (cosmicTime+50)/1.e6
             intTime = t1-t0
-        tempTs = np.array([])
-        for iRow in range(self.file.nRow):
-            for iCol in range(self.file.nCol):
-                gtpl = self.file.getTimedPacketList(iRow, iCol, t0, intTime)
-                tempTs = np.append(tempTs, gtpl['timestamps'])
-
-        print "tempTs=", tempTs
-        
-        mean = tempTs.mean()
-        sigma = tempTs.std()
-        left = mean-5*sigma
-        right = mean+5*sigma
-        i = i | interval[left, right]
-           
+            tempTs = np.array([])
+            for iRow in range(self.file.nRow):
+                for iCol in range(self.file.nCol):
+                    gtpl = self.file.getTimedPacketList(iRow, iCol, 
+                                                        t0, intTime)
+                    tempTs = np.append(tempTs, gtpl['timestamps'])
+                    
+            mean = tempTs.mean()
+            sigma = tempTs.std()
+            left = mean-5*sigma
+            right = mean+5*sigma
+            print "cosmicTime=", cosmicTime, "mean=",mean, "left=",left," right=",right
+            i = i | interval[left, right]
+            
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = pfthgv['populationHg']
@@ -373,44 +372,6 @@ class Cosmic:
         return retval
 
 
-    def getHgsForOneSecDELETE(self, iSec, inter, stride=1, populationMax=10, threshold=100):
-        """
-        inputs:
-        iSec = the second to consider
-        inter -- sent to ObsFile.parsePhotonPackets
-
-        return dictionary with timeHgValues, populationHg, and cosmicTimeList
-        where
-        timeHgValues = histogram of the number of photons in each time interval
-        populationHg = histogram of the number of entries per time bin
-        cosmicTimeList = numpy array of starting time tick of bins with
-          more than threshold photons
-        """
-        bins = np.arange(0, self.file.ticksPerSec, 1)
-        minLength = self.file.ticksPerSec
-        timeHgValues = np.zeros(minLength, dtype=np.int64)
-        frameSum = np.zeros((self.file.nRow,self.file.nCol))
-        for iRow in range(self.file.nRow):
-            for iCol in range(self.file.nCol):
-                gtpl = self.file.getTimedPacketList(iRow,iCol)
-                timestamps = gtpl['timestamps']
-                if timestamps.size > 0:
-                    ts0 = timestamps[0]
-                    print "ts0=",ts0," type=",type(ts0)
-                    ts64 = (timestamps*1000000).astype(np.uint64)
-                    tsBinner.tsBinner(ts64, timeHgValues)
-                    frameSum[iRow,iCol] += timestamps.size
-        pfthgv = Cosmic.populationFromTimeHgValues\
-            (timeHgValues,populationMax,stride,threshold)
-        populationHg = pfthgv['populationHg']
-        cosmicTimeList = pfthgv['cosmicTimeList']
-        retval = {}
-        retval['timeHgValues'] = timeHgValues
-        retval['populationHg'] = populationHg
-        retval['cosmicTimeList'] = cosmicTimeList
-        retval['binContents'] = pfthgv['binContents']
-        retval['frameSum'] = frameSum
-        return retval
     @staticmethod
     def populationFromTimeHgValues(timeHgValues,populationMax,stride,threshold):
         """
@@ -431,6 +392,7 @@ class Cosmic:
             cosmicTimeList = np.where(timeHgValues > threshold)[0]
             binContents = np.extract(timeHgValues > threshold, timeHgValues)
         else:
+            print "aaa stride=",stride
             # rebin the timeHgValues before counting the populations
             length = timeHgValues.size
             
@@ -461,7 +423,8 @@ class Cosmic:
             cosmicTimeList = cosmicTimeList[args]
             binContents = binContents[args]
             cosmicTimeList.sort()
-            
+
+        print "zzz cosmicTimeList",cosmicTimeList
         retval = {}
         retval['populationHg'] = populationHg
         retval['cosmicTimeList'] = cosmicTimeList
