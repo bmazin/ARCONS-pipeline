@@ -343,6 +343,7 @@ class Cosmic:
                     frameSum[iRow,iCol] += ts64.size
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
+        #now build up all of the intervals in seconds
         i = interval()
         for cosmicTime in pfthgv['cosmicTimeList']:
             t0 = (cosmicTime-50)/1.e6
@@ -354,14 +355,11 @@ class Cosmic:
                     gtpl = self.file.getTimedPacketList(iRow, iCol, 
                                                         t0, intTime)
                     tempTs = np.append(tempTs, gtpl['timestamps'])
-                    
             mean = tempTs.mean()
             sigma = tempTs.std()
             left = mean-5*sigma
             right = mean+5*sigma
             print "cosmicTime=", cosmicTime, "mean=",mean, "left=",left," right=",right
-            i = i | interval[left, right]
-            
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = pfthgv['populationHg']
@@ -392,12 +390,18 @@ class Cosmic:
             cosmicTimeList = np.where(timeHgValues > threshold)[0]
             binContents = np.extract(timeHgValues > threshold, timeHgValues)
         else:
-            print "aaa stride=",stride
             # rebin the timeHgValues before counting the populations
             length = timeHgValues.size
-            
-            timeHgValuesRebinned0 = np.reshape(\
-                timeHgValues, [length/stride, stride]).sum(axis=1)
+            remainder = length%stride
+            if remainder == 0:
+                end = length
+            else:
+                end = -remainder
+
+            timeHgValuesTrimmed = timeHgValues[0:end]
+
+            timeHgValuesRebinned0 = np.reshape(
+                timeHgValuesTrimmed, [length/stride, stride]).sum(axis=1)
             populationHg0 = np.histogram(
                 timeHgValuesRebinned0, populationMax, range=popRange)
             cosmicTimeList0 = stride*np.where(\
@@ -406,7 +410,7 @@ class Cosmic:
                                       timeHgValuesRebinned0)
 
             timeHgValuesRebinned1 = np.reshape(
-                timeHgValues[stride/2:-stride/2], 
+                timeHgValuesTrimmed[stride/2:-stride/2], 
                 [(length-stride)/stride, stride]).sum(axis=1)
             populationHg1 = np.histogram(\
                 timeHgValuesRebinned1, populationMax, range=popRange)
@@ -424,7 +428,6 @@ class Cosmic:
             binContents = binContents[args]
             cosmicTimeList.sort()
 
-        print "zzz cosmicTimeList",cosmicTimeList
         retval = {}
         retval['populationHg'] = populationHg
         retval['cosmicTimeList'] = cosmicTimeList

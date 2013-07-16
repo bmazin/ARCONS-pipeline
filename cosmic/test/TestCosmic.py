@@ -162,11 +162,9 @@ class TestCosmic(unittest.TestCase):
         sundownDate = '20121211'
         obsDate = '20121212'
         seq = '121229'
-        t0 = '123247835'
         fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
         cosmic = Cosmic(fn, beginTime=123, endTime=124)
-        dictionary = cosmic.findCosmics(stride=10, threshold=40, 
-                                        populationMax=2000)
+        dictionary = cosmic.findCosmics()
         for key in dictionary:
             print key
         print "cosmicTimeList=", dictionary['cosmicTimeList']
@@ -220,56 +218,175 @@ class TestCosmic(unittest.TestCase):
 
 
     def testWriteAndReadIntervals(self):
-      i = interval()
-      i = i | interval[5, 10]
-      i = i | interval[100, 110.123]
-      i = i | interval[4.5, 6.543]
-      i = i | interval[3210.123, 3211.456]
-      run = 'PAL2012'
-      sundownDate = '20121211'
-      obsDate = '20121212'
-      seq = '121229'
-      fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
-      ticksPerSec = 1000000
+        i = interval()
+        i = i | interval[5, 10]
+        i = i | interval[100, 110.123]
+        i = i | interval[4.5, 6.543]
+        i = i | interval[3210.123, 3211.456]
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '121229'
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        ticksPerSec = 1000000
 
-      ObsFile.ObsFile.writeCosmicIntervalToFile(
-          i, ticksPerSec, fileName="intervalTest.h5")
-      i2 = ObsFile.ObsFile.readCosmicIntervalFromFile(fileName="intervalTest.h5")
+        ObsFile.ObsFile.writeCosmicIntervalToFile(
+            i, ticksPerSec, fileName="intervalTest.h5")
+        i2 = ObsFile.ObsFile.readCosmicIntervalFromFile(fileName="intervalTest.h5")
 
-      self.assertEquals(len(i),len(i2))
+        self.assertEquals(len(i),len(i2))
 
     def testCosmicTimeMasking(self):
-      run = 'PAL2012'
-      sundownDate = '20121211'
-      obsDate = '20121212'
-      seq = '121229'
-      fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
-      cosmic = Cosmic(fn, beginTime=123, endTime=133)
-      dictionary0 = cosmic.findCosmics()
-      
-      plt.subplot(211)
-      hist = dictionary0['timeHgValues']
-      bins = np.arange(len(hist))
-      plt.plot(bins, hist)
-      plt.ylabel("no mask")
-
-      fn = FileName.FileName(run='PAL2012', date='20121211',
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '121229'
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        cosmic = Cosmic(fn, beginTime=123, endTime=124)
+        dictionary0 = cosmic.findCosmics(populationMax=1000)
+        
+        
+        fn = FileName.FileName(run='PAL2012', date='20121211',
                              tstamp='20121212-121229').obs()
-      obsFile = ObsFile.ObsFile(fn)
-      interval = dictionary0['interval']
-      ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
+        obsFile = ObsFile.ObsFile(fn)
+        interval = dictionary0['interval']
+        ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
                                                 obsFile.ticksPerSec,
                                                 'junk.h5')
       
-      cosmic.file.loadCosmicMask('junk.h5')
-      dictionary1 = cosmic.findCosmics()
-    
-      plt.subplot(212)
-      hist = dictionary1['timeHgValues']
-      bins = np.arange(len(hist))
-      plt.plot(bins, hist)
-      plt.ylabel("cosmic mask")
-      plt.savefig("testCosmicTimeMasking.png")
-      
+        cosmic.file.loadCosmicMask('junk.h5')
+        dictionary1 = cosmic.findCosmics(populationMax=1000)
+        
+        plt.clf()
+        plt.subplot(211)
+        hist = dictionary0['populationHg'][0]
+        bins = np.arange(len(hist))
+        plt.plot(bins, hist)
+        plt.ylabel("no mask")
+        plt.yscale('log')
+       
+        plt.subplot(212)
+        hist = dictionary1['populationHg'][0]
+        bins = np.arange(len(hist))
+        plt.plot(bins, hist)
+        plt.ylabel("cosmic mask")
+        plt.yscale('log')
+        plt.savefig("testCosmicTimeMasking.png")
+
+    def testPopulationFromTimeHgValues0(self):
+        """
+        test one specific example with stride of 1
+        """
+        timeHgValues = np.array([0,10,5,0,0,0,0,10,8,1,0,0,0,0,0,0])
+        populationMax = 20
+        stride = 1
+        threshold = 9
+        d = Cosmic.populationFromTimeHgValues(timeHgValues, populationMax, 
+                                              stride, threshold)
+        
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['populationHg'][0], 
+                np.array([11,1,0,0,0,1,0,0,1,0,2,0,0,0,0,0,0,0,0,0])))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['cosmicTimeList'],
+                np.array([1,7])))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['binContents'],
+                np.array([10,10])))
+
+        
+    def testPopulationFromTimeHgValues1(self):
+        """
+        test one specific example with stride of 4
+        """
+        timeHgValues = np.array([0,0,10,20,0,0,5,6,7,8,9,1])
+        populationMax = 40
+        stride = 4
+        threshold = 15
+        d = Cosmic.populationFromTimeHgValues(timeHgValues, populationMax, 
+                                              stride, threshold)
+        
+        populationTrue = np.zeros(populationMax)
+        populationTrue[11] = 1
+        populationTrue[25] = 1
+        populationTrue[26] = 1
+        populationTrue[30] = 2
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['populationHg'][0], 
+                populationTrue))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['cosmicTimeList'],
+                np.array([0,2,6,8])))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['binContents'],
+                np.array([30,30,26,25])))
+
+    def testPopulationFromTimeHgValues2(self):
+        """
+        test one specific example with stride of 4
+        and a number of timeHgValues that is not a multiple of stride
+        """
+        timeHgValues = np.array([0,0,10,20,0,0,5,6,7,8,9,1,99])
+        populationMax = 40
+        stride = 4
+        threshold = 15
+        d = Cosmic.populationFromTimeHgValues(timeHgValues, populationMax, 
+                                              stride, threshold)
+        
+        populationTrue = np.zeros(populationMax)
+        populationTrue[11] = 1
+        populationTrue[25] = 1
+        populationTrue[26] = 1
+        populationTrue[30] = 2
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['populationHg'][0], 
+                populationTrue))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['cosmicTimeList'],
+                np.array([0,2,6,8])))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['binContents'],
+                np.array([30,30,26,25])))
+
+        
+    def testPopulationFromTimeHgValues3(self):
+        """
+        test one specific example with stride of 5
+        and a number of timeHgValues that is not a multiple of stride
+        """
+        timeHgValues = np.array([0,0,10,20,0,0,5,6,7,8,9,1,99])
+        populationMax = 40
+        stride = 5
+        threshold = 15
+        d = Cosmic.populationFromTimeHgValues(timeHgValues, populationMax, 
+                                              stride, threshold)
+        
+        populationTrue = np.zeros(populationMax)
+        populationTrue[26] = 1
+        populationTrue[30] = 1
+        populationTrue[35] = 1
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['populationHg'][0], 
+                populationTrue))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['cosmicTimeList'],
+                np.array([0,2,5])))
+
+        self.assertEquals(None, np.testing.assert_array_equal(
+                d['binContents'],
+                np.array([30,35,26])))
+
+
+        
 if __name__ == '__main__':
     unittest.main()
