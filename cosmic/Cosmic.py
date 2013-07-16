@@ -343,26 +343,25 @@ class Cosmic:
                     frameSum[iRow,iCol] += ts64.size
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
+        #now build up all of the intervals in seconds
         i = interval()
         for cosmicTime in pfthgv['cosmicTimeList']:
             print "cosmicTime=", cosmicTime
             t0 = (cosmicTime-50)/1.e6
             t1 = (cosmicTime+50)/1.e6
             intTime = t1-t0
-        tempTs = np.array([])
-        for iRow in range(self.file.nRow):
-            for iCol in range(self.file.nCol):
-                gtpl = self.file.getTimedPacketList(iRow, iCol, t0, intTime)
-                tempTs = np.append(tempTs, gtpl['timestamps'])
-
-        print "tempTs=", tempTs
+            tempTs = np.array([])
+            for iRow in range(self.file.nRow):
+                for iCol in range(self.file.nCol):
+                    gtpl = self.file.getTimedPacketList(iRow, iCol, t0, intTime)
+                    tempTs = np.append(tempTs, gtpl['timestamps'])
         
-        mean = tempTs.mean()
-        sigma = tempTs.std()
-        left = mean-5*sigma
-        right = mean+5*sigma
-        i = i | interval[left, right]
-           
+            mean = tempTs.mean()
+            sigma = tempTs.std()
+            left = mean-5*sigma
+            right = mean+5*sigma
+            i = i | interval[left, right]
+        
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = pfthgv['populationHg']
@@ -434,7 +433,7 @@ class Cosmic:
             # rebin the timeHgValues before counting the populations
             length = timeHgValues.size
             
-            timeHgValuesRebinned0 = np.reshape(\
+            timeHgValuesRebinned0 = np.reshape(
                 timeHgValues, [length/stride, stride]).sum(axis=1)
             populationHg0 = np.histogram(
                 timeHgValuesRebinned0, populationMax, range=popRange)
