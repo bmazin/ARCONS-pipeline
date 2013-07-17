@@ -204,9 +204,10 @@ def main():
                 ob.loadFlatCalFile(flatCalFileName)
                 ob.loadFluxCalFile(fluxCalFileName)
                 ob.loadHotPixCalFile(timeMaskFileName)
+                ob.loadCentroidListFile(centroidFileName)
                 ob.setWvlCutoffs(None,None)
                 print 'Writing: '+FileName(obsFile=ob).photonList()
-                ob.writePhotonList(astrometryFileName=centroidFileName)
+                ob.writePhotonList()
 
     print '-----------All done--------------'
 

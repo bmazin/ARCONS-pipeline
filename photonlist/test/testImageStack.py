@@ -30,7 +30,7 @@ def makeImageStack(fileNames='photons_*.h5',dir='/Scratch/photonLists/20121211',
     
     #Get the list of filenames
     if fileNames[0]=='@':
-        #(Note, actually untested, but should be more or less right...)'
+        #(Note, actually untested, but should be more or less right...)
         files=[]
         with open(fileNames[1:]) as f:
             for line in f:

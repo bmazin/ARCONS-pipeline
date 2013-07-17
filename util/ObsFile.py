@@ -31,6 +31,7 @@ getDeadPixels(self, showMe=False, weighted=True)
 getNonAllocPixels(self, showMe=False)
 getRoachNum(self,iRow,iCol)
 getFrame(self, firstSec=0, integrationTime=-1)
+loadCentroidListFile(self, centroidListFileName)
 loadFlatCalFile(self, flatCalFileName)
 loadFluxCalFile(self, fluxCalFileName)
 loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True)
@@ -82,6 +83,7 @@ class ObsFile:
         self.hotPixFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
+        self.centroidListFile = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
         
@@ -108,6 +110,10 @@ class ObsFile:
             pass
         try:
             self.hotPixFile.close()
+        except:
+            pass
+        try:
+            self.centroidListFile.close()
         except:
             pass
         self.file.close()
@@ -955,6 +961,19 @@ class ObsFile:
                 frame[iRow][iCol] += nphoton
         return frame
 
+    def loadCentroidListFile(self, centroidListFileName):
+        """
+        Load an astrometry (centroid list) file into the 
+        current obs file instance.
+        """
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        centroidListPath = os.path.join(scratchDir, 'centroidListFiles')
+        fullCentroidListFileName = os.path.join(centroidListPath, centroidListFileName)
+        if (not os.path.exists(centroidListFileName)):
+            print 'Astrometry centroid list file does not exist: ', centroidListFileName
+            return
+        self.centroidListFile = tables.openFile(centroidListFileName)
+        
     def loadFlatCalFile(self, flatCalFileName):
         """
         loads the flat cal factors from the given file
