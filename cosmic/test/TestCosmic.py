@@ -11,6 +11,8 @@ from util import hgPlot
 from util import ObsFile
 from scipy.stats import poisson,expon
 from cosmic import tsBinner
+import sys
+
 class TestCosmic(unittest.TestCase):
     """
     test the Cosmic class
@@ -237,17 +239,37 @@ class TestCosmic(unittest.TestCase):
         self.assertEquals(len(i),len(i2))
 
     def testCosmicTimeMasking(self):
+        ymax = sys.float_info.max/100.0
         run = 'PAL2012'
         sundownDate = '20121211'
         obsDate = '20121212'
         seq = '121229'
         fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
-        cosmic = Cosmic(fn, beginTime=123, endTime=124)
-        dictionary0 = cosmic.findCosmics(populationMax=1000)
-        
-        
+        beginTime = 123.247400
+        endTime   = 123.248400
+        cosmic = Cosmic(fn, beginTime=beginTime, endTime=endTime)
+
+        stride = 10
+        threshold = 100
+        populationMax=2000
+        nSigma=10
+        dictionary0 = cosmic.findCosmics(stride=stride,
+                                         threshold=threshold,
+                                         populationMax=populationMax,
+                                         nSigma=nSigma)
         interval = dictionary0['interval']
-        print "interval=",interval
+        plt.clf()
+        plt.plot(dictionary0['timeHgValues'])
+        for oneInt in interval:
+            x0 = (oneInt[0]-beginTime)*cosmic.file.ticksPerSec
+            x1 = (oneInt[1]-beginTime)*cosmic.file.ticksPerSec
+            plt.fill_between((x0,x1),(0,0),(ymax,ymax),alpha=0.2,color='red')
+        plt.title("timeHgValues stride=%d  threshold=%d nSigma=%d"%(stride,threshold,nSigma))
+        plt.xlabel("ticks after t=%f seconds"%beginTime)
+        plt.yscale("symlog",linthreshy=0.5)
+        plt.ylim(0,dictionary0['timeHgValues'].max())
+        plt.savefig("testCosmicTimeMasking-0.png")
+
         ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
                                                 cosmic.file.ticksPerSec,
                                                 'junk.h5')

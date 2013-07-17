@@ -283,7 +283,8 @@ class Cosmic:
                 plt.plot([t0,t1],[y,y],'r', linewidth=4)
             y -= 2
 
-    def findCosmics(self, stride=10, threshold=100, populationMax=20):
+    def findCosmics(self, stride=10, threshold=100, 
+                    populationMax=2000, nSigma=5):
         """
         Find cosmics ray suspects.  Histogram the number of photons
         recorded at each timeStamp.  When the number of photons in a
@@ -312,31 +313,20 @@ class Cosmic:
 
         """
 
-        tickDur = self.file.tickDuration
-        interFullSec = interval[0, (1.0/tickDur)-1]
-        allPopulationHgValues = np.zeros(populationMax)
-        cosmicTimeLists = []
-        binContentsList = []
-        hgs = self.getHgs(stride, threshold, populationMax)
-        return hgs
-
-    def getHgs(self, stride=1, threshold=100, populationMax=10):
-        exptime = self.file.getFromHeader('exptime')
-        nBins = self.file.ticksPerSec*exptime
+        exptime = self.endTime-self.beginTime
+        nBins = int(np.round(self.file.ticksPerSec*exptime+1))
         bins = np.arange(0, nBins, 1)
         timeHgValues = np.zeros(nBins, dtype=np.int64)
         frameSum = np.zeros((self.file.nRow,self.file.nCol))
-        firstSec = self.beginTime
         integrationTime = self.endTime - self.beginTime
         for iRow in range(self.file.nRow):
-            if iRow%10 == 0:
-                print "Cosmic.getHgs:  iRow=",iRow
             for iCol in range(self.file.nCol):
-                gtpl = self.file.getTimedPacketList(iRow,iCol,
-                                                    firstSec, integrationTime)
+                gtpl = self.file.getTimedPacketList(iRow,iCol,self.beginTime, 
+                                                    integrationTime)
                 timestamps = gtpl['timestamps']
                 if timestamps.size > 0:
-                    timestamps *= self.file.ticksPerSec
+                    timestamps = \
+                        (timestamps - self.beginTime)*self.file.ticksPerSec
                     # per Matt S. suggestion 2013-07-09
                     ts64 = np.round(timestamps).astype(np.uint64)
                     tsBinner.tsBinner(ts64, timeHgValues)
@@ -346,8 +336,8 @@ class Cosmic:
         #now build up all of the intervals in seconds
         i = interval()
         for cosmicTime in pfthgv['cosmicTimeList']:
-            t0 = (cosmicTime-50)/1.e6
-            t1 = (cosmicTime+50)/1.e6
+            t0 = self.beginTime+(cosmicTime-50)/1.e6
+            t1 = self.beginTime+(cosmicTime+50)/1.e6
             intTime = t1-t0
             tempTs = np.array([])
             for iRow in range(self.file.nRow):
@@ -357,9 +347,8 @@ class Cosmic:
                     tempTs = np.append(tempTs, gtpl['timestamps'])
             mean = tempTs.mean()
             sigma = tempTs.std()
-            left = mean-5*sigma
-            right = mean+5*sigma
-            print "cosmicTime=", cosmicTime, "mean=",mean, "left=",left," right=",right
+            left  = mean-nSigma*sigma
+            right = mean+nSigma*sigma
             i = i | interval[left,right]
         retval = {}
         retval['timeHgValues'] = timeHgValues
