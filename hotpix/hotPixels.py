@@ -260,7 +260,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         outputFileName - string, pathname of output .h5 file.
         timeStep - integer (for now), check for hot pixels in intervals of 
                    timeStep seconds.
-        startTime - integer (for now), number of seconds into exposure to beginfs
+        startTime - integer (for now), number of seconds into exposure to begin
                     searching for hot pixels (default is 0, start of exposure).
         endTime - integer (for now), number of seconds into exposure to end at.
                   If endTime=-1, will continue to end of exposure.
@@ -501,17 +501,27 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
 
 
     
-def readHotPixels(inputFile):
+def readHotPixels(inputFile,nodePath=None):
     '''
     To read in a hot-pixels HDF file as written by findHotPixels(). 
     (Note 'hot pixels' may later include cold pixels and possibly other
      such things as well).
     
     INPUTS:
-        inputFile - either a pytables file instance or pathname of the
-                    .h5 hot-pixel time-mask file to read in. Note in the
-                    former case the file will be left open; in the latter, 
-                    the file will be opened and then closed on completion.
+        inputFile - either: a pytables hot-pixel file instance; a pytables 
+                    photon-list file instance from which to extract the same
+                    information; or the pathname of either of these. If a file
+                    instance, the file will be left open on completion, while if 
+                    a pathname is given, the file will be opened and then closed
+                    on completion.
+        nodePath - optionally supply the location of the PyTables group
+                   within the HDF hierarchy that contains the hot pixel 
+                   information. Default is just the root ('/') of the .h5
+                   file, which is appropriate for standard hot pixel files.
+                   However, by setting this appropriately, you can instead 
+                   supply a photon list file in 'inputFile', since the hot pixel
+                   data hierarchy is copied directly into a sub-group within the
+                   hot pixel file.
     
     OUTPUTS:
         Returns a dictionary with the following info:
@@ -611,9 +621,20 @@ def readHotPixels(inputFile):
         fileh = inputFile
     else: raise ValueError('inputFile must be either a pathname string or a PyTables file instance.')
     
+    if nodePath is None:
+        if '/timemask/'+dataGroupName in fileh:
+            nodePath = '/timemask/'
+        elif '/timeMask/'+dataGroupName in fileh:
+            nodePath = '/timeMask/'
+        elif '/'+dataGroupName in fileh:
+            nodePath = '/'
+        
+    if nodePath+'/'+dataGroupName not in fileh:
+        raise RuntimeError, 'Time mask data node not found in HDF file: '+fileh.filename
+    
     try:        
         #Get the header info
-        headerInfo = fileh.getNode('/' + headerGroupName, headerTableName)[0] #The one row from the header
+        headerInfo = fileh.getNode(nodePath + headerGroupName, headerTableName)[0] #The one row from the header
         nRow = headerInfo[nRowColName]
         nCol = headerInfo[nColColName]
         obsFileName = headerInfo[obsFileColName]
@@ -631,7 +652,7 @@ def readHotPixels(inputFile):
             for iCol in range(nCol):
                 tableName = constructDataTableName(iCol, iRow)   #'x'+str(iCol)+'y'+str(iRow)
                 #Get the list for the current pixel
-                eventListTable = fileh.getNode('/' + dataGroupName, name=tableName)
+                eventListTable = fileh.getNode(nodePath + dataGroupName, name=tableName)
                 reasonEnum = eventListTable.getEnum('reason')  #Gets read in once for every table, but they should all be the same...
                 timeIntervals[iRow, iCol] = \
                     [interval([eachRow['tBegin'], eachRow['tEnd']]) / ticksPerSec for eachRow
@@ -657,9 +678,6 @@ def getEffIntTimeImage(hotPixDict,integrationTime,firstSec=0):
     
     INPUTS:
         hotPixDict -  a hot pixels dictionary as returned by hotPixels.readHotPixels()
-        either the name of a hot pixel (time mask) file, or
-                    an already-opened file instance of the same, from which
-                    eff. exposure times will be calculated.
         firstSec - Start time (sec) to start calculations from, starting from
                     the beginning of the exposure to which timeMask refers.
         integrationTime - Length of integration time (sec) from firstSec to include
