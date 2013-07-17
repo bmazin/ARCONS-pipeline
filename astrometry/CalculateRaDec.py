@@ -21,33 +21,51 @@ class CalculateRaDec:
     radiansToDegrees = 180.0/np.pi
     platescale=0.44 # arcsec/pixel
 
-    def __init__(self,centroidListFileName):
-        # Check centroidListFileName
-        if os.path.isabs(centroidListFileName) == True:
-            fullCentroidListFileName = centroidListFileName
+    def __init__(self,centroidListFile):
+        '''
+        centroidListFile may either be a pathname (string) to a centroid list file, a PyTables instance
+        of a centroid list file, or a PyTables instance of the actual centroid list node (table) within
+        a centroid list file (as stored in PhotList instances).
+        '''
+        
+        if type(centroidListFile) is str:
+            # Assume input is a pathname string - check centroidListFileName
+            if os.path.isabs(centroidListFile) == True:
+                fullCentroidListFileName = centroidListFile
+            else:
+                scratchDir = os.getenv('INTERM_PATH')
+                centroidDir = os.path.join(scratchDir,'centroidListFiles')
+                fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
+            if (not os.path.exists(fullCentroidListFileName)):
+                raise IOError, 'Centroid list file does not exist: '+fullCentroidListFileName
+                #print 'Centroid list file does not exist: ', fullCentroidListFileName
+                #return
+            # Load centroid positions, center of rotation, hour angle, and RA/DEC data from centroidListFile.
+            clFile = tables.openFile(fullCentroidListFileName, mode='r')
+            centroidListNode = clFile.root.centroidlist
+        elif type(centroidListFile) is tables.file.File:
+            clFile = None
+            centroidListNode = centroidListFile.root.centroidlist
+        elif type(centroidListFile) is tables.group.Group:
+            clFile = None
+            centroidListNode = centroidListFile
         else:
-            scratchDir = os.getenv('INTERM_PATH')
-            centroidDir = os.path.join(scratchDir,'centroidListFiles')
-            fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
-        if (not os.path.exists(fullCentroidListFileName)):
-            print 'centroid list file does not exist: ', fullCentroidListFileName
-            return
-
-        # Load centroid positions, center of rotation, hour angle, and RA/DEC data from centroidListFile.
-        self.centroidListFile = tables.openFile(fullCentroidListFileName, mode='r')
-        self.params = np.array(self.centroidListFile.root.centroidlist.params.read())
+            raise ValueError('Input parameter centroidListFile must be either a pathname string or a PyTables file instance.')
+        
+        
+        self.params = np.array(centroidListNode.params.read())
         '''
         self.xCenterOfRotation = float(self.params[0])
         self.yCenterOfRotation = float(self.params[1])
         '''
         self.centroidRightAscension = self.params[2]
         self.centroidDeclination = self.params[3]
-        self.times = np.array(self.centroidListFile.root.centroidlist.times.read())
-        self.hourAngles = np.array(self.centroidListFile.root.centroidlist.hourAngles.read())
-        self.xCentroids = np.array(self.centroidListFile.root.centroidlist.xPositions.read())
-        self.yCentroids = np.array(self.centroidListFile.root.centroidlist.yPositions.read())
-        self.centroidFlags = np.array(self.centroidListFile.root.centroidlist.flags.read())
-        self.centroidListFile.close()
+        self.times = np.array(centroidListNode.times.read())
+        self.hourAngles = np.array(centroidListNode.hourAngles.read())
+        self.xCentroids = np.array(centroidListNode.xPositions.read())
+        self.yCentroids = np.array(centroidListNode.yPositions.read())
+        self.centroidFlags = np.array(centroidListNode.flags.read())
+        if clFile is not None: clFile.close()
         self.frames=len(self.times)
         
         '''
