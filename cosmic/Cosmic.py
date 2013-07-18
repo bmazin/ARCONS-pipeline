@@ -347,13 +347,8 @@ class Cosmic:
                     tempTs = np.append(tempTs, gtpl['timestamps'])
             mean = tempTs.mean()
             sigma = tempTs.std()
-<<<<<<< HEAD
-            left = mean-5*sigma
-            right = mean+5*sigma
-=======
             left  = mean-nSigma*sigma
             right = mean+nSigma*sigma
->>>>>>> f247d90d82540b77d54748670d91f5bb223a0665
             i = i | interval[left,right]
         retval = {}
         retval['timeHgValues'] = timeHgValues

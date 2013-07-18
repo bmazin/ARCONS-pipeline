@@ -37,12 +37,20 @@ hist1 = dictionary1['populationHg'][0]
 bins1 = np.arange(len(hist1))
 plt.plot(bins1, hist1, label="cosmic mask")
 
+mu1 = (bins1*hist1).sum()/float(bins1.sum())
+print "mu1=",mu1
+p = poisson(mu1)
+xvalues = np.arange(20)
+theory = hist1.sum()*p.pmf(xvalues)
+print "xvalues=",xvalues
+print "theory=",theory
+plt.plot(xvalues,theory,'+',label="poisson with mu=%.3f"%mu1)
 
-s = np.random.poisson(np.mean(dictionary1['populationHg'][0]), 1000)
-plt.plot(s, hist1)
+#s = np.random.poisson(np.mean(dictionary1['populationHg'][0]), 1000)
+#plt.plot(s, hist1)
 
 plt.xscale('log')
-plt.yscale('log')
+plt.yscale('symlog',linthreshy=0.5)
 plt.legend()
 plt.savefig("testCosmicTimeMasking.png")
 
