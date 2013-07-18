@@ -1030,7 +1030,6 @@ class ObsFile:
                     print "   interval=",interval
     def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
         self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
-        print "ObsFile:  cosmicMask=",self.cosmicMask
         if switchOnCosmicMask: self.switchOnCosmicTimeMask()
 
     def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
@@ -1237,7 +1236,6 @@ class ObsFile:
 
     @staticmethod
     def readCosmicIntervalFromFile(fileName):
-        print "ObsFile:  readCosmicIntervalFromFile fileName=",fileName
         fid = tables.openFile(fileName, mode='r')
         headerInfo = fid.getNode("/Header","Header")[0]
         ticksPerSec = headerInfo['ticksPerSec']
@@ -1245,7 +1243,6 @@ class ObsFile:
         enum = table.getEnum('reason')
 
         retval = interval()
-        print "table.nrows=",table.nrows
         for i in range(table.nrows):
             temp = (interval[table[i]['tBegin'],table[i]['tEnd']])/ticksPerSec
             print "i=",i," temp=",temp
