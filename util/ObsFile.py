@@ -1245,7 +1245,6 @@ class ObsFile:
         retval = interval()
         for i in range(table.nrows):
             temp = (interval[table[i]['tBegin'],table[i]['tEnd']])/ticksPerSec
-            print "i=",i," temp=",temp
             retval = retval | temp
 
         fid.close()
