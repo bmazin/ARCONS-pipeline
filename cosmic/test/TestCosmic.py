@@ -247,7 +247,6 @@ class TestCosmic(unittest.TestCase):
         
         
         interval = dictionary0['interval']
-        print "interval=",interval
         ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
                                                 cosmic.file.ticksPerSec,
                                                 'junk.h5')
@@ -256,7 +255,6 @@ class TestCosmic(unittest.TestCase):
         dictionary1 = cosmic.findCosmics(populationMax=1000)
         
         plt.clf()
-        plt.subplot(211)
         hist = dictionary0['populationHg'][0]
         bins = np.arange(len(hist))
         plt.plot(bins, hist)
@@ -264,10 +262,9 @@ class TestCosmic(unittest.TestCase):
         plt.xscale('log')
         plt.yscale('log')
        
-        plt.subplot(212)
         hist = dictionary1['populationHg'][0]
         bins = np.arange(len(hist))
-        plt.plot(bins, hist)
+        plt.plot(bins, hist, color='g')
         plt.ylabel("cosmic mask") 
         plt.xscale('log')
         plt.yscale('log')
@@ -390,3 +387,4 @@ class TestCosmic(unittest.TestCase):
         
 if __name__ == '__main__':
     unittest.main()
+
