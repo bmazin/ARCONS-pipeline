@@ -329,8 +329,6 @@ class Cosmic:
         firstSec = self.beginTime
         integrationTime = self.endTime - self.beginTime
         for iRow in range(self.file.nRow):
-            if iRow%10 == 0:
-                print "Cosmic.getHgs:  iRow=",iRow
             for iCol in range(self.file.nCol):
                 gtpl = self.file.getTimedPacketList(iRow,iCol,
                                                     firstSec, integrationTime)
@@ -359,7 +357,6 @@ class Cosmic:
             sigma = tempTs.std()
             left = mean-5*sigma
             right = mean+5*sigma
-            print "cosmicTime=", cosmicTime, "mean=",mean, "left=",left," right=",right
             i = i | interval[left,right]
         retval = {}
         retval['timeHgValues'] = timeHgValues
