@@ -229,7 +229,31 @@ iRow= 44  iCol= 43
 
         plt.savefig(inspect.stack()[0][3]+".png")
 
-        
+    def testGetTimedPacketList2(self):
+        """
+        this seems to get a timestamp outside of beginTime, beginTime+expTime
+        """
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '115722'
+        fn = FileName.FileName(run, sundownDate,obsDate+"-"+seq)
+        print "now open",fn.obs()
+        obsFile = ObsFile.ObsFile(fn.obs())
+        obsFile.loadTimeAdjustmentFile(fn.timeAdjustments())
+        beginTime = 0
+        integrationTime = 0.177653
+        iRow = 3
+        iCol = 1
+        print "beginTime=",beginTime, "iRow=",iRow,"iCol=",iCol,"integrationTime=",integrationTime
+        endTime = beginTime + integrationTime
+        gtpl = obsFile.getTimedPacketList(iRow,iCol,beginTime,integrationTime)
+        print "timestamps=",gtpl['timestamps']
+        for timestamp in gtpl['timestamps']:
+            msg = "beginTime=%f   timestamp=%f  endTime=%f"%(beginTime,timestamp,endTime)
+            self.assertTrue(timestamp >= beginTime, msg)
+            self.assertTrue(timestamp <= endTime, msg)
+
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False
