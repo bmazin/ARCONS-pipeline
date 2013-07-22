@@ -258,8 +258,6 @@ class TestCosmic(unittest.TestCase):
                                          populationMax=populationMax,
                                          nSigma=nSigma)
         interval = dictionary0['interval']
-<<<<<<< HEAD
-=======
         plt.clf()
         plt.plot(dictionary0['timeHgValues'])
         for oneInt in interval:
@@ -271,8 +269,6 @@ class TestCosmic(unittest.TestCase):
         plt.yscale("symlog",linthreshy=0.5)
         plt.ylim(0,dictionary0['timeHgValues'].max())
         plt.savefig("testCosmicTimeMasking-0.png")
-
->>>>>>> f247d90d82540b77d54748670d91f5bb223a0665
         ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
                                                 cosmic.file.ticksPerSec,
                                                 'junk.h5')

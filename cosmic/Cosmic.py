@@ -320,6 +320,7 @@ class Cosmic:
         frameSum = np.zeros((self.file.nRow,self.file.nCol))
         integrationTime = self.endTime - self.beginTime
         for iRow in range(self.file.nRow):
+            print "Cosmic.findCosmics:  iRow=",iRow
             for iCol in range(self.file.nCol):
                 gtpl = self.file.getTimedPacketList(iRow,iCol,self.beginTime, 
                                                     integrationTime)
@@ -336,8 +337,8 @@ class Cosmic:
         #now build up all of the intervals in seconds
         i = interval()
         for cosmicTime in pfthgv['cosmicTimeList']:
-            t0 = self.beginTime+(cosmicTime-50)/1.e6
-            t1 = self.beginTime+(cosmicTime+50)/1.e6
+            t0 = max(0,self.beginTime+(cosmicTime-50)/1.e6)
+            t1 = min(self.endTime,self.beginTime+(cosmicTime+50)/1.e6)
             intTime = t1-t0
             tempTs = np.array([])
             for iRow in range(self.file.nRow):
@@ -348,7 +349,7 @@ class Cosmic:
             mean = tempTs.mean()
             sigma = tempTs.std()
             left  = mean-nSigma*sigma
-            right = mean+nSigma*sigma
+            right = mean+2*nSigma*sigma
             i = i | interval[left,right]
         retval = {}
         retval['timeHgValues'] = timeHgValues
@@ -534,7 +535,16 @@ class Cosmic:
 
         return retval
 
- 
+    @staticmethod
+    def intervalTime(intervals):
+        """
+        return the time (in seconds) masked by the intervals
+        """
+        time = 0
+        for interval in intervals:
+            time += interval[1]-interval[0]
+        return time
+
     @staticmethod
     def funcExpon(x, a, b, c, d):
         retval = a*np.exp(-b*(x-d)) + c

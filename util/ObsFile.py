@@ -644,9 +644,15 @@ class ObsFile:
             baselines.append(bases)
             peakHeights.append(peaks)
             
-        timestamps = np.concatenate(timestamps)
-        baselines = np.concatenate(baselines)
-        peakHeights = np.concatenate(peakHeights)
+        # crashes on /ScienceData/PAL2012/20121211/obs_20121212-115722.h5
+        # with ValueError: concatenation of zero-length sequences is impossible
+
+        try:
+            timestamps = np.concatenate(timestamps)
+            baselines = np.concatenate(baselines)
+            peakHeights = np.concatenate(peakHeights)
+        except ValueError:
+            pass
 
 #        if self.timeAdjustFile != None:
 #            timestamps += self.firmwareDelay
@@ -1226,8 +1232,8 @@ class ObsFile:
                               "Cosmic Mask")
         for interval in intervals:
             row = tbl.row
-            row['tBegin'] = np.round(interval[0]*ticksPerSec)
-            row['tEnd'] = np.round(interval[1]*ticksPerSec)
+            row['tBegin'] = max(0,int(np.round(interval[0]*ticksPerSec)))
+            row['tEnd'] = int(np.round(interval[1]*ticksPerSec))
             row['reason'] = TimeMask.timeMaskReason["cosmic"]
             row.append()
             tbl.flush()
