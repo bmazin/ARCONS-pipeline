@@ -51,6 +51,7 @@ hist1 = dictionary1['populationHg'][0]
 bins1 = np.arange(len(hist1))
 plt.plot(bins1, hist1, label="cosmic mask")
 
+
 mu1 = (bins1*hist1).sum()/float(hist1.sum())
 p = poisson(mu1)
 xvalues = np.arange(20)
@@ -75,17 +76,20 @@ nlist = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
 mean = []
 cosmicevents = []
 nSigma = 7
-threshold = 100
+threshold = 25
 stride = 10
 populationMax = 1000
-for n in nlist:
 
-    cosmic = Cosmic(fn, beginTime=n-10, endTime=n)
+for n in nlist:
+   
+    beginTime = n-10
+    endTime = n
+    cosmic = Cosmic(fn, beginTime, endTime)
     dictionary0 = cosmic.findCosmics(nSigma, threshold, stride, populationMax)
     interval = dictionary0['interval']
     ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
-                                          cosmic.file.ticksPerSec,
-                                          'junk.h5')
+                                              cosmic.file.ticksPerSec,
+                                              'junk.h5')
 
     cosmic.file.loadCosmicMask('junk.h5')
     dictionary1 = cosmic.findCosmics(nSigma, threshold, stride, populationMax)
@@ -93,12 +97,24 @@ for n in nlist:
     hist1 = dictionary1['populationHg'][0]
     bins1 = np.arange(len(hist1))
     hist0 = dictionary0['populationHg'][0]
+    bins0 = np.arange(len(hist0))
 
     mu1 = (bins1*hist1).sum()/float(hist1.sum())
     mean.append(mu1)
-    events = (hist0*hist1).sum()-hist1.sum()
+    events = (hist0-hist1).sum()
     cosmicevents.append(events)
 
+    plt.clf()
+    plt.plot(bins0, hist0, color='r', label="unmasked")
+    plt.plot(bins1, hist1, label="masked")
+    plt.xscale('log')
+    plt.yscale('symlog',linthreshy=0.5)
+    plt.legend()
+    plt.savefig("MaskedAndUnmaskedHistogram-n=%03d"%n)
+
+print "cosmicevents=", cosmicevents
+
+plt.clf()
 plt.subplot(211)
 plt.plot(nlist, mean, 'o')
 plt.ylabel("mean")
