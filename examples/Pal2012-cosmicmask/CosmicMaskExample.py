@@ -74,20 +74,21 @@ nlist = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
          280, 290, 300]
 mean = []
 cosmicevents = []
-
+nSigma = 7
+threshold = 100
+stride = 10
+populationMax = 1000
 for n in nlist:
 
     cosmic = Cosmic(fn, beginTime=n-10, endTime=n)
-    dictionary0 = cosmic.findCosmics(nSigma=6, threshold=30, 
-                                     populationMax=1000)
+    dictionary0 = cosmic.findCosmics(nSigma, threshold, stride, populationMax)
     interval = dictionary0['interval']
     ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
                                           cosmic.file.ticksPerSec,
                                           'junk.h5')
 
     cosmic.file.loadCosmicMask('junk.h5')
-    dictionary1 = cosmic.findCosmics(nSigma=6, threshold=30, 
-                                     populationMax=1000)
+    dictionary1 = cosmic.findCosmics(nSigma, threshold, stride, populationMax)
 
     hist1 = dictionary1['populationHg'][0]
     bins1 = np.arange(len(hist1))
@@ -101,9 +102,11 @@ for n in nlist:
 plt.subplot(211)
 plt.plot(nlist, mean, 'o')
 plt.ylabel("mean")
+plt.title("Mean and Cosmic Events"+"  "+"threshold=%.3f"%threshold+"  "+ 
+          "nSigma=%.3f"%nSigma)
+
 plt.subplot(212)
 plt.plot(nlist, cosmicevents, 'o')
 plt.xlabel("seconds")
 plt.ylabel("cosmics")
-plt.title("Mean and Cosmic Events")
 plt.savefig("MeanAndCosmicEvents.png")
