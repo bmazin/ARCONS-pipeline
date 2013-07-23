@@ -60,13 +60,15 @@ from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
 from scipy import pi
+from tables.nodes import filenode
+from headers import TimeMask
 
 class ObsFile:
     h = 4.135668e-15 #eV s
     c = 2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName,verbose=False):
+    def __init__(self, fileName, verbose=False):
         """
         load the given file with fileName relative to $MKID_DATA_DIR
         """
@@ -78,6 +80,8 @@ class ObsFile:
         self.hotPixFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
+        self.cosmicMaskIsApplied = False
+        self.cosmicMask = None # interval of times to mask cosmic ray events
         self.centroidListFile = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
@@ -151,7 +155,7 @@ class ObsFile:
             if verbose:
                 print msg
             raise Exception(msg)
-
+        
         #open the hdf5 file
         self.file = tables.openFile(self.fullFileName, mode='r')
 
@@ -390,7 +394,7 @@ class ObsFile:
                 lastSec = pixelNode.nrows
             else:
                 lastSec = firstSec + integrationTime
-        
+            
         pixelData = pixelNode.read(firstSec, lastSec)
         #return {'pixelData':pixelData,'firstSec':firstSec,'lastSec':lastSec}
         return pixelData
@@ -618,6 +622,10 @@ class ObsFile:
             inter = self.getPixelBadTimes(iRow, iCol)
         else:
             inter = interval()
+
+        if self.cosmicMaskIsApplied:
+            inter = inter | self.cosmicMask
+
         
         if (type(firstSec) is not int) or (type(integrationTime) is not int):
             #Also exclude times outside firstSec to lastSec. Allows for sub-second
@@ -640,6 +648,7 @@ class ObsFile:
 
         for t in range(len(pixelData)):
             interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
+            
             times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
             times = np.floor(firstSec) + self.tickDuration * times + t
             timestamps.append(times)
@@ -1036,6 +1045,18 @@ class ObsFile:
         else:
             if switchOnMask: self.switchOnHotPixTimeMask()
 
+        print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
+        print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
+        print "one interval"
+        for iRow in range(self.nRow):
+            for iCol in range(self.nCol):
+                print "iRow=",iRow," iCol=",iCol
+                for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
+                    print "   interval=",interval
+    def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
+        self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
+        if switchOnCosmicMask: self.switchOnCosmicTimeMask()
+
     def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
         """
         loads obsfile specific adjustments to add to all timestamps read
@@ -1198,12 +1219,69 @@ class ObsFile:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
 
+    def switchOffCosmicTimeMask(self):
+        """
+        Switch off hot pixel time masking - bad pixel times will no longer be
+        removed (although the mask remains 'loaded' in ObsFile instance).
+        """
+        self.cosmicMaskIsApplied = False
+
+    def switchOnCosmicTimeMask(self):
+        """
+        Switch on cosmic time masking. Subsequent calls to getPixelCountImage
+        etc. will have cosmic times removed.
+        """
+        if self.cosmicMask is None:
+            raise RuntimeError, 'No cosmic mask file loaded'
+        self.cosmicMaskIsApplied = True
+
+    @staticmethod
+    def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName):
+        h5f = tables.openFile(fileName, 'w')
+
+        headerGroup = h5f.createGroup("/", 'Header', 'Header')
+        headerTable = h5f.createTable(headerGroup,'Header',
+                                      cosmicHeaderDescription, 'Header')
+        header = headerTable.row
+        header['ticksPerSec'] = ticksPerSec
+        header.append()
+        headerTable.flush()
+        headerTable.close()
+        tbl = h5f.createTable("/", "cosmicMaskData", TimeMask.TimeMask, 
+                              "Cosmic Mask")
+        for interval in intervals:
+            row = tbl.row
+            row['tBegin'] = max(0,int(np.round(interval[0]*ticksPerSec)))
+            row['tEnd'] = int(np.round(interval[1]*ticksPerSec))
+            row['reason'] = TimeMask.timeMaskReason["cosmic"]
+            row.append()
+            tbl.flush()
+        tbl.close()
+        h5f.close()
+
+    @staticmethod
+    def readCosmicIntervalFromFile(fileName):
+        fid = tables.openFile(fileName, mode='r')
+        headerInfo = fid.getNode("/Header","Header")[0]
+        ticksPerSec = headerInfo['ticksPerSec']
+        table = fid.getNode("/cosmicMaskData")
+        enum = table.getEnum('reason')
+
+        retval = interval()
+        for i in range(table.nrows):
+            temp = (interval[table[i]['tBegin'],table[i]['tEnd']])/ticksPerSec
+            retval = retval | temp
+
+        fid.close()
+        return retval
+
+
     def writePhotonList(self,*nkwargs,**kwargs): #filename=None, firstSec=0, integrationTime=-1):                       
         """
         Write out the photon list for this obs file.
         See photonlist/photlist.py for input parameters and outputs.
         Shifted over to photonlist/, May 10 2013, JvE. All under construction at the moment.
-        """
+        """        
         import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.writePhotonList(self,*nkwargs,**kwargs)
         
@@ -1414,3 +1492,7 @@ def repackArray(array, slices):
         retval[iPt:iPtNew] = array[s0:s1]
         iPt = iPtNew
     return retval
+
+class cosmicHeaderDescription(tables.IsDescription):
+    ticksPerSec = tables.Float64Col() # number of ticks per second
+

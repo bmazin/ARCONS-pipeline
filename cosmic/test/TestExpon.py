@@ -409,33 +409,32 @@ class TestExpon(unittest.TestCase):
         fn = FileName(run, sundownDate, obsDate+"-"+seq)
         # The class Cosmic is in ARCONS-pipeline/cosmic/Cosmic.py
         cosmic = Cosmic(fn)
-        t0 = 138595580
-        t1 = 138595650
+        t0 = 138595526
+        t1 = 138595666
         dictionary = cosmic.fitExpon(t0,t1)
-        tAverage = dictionary['tAverage']
-        
-        print "pFit=",dictionary['pFit']
-        print "number of photons=",dictionary['timeHgValues'].sum()
         
         hist = dictionary['timeHgValues']
         bins = np.arange(len(hist))
         width = 0.7*(bins[1]-bins[0])
         center = (bins[:-1]+bins[1:])/2
         #plt.step(center, hist, where = 'post')       
-        plt.plot(bins,hist)
+        plt.plot(bins,hist, label='data')
 
         xFit = np.linspace(0,len(hist),10*len(hist))
-        pFit = dictionary['pFit']        
+        pFit = dictionary['pExponFit']        
+        yFit = Cosmic.funcExpon(xFit,*pFit)
+        plt.plot(xFit,yFit, label='Exponential Fit')
 
-        def funcExpon(x, a, b, c, d):
-            retval = a*np.exp(-b*(x-d)) + c
-            retval[x < d] = 0
-            return retval
+        xFit = np.linspace(0,len(hist),10*len(hist))
+        pFit = dictionary['pGaussFit']        
+        print "pFit=",pFit
+        yFit = Cosmic.funcGauss(xFit,*pFit)
+        plt.plot(xFit,yFit, label='Gaussian Fit')
+        plt.legend()
 
-        yFit = funcExpon(xFit,*pFit)
-        plt.plot(xFit,yFit)
-        print "xFit[0]=",xFit[0]
-        print "yFit[0]=",yFit[0]
+        xLimit = dictionary['xLimit']
+        plt.axvline(x=xLimit[0], color='magenta', linestyle='-.')
+        plt.axvline(x=xLimit[1], color='magenta', linestyle='-.')
         plt.savefig(inspect.stack()[0][3]+".png")
 
 if __name__ == '__main__':
