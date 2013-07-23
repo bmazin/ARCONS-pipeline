@@ -32,7 +32,14 @@ readHotPixels: reads in a hot-pixel .h5 file into somewhat sensible structures
 
 checkInterval: creates a 2D mask for a given time interval within a given 
                 exposure.
-
+                
+getEffIntTimeImage: Once hot pixels have been found, can use this to return the
+                effective integration times for each pixel in a given period after
+                masking out bad times. 
+                
+getHotPixels: Similar to getEffIntTimeImage, but just returns a boolean array 
+                indicating which pixels went bad at any point during the specified
+                period.
 -------------
 
 
@@ -81,6 +88,7 @@ nRowColName = 'nRow'        #Name of the no.-of-rows column in the header for th
 nColColName = 'nCol'        #Ditto for no.-of-columns column.
 obsFileColName = 'obsFileName' #Ditto for the column containing the name of the original obs. file.
 ticksPerSecColName = 'ticksPerSec'  #Ditto for column containing number of clock ticks per second for original obs. file.
+expTimeColName = 'expTime'  #Ditto for column containing total exposure time
 
 def constructDataTableName(x, y):
     '''Construct the name for the pytables table for a given pixel at location x,y'''
@@ -469,7 +477,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
         header[nColColName] = max([x[0] for x in timeMaskData]) + 1  #Assume max. x value represents number of columns
         header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
         header[ticksPerSecColName] = obsFile.ticksPerSec
-        header[expTime] = obsFile.getFromHeader('exptime')      #NEWLY IMPLEMENTED - should double check... JvE 7/08/2013.
+        header[expTimeColName] = obsFile.getFromHeader('exptime')    #Newly implemented - SHOULD DOUBLE CHECK! Should automatically account for any of Matt's time corrections JvE 7/08/2013.
         header.append()
         headerTable.flush()
         headerTable.close()
@@ -714,6 +722,54 @@ def getEffIntTimeImage(hotPixDict,integrationTime,firstSec=0):
             effectiveIntTimes[iRow,iCol] = integrationTime - utils.intervalSize(maskedIntervals)
     
     return effectiveIntTimes
+
+
+def getHotPixels(hotPixDict,integrationTime=-1,firstSec=0):
+    '''
+    Return a boolean array indicating which pixels went bad at any point
+    during the specified integration time.
+    
+    INPUTS:
+        hotPixDict -  a hot pixels dictionary as returned by hotPixels.readHotPixels()
+        firstSec - Start time (sec) to start calculations from, starting from
+                    the beginning of the exposure to which timeMask refers.
+        integrationTime - Length of integration time (sec) from firstSec to include
+                    in the calculation. NOTE - currently does not (always)
+                    have direct access to the total exposure time, so if you set 
+                    integrationTime=-1, it'll hopefully give results good to the
+                    end of the exposure, assuming that the measured hot pixel time mask
+                    doesn't somehow extend over the end of the exposure. But that's not
+                    totally 100% guaranteed at this point (at least as far as I can think right now).
+                    
+    RETURNS:
+        A 2D Boolean array matching the size/shape of the detector image. True indicates
+        a pixel that went bad between firstSec and firstSec+integrationTime, and False 
+        indicates that the pixel was okay during that time.
+    '''
+    
+    if integrationTime == -1:
+        intTimeInternal = np.Inf
+    else:
+        intTimeInternal = integrationTime
+    lastSec = firstSec + intTimeInternal
+    
+    #outsideIntegration = interval([-np.inf, firstSec], [lastSec, np.inf])
+    integrationInterval = interval([firstSec, lastSec])
+    badPix = np.zeros((hotPixDict['nRow'],hotPixDict['nCol']),dtype=bool)
+    badPix.fill(False)
+    
+    for iRow in np.arange(hotPixDict['nRow']):
+        for iCol in np.arange(hotPixDict['nCol']):
+            #Get the unioned (possibly multi-component) bad interval for this pixel.
+            #(As in ObsFile.getPixelBadTimes)
+            allBadIntervals = interval.union(hotPixDict['intervals'][iRow, iCol])
+            #Get intersection of integration time interval and the bad time intervals.
+            maskedIntervals = allBadIntervals & integrationInterval
+            #Figure out if there were any bad intervals during the integration time or not.
+            if len(maskedIntervals) != 0:
+                badPix[iRow,iCol]=True
+    
+    return badPix
 
 
 

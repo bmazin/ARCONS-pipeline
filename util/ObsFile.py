@@ -56,15 +56,10 @@ import warnings
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
-#from astropy import constants, units
-#from headers import ArconsHeaders
-#from headers import pipelineFlags
 from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
-import photonlist.photlist
 from scipy import pi
-
 
 class ObsFile:
     h = 4.135668e-15 #eV s
@@ -281,6 +276,7 @@ class ObsFile:
         Shifted functionality to photonlist/photlist.py, JvE May 10 2013.
         See that function for input parameters and outputs.
         """
+        import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.createEmptyPhotonListFile(self,*nkwargs,**kwargs)
 
 
@@ -320,18 +316,26 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False):
+                   scaleByEffInt=False, getRawCount=False, fignum=None):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         if scaleByEffInt is True, then counts are scaled by effective exposure
         time on a per-pixel basis.
+        nSdevMax - max end of stretch scale for display, in # sigmas above the mean.
+        getRawCount - if True the raw non-wavelength-calibrated image is
+        displayed with no wavelength cutoffs applied (in which case no wavecal
+        file need be loaded).
+        fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
+                 specify target window number).
         """
-        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted,
-                                         fluxWeighted, scaleByEffInt=scaleByEffInt)['image']
-        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg), plotTitle=plotTitle)
+        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
+                                         getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
+        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
+                        plotTitle=plotTitle, fignum=fignum)
 
+            
     def getFromHeader(self, name):
         """
         Returns a requested entry from the obs file header
@@ -1199,7 +1203,8 @@ class ObsFile:
         Write out the photon list for this obs file.
         See photonlist/photlist.py for input parameters and outputs.
         Shifted over to photonlist/, May 10 2013, JvE. All under construction at the moment.
-        """        
+        """
+        import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.writePhotonList(self,*nkwargs,**kwargs)
         
         

@@ -8,11 +8,13 @@ import os.path
 import warnings
 import tables
 from astropy import constants, units
+import matplotlib.pylab as mpl
 from headers import pipelineFlags, ArconsHeaders
 from util import utils
 from astrometry import CalculateRaDec as crd
 from util.FileName import FileName
-from hotpix.hotPixels import readHotPixels
+from hotpix import hotPixels as hp
+
 
 xyPackMult = 100  #Multiplier factor for turning row,col coordinate pairs into single integers for storage in HDF file (see xyPack).
 
@@ -104,17 +106,29 @@ class PhotList(object):
     def parseHotPixTimeMask(self):
         '''Parse in the hot pixel time mask HDF data.'''        
         print 'Parsing pixel time-mask data'
-        self.hotPixTimeMask = readHotPixels(self.file)
+        self.hotPixTimeMask = hp.readHotPixels(self.file)
         print 'Done parsing'
+
     
-    def getPhotonsForPixel(self):
+    def getBadWvlCalFlags(self):
         '''
-        Space holder for now
+        Check the wavelength cal and figure out which pixels have bad (or no)
+        wavelength solutions -- should catch unassigned pixels, most dead pixels, etc.
+        INPUTS:
+            None (except the photon list instance).
+        OUTPUTS:
+            Returns a 2D integer array representing the wavelength cal flags for
+            each pixel.
         '''
-        pass
+        
+        flagArr = np.zeros((self.nRow,self.nCol)) 
+        wvlTable = self.file.root.wavecal.calsoln
+        for row in wvlTable.iterrows():
+            flagArr[row['pixelrow'],row['pixelcol']] = row['wave_flag']
+        return flagArr
+        
     
-    
-    def getImageDet(self,firstSec=-np.Inf,integrationTime=-1,wvlMin=-np.Inf,
+    def getImageDet(self,firstSec=0,integrationTime=-1,wvlMin=-np.Inf,
                  wvlMax=np.Inf,newMethod=True):
         '''
         Return a 2D image consisting of photon counts in each pixel, in the detector pixel
@@ -137,7 +151,7 @@ class PhotList(object):
             #photX = self.photTable.readCoordinates(ind,field='xPix')
             #photY = self.photTable.readCoordinates(ind,field='yPix')
             print 'Building 2D histogram'
-            image, y,x = np.histogram2d(photons['xPix'],photons['yPix'],bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
+            image, y,x = np.histogram2d(photons['yPix'],photons['xPix'],bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
             #image, y,x = np.histogram2d(photX,photY,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
 
         else:
@@ -171,13 +185,38 @@ class PhotList(object):
         #That should be it....
         return image
 
+    def getPhotonsForPixel(self):
+        '''
+        Space holder for now
+        '''
+        pass
+
+    def displayImageDet(self, firstSec=0,integrationTime=-1,wvlMin=-np.Inf,
+                 wvlMax=np.Inf, normMin=None, normMax=None, showHotPix=False):
+        '''
+        Display an image built from the photon list in detector coordinate space
+        '''
+        im = self.getImageDet(firstSec=firstSec, integrationTime=integrationTime, wvlMin=wvlMin, wvlMax=wvlMax)
+        utils.plotArray(im, normMin=normMin, normMax=normMax, cbar=True, fignum=None)
+        if showHotPix is True:
+            if self.hotPixTimeMask is None:
+                self.parseHotPixTimeMask()
+            badPix = hp.getHotPixels(self.hotPixTimeMask, firstSec=firstSec, integrationTime=integrationTime)
+            x = np.arange(self.nCol)
+            y = np.arange(self.nRow)
+            xx, yy = np.meshgrid(x, y)
+            if np.sum(badPix) > 0: mpl.scatter(xx[badPix], yy[badPix], c='y')
+
+
     def getImageSky(self,firstSec=-np.Inf,integrationTime=-1,wvlMin=-np.Inf,wvlMax=np.Inf):
         '''
         Get a 2D image in the sky frame - i.e, in RA, dec coordinate space, derotated and stacked
         if necessary.
         '''
         pass #Place holder for now! (Should point to the RADecImage.py code).
-    
+
+
+
         
 def createEmptyPhotonListFile(obsFile,fileName=None):
      """

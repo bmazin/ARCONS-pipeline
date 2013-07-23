@@ -16,7 +16,7 @@ def getSimpleImage(fileName=FileName(run='PAL2012',date='20121211',tstamp='20121
     time weighting.
     '''
     
-    virtualImage = rdi.RADecImage()
+    virtualImage = rdi.RADecImage(vPlateScale=0.1)
     print 'Loading: ',os.path.basename(fileName)
     phList = pl.PhotList(fileName)
     baseSaveName,ext=os.path.splitext(os.path.basename(fileName))

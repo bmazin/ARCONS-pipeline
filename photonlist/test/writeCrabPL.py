@@ -21,6 +21,7 @@ import tables
 import ephem
 import matplotlib
 import matplotlib.cm as cm
+import matplotlib.pylab as mpl
 import os
 import hotpix.hotPixels as hp
 import astrometry.CentroidCalc as cc
@@ -81,13 +82,13 @@ def main():
     obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
     #TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES...
-    obsSequences = ['9999999',
-                    '''
-                    033323
-                    045902
-                    '''
-                    '9999999',
-                    '9999999']
+    #obsSequences = ['9999999',
+    #                '''
+    #                033323
+    #                045902
+    #                '''
+    #                '9999999',
+    #                '9999999']
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']
@@ -141,7 +142,7 @@ def main():
                 hp.findHotPixels(obsFileNames[iSeq][iOb],timeMaskFileName)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             else:
-                print 'Skipping hot pixel mask creation for '+obsFileNames[iSeq][iOb]
+                print 'Skipping hot pixel mask creation for non-existent file '+obsFileNames[iSeq][iOb]
 
 
     apertureRadius = 4
@@ -206,6 +207,16 @@ def main():
                 ob.loadHotPixCalFile(timeMaskFileName)
                 ob.loadCentroidListFile(centroidFileName)
                 ob.setWvlCutoffs(None,None)
+                
+                #Show the image in detector space
+                ob.displaySec()
+                #Mark any pixels that were bad at any point:
+                #badPix = hp.getHotPixels(ob.hotPixTimeMask)
+                #x = np.arange(ob.nCol)
+                #y = np.arange(ob.nRow)
+                #xx, yy = np.meshgrid(x, y)
+                #if np.sum(badPix) > 0: mpl.scatter(xx[badPix], yy[badPix], c='y')
+                
                 print 'Writing: '+FileName(obsFile=ob).photonList()
                 ob.writePhotonList()
 
