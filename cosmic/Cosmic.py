@@ -320,7 +320,7 @@ class Cosmic:
         frameSum = np.zeros((self.file.nRow,self.file.nCol))
         integrationTime = self.endTime - self.beginTime
         for iRow in range(self.file.nRow):
-            print "Cosmic.findCosmics:  iRow=",iRow
+            #print "Cosmic.findCosmics:  iRow=",iRow
             for iCol in range(self.file.nCol):
                 gtpl = self.file.getTimedPacketList(iRow,iCol,self.beginTime, 
                                                     integrationTime)

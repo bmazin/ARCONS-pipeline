@@ -70,15 +70,18 @@ plt.clf()
 #cosmic events for every ten seconds of data
 
 
-nlist = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
+nlist = [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
          150, 150, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270,
          280, 290, 300]
 mean = []
-cosmicevents = []
+meanErr = []
+nIntervals = []
 nSigma = 7
 threshold = 25
 stride = 10
 populationMax = 1000
+
+#nlist = nlist[0:4]
 
 for n in nlist:
    
@@ -87,42 +90,36 @@ for n in nlist:
     cosmic = Cosmic(fn, beginTime, endTime)
     dictionary0 = cosmic.findCosmics(nSigma, threshold, stride, populationMax)
     interval = dictionary0['interval']
-    ObsFile.ObsFile.writeCosmicIntervalToFile(interval, 
-                                              cosmic.file.ticksPerSec,
-                                              'junk.h5')
+    nIntervals.append(len(interval))
 
-    cosmic.file.loadCosmicMask('junk.h5')
-    dictionary1 = cosmic.findCosmics(nSigma, threshold, stride, populationMax)
 
-    hist1 = dictionary1['populationHg'][0]
-    bins1 = np.arange(len(hist1))
     hist0 = dictionary0['populationHg'][0]
     bins0 = np.arange(len(hist0))
 
-    mu1 = (bins1*hist1).sum()/float(hist1.sum())
+    muNum = (bins0*hist0).sum()
+    muDen = float(hist0.sum())
+    mu1 = muNum/muDen
+    mu1Err = np.sqrt(mu1/muDen)
+    print "mu1=",mu1," mu1Err=",mu1Err," muNum=",muNum," muDen=",muDen
     mean.append(mu1)
-    events = (hist0-hist1).sum()
-    cosmicevents.append(events)
-
-    plt.clf()
-    plt.plot(bins0, hist0, color='r', label="unmasked")
-    plt.plot(bins1, hist1, label="masked")
-    plt.xscale('log')
-    plt.yscale('symlog',linthreshy=0.5)
-    plt.legend()
-    plt.savefig("MaskedAndUnmaskedHistogram-n=%03d"%n)
-
-print "cosmicevents=", cosmicevents
+    meanErr.append(mu1Err)
 
 plt.clf()
 plt.subplot(211)
-plt.plot(nlist, mean, 'o')
-plt.ylabel("mean")
-plt.title("Mean and Cosmic Events"+"  "+"threshold=%.3f"%threshold+"  "+ 
+plt.errorbar(nlist, mean, yerr=meanErr, fmt='x')
+plt.ylabel("mean photons/tick")
+plt.title("Mean and Interval Time"+"  "+"threshold=%.3f"%threshold+"  "+ 
           "nSigma=%.3f"%nSigma)
 
+nIntervalsErr = np.sqrt(nIntervals)
 plt.subplot(212)
-plt.plot(nlist, cosmicevents, 'o')
-plt.xlabel("seconds")
-plt.ylabel("cosmics")
+plt.errorbar(nlist, nIntervals, yerr=nIntervalsErr, fmt='x')
+plt.xlabel("time in exposure (sec)")
+plt.ylabel("# cosmics masked")
 plt.savefig("MeanAndCosmicEvents.png")
+
+plt.clf()
+plt.scatter(nIntervals, mean)
+plt.xlabel("# cosmics masked")
+plt.ylabel("mean photons/tick")
+plt.savefig("scatter.png")
