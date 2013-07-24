@@ -31,6 +31,7 @@ getDeadPixels(self, showMe=False, weighted=True)
 getNonAllocPixels(self, showMe=False)
 getRoachNum(self,iRow,iCol)
 getFrame(self, firstSec=0, integrationTime=-1)
+loadCentroidListFile(self, centroidListFileName)
 loadFlatCalFile(self, flatCalFileName)
 loadFluxCalFile(self, fluxCalFileName)
 loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True)
@@ -55,13 +56,9 @@ import warnings
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
-#from astropy import constants, units
-#from headers import ArconsHeaders
-#from headers import pipelineFlags
 from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
-import photonlist.photlist
 from scipy import pi
 from tables.nodes import filenode
 from headers import TimeMask
@@ -85,6 +82,7 @@ class ObsFile:
         self.hotPixIsApplied = False
         self.cosmicMaskIsApplied = False
         self.cosmicMask = None # interval of times to mask cosmic ray events
+        self.centroidListFile = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
         
@@ -111,6 +109,10 @@ class ObsFile:
             pass
         try:
             self.hotPixFile.close()
+        except:
+            pass
+        try:
+            self.centroidListFile.close()
         except:
             pass
         self.file.close()
@@ -278,6 +280,7 @@ class ObsFile:
         Shifted functionality to photonlist/photlist.py, JvE May 10 2013.
         See that function for input parameters and outputs.
         """
+        import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.createEmptyPhotonListFile(self,*nkwargs,**kwargs)
 
 
@@ -317,18 +320,26 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False):
+                   scaleByEffInt=False, getRawCount=False, fignum=None):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         if scaleByEffInt is True, then counts are scaled by effective exposure
         time on a per-pixel basis.
+        nSdevMax - max end of stretch scale for display, in # sigmas above the mean.
+        getRawCount - if True the raw non-wavelength-calibrated image is
+        displayed with no wavelength cutoffs applied (in which case no wavecal
+        file need be loaded).
+        fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
+                 specify target window number).
         """
-        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted,
-                                         fluxWeighted, scaleByEffInt=scaleByEffInt)['image']
-        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg), plotTitle=plotTitle)
+        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
+                                         getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
+        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
+                        plotTitle=plotTitle, fignum=fignum)
 
+            
     def getFromHeader(self, name):
         """
         Returns a requested entry from the obs file header
@@ -619,7 +630,7 @@ class ObsFile:
         if (type(firstSec) is not int) or (type(integrationTime) is not int):
             #Also exclude times outside firstSec to lastSec. Allows for sub-second
             #(floating point) values in firstSec and integrationTime
-            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
+            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits (??? REDUNDANT? JvE 6/19/2013)
 
         #Inter now contains a single 'interval' instance, which contains a list of
         #times to exclude, in seconds, including all times outside the requested
@@ -644,15 +655,10 @@ class ObsFile:
             baselines.append(bases)
             peakHeights.append(peaks)
             
-        # crashes on /ScienceData/PAL2012/20121211/obs_20121212-115722.h5
-        # with ValueError: concatenation of zero-length sequences is impossible
-
-        try:
+        if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
             timestamps = np.concatenate(timestamps)
             baselines = np.concatenate(baselines)
             peakHeights = np.concatenate(peakHeights)
-        except ValueError:
-            pass
 
 #        if self.timeAdjustFile != None:
 #            timestamps += self.firmwareDelay
@@ -968,6 +974,19 @@ class ObsFile:
                 frame[iRow][iCol] += nphoton
         return frame
 
+    def loadCentroidListFile(self, centroidListFileName):
+        """
+        Load an astrometry (centroid list) file into the 
+        current obs file instance.
+        """
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        centroidListPath = os.path.join(scratchDir, 'centroidListFiles')
+        fullCentroidListFileName = os.path.join(centroidListPath, centroidListFileName)
+        if (not os.path.exists(centroidListFileName)):
+            print 'Astrometry centroid list file does not exist: ', centroidListFileName
+            return
+        self.centroidListFile = tables.openFile(centroidListFileName)
+        
     def loadFlatCalFile(self, flatCalFileName):
         """
         loads the flat cal factors from the given file
@@ -1263,6 +1282,7 @@ class ObsFile:
         See photonlist/photlist.py for input parameters and outputs.
         Shifted over to photonlist/, May 10 2013, JvE. All under construction at the moment.
         """        
+        import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.writePhotonList(self,*nkwargs,**kwargs)
         
         

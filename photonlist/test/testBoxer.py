@@ -32,3 +32,7 @@ def testBoxer(i=0.0, j=0.0,
         
 
     print 'All good.'
+    
+    
+if __name__=='__main__':
+    testBoxer()
