@@ -57,6 +57,15 @@ class TestFileName(unittest.TestCase):
         fn2 = FileName.FileName(obsFile=obsFile)
         self.assertTrue(fn1.obs()==fn2.obs())
         self.assertTrue(fn2.getComponents()==(run,date,tstamp))
-
+        
+    def testPassObsFileNameString(self):
+        run = 'LICK2012'
+        date = '20120919'
+        tstamp = '20120920-123350'
+        fn = FileName.FileName(run, date, tstamp)
+        fullFileNameStr = fn.obs()
+        self.assertTrue(FileName.FileName(obsFile=fullFileNameStr).obs() == fullFileNameStr)
+        self.assertTrue(FileName.FileName(obsFile=fullFileNameStr).timeMask() == fn.timeMask())
+        
 if __name__ == '__main__':
     unittest.main()

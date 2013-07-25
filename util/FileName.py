@@ -47,15 +47,24 @@ class FileName:
         else:
             # Split full file path of ObsFile instance into 
             # individual directory names
-
+            
+            if type(obsFile) is str:
+                fullObsFileName = obsFile
+            else:
+                try:
+                    fullObsFileName = obsFile.fullFileName
+                except:
+                    print 'Note - input parameter obsFile must be string or ObsFile instance'
+                    raise
+                
             # Warning:  Chris S. changed obsFile.fullFile name to obsFile
             # here and then again a few lines down.  July 11, 2013
-            dirs = os.path.dirname(os.path.normpath(obsFile)).split(os.sep)
+            dirs = os.path.dirname(os.path.normpath(fullObsFileName)).split(os.sep)
             #Pull out the relevant bits
 
             self.run = dirs[-2]
             self.date = dirs[-1]
-            self.tstamp = (os.path.basename(obsFile)
+            self.tstamp = (os.path.basename(fullObsFileName)
                            .partition('obs_')[2]
                            .rpartition('.h5')[0])
 
