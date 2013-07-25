@@ -43,10 +43,10 @@ def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     obsFile.loadFluxCalFile(FileName(run=run,date=date,tstamp=fluxTstamp).fluxSoln())
     obsFile.loadTimeAdjustmentFile(FileName(run=run,date=date,tstamp=tstamp).timeAdjustments())
     obsFile.loadHotPixCalFile(FileName(run=run,date=date,tstamp=tstamp).timeMask())
+    obsFile.loadCentroidListFile(FileName(run=run,date=date,tstamp=tstamp).centroidList())
     
     #And write out the results....
-    obsFile.writePhotonList(outputFileName,firstSec,integrationTime,
-                            astrometryFileName=FileName(run=run,date=date,tstamp=tstamp).centroidList())
+    obsFile.writePhotonList(outputFileName,firstSec,integrationTime)
     
     #Read the results back in....
     #photFile = photList.PhotFile(outputFilename)

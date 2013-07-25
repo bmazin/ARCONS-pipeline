@@ -5,10 +5,6 @@ Author: Paul Szypryt		Date: May 8, 2013
 
 Based on RaDecMap.py.  Takes a list of centroids and hour angles and outputs the ra and dec for
 an individual photon.
-
-Updated to allow non-integer values for input pixel coordinates; no longer uses lookup table;
-also vectorised to run faster. JvE 7/20/2013.
-
 '''
 
 import numpy as np
@@ -95,9 +91,8 @@ class CalculateRaDec:
       
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
         self.timestamp = np.array(timestamp)
-        self.xPhotonPixel = np.array(xPhotonPixel)  #.astype('int')        #Don't require integer values for inputs - JvE 7/19/2013
-        self.yPhotonPixel = np.array(yPhotonPixel)  #.astype('int')
-        self.xyPhotonPixel = np.array([self.xPhotonPixel,self.yPhotonPixel])  #2 x nPhotons array of x,y pairs
+        self.xPhotonPixel = np.array(xPhotonPixel).astype('int')
+        self.yPhotonPixel = np.array(yPhotonPixel).astype('int')
 
         self.inputLength = len(self.timestamp)
                 
@@ -110,25 +105,11 @@ class CalculateRaDec:
 
         self.xPhotonRotated=np.zeros(len(self.timestamp))
         self.yPhotonRotated=np.zeros(len(self.timestamp))
-
-        # ORIGINAL VERSION       
+        
         # Find better way to do this, taking majority of the time currently
-        #for i in range(len(self.timestamp)):
-        #    self.xPhotonRotatedOld[i] = self.rotatedValues[self.binNumber[i]][0][self.indexArray[i]]
-        #    self.yPhotonRotatedOld[i] = self.rotatedValues[self.binNumber[i]][1][self.indexArray[i]]           
-
-        # NEW VERSION (calculate on the fly, no look-up table, can handle non-integers)
-        for iBin in np.arange(np.min(self.binNumber),np.max(self.binNumber)+1):
-            inThisBin = np.where(self.binNumber==iBin)[0]       #[0] just to move array result outside tuple
-            if len(inThisBin) == 0: continue
-            rotatedValues = np.dot(self.rotationMatrix[iBin,:,:],self.xyPhotonPixel[:,inThisBin])
-            self.xPhotonRotated[inThisBin] = rotatedValues[0,:]
-            self.yPhotonRotated[inThisBin] = rotatedValues[1,:]
-            self.rotatedValues = np.dot(self.rotationMatrix,self.values)
-            
-        #assert all(self.xPhotonRotated==self.xPhotonRotatedOld)
-        #assert all(self.yPhotonRotated==self.yPhotonRotatedOld)            
-
+        for i in range(len(self.timestamp)):
+            self.xPhotonRotated[i] = self.rotatedValues[self.binNumber[i]][0][self.indexArray[i]]
+            self.yPhotonRotated[i] = self.rotatedValues[self.binNumber[i]][1][self.indexArray[i]]           
 
         # Use the centroid as the zero point for ra and dec offsets
         self.rightAscensionOffset = -CalculateRaDec.platescale*(self.xPhotonRotated - self.centroidRotated[0][self.binNumber])
