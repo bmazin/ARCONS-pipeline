@@ -28,6 +28,7 @@ class FileName:
             date - string, date (usually of sunset), name of folder in which obs files for this date are stored
             tstamp - string, timestamp of the obs. file.
             obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out the required parameters automatically.
+                      Alternatively, obsFile can also be a string containing a full obs file path name instead.
             mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_DATA_DIR' if not specified.)
             intermDir - data reduction product directory (uses path pointed to by system variable 'INTERM_DIR' if not specified.
         '''
@@ -53,9 +54,8 @@ class FileName:
             else:
                 try:
                     fullObsFileName = obsFile.fullFileName
-                except:
-                    print 'Note - input parameter obsFile must be string or ObsFile instance'
-                    raise
+                except AttributeError:
+                    raise ValueError, 'FileName parameter obsFile must be None, path string, or obsFile instance.'
                 
             # Warning:  Chris S. changed obsFile.fullFile name to obsFile
             # here and then again a few lines down.  July 11, 2013
