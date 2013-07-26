@@ -159,7 +159,11 @@ class TestCosmic(unittest.TestCase):
         cosmic.fitDecayTime()
 
     def testFindCosmicRays(self):
-        
+        """
+        test what the method in Cosmic findcosmics returns.
+        Gets the keys for each dictionary as well as printing the cosmic time
+        list and the intervals
+        """
         run = 'PAL2012'
         sundownDate = '20121211'
         obsDate = '20121212'
@@ -173,6 +177,10 @@ class TestCosmic(unittest.TestCase):
         print "interval=", dictionary['interval']
         
     def testRound(self):
+        """
+        tests rounding the time stamps so that the histograms don't contain
+        unexpected zero values
+        """
         run = 'PAL2012'
         sundownDate = '20121211'
         obsDate = '20121212'
@@ -220,6 +228,10 @@ class TestCosmic(unittest.TestCase):
 
 
     def testWriteAndReadIntervals(self):
+        """
+        tests the functions to write and read intervals which is used to mask
+        out cosmics
+        """
         i = interval()
         i = i | interval[5, 10]
         i = i | interval[100, 110.123]
@@ -239,6 +251,9 @@ class TestCosmic(unittest.TestCase):
         self.assertEquals(len(i),len(i2))
 
     def testCosmicTimeMasking(self):
+        """
+        tests the cosmic time masking function
+        """
         ymax = sys.float_info.max/100.0
         run = 'PAL2012'
         sundownDate = '20121211'
