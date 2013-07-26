@@ -296,12 +296,15 @@ class Cosmic:
         return a dictionary of 'populationHg', 'cosmicTimeLists',
         'binContents', 'timeHgValues', 'interval'  and 'frameSum'
       
-        populationHg is a histogram of the number of entries per time bin
+        populationHg is a histogram of the number of photons in each time bin.
+        This is a poisson distribution with a long tail due to cosmic events
         
         cosmicTimeLists is a numpy array  of all the sequences that are
         suspects for cosmic rays
         
-        binContents is a list of the total number of photons in each bin
+        binContents corresponds to cosmicTimeLists.  For each time in
+        cosmicTimeLists, binContents is the number of photons detected
+        at that time.
         
         timeHgValues is a histogram of the number of photons in each time
         interval

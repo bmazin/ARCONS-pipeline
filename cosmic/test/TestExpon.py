@@ -442,17 +442,16 @@ class TestExpon(unittest.TestCase):
         run = 'PAL2012'
         sundownDate = '20121211'
         obsDate = '20121212'
-        seq = '133303'
+        seq = '131254'
         fn = FileName(run, sundownDate, obsDate+"-"+seq)
-        cosmic = Cosmic(fn)
+        beginTime=79.248482
+        endTime = beginTime+200*1e-6
+        cosmic = Cosmic(fn, beginTime=beginTime,endTime=endTime)
         dictionary = cosmic.findCosmics(populationMax=1000)
     
-        hist = np.array(dictionary['populationHg'])
+        hist = np.array(dictionary['timeHgValues'])
         bins = np.arange(len(hist))
         plt.plot(bins, hist)
-        
-
-
         plt.savefig(inspect.stack()[0][3]+".png")
         
 
