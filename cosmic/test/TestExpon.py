@@ -437,5 +437,24 @@ class TestExpon(unittest.TestCase):
         plt.axvline(x=xLimit[1], color='magenta', linestyle='-.')
         plt.savefig(inspect.stack()[0][3]+".png")
 
+
+    def testExponAndGaussFit(self):
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '133303'
+        fn = FileName(run, sundownDate, obsDate+"-"+seq)
+        cosmic = Cosmic(fn)
+        dictionary = cosmic.findCosmics(populationMax=1000)
+    
+        hist = np.array(dictionary['populationHg'])
+        bins = np.arange(len(hist))
+        plt.plot(bins, hist)
+        
+
+
+        plt.savefig(inspect.stack()[0][3]+".png")
+        
+
 if __name__ == '__main__':
     unittest.main()
