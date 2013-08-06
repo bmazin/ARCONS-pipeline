@@ -9,6 +9,7 @@ from util import utils
 from util import hgPlot
 from cosmic.Cosmic import Cosmic
 import tables
+from scipy.optimize import curve_fit
 from hotpix import hotPixels
 import pickle
 from interval import interval, inf, imath
@@ -88,22 +89,25 @@ class CosmicRun:
                         ts64 = np.round(ts).astype(np.uint64)
                         tsBinner.tsBinner(ts64, timeHgValues)
                 plt.clf()
-                plt.plot(timeHgValues)
+                plt.plot(timeHgValues, label="data")
                 x0 = (i0-beginTime)*obsFile.ticksPerSec
                 x1 = (i1-beginTime)*obsFile.ticksPerSec
-                plt.fill_between((x0,x1),(0,0), (ymax,ymax), alpha=0.2, color='red')
+                plt.fill_between((x0,x1),(0,0), (ymax,ymax), alpha=0.2, color='red')   
                 plt.yscale("symlog",linthreshy=0.9)
                 plt.xlim(0,1000)
                 plt.ylim(-0.1,300)
                 tick0 = int(np.round(i0*obsFile.ticksPerSec))
                 plotfn = "cp-%05d-%s-%s-%s-%09d"%(timeHgValues.sum(),run,obsDate,seq,tick0)
                 plt.title(plotfn)
+                plt.legend()
                 plt.savefig(plotfn+".png")
                 plt.xlabel("nSigma=%d stride=%d threshold=%d"%(int(self.s['nSigma']),int(self.s['stride']),int(self.s['threshold'])))
                 print "plotfn=",plotfn
                 
 
         os.system("convert -delay 0 `ls -r cp*png` cp.gif")
+
+
 
 
 if __name__ == '__main__':

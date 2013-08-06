@@ -19,15 +19,20 @@ Makes a plot of populationHg values, masking out cosmic ray events. The poisson
 distribution is shown with red crosses. The plot is saved as 
 CosmicTimeMasking.png
 
-Also makes a plot for the entire file showing the mean for every ten seconds of
+Makes a plot for the entire file showing the mean for every ten seconds of
 data and the cosmic events. This plot is saved as MeanAndCosmicEvents.png
+
+Makes a scatter plot of the number of cosmics masked out and the mean which is
+saved as scatter.png
 """
 
+#loads the file
 run = 'PAL2012'
 sundownDate = '20121211'
 obsDate = '20121212'
 seq = '121229'
 fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+#this particular plot is for only ten seconds of data
 cosmic = Cosmic(fn, beginTime=123, endTime=133)
 dictionary0 = cosmic.findCosmics(nSigma=6, threshold=15, populationMax=1000)
 
@@ -71,7 +76,7 @@ plt.clf()
 
 
 nlist = [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
-         150, 150, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270,
+         150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270,
          280, 290, 300]
 mean = []
 meanErr = []

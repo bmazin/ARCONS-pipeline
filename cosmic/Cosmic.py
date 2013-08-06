@@ -296,12 +296,17 @@ class Cosmic:
         return a dictionary of 'populationHg', 'cosmicTimeLists',
         'binContents', 'timeHgValues', 'interval'  and 'frameSum'
       
-        populationHg is a histogram of the number of entries per time bin
+         populationHg is a histogram of the number of photons in each time bin.
+        This is a poisson distribution with a long tail due to cosmic events
+
         
         cosmicTimeLists is a numpy array  of all the sequences that are
         suspects for cosmic rays
-        
-        binContents is a list of the total number of photons in each bin
+
+
+        binContents corresponds to cosmicTimeLists.  For each time in
+        cosmicTimeLists, binContents is the number of photons detected
+        at that time.
         
         timeHgValues is a histogram of the number of photons in each time
         interval
@@ -349,6 +354,8 @@ class Cosmic:
             mean = tempTs.mean()
             sigma = tempTs.std()
             left  = mean-nSigma*sigma
+            #the cosmic events tend to have more peaks on the right side,
+            #so more data is masked out in that direction
             right = mean+2*nSigma*sigma
             i = i | interval[left,right]
         retval = {}
@@ -489,15 +496,12 @@ class Cosmic:
                     # round per Matt S. suggestion 2013-07-09
                     #ts64 = (timeStamps).astype(np.uint64)
                     ts64round = np.round(timeStamps).astype(np.uint64)
-                    
-                    temp = 1e6*(timeStamps-firstSec)
-                    if iRow==45 and iCol==40:
-                        print "iRow=",iRow," iCol=",iCol," len(timeStamps)=",len(timeStamps), "  nBins=",nBins
-                        for i in range(len(timeStamps)):
-                            print "i=%6d  timeStamps=%13.9f"%(i,timeStamps[i])
-                    ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
-                    # add these timestamps to the histogram timeHgValues
                     tsBinner.tsBinner(ts64round, timeHgValues)
+        
+                    temp = 1e6*(timeStamps-firstSec)
+                    for i in range(len(timeStamps)):
+                        ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
+                    # add these timestamps to the histogram timeHgValues
         remain0 = int(t0%1e6)
         remain1 = int(t1%1e6)
         timeHgValues = timeHgValues[remain0:remain1]
