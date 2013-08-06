@@ -29,15 +29,15 @@ class PhotList(object):
         '''
         Initialise by loading a photon list file.
         '''
-        self.file = None
-        self.fileName = None
-        self.fullFileName = None
-        self.nRow = None
-        self.nCol = None
-        self.startTime = None   #To be implemented!
-        self.photTable = None    #To hold the photon list table node (just a shortcut)
-        self.loadFile(fileName)
+        self.file = None           #To contain the photon list file object
+        self.fileName = None       #Name of the photon list file
+        self.fullFileName = None   #Full path name of the same.
+        self.nRow = None           #Number of detector rows 
+        self.nCol = None           #Number of detector columns
+        self.startTime = None      #To be implemented!
+        self.photTable = None      #To reference the photon list table node within self.file (just a shortcut)
         self.hotPixTimeMask = None      #To store the hot pixel info dictionary after a hot (or bad) pixel file is loaded.
+        self.loadFile(fileName)
     
     def __del__(self):
         '''

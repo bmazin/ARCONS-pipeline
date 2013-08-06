@@ -209,7 +209,7 @@ def main():
                 ob.setWvlCutoffs(None,None)
                 
                 #Show the image in detector space
-                ob.displaySec()
+                #ob.displaySec()
                 #Mark any pixels that were bad at any point:
                 #badPix = hp.getHotPixels(ob.hotPixTimeMask)
                 #x = np.arange(ob.nCol)
