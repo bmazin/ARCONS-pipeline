@@ -21,7 +21,7 @@ def getSimpleImage(fileName=FileName(run='PAL2012',date='20121211',tstamp='20121
     phList = pl.PhotList(fileName)
     baseSaveName,ext=os.path.splitext(os.path.basename(fileName))
     imSaveName=baseSaveName+'.tif'
-    virtualImage.loadImage(phList,stack=True,savePreStackImage=imSaveName,
+    virtualImage.loadImage(phList,doStack=True,savePreStackImage=imSaveName,
                            firstSec=firstSec,integrationTime=integrationTime,
                            wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted)
     virtualImage.display(pclip=True)

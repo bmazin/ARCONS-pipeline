@@ -6,6 +6,8 @@ mapped to sky coordinates.
 
 Under construction....
 '''
+
+import time
 import numpy as np
 import tables
 import matplotlib.pyplot as mpl
@@ -122,13 +124,16 @@ class RADecImage(object):
                                 (i.e. the one supplied) will be stored in the class attribute.
             wvlMin, wvlMax - set min and max wavelength cutoffs for photons to be loaded in.
             savePreStackImage - temporary fudge, set to a file-name to save the image out to a file prior to stacking.
-            doWeighted - if True, includes flatfield weighting factors from photons, and rejects photons from pixels where the
-                                flatfield is bad at any wavelength within the requested wavelength range (all if wvlMin/wvl Max
-                                not specified). 
+            doWeighted - if True, includes flat and flux weighting (i.e. flatfielding and spectral response)factors from photons,
+                                and rejects photons from pixels where the flatfield is bad at any wavelength within the requested
+                                wavelength range (all if wvlMin/wvl Max not specified).
+                                ****NOTE - FLUX WEIGHTING NOT FULLY TESTED -- but looks probably okay.****
         '''
         
         #posErr = 0.8    #Approx. position error in arcsec (just a fixed estimate for now, will improve later)
         #posErr *= 2*np.pi/(60.*60.*360.)  #Convert to radians
+        
+        tic = time.clock()
         
         photTable = photList.file.root.photons.photons   #Shortcut to table
         if expWeightTimeStep is not None:
@@ -218,7 +223,8 @@ class RADecImage(object):
         photRAs = photons['ra']       #Read all photon coords into an RA and a dec array.
         photDecs = photons['dec']
         photHAs = photons['ha']       #Along with hour angles...
-        photWeights = photons['flatWeight']     #*photons['fluxWeight']
+        photWeights = photons['flatWeight'] * photons['fluxWeight']   #********EXPERIMENTING WITH ADDING FLUX WEIGHT - NOT FULLY TESTED, BUT SEEMS OKAY....********
+        print 'INCLUDING FLUX WEIGHTS!'
         photWavelengths = photons['wavelength']
         if wvlMin is not None or wvlMax is not None:
             assert all(photWavelengths>=wvlMin) and all(photWavelengths<=wvlMax)
@@ -296,6 +302,8 @@ class RADecImage(object):
             
             #Make array to take the total exposure times for each virtual pixel at each time step
             vExpTimesStack = np.zeros((nVPixDec,nVPixRA,nFrames))
+            #vExpTimesStack2 = np.zeros((nVPixDec,nVPixRA,nFrames))  #FOR TEST PURPOSES
+            
             #And one for the total exposure time at each pixel summed over all time steps
             vExpTimes = np.zeros((nVPixDec,nVPixRA))
             
@@ -354,28 +362,55 @@ class RADecImage(object):
                 detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
                                                      firstSec=tStartFrames[iFrame]) * deadPixMask * flatCalMask).flatten()
                 
-                #Loop over the virtual pixels and accumulate the exposure time that falls in each
-                for iVDec in np.arange(nVPixDec):
-                    for iVRA in np.arange(nVPixRA):
-                        maybeOverlapping = np.where((dPixRANormMax > vPixRANormMin[iVRA]) & 
-                                                 (dPixRANormMin < vPixRANormMax[iVRA]) &
-                                                 (dPixDecNormMax > vPixDecNormMin[iVDec]) &
-                                                 (dPixDecNormMin < vPixDecNormMax[iVDec]))[0]       #[0] since 'where' returns an array in a 1-element tuple
-            
-                        #Loop over the detector pixels which may be overlapping the current virtual pixel
-                        for overlapLoc in maybeOverlapping:
-                            #Calculate overlap fraction for given virtual pixel with given detector pixel
-                            overlapFrac = boxer.boxer(iVDec,iVRA,dPixCornersDec[:,overlapLoc],dPixCornersRA[:,overlapLoc])      #Feed one set of pixel corners at a time to boxer.
-                            #And add the contributing exposure time to vexptimes:
-                            expTimeToAdd = overlapFrac*detExpTimes[overlapLoc]
-                            vExpTimesStack[iVDec,iVRA,iFrame] += expTimeToAdd        #vExpTimes is 2D and it should all magically work out.
+                
+                #Temporary switch between two looping methods
+                #if 1==0:
+                #    #Loop over the virtual pixels and accumulate the exposure time that falls in each
+                #    #print 'Method 1...'
+                #    #tic = time.clock()
+                #    for iVDec in np.arange(nVPixDec):
+                #        for iVRA in np.arange(nVPixRA):
+                #            maybeOverlapping = np.where((dPixRANormMax > vPixRANormMin[iVRA]) & 
+                #                                    (dPixRANormMin < vPixRANormMax[iVRA]) &
+                #                                    (dPixDecNormMax > vPixDecNormMin[iVDec]) &
+                #                                    (dPixDecNormMin < vPixDecNormMax[iVDec]))[0]       #[0] since 'where' returns an array in a 1-element tuple
+                #
+                #           #Loop over the detector pixels which may be overlapping the current virtual pixel
+                #           for overlapLoc in maybeOverlapping:
+                #               #Calculate overlap fraction for given virtual pixel with given detector pixel
+                #               overlapFrac = boxer.boxer(iVDec,iVRA,dPixCornersDec[:,overlapLoc],dPixCornersRA[:,overlapLoc])      #Feed one set of pixel corners at a time to boxer.
+                #               #And add the contributing exposure time to vexptimes:
+                #               expTimeToAdd = overlapFrac*detExpTimes[overlapLoc]
+                #               vExpTimesStack[iVDec,iVRA,iFrame] += expTimeToAdd        #vExpTimes is 2D and it should all magically work out.
+                #   #print 'Time taken (s): ',time.clock()-tic
+                #else:
+                
+                #Alternatively.... loop over the detector pixels.... should be faster
+                #print 'Method 2...'
+                #tic = time.clock()
+                for iDPix in np.arange(nDPixRow * nDPixCol):
+                        #Find the pixels which are likely to be overlapping (note - could do this as a sorted search to make things faster)
+                        maybeOverlappingRA = np.where((dPixRANormMax[iDPix] > vPixRANormMin) & (dPixRANormMin[iDPix] < vPixRANormMax))[0]
+                        maybeOverlappingDec = np.where((dPixDecNormMax[iDPix] > vPixDecNormMin) & (dPixDecNormMin[iDPix] < vPixDecNormMax))[0]
+                        
+                        for overlapLocRA in maybeOverlappingRA:
+                            for overlapLocDec in maybeOverlappingDec:
+                                overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
+                                expTimeToAdd = overlapFrac*detExpTimes[iDPix]
+                                vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
+
+               #print 'Time taken (s): ',time.clock()-tic                
+
+               #vExpTimesStack = vExpTimesStack2                    
+                    
+               #assert np.all(vExpTimesStack2 == vExpTimesStack)
+               #print 'Yup, all seems okay...'
+                
         
             #------------ End loop through time steps ----------
         
         #Sum up the exposure times from each frame:
         vExpTimes = np.sum(vExpTimesStack,axis=2)
-        
-        #------ Done with exposure time weighting, in principle ------
         
         
         #Temporary for testing-------------
@@ -399,8 +434,7 @@ class RADecImage(object):
             self.totExpTime += lastSec-firstSec
             self.expTimeWeights = self.totExpTime/self.effIntTimes
 
-        
-        print 'Done.'
+        print 'Image load done. Time taken (s): ', time.clock()-tic
 
 
 
