@@ -3,6 +3,7 @@ Author: Julian van Eyken                Date: May 7 2013
 For handling calibrated output photon lists.
 '''
 
+import time
 import numpy as np
 import os.path
 import warnings
@@ -146,13 +147,32 @@ class PhotList(object):
             #Should be more efficient....
             print 'Searching photons'
             #ind = self.photTable.getWhereList('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+            tic = time.clock()
             photons = self.photTable.readWhere('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+            xPix = photons['xPix']
+            yPix = photons['yPix']
+            print 'Time taken (s): ',time.clock()-tic
+            print 'Doing by second method'
+            #tic = time.clock()
+            #photons2 = [x for x in self.photTable.iterrows() if (x['arrivalTime']>=firstSec) and (x['arrivalTime']<lastSec)
+            #            and x['wavelength'>=wvlMin] and x['wavelength']<wvlMax]
+            #print 'Time taken (s): ',time.clock()-tic
+            #print 'Doing by third method'
+            #tic = time.clock()
+            #photons2 = [(phot['xPix'], phot['yPix']) for phot in self.photTable.where('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')]
+            #photons2 = self.photTable.getWhereList('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+            #xPix2 = self.photTable[photons2]['xPix']
+            #yPix2 = self.photTable[photons2]['yPix']
+            #print 'Time taken (s): ',time.clock()-tic
+             
             #print 'Getting coordinates'
             #photX = self.photTable.readCoordinates(ind,field='xPix')
             #photY = self.photTable.readCoordinates(ind,field='yPix')
             print 'Building 2D histogram'
-            image, y,x = np.histogram2d(photons['yPix'],photons['xPix'],bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
+            image, y,x = np.histogram2d(yPix,xPix,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
             #image, y,x = np.histogram2d(photX,photY,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
+            #image2, y,x = np.histogram2d(yPix2,xPix2,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
+            #assert np.all(image1 == image2)
 
         else:
             #Initialise an empty image

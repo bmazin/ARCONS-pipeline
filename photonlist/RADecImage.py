@@ -25,8 +25,8 @@ class RADecImage(object):
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
-                 vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1,
-                 expWeightTimeStep=1.0):
+                 vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1):
+                 #expWeightTimeStep=1.0):
         '''
         Initialise a (possibly empty) RA-dec coordinate frame image.
 
@@ -47,8 +47,11 @@ class RADecImage(object):
                         begin integration 
             integrationTime: float, length of time to integrate for in seconds. If
                         -1, integrate to end of photon list.
+            
+            #### DEPRECATED ##### 
             expWeightTimeStep: float, time step to use when calculating exposure
                         time weights for the virtual pixels (seconds).
+            #####################
         '''
         
         self.nPixRA = nPixRA                    #No. of virtual pixels in RA direction
@@ -73,7 +76,7 @@ class RADecImage(object):
             self.gridDec = np.empty((self.nPixDec),dtype=float)     #Virtual pixel boundaries in the dec. direction.
             self.gridDec.fill(np.nan)
             self.totExpTime = np.nan                        #Total exposure time included in current image
-            self.expWeightTimeStep = expWeightTimeStep
+            #self.expWeightTimeStep = expWeightTimeStep
         else:
             self.image = None
             self.effIntTimes = None
@@ -81,7 +84,7 @@ class RADecImage(object):
             self.gridRA = None
             self.gridDec = None
             self.totExpTime = None
-            self.expWeightTimeStep = expWeightTimeStep
+            #self.expWeightTimeStep = expWeightTimeStep
         if (cenRA is not None and cenDec is not None and vPlateScale is not None
             and nPixRA is not None and nPixDec is not None):
             self.setCoordGrid()            
@@ -105,7 +108,7 @@ class RADecImage(object):
         self.gridDec = self.cenDec + (self.vPlateScale*(np.arange(self.nPixDec+1) - ((self.nPixDec+1)//2)))
     
     def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=None,wvlMax=None,
-                  doStack=False,expWeightTimeStep=None, 
+                  doStack=False,        #expWeightTimeStep=None, 
                   savePreStackImage=None, doWeighted=True):  #savePreStackImage is temporary for test purposes
         '''
         
@@ -118,10 +121,14 @@ class RADecImage(object):
             integrationTime - duration of integration time to include in the image (in seconds; -1 or NaN => to end of exposure)
             wvlMin, wvlMax - min and max wavelengths of photons to include in the image (Angstroms).
             doStack - boolean; if True, then stack the image to be loaded on top of any image data already present.
+            
+            #### DEPRECATED - NOW GETS TIME STEPS STRAIGHT FROM CENTROID LIST FILES #####
             expWeightTimeStep - see __init__. If set here, overrides any value already set in the RADecImage object.
                                 If the new image is being stacked on top of a current image, a new value can be
                                 supplied that is different from the current image's value; but only the last value used
                                 (i.e. the one supplied) will be stored in the class attribute.
+            ################################
+            
             wvlMin, wvlMax - set min and max wavelength cutoffs for photons to be loaded in.
             savePreStackImage - temporary fudge, set to a file-name to save the image out to a file prior to stacking.
             doWeighted - if True, includes flat and flux weighting (i.e. flatfielding and spectral response)factors from photons,
@@ -136,8 +143,8 @@ class RADecImage(object):
         tic = time.clock()
         
         photTable = photList.file.root.photons.photons   #Shortcut to table
-        if expWeightTimeStep is not None:
-            self.expWeightTimeStep=expWeightTimeStep
+        #if expWeightTimeStep is not None:
+        #    self.expWeightTimeStep=expWeightTimeStep
         
         if wvlMin is not None and wvlMax is None: wvlMax = np.inf
         if wvlMin is None and wvlMax is not None: wvlMin = 0.0
@@ -178,7 +185,7 @@ class RADecImage(object):
         #True (1) = good; False (0) = dead 
         #First on the basis of the wavelength cals:
         wvlCalFlagImage = photList.getBadWvlCalFlags()
-        deadPixMask = np.where(wvlCalFlagImage == pipelineFlags.waveCal['good'], 1.0, 0.0)   #1.0 where flag is good; 0.0 otherwise. (Straight boolean mask would work, but not guaranteed for Python 4....)
+        deadPixMask = np.where(wvlCalFlagImage == pipelineFlags.waveCal['good'], 1, 0)   #1.0 where flag is good; 0.0 otherwise. (Straight boolean mask would work, but not guaranteed for Python 4....)
 
         #Next on the basis of the flat cals (or all ones if weighting not requested)
         if doWeighted:
@@ -201,7 +208,13 @@ class RADecImage(object):
         if wvlMin is None:
             assert wvlMin is None and wvlMax is None
             print '(getting all wavelengths)'
+            tic = time.clock()
             photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')
+            print 'Time taken (s): ',time.clock()-tic
+            #print 'Doing by second method'
+            #tic = time.clock()
+            #photons2 = [x for x in photons.iterrows() if (x['arrivalTime']>=firstSec) and (x['arrivalTime']<=lastSec)]
+            #print 'Time taken (s): ',time.clock()-tic
         else:
             assert wvlMin is not None and wvlMax is not None
             print '(trimming wavelength range) '
@@ -360,7 +373,7 @@ class RADecImage(object):
                 #Multiply by the bad pixel mask and the flatcal mask so that non-functioning pixels have zero exposure time.
                 #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
                 detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
-                                                     firstSec=tStartFrames[iFrame]) * deadPixMask * flatCalMask).flatten()
+                                                     firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
                 
                 
                 #Temporary switch between two looping methods
@@ -398,7 +411,7 @@ class RADecImage(object):
                                 overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
                                 expTimeToAdd = overlapFrac*detExpTimes[iDPix]
                                 vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
-
+               
                #print 'Time taken (s): ',time.clock()-tic                
 
                #vExpTimesStack = vExpTimesStack2                    
@@ -408,10 +421,13 @@ class RADecImage(object):
                 
         
             #------------ End loop through time steps ----------
-        
+                
         #Sum up the exposure times from each frame:
         vExpTimes = np.sum(vExpTimesStack,axis=2)
         
+        #Check that wherever the exposure time is zero, there are no photons that have not been rejected
+        #assert np.all(thisImage[vExpTimes==0] == 0)
+        #assert 1==0
         
         #Temporary for testing-------------
         if savePreStackImage is not None:
@@ -461,11 +477,12 @@ class RADecImage(object):
         toDisplay[np.isnan(toDisplay)] = 0
         
         #Find the coordinates of the centers of the virtual pixels in degrees
-        ra = (self.gridRA[0:-1] + self.gridRA[1:])/2.0 / np.pi * 180.
-        dec = (self.gridDec[0:-1] + self.gridDec[1:])/2.0 / np.pi * 180.
+        #raMin = (self.gridRA[0:-1] + self.gridRA[1:])/2.0 / np.pi * 180.
+        #dec = (self.gridDec[0:-1] + self.gridDec[1:])/2.0 / np.pi * 180.
         
         utils.plotArray(toDisplay,cbar=True,normMin=normMin,normMax=normMax,colormap=colormap)
-        #mpl.imshow(toDisplay,vmin=normMin,vmax=normMax,extent=(ra[0],ra[-1],dec[0],dec[-1])) 
+        #mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=(180./np.pi)*
+        #           np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]])
 
         
 
