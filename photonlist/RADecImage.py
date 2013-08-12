@@ -227,7 +227,7 @@ class RADecImage(object):
         badXY = pl.xyPack(whereBad[0],whereBad[1])   #Array of packed x-y values for bad pixels (CHECK X,Y THE RIGHT WAY ROUND!)
         allPhotXY = photons['xyPix']                 #Array of packed x-y values for all photons           
         #Get a boolean array indicating photons whose packed x-y coordinate value is in the 'bad' list.
-        toReject = np.in1d(allPhotXY,badXY)
+        toReject = np.where(np.in1d(allPhotXY,badXY))[0]      #Zero to take index array out of the returned 1-element tuple.
         #Chuck out the bad photons
         print 'Rejecting photons from bad pixels...'
         photons = np.delete(photons,toReject)
