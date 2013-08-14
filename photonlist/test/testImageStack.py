@@ -7,6 +7,7 @@ import warnings
 import pickle
 import os.path
 import glob
+import scipy.stats
 #from astropy import coordinates as coord
 import matplotlib.pyplot as mpl
 import photonlist.photlist as pl
@@ -17,7 +18,7 @@ from util import utils
 
 def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default="/Scratch")+'/photonLists/20121211',
                    detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
-                   wvlMax=None, doWeighted=True):
+                   wvlMax=None, doWeighted=True, medCombine=False):
     '''
     Create an image stack
     INPUTS:
@@ -32,12 +33,18 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
                     of transforming to RA/dec space.
         saveFileName - name of output pickle file for saving final resulting object.
         doWeighted - boolean, if True, do the image flatfield weighting.
+        medCombine - experimental, if True, do a median combine of the image stack
+                     instead of just adding them all.... Prob. should be implemented
+                     properly at some point, just a fudge for now.
     
     OUTPUTS:
         Returns a stacked image object, saves the same out to a pickle file, and
         (depending whether it's still set to or not) saves out the individual non-
         stacked images as it goes. 
     '''
+    
+    nPixRA = 500        #Number of virtual pixels
+    nPixDec = 500
     
     #Get the list of filenames
     if fileNames[0]=='@':
@@ -50,8 +57,9 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         files = glob.glob(os.path.join(dir, fileNames))
 
     #Initialise empty image centered on Crab Pulsar
-    virtualImage = rdi.RADecImage(nPixRA=500,nPixDec=500,vPlateScale=0.1,
+    virtualImage = rdi.RADecImage(nPixRA=nPixRA,nPixDec=nPixDec,vPlateScale=0.1,
                                   cenRA=1.4596725441339724, cenDec=0.38422539085925933)
+    imageStack = []
                                   
     for eachFile in files:
         if os.path.exists(eachFile):
@@ -71,12 +79,18 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
                     virtualImage+=im
             else:
                 imSaveName=baseSaveName+'.tif'
-                virtualImage.loadImage(phList,doStack=True,savePreStackImage=imSaveName,
+                virtualImage.loadImage(phList,doStack=not medCombine,savePreStackImage=imSaveName,
                                        wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted)
                 virtualImage.display(pclip=0.1)
+                imageStack.append(virtualImage.image)       #Only makes sense if medCombine==True, otherwise will be ignored
         
         else:
             print 'File doesn''t exist: ',eachFile
+    
+    if medCombine == True:
+        medComImage = scipy.stats.nanmedian(np.array(imageStack), axis=0)
+    else:
+        medComImage = None
     
     #Save the results
     try:
@@ -86,7 +100,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
     except:
         warnings.warn('Unable to save results for some reason...')
     
-    return virtualImage
+    return virtualImage, medComImage
 
 
 
@@ -106,3 +120,6 @@ def checkRotationDirection():
     vIm2.display()
     return vIm1,vIm2
 
+
+if __name__ == '__main__':
+    makeImageStack()
