@@ -191,13 +191,18 @@ class FileName:
             'timeAdjust' + os.sep + \
             self.run + '.h5'
 
-    
+    def pixRemap(self):
+        return self.intermDir + os.sep + \
+            'pixRemap' + os.sep + \
+            'pixRemap_' + self.run + '.h5'
+            
     ##################################
     
     def getComponents(self):
         '''
         Return a tuple of run, date, and timestamp.
-        Potentially useful if an obsFile instance was passed on creation instead of individual components
+        Potentially useful if an FileName object was created
+        using an obsFile instance instead of individual components.
         '''
         return self.run, self.date, self.tstamp
-                            
+        
