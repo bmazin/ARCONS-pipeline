@@ -13,7 +13,7 @@ def testRemap():
     #Arbitrary set of pixels to remap
     #Pixel at row 1,2 goes to 3,4; 10,11 goes to 12,13, etc.:
     remapPix =  [(1,2,3,4),(10,11,12,13),(15,20,25,30),
-                 (25,30,1,2),(12,13,10,11)]
+                 (25,30,1,2),(4,5,4,20)]
     
     #Value to give to unassigned pixels in the remapped result
     missingVal = -1
@@ -42,8 +42,11 @@ def testRemap():
     assert newArr[12,13]==oldArr[10,11]
     assert newArr[25,30]==oldArr[15,20]
     assert newArr[1,2]==oldArr[25,30]
-    assert newArr[10,11]==oldArr[12,13]
-    assert newArr[15,20]==missingVal    
+    assert newArr[4,20]==oldArr[4,5]
+    assert newArr[4,5]==missingVal
+    assert newArr[10,11]==missingVal
+    assert newArr[15,20]==missingVal
+    
     
     #All good if we got this far
     print 'Yep, all good....'

@@ -42,6 +42,7 @@ class PixelMap(object):
                 self.pixMap = h5file.root.pixMap.read()
             finally:
                 h5file.close()
+        self.nRow,self.nCol = np.shape(self.pixMap[0,:,:])
 
 
     def remapPix(self,yPix,xPix):
@@ -82,15 +83,36 @@ class PixelMap(object):
         
         newArr = np.zeros_like(inputArr)
         newArr.fill(mVal)   #Set all to missing value to begin with.
-        nRow,nCol = np.shape(self.pixMap[0,:,:])
-        for oldRow in range(nRow):
-            for oldCol in range(nCol):
+        for oldRow in range(self.nRow):
+            for oldCol in range(self.nCol):
                 newRow,newCol = self.remapPix(oldRow,oldCol)
                 if newRow>=0 and newCol>=0:
                     newArr[newRow,newCol] = inputArr[oldRow,oldCol]
         return newArr
+    
+    
+    def getRemappedPix(self):
+        '''
+        Returns a tuple containing two lists of tuples:
+            (source,dest),
+        where:
+            source = [(y1source,x1source),(y2source,x2source),...]
+            dest   = [(y1dest,x1dest),(y2dest,x2dest),...],
+        representing the original coordinates of pixels that are to be remapped
+        and the new coordinates that they are to be mapped to.
+        '''
         
-        
+        identityMap = np.mgrid[0:self.nRow,0:self.nCol]   #Array you'd get if no pixels locations were to be changed
+        sources = []
+        destinations = []
+        for iRow in np.arange(self.nRow):
+            for iCol in np.arange(self.nCol):
+                if np.any(self.pixMap[:,iRow,iCol] != identityMap[:,iRow,iCol]):
+                    sources.append((iRow,iCol))
+                    destinations.append((self.pixMap[0,iRow,iCol],self.pixMap[1,iRow,iCol]))
+
+        return sources, destinations
+    
         
 def makeMap(outputFileName=FileName(run='PAL2012').pixRemap(),
              nRow=46, nCol=44,
@@ -135,8 +157,10 @@ def makeMap(outputFileName=FileName(run='PAL2012').pixRemap(),
     #Make 3D array (2 x nRow x nCol) with values filled out as if all pixels
     #were mapped directly to themselves (i.e., no changes).
     mapArray = np.mgrid[0:nRow,0:nCol]
-    sourcePixList = np.array(remapPix)[:,0:2]    #Source coordinates of all remap pixel pairs
-    destPixList = np.array(remapPix)[:,2:4]      #Destination coordinates of all remap pixel pairs
+    sourcePixList = [(entry[0],entry[1]) for entry in remapPix]
+    destPixList = [(entry[2],entry[3]) for entry in remapPix]
+    #sourcePixList = np.array(remapPix)[:,0:2]    #Source coordinates of all remap pixel pairs
+    #destPixList = np.array(remapPix)[:,2:4]      #Destination coordinates of all remap pixel pairs
     
     #Update pixel map for all the requested remap pairs.
     for sourcePix,destPix in zip(sourcePixList,destPixList):
@@ -160,7 +184,7 @@ def makeMap(outputFileName=FileName(run='PAL2012').pixRemap(),
 
 
 if __name__ == '__main__':
-    mapArr = makeMap(outputFileName=None, remapPix=[(1,2,3,4),(10,11,12,13),(15,20,25,30)])
+    mapArr = makeMap(outputFileName=None, remapPix=[(1,2,3,4),(10,11,12,13),(15,20,25,30),(4,5,4,20)])
     print mapArr[:,1,2]
     print mapArr[:,3,4]
     print
