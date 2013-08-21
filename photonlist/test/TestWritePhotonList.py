@@ -11,11 +11,13 @@ import numpy as np
 from photonlist import photlist
 
 
-def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
+def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1,doPixRemap=True):
     '''
     Test run of obsFile.writePhotonList. fileName can be used
     to specify the output file name. If not specified, default
     name/location is used.
+    
+    Now includes test for pixel remapping....
     '''
 
     #Details of example obs file to run test on.
@@ -31,7 +33,10 @@ def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     calTstamp='20121209-131132'
     fluxTstamp='20121209-020416'
     flatTstamp='20121209-021036'
-    
+    if doPixRemap==True:
+        pixRemapFileName = FileName(run=run).pixRemap()
+    else:
+        pixRemapFileName = None
     
     #Load up the obs file
     obsFileName = FileName(run=run, date=date, tstamp=tstamp)
@@ -46,7 +51,8 @@ def testWritePhotonList(outputFileName=None,firstSec=0,integrationTime=-1):
     obsFile.loadCentroidListFile(FileName(run=run,date=date,tstamp=tstamp).centroidList())
     
     #And write out the results....
-    obsFile.writePhotonList(outputFileName,firstSec,integrationTime)
+    obsFile.writePhotonList(outputFileName,firstSec,integrationTime,
+                            pixRemapFileName=pixRemapFileName)
     
     #Read the results back in....
     #photFile = photList.PhotFile(outputFilename)
@@ -59,6 +65,6 @@ if __name__ == "__main__":
     import sys
     #hotPixelsTest(sys.argv[1])
     #hotPixelsTest2(startTime=2.5, endTime=6.3)
-    TestWritePhotonList()
+    testWritePhotonList()
     
     
