@@ -1044,14 +1044,15 @@ class ObsFile:
         else:
             if switchOnMask: self.switchOnHotPixTimeMask()
 
-        print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
-        print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
-        print "one interval"
-        for iRow in range(self.nRow):
-            for iCol in range(self.nCol):
-                print "iRow=",iRow," iCol=",iCol
-                for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
-                    print "   interval=",interval
+        #print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
+        #print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
+        #print "one interval"
+        #for iRow in range(self.nRow):
+            #for iCol in range(self.nCol):
+                #print "iRow=",iRow," iCol=",iCol
+                #for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
+                    #print "   interval=",interval
+
     def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
         self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
         if switchOnCosmicMask: self.switchOnCosmicTimeMask()
