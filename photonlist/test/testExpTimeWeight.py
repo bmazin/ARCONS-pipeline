@@ -9,7 +9,7 @@ import photonlist.RADecImage as rdi
 from util.FileName import FileName
 
 def getSimpleImage(fileName=FileName(run='PAL2012',date='20121211',tstamp='20121212-033323').photonList(),
-                   firstSec=0, integrationTime=5):
+                   firstSec=0, integrationTime=5, wvlMin=None, wvlMax=None, doWeighted=True):
     '''
     Get a simple short-exposure time RA/dec-mapped image, for
     the purposes of looking at the per-pixel effective integration
@@ -21,8 +21,9 @@ def getSimpleImage(fileName=FileName(run='PAL2012',date='20121211',tstamp='20121
     phList = pl.PhotList(fileName)
     baseSaveName,ext=os.path.splitext(os.path.basename(fileName))
     imSaveName=baseSaveName+'.tif'
-    virtualImage.loadImage(phList,stack=True,savePreStackImage=imSaveName,
-                           firstSec=firstSec,integrationTime=integrationTime)
+    virtualImage.loadImage(phList,doStack=True,savePreStackImage=imSaveName,
+                           firstSec=firstSec,integrationTime=integrationTime,
+                           wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted)
     virtualImage.display(pclip=True)
 
     return virtualImage

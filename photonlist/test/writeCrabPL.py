@@ -28,6 +28,9 @@ import astrometry.CentroidCalc as cc
 
 def main():
 
+    #Try remapping the pixels - set to None to not do this....
+    pixRemapFileName = FileName(run='PAL2012').pixRemap()
+
     obsSequence0="""
     051516
     052018
@@ -82,13 +85,12 @@ def main():
     obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
     #TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES...
-    #obsSequences = ['9999999',
-    #                '''
-    #                033323
-    #                045902
-    #                '''
-    #                '9999999',
-    #                '9999999']
+    obsSequences = ['9999999',
+                    '''
+                    033323
+                    ''',
+                    '9999999',
+                    '9999999']
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']
@@ -209,7 +211,7 @@ def main():
                 ob.setWvlCutoffs(None,None)
                 
                 #Show the image in detector space
-                ob.displaySec()
+                #ob.displaySec()
                 #Mark any pixels that were bad at any point:
                 #badPix = hp.getHotPixels(ob.hotPixTimeMask)
                 #x = np.arange(ob.nCol)
@@ -218,7 +220,7 @@ def main():
                 #if np.sum(badPix) > 0: mpl.scatter(xx[badPix], yy[badPix], c='y')
                 
                 print 'Writing: '+FileName(obsFile=ob).photonList()
-                ob.writePhotonList()
+                ob.writePhotonList(pixRemapFileName=pixRemapFileName)
 
     print '-----------All done--------------'
 

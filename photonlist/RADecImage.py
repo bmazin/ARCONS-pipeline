@@ -6,11 +6,14 @@ mapped to sky coordinates.
 
 Under construction....
 '''
+
+import time
 import numpy as np
 import tables
 import matplotlib.pyplot as mpl
 import hotpix.hotPixels as hp
 from util import utils
+import photonlist.photlist as pl
 from photonlist import boxer
 from astrometry import CalculateRaDec as crd
 from headers import pipelineFlags
@@ -22,8 +25,8 @@ class RADecImage(object):
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
-                 vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1,
-                 expWeightTimeStep=1.0):
+                 vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1):
+                 #expWeightTimeStep=1.0):
         '''
         Initialise a (possibly empty) RA-dec coordinate frame image.
 
@@ -44,8 +47,11 @@ class RADecImage(object):
                         begin integration 
             integrationTime: float, length of time to integrate for in seconds. If
                         -1, integrate to end of photon list.
+            
+            #### DEPRECATED ##### 
             expWeightTimeStep: float, time step to use when calculating exposure
                         time weights for the virtual pixels (seconds).
+            #####################
         '''
         
         self.nPixRA = nPixRA                    #No. of virtual pixels in RA direction
@@ -53,15 +59,14 @@ class RADecImage(object):
         self.cenRA = cenRA                      #RA location of center of field (radians)
         self.cenDec = cenDec                    #Dec location of center of field (rad)
         self.vPlateScale = vPlateScale*2*np.pi/1296000          #No. of radians on sky per virtual pixel.
+        self.imageIsLoaded = False              #Flag to indicate whether an actual image has been loaded yet.
         if detPlateScale is None:
             self.detPlateScale = crd.CalculateRaDec.platescale*2*np.pi/1296000      #Radians per detector pixel. ******For now - but this really needs reading in from the photon list file.
         else:
             self.detPlateScale = detPlateScale
         if nPixRA is not None and nPixDec is not None:
-            self.imageUnweighted = np.empty((self.nPixDec,self.nPixRA),dtype=float)   #To take a (possibly stacked) image in virtual
-            self.imageUnweighted.fill(np.nan)
-            self.imageWeighted = np.empty((self.nPixDec,self.nPixRA),dtype=float)   #To take a (possibly stacked) image in virtual
-            self.imageWeighted.fill(np.nan)
+            self.image = np.empty((self.nPixDec,self.nPixRA),dtype=float)   #To take a (possibly stacked) image in virtual
+            self.image.fill(np.nan)
             self.effIntTimes = np.empty_like(self.image)    #Effective integration times for each pixel, in seconds.
             self.effIntTimes.fill(np.nan)
             self.expTimeWeights = np.empty((self.nPixDec,self.nPixRA),dtype=float)  #Weights for each pixel in the virtual image to account for effective integration time on each pixel.
@@ -71,7 +76,7 @@ class RADecImage(object):
             self.gridDec = np.empty((self.nPixDec),dtype=float)     #Virtual pixel boundaries in the dec. direction.
             self.gridDec.fill(np.nan)
             self.totExpTime = np.nan                        #Total exposure time included in current image
-            self.expWeightTimeStep = expWeightTimeStep
+            #self.expWeightTimeStep = expWeightTimeStep
         else:
             self.image = None
             self.effIntTimes = None
@@ -79,10 +84,10 @@ class RADecImage(object):
             self.gridRA = None
             self.gridDec = None
             self.totExpTime = None
-            self.expWeightTimeStep = expWeightTimeStep
-        if (cenRA is not None and cenDec is not None and vPixPerArcsec is not None
+            #self.expWeightTimeStep = expWeightTimeStep
+        if (cenRA is not None and cenDec is not None and vPlateScale is not None
             and nPixRA is not None and nPixDec is not None):
-            self.setCoordGrid(cenRA,cenDec,vPlateScale)            
+            self.setCoordGrid()            
         if photList is not None:
             self.loadImage(photList,firstSec=firstSec,integrationTime=integrationTime)     
     
@@ -102,10 +107,11 @@ class RADecImage(object):
         self.gridRA = self.cenRA + (self.vPlateScale*(np.arange(self.nPixRA+1) - ((self.nPixRA+1)//2)))
         self.gridDec = self.cenDec + (self.vPlateScale*(np.arange(self.nPixDec+1) - ((self.nPixDec+1)//2)))
     
-    def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=-np.inf,wvlMax=np.inf,
-                  stack=False,expWeightTimeStep=None,
-                  savePreStackImage=None):  #savePreStackImage is temporary for test purposes
+    def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=None,wvlMax=None,
+                  doStack=False,        #expWeightTimeStep=None, 
+                  savePreStackImage=None, doWeighted=True):  #savePreStackImage is temporary for test purposes
         '''
+        
         Build a de-rotated stacked image from a photon list (PhotList) object.
         If the RADecImage instance already contains an image, the new image is added to it.
         
@@ -114,20 +120,34 @@ class RADecImage(object):
             firstSec - time from start of exposure to start the 'integration' for the image (seconds)
             integrationTime - duration of integration time to include in the image (in seconds; -1 or NaN => to end of exposure)
             wvlMin, wvlMax - min and max wavelengths of photons to include in the image (Angstroms).
-            stack - boolean; if True, then stack the image to be loaded on top of any image data already present.
+            doStack - boolean; if True, then stack the image to be loaded on top of any image data already present.
+            
+            #### DEPRECATED - NOW GETS TIME STEPS STRAIGHT FROM CENTROID LIST FILES #####
             expWeightTimeStep - see __init__. If set here, overrides any value already set in the RADecImage object.
                                 If the new image is being stacked on top of a current image, a new value can be
                                 supplied that is different from the current image's value; but only the last value used
                                 (i.e. the one supplied) will be stored in the class attribute.
+            ################################
+            
+            wvlMin, wvlMax - set min and max wavelength cutoffs for photons to be loaded in.
             savePreStackImage - temporary fudge, set to a file-name to save the image out to a file prior to stacking.
+            doWeighted - if True, includes flat and flux weighting (i.e. flatfielding and spectral response)factors from photons,
+                                and rejects photons from pixels where the flatfield is bad at any wavelength within the requested
+                                wavelength range (all if wvlMin/wvl Max not specified).
+                                ****NOTE - FLUX WEIGHTING NOT FULLY TESTED -- but looks probably okay.****
         '''
         
         #posErr = 0.8    #Approx. position error in arcsec (just a fixed estimate for now, will improve later)
         #posErr *= 2*np.pi/(60.*60.*360.)  #Convert to radians
         
+        tic = time.clock()
+        
         photTable = photList.file.root.photons.photons   #Shortcut to table
-        if expWeightTimeStep is not None:
-            self.expWeightTimeStep=expWeightTimeStep
+        #if expWeightTimeStep is not None:
+        #    self.expWeightTimeStep=expWeightTimeStep
+        
+        if wvlMin is not None and wvlMax is None: wvlMax = np.inf
+        if wvlMin is None and wvlMax is not None: wvlMin = 0.0
         
         #Figure out last second of integration
         obsFileExpTime = photList.header.cols.exptime[0]
@@ -161,12 +181,67 @@ class RADecImage(object):
         #Calculate ratio of virtual pixel area to detector pixel area
         vdPixAreaRatio = (self.vPlateScale/self.detPlateScale)**2
         
+        #Make a boolean mask of dead (non functioning for whatever reason) pixels
+        #True (1) = good; False (0) = dead 
+        #First on the basis of the wavelength cals:
+        wvlCalFlagImage = photList.getBadWvlCalFlags()
+        deadPixMask = np.where(wvlCalFlagImage == pipelineFlags.waveCal['good'], 1, 0)   #1.0 where flag is good; 0.0 otherwise. (Straight boolean mask would work, but not guaranteed for Python 4....)
+
+        #Next on the basis of the flat cals (or all ones if weighting not requested)
+        if doWeighted:
+            flatCalFlagArray = photList.file.root.flatcal.flags.read()       # 3D array - nRow * nCol * nWavelength Bins.
+            flatWvlBinEdges = photList.file.root.flatcal.wavelengthBins.read()   # 1D array of wavelength bin edges for the flat cal.
+            lowerEdges = flatWvlBinEdges[0:-1]
+            upperEdges = flatWvlBinEdges[1:]
+            if wvlMin is None and wvlMax is None:
+                inRange = np.ones(len(lowerEdges),dtype=bool)   # (all bins in range implies all True)
+            else:
+                inRange = ((lowerEdges >= wvlMin) & (lowerEdges < wvlMax) |
+                           (upperEdges >= wvlMin) & (lowerEdges < wvlMax))
+            flatCalMask = np.where(np.all(flatCalFlagArray[:,:,inRange]==False, axis=2), 1, 0) # Should be zero where any pixel has a bad flag at any wavelength within the requested range; one otherwise. Spot checked, seems to work.
+        else:
+            flatCalMask = np.ones((nDPixRow,nDPixCol))
+        
+        #Get the photons
         print 'Getting photon coords'
-        photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')
+        print 'wvlMin, wvlMax: ',wvlMin,wvlMax
+        if wvlMin is None:
+            assert wvlMin is None and wvlMax is None
+            print '(getting all wavelengths)'
+            tic = time.clock()
+            photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')
+            print 'Time taken (s): ',time.clock()-tic
+            #print 'Doing by second method'
+            #tic = time.clock()
+            #photons2 = [x for x in photons.iterrows() if (x['arrivalTime']>=firstSec) and (x['arrivalTime']<=lastSec)]
+            #print 'Time taken (s): ',time.clock()-tic
+        else:
+            assert wvlMin is not None and wvlMax is not None
+            print '(trimming wavelength range) '
+            photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec) & (wavelength>=wvlMin) & (wavelength<=wvlMax)')
+        
+        #Filter out photons to be masked out on the basis of detector pixel######
+        print 'Finding bad detector pixels...'
+        detPixMask = deadPixMask * flatCalMask      #Combine wave cal pixel mask and flat cal mask (should be the same in an ideal world, but not 
+        whereBad = np.where(detPixMask == 0)
+        badXY = pl.xyPack(whereBad[0],whereBad[1])   #Array of packed x-y values for bad pixels (CHECK X,Y THE RIGHT WAY ROUND!)
+        allPhotXY = photons['xyPix']                 #Array of packed x-y values for all photons           
+        #Get a boolean array indicating photons whose packed x-y coordinate value is in the 'bad' list.
+        toReject = np.where(np.in1d(allPhotXY,badXY))[0]      #Zero to take index array out of the returned 1-element tuple.
+        #Chuck out the bad photons
+        print 'Rejecting photons from bad pixels...'
+        photons = np.delete(photons,toReject)
+        #########################################################################
+        
         photRAs = photons['ra']       #Read all photon coords into an RA and a dec array.
         photDecs = photons['dec']
         photHAs = photons['ha']       #Along with hour angles...
-        photWeights = photons['flatWeight']     #*photons['fluxWeight']
+        photWeights = photons['flatWeight'] * photons['fluxWeight']   #********EXPERIMENTING WITH ADDING FLUX WEIGHT - NOT FULLY TESTED, BUT SEEMS OKAY....********
+        print 'INCLUDING FLUX WEIGHTS!'
+        photWavelengths = photons['wavelength']
+        if wvlMin is not None or wvlMax is not None:
+            assert all(photWavelengths>=wvlMin) and all(photWavelengths<=wvlMax)
+        print 'Min, max photon wavelengths found: ', np.min(photWavelengths), np.max(photWavelengths)
         nPhot = len(photRAs)
         
         
@@ -182,13 +257,13 @@ class RADecImage(object):
         photDecs=photDecs+ditherDecs
         
         #Make the image for this integration
-        print 'Making unweighted image'
-        thisImageUnweighted,thisGridDec,thisGridRA = np.histogram2d(photDecs,photRAs,[self.gridDec,self.gridRA])
-                
-        print 'Making weighted image'
-        thisImageWeighted,thisGridDec,thisGridRA = np.histogram2d(photDecs,photRAs,[self.gridDec,self.gridRA],
-                                                          weights=photWeights)
-        
+        if doWeighted:
+            print 'Making weighted image'
+            thisImage,thisGridDec,thisGridRA = np.histogram2d(photDecs,photRAs,[self.gridDec,self.gridRA],
+                                                                      weights=photWeights)
+        else:
+            print 'Making unweighted image'        
+            thisImage,thisGridDec,thisGridRA = np.histogram2d(photDecs,photRAs,[self.gridDec,self.gridRA])
                 
         if 1==1:
             #If hot pixels time-mask data not already parsed in, then parse it.
@@ -240,6 +315,8 @@ class RADecImage(object):
             
             #Make array to take the total exposure times for each virtual pixel at each time step
             vExpTimesStack = np.zeros((nVPixDec,nVPixRA,nFrames))
+            #vExpTimesStack2 = np.zeros((nVPixDec,nVPixRA,nFrames))  #FOR TEST PURPOSES
+            
             #And one for the total exposure time at each pixel summed over all time steps
             vExpTimes = np.zeros((nVPixDec,nVPixRA))
             
@@ -247,11 +324,6 @@ class RADecImage(object):
             #(just for calculating the RA/dec coordinates of the pixel corners)
             frameTimeFlat = np.zeros((nDPixRow*nDPixCol))   #Also flat array for the purposes of getRaDec()
             frameTimeFlat.fill(np.nan)
-            
-            #Make a boolean mask of dead (non functioning for whatever reason) pixels
-            #True (1) = good; False (0) = dead 
-            wvlCalFlagImage = photList.getBadWvlCalFlags()
-            deadPixMask = np.where(wvlCalFlagImage == pipelineFlags.waveCal['good'], 1.0, 0.0)      #1.0 where flag is 0; 0.0 otherwise. (Straight boolean mask would work, but not guaranteed for Python 4....)
             
             #Initialise RA/dec calculations of pixel locations for exposure time weighting
             raDecCalcObject = crd.CalculateRaDec(photList.file.root.centroidList)            
@@ -261,7 +333,7 @@ class RADecImage(object):
                 
                 print 'Time slice: ',iFrame+1, '/', nFrames
 
-                #Calculate detector pixel corner locations in RA/dec space    - NEEDS TO BE CLOCKWISE IN RA/DEC SPACE -- CHECK ON THIS!!
+                #Calculate detector pixel corner locations in RA/dec space (needs to be clockwise in RA/dec space! (checked, gives +ve answers).
                 frameTimeFlat.fill(tStartFrames[iFrame])
                 dPixRA1,dPixDec1,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXminFlat,dPixYminFlat)      #dPix* should all be flat
                 dPixRA2,dPixDec2,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXminFlat,dPixYmaxFlat)   
@@ -297,64 +369,93 @@ class RADecImage(object):
                 dPixDecNormMin = dPixCornersDec.min(axis=0)
                 dPixDecNormMax = dPixCornersDec.max(axis=0)
 
-                #Get array of effective exposure times for each detector pixel
-                #Multiply by the bad pixel mask so that non-functioning pixels have zero exposure time.
+                #Get array of effective exposure times for each detector pixel based on the hot pixel time mask
+                #Multiply by the bad pixel mask and the flatcal mask so that non-functioning pixels have zero exposure time.
                 #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
                 detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
-                                                     firstSec=tStartFrames[iFrame]) * deadPixMask).flatten()
+                                                     firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
                 
-                #Loop over the virtual pixels and accumulate the exposure time that falls in each
-                for iVDec in np.arange(nVPixDec):
-                    for iVRA in np.arange(nVPixRA):
-                        maybeOverlapping = np.where((dPixRANormMax > vPixRANormMin[iVRA]) & 
-                                                 (dPixRANormMin < vPixRANormMax[iVRA]) &
-                                                 (dPixDecNormMax > vPixDecNormMin[iVDec]) &
-                                                 (dPixDecNormMin < vPixDecNormMax[iVDec]))[0]       #[0] since 'where' returns an array in a 1-element tuple
-            
-                        #Loop over the detector pixels which may be overlapping the current virtual pixel
-                        for overlapLoc in maybeOverlapping:
-                            #Calculate overlap fraction for given virtual pixel with given detector pixel
-                            overlapFrac = boxer.boxer(iVDec,iVRA,dPixCornersDec[:,overlapLoc],dPixCornersRA[:,overlapLoc])      #Feed one set of pixel corners at a time to boxer.
-                            #And add the contributing exposure time to vexptimes:
-                            expTimeToAdd = overlapFrac*detExpTimes[overlapLoc]
-                            vExpTimesStack[iVDec,iVRA,iFrame] += expTimeToAdd        #vExpTimes is 2D and it should all magically work out.
+                
+                #Temporary switch between two looping methods
+                #if 1==0:
+                #    #Loop over the virtual pixels and accumulate the exposure time that falls in each
+                #    #print 'Method 1...'
+                #    #tic = time.clock()
+                #    for iVDec in np.arange(nVPixDec):
+                #        for iVRA in np.arange(nVPixRA):
+                #            maybeOverlapping = np.where((dPixRANormMax > vPixRANormMin[iVRA]) & 
+                #                                    (dPixRANormMin < vPixRANormMax[iVRA]) &
+                #                                    (dPixDecNormMax > vPixDecNormMin[iVDec]) &
+                #                                    (dPixDecNormMin < vPixDecNormMax[iVDec]))[0]       #[0] since 'where' returns an array in a 1-element tuple
+                #
+                #           #Loop over the detector pixels which may be overlapping the current virtual pixel
+                #           for overlapLoc in maybeOverlapping:
+                #               #Calculate overlap fraction for given virtual pixel with given detector pixel
+                #               overlapFrac = boxer.boxer(iVDec,iVRA,dPixCornersDec[:,overlapLoc],dPixCornersRA[:,overlapLoc])      #Feed one set of pixel corners at a time to boxer.
+                #               #And add the contributing exposure time to vexptimes:
+                #               expTimeToAdd = overlapFrac*detExpTimes[overlapLoc]
+                #               vExpTimesStack[iVDec,iVRA,iFrame] += expTimeToAdd        #vExpTimes is 2D and it should all magically work out.
+                #   #print 'Time taken (s): ',time.clock()-tic
+                #else:
+                
+                #Alternatively.... loop over the detector pixels.... should be faster
+                #print 'Method 2...'
+                #tic = time.clock()
+                for iDPix in np.arange(nDPixRow * nDPixCol):
+                        #Find the pixels which are likely to be overlapping (note - could do this as a sorted search to make things faster)
+                        maybeOverlappingRA = np.where((dPixRANormMax[iDPix] > vPixRANormMin) & (dPixRANormMin[iDPix] < vPixRANormMax))[0]
+                        maybeOverlappingDec = np.where((dPixDecNormMax[iDPix] > vPixDecNormMin) & (dPixDecNormMin[iDPix] < vPixDecNormMax))[0]
+                        
+                        for overlapLocRA in maybeOverlappingRA:
+                            for overlapLocDec in maybeOverlappingDec:
+                                overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
+                                expTimeToAdd = overlapFrac*detExpTimes[iDPix]
+                                vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
+               
+               #print 'Time taken (s): ',time.clock()-tic                
+
+               #vExpTimesStack = vExpTimesStack2                    
+                    
+               #assert np.all(vExpTimesStack2 == vExpTimesStack)
+               #print 'Yup, all seems okay...'
+                
         
             #------------ End loop through time steps ----------
-        
+                
         #Sum up the exposure times from each frame:
         vExpTimes = np.sum(vExpTimesStack,axis=2)
         
-        #------ Done with exposure time weighting, in principle ------
-        
+        #Check that wherever the exposure time is zero, there are no photons that have not been rejected
+        #assert np.all(thisImage[vExpTimes==0] == 0)
+        #assert 1==0
         
         #Temporary for testing-------------
-        #if savePreStackImage is not None:
-        #    print 'Saving pre-stacked image to '+savePreStackImage
-        #    mpl.imsave(fname=savePreStackImage,arr=thisImageWeighted,origin='lower',cmap=mpl.cm.gnuplot2)  #,vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
+        if savePreStackImage is not None:
+            print 'Saving pre-stacked image to '+savePreStackImage
+            mpl.imsave(fname=savePreStackImage,arr=thisImage,origin='lower',cmap=mpl.cm.gnuplot2,vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
         #---------------------------------
         
-        if self.image is None or stack is False:
-            self.imageUnweighted = thisImageUnweighted
-            self.imageWeighted = thisImageWeighted
-            self.image = self.imageUnweighted           #For now, let's keep it this way.... Since weighting does odd things.
+        if self.imageIsLoaded is False or doStack is False:
+            self.image = thisImage           #For now, let's keep it this way.... Since weighting does odd things.
             self.effIntTimes = vExpTimes
             self.totExpTime = lastSec-firstSec
             self.expTimeWeights = self.totExpTime/self.effIntTimes
             self.vExpTimesStack = vExpTimesStack                   #TEMPORARY FOR DEBUGGING PURPOSES
+            self.imageIsLoaded = True
         else:
+            assert self.imageIsLoaded == True
             print 'Stacking'
-            self.imageUnweighted += thisImageUnweighted
-            self.imageWeighted += thisImageWeighted
-            self.image = self.imageUnweighted
+            self.image += thisImage
             self.effIntTimes += vExpTimes
             self.totExpTime += lastSec-firstSec
             self.expTimeWeights = self.totExpTime/self.effIntTimes
-        
-        print 'Done.'
+
+        print 'Image load done. Time taken (s): ', time.clock()-tic
 
 
 
-    def display(self,normMin=None,normMax=None,expWeight=True,pclip=False,colormap=mpl.cm.gnuplot2):
+    def display(self,normMin=None,normMax=None,expWeight=True,pclip=None,colormap=mpl.cm.gnuplot2,
+                image=None, logScale=False):
         '''
         Display the current image. Currently just a short-cut to utils.plotArray,
         but needs updating to mark RA and Dec on the axes.
@@ -364,16 +465,26 @@ class RADecImage(object):
         else:
             toDisplay = np.copy(self.image)
         
+        if logScale is True: toDisplay = np.log10(toDisplay)
+        
+        if image is not None: toDisplay = image
+        
         if pclip:
-            normMin = np.percentile(toDisplay[np.isfinite(toDisplay)],q=1.0)
-            normMax = np.percentile(toDisplay[np.isfinite(toDisplay)],q=99.0)
+            normMin = np.percentile(toDisplay[np.isfinite(toDisplay)],q=pclip)
+            normMax = np.percentile(toDisplay[np.isfinite(toDisplay)],q=100.0-pclip)
 
-        toDisplay[np.isnan(toDisplay)] = 0    
+        #Display NaNs as zeros so it looks better
+        toDisplay[np.isnan(toDisplay)] = 0
+        
+        #Find the coordinates of the centers of the virtual pixels in degrees
+        #raMin = (self.gridRA[0:-1] + self.gridRA[1:])/2.0 / np.pi * 180.
+        #dec = (self.gridDec[0:-1] + self.gridDec[1:])/2.0 / np.pi * 180.
         
         utils.plotArray(toDisplay,cbar=True,normMin=normMin,normMax=normMax,colormap=colormap)
+        #mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=(180./np.pi)*
+        #           np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]])
 
-
-
+        
 
 
 def test(photListFileName='/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/testPhotonList-blosc.h5',

@@ -67,5 +67,11 @@ class TestFileName(unittest.TestCase):
         self.assertTrue(FileName.FileName(obsFile=fullFileNameStr).obs() == fullFileNameStr)
         self.assertTrue(FileName.FileName(obsFile=fullFileNameStr).timeMask() == fn.timeMask())
         
+    def testPixRemapFile(self):
+        run = 'PAL2012'
+        fn = FileName.FileName(run)
+        pixRemapFn = fn.pixRemap()
+        self.assertTrue(os.path.exists(pixRemapFn), msg=pixRemapFn)    
+        
 if __name__ == '__main__':
     unittest.main()
