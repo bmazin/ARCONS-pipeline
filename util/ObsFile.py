@@ -23,6 +23,7 @@ getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
+getAperturePixelCountImage(self, firstSec=0, integrationTime= -1, y_values=range(46), x_values=range(44), y_sky=[], x_sky=[], apertureMask=np.ones((46,44)), skyMask=np.zeros((46,44)), weighted=False, fluxWeighted=False, getRawCount=False, scaleByEffInt=False)
 getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None)
 getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000, wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None)
 getPixelBadTimes(self, pixelRow, pixelCol)
@@ -30,6 +31,7 @@ getDeadPixels(self, showMe=False, weighted=True)
 getNonAllocPixels(self, showMe=False)
 getRoachNum(self,iRow,iCol)
 getFrame(self, firstSec=0, integrationTime=-1)
+loadCentroidListFile(self, centroidListFileName)
 loadFlatCalFile(self, flatCalFileName)
 loadFluxCalFile(self, fluxCalFileName)
 loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True)
@@ -54,21 +56,19 @@ import warnings
 import tables
 import numpy as np
 import matplotlib.pyplot as plt
-#from astropy import constants, units
-#from headers import ArconsHeaders
-#from headers import pipelineFlags
 from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
-import photonlist.photlist
-
+from scipy import pi
+from tables.nodes import filenode
+from headers import TimeMask
 
 class ObsFile:
     h = 4.135668e-15 #eV s
     c = 2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName,verbose=False):
+    def __init__(self, fileName, verbose=False):
         """
         load the given file with fileName relative to $MKID_DATA_DIR
         """
@@ -80,6 +80,9 @@ class ObsFile:
         self.hotPixFile = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
+        self.cosmicMaskIsApplied = False
+        self.cosmicMask = None # interval of times to mask cosmic ray events
+        self.centroidListFile = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
         
@@ -106,6 +109,10 @@ class ObsFile:
             pass
         try:
             self.hotPixFile.close()
+        except:
+            pass
+        try:
+            self.centroidListFile.close()
         except:
             pass
         self.file.close()
@@ -148,7 +155,7 @@ class ObsFile:
             if verbose:
                 print msg
             raise Exception(msg)
-
+        
         #open the hdf5 file
         self.file = tables.openFile(self.fullFileName, mode='r')
 
@@ -273,6 +280,7 @@ class ObsFile:
         Shifted functionality to photonlist/photlist.py, JvE May 10 2013.
         See that function for input parameters and outputs.
         """
+        import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.createEmptyPhotonListFile(self,*nkwargs,**kwargs)
 
 
@@ -312,18 +320,26 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False):
+                   scaleByEffInt=False, getRawCount=False, fignum=None):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
         if scaleByEffInt is True, then counts are scaled by effective exposure
         time on a per-pixel basis.
+        nSdevMax - max end of stretch scale for display, in # sigmas above the mean.
+        getRawCount - if True the raw non-wavelength-calibrated image is
+        displayed with no wavelength cutoffs applied (in which case no wavecal
+        file need be loaded).
+        fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
+                 specify target window number).
         """
-        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted,
-                                         fluxWeighted, scaleByEffInt=scaleByEffInt)['image']
-        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg), plotTitle=plotTitle)
+        secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
+                                         getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
+        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
+                        plotTitle=plotTitle, fignum=fignum)
 
+            
     def getFromHeader(self, name):
         """
         Returns a requested entry from the obs file header
@@ -476,8 +492,7 @@ class ObsFile:
             return {'counts':counts, 'effIntTime':effIntTime}
 
         else:
-            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,
-                                          weighted=weighted, fluxWeighted=fluxWeighted)
+            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted)
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 
@@ -565,7 +580,6 @@ class ObsFile:
     def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
-        inter is an interval of time values to mask out [missing?? To be implented? JvE 2/18/13]
         returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
         integration time after accounting for time-masking.)
         parses packets from firstSec to firstSec+integrationTime.
@@ -607,11 +621,15 @@ class ObsFile:
             inter = self.getPixelBadTimes(iRow, iCol)
         else:
             inter = interval()
+
+        if self.cosmicMaskIsApplied:
+            inter = inter | self.cosmicMask
+
         
         if (type(firstSec) is not int) or (type(integrationTime) is not int):
             #Also exclude times outside firstSec to lastSec. Allows for sub-second
             #(floating point) values in firstSec and integrationTime
-            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
+            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits (??? REDUNDANT? JvE 6/19/2013)
 
         #Inter now contains a single 'interval' instance, which contains a list of
         #times to exclude, in seconds, including all times outside the requested
@@ -629,15 +647,17 @@ class ObsFile:
 
         for t in range(len(pixelData)):
             interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
+            
             times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
             times = np.floor(firstSec) + self.tickDuration * times + t
             timestamps.append(times)
             baselines.append(bases)
             peakHeights.append(peaks)
             
-        timestamps = np.concatenate(timestamps)
-        baselines = np.concatenate(baselines)
-        peakHeights = np.concatenate(peakHeights)
+        if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
+            timestamps = np.concatenate(timestamps)
+            baselines = np.concatenate(baselines)
+            peakHeights = np.concatenate(peakHeights)
 
 #        if self.timeAdjustFile != None:
 #            timestamps += self.firmwareDelay
@@ -680,6 +700,57 @@ class ObsFile:
             secImg *= (integrationTime / effIntTimes)                    
         #if getEffInt is True:
         return{'image':secImg, 'effIntTimes':effIntTimes}
+        #else:
+        #    return secImg
+
+    def getAperturePixelCountImage(self, firstSec=0, integrationTime= -1, y_values=range(46), x_values=range(44), y_sky=[], x_sky=[], apertureMask=np.ones((46,44)), skyMask=np.zeros((46,44)), weighted=False, fluxWeighted=False, getRawCount=False, scaleByEffInt=False):
+
+        """
+        Return a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime 
+        This aperture version subtracts out the average sky counts/pixel and includes scaling due to circular apertures. GD 5/27/13
+        If integration time is -1, all time after firstSec is used.
+        If weighted is True, flat cal weights are applied. JvE 12/28/12
+        If fluxWeighted is True, flux cal weights are applied. SM 2/7/13
+        If getRawCount is True then the raw non-wavelength-calibrated image is
+        returned with no wavelength cutoffs applied (in which case no wavecal
+        file need be loaded). JvE 3/1/13
+        If scaleByEffInt is True, any pixels that have 'bad' times masked out
+        will have their counts scaled up to match the equivalent integration 
+        time requested.
+        RETURNS:
+            Dictionary with keys:
+                'image' - a 2D array representing the image
+                'effIntTimes' - a 2D array containing effective integration 
+                                times for each pixel.
+        """
+        secImg = np.zeros((self.nRow, self.nCol))
+        effIntTimes = np.zeros((self.nRow, self.nCol), dtype=np.float64)
+        effIntTimes.fill(np.nan)   #Just in case an element doesn't get filled for some reason.
+        skyValues=[]
+        objValues=[]
+        AreaSky=[]
+        AreaObj=[]
+        for pix in xrange(len(y_sky)):
+            pcount = self.getPixelCount(y_sky[pix], x_sky[pix], firstSec, integrationTime,weighted, fluxWeighted, getRawCount)
+            skyValue=pcount['counts']*skyMask[y_sky[pix]][x_sky[pix]]
+            skyValues.append(skyValue)
+            AreaSky.append(skyMask[y_sky[pix]][x_sky[pix]])
+        skyCountPerPixel = np.sum(skyValues)/(np.sum(AreaSky))
+#        print 'sky count per pixel =',skyCountPerPixel
+        for pix in xrange(len(y_values)):
+            pcount = self.getPixelCount(y_values[pix], x_values[pix], firstSec, integrationTime,weighted, fluxWeighted, getRawCount)
+            secImg[y_values[pix],x_values[pix]] = (pcount['counts']-skyCountPerPixel)*apertureMask[y_values[pix]][x_values[pix]]
+            AreaObj.append(apertureMask[y_values[pix]][x_values[pix]])
+            effIntTimes[y_values[pix],x_values[pix]] = pcount['effIntTime']
+            objValues.append(pcount['counts']*apertureMask[y_values[pix]][x_values[pix]])
+        AveObj=np.sum(objValues)/(np.sum(AreaObj))
+#        print 'ave obj per pixel (not sub) = ',AveObj
+        NumObjPhotons = np.sum(secImg)
+#        print 'lightcurve = ',NumObjPhotons
+        if scaleByEffInt is True:
+            secImg *= (integrationTime / effIntTimes)                    
+        #if getEffInt is True:
+        return{'image':secImg, 'effIntTimes':effIntTimes, 'SkyCountSubtractedPerPixel':skyCountPerPixel,'lightcurve':NumObjPhotons}
         #else:
         #    return secImg
     
@@ -853,8 +924,7 @@ class ObsFile:
         1's for pixels with counts, 0's for pixels without counts
         if showMe is True, a plot of the mask pops up
         """
-        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts']
-                                 for iCol in range(self.nCol)] for iRow in range(self.nRow)])
+        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts'] for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow, self.nCol))
         deadArray[countArray == 0] = 0
         if showMe == True:
@@ -903,6 +973,19 @@ class ObsFile:
                 frame[iRow][iCol] += nphoton
         return frame
 
+    def loadCentroidListFile(self, centroidListFileName):
+        """
+        Load an astrometry (centroid list) file into the 
+        current obs file instance.
+        """
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        centroidListPath = os.path.join(scratchDir, 'centroidListFiles')
+        fullCentroidListFileName = os.path.join(centroidListPath, centroidListFileName)
+        if (not os.path.exists(centroidListFileName)):
+            print 'Astrometry centroid list file does not exist: ', centroidListFileName
+            return
+        self.centroidListFile = tables.openFile(centroidListFileName)
+        
     def loadFlatCalFile(self, flatCalFileName):
         """
         loads the flat cal factors from the given file
@@ -960,6 +1043,18 @@ class ObsFile:
             self.hotPixTimeMask = None
         else:
             if switchOnMask: self.switchOnHotPixTimeMask()
+
+        print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
+        print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
+        print "one interval"
+        for iRow in range(self.nRow):
+            for iCol in range(self.nCol):
+                print "iRow=",iRow," iCol=",iCol
+                for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
+                    print "   interval=",interval
+    def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
+        self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
+        if switchOnCosmicMask: self.switchOnCosmicTimeMask()
 
     def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
         """
@@ -1123,12 +1218,70 @@ class ObsFile:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
 
+    def switchOffCosmicTimeMask(self):
+        """
+        Switch off hot pixel time masking - bad pixel times will no longer be
+        removed (although the mask remains 'loaded' in ObsFile instance).
+        """
+        self.cosmicMaskIsApplied = False
+
+    def switchOnCosmicTimeMask(self):
+        """
+        Switch on cosmic time masking. Subsequent calls to getPixelCountImage
+        etc. will have cosmic times removed.
+        """
+        if self.cosmicMask is None:
+            raise RuntimeError, 'No cosmic mask file loaded'
+        self.cosmicMaskIsApplied = True
+
+    @staticmethod
+    def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName):
+        h5f = tables.openFile(fileName, 'w')
+
+        headerGroup = h5f.createGroup("/", 'Header', 'Header')
+        headerTable = h5f.createTable(headerGroup,'Header',
+                                      cosmicHeaderDescription, 'Header')
+        header = headerTable.row
+        header['ticksPerSec'] = ticksPerSec
+        header.append()
+        headerTable.flush()
+        headerTable.close()
+        tbl = h5f.createTable("/", "cosmicMaskData", TimeMask.TimeMask, 
+                              "Cosmic Mask")
+        for interval in intervals:
+            row = tbl.row
+            row['tBegin'] = max(0,int(np.round(interval[0]*ticksPerSec)))
+            row['tEnd'] = int(np.round(interval[1]*ticksPerSec))
+            row['reason'] = TimeMask.timeMaskReason["cosmic"]
+            row.append()
+            tbl.flush()
+        tbl.close()
+        h5f.close()
+
+    @staticmethod
+    def readCosmicIntervalFromFile(fileName):
+        fid = tables.openFile(fileName, mode='r')
+        headerInfo = fid.getNode("/Header","Header")[0]
+        ticksPerSec = headerInfo['ticksPerSec']
+        table = fid.getNode("/cosmicMaskData")
+        enum = table.getEnum('reason')
+
+        retval = interval()
+        for i in range(table.nrows):
+            temp = (interval[table[i]['tBegin'],table[i]['tEnd']])/ticksPerSec
+            retval = retval | temp
+
+        fid.close()
+        return retval
+
+
     def writePhotonList(self,*nkwargs,**kwargs): #filename=None, firstSec=0, integrationTime=-1):                       
         """
         Write out the photon list for this obs file.
         See photonlist/photlist.py for input parameters and outputs.
         Shifted over to photonlist/, May 10 2013, JvE. All under construction at the moment.
         """        
+        import photonlist.photlist      #Here instead of at top to avoid circular imports
         photonlist.photlist.writePhotonList(self,*nkwargs,**kwargs)
         
         
@@ -1338,3 +1491,7 @@ def repackArray(array, slices):
         retval[iPt:iPtNew] = array[s0:s1]
         iPt = iPtNew
     return retval
+
+class cosmicHeaderDescription(tables.IsDescription):
+    ticksPerSec = tables.Float64Col() # number of ticks per second
+

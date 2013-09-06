@@ -4,6 +4,8 @@ from util import utils
 import matplotlib.pyplot as plt
 import sys
 
+### this is used to view a single frame from display stack or psffit npz. Into the command type "python sdssview_frameBlue.py 3" to view image number 3.
+
 def aperture(startpx,startpy,radius=3):
     r = radius
     length = 2*r 
@@ -25,7 +27,7 @@ def gaussian(height, center_x, center_y, width_x, width_y,offset):
     width_y = float(width_y)
     return lambda x,y: height*np.exp(-(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)+offset
 
-stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11SIImageStackRed.npz')
+stackDict = np.load('/Scratch/dataProcessing/SDSS_J0926/Dec8ImageStackAllInt3Aperture510.npz')
 stack = stackDict['stack']
 if len(sys.argv) == 1:
     print 'Useage: ',sys.argv[0],' iFrame'

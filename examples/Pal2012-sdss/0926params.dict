@@ -1,15 +1,26 @@
 
+######################## For display_stack_aperture.py only ########################
+
+apertureRadius1 = 5
+apertureRadius2 = 10
+
+#ObjPosFile=[[what file number this position started at, x position, y position],[what file number it changed, new x, new y]]
+ObjPosFile=[[1,14,8]] #Dec8
+#ObjPosFile=[[1,31,30],[15,14,8]] #Dec10
+#ObjPosFile=[[1,16,15]] #Dec11
+#ObjPosFile=[[1,14,8],[18,31,30],[32,14,8],[49,16,15]] #All
+
 ######################## For display_stack.py ########################
 
-npzFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10ImageStackBlueUpdated.npz'
-gifFileName = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec10ImageStackBlueUpdated.gif'
+npzFileName = '/Scratch/dataProcessing/SDSS_J0926/Dec8ImageStackAllInt3Aperture510.npz'
+gifFileName = '/Scratch/dataProcessing/SDSS_J0926/Dec8ImageStackAllInt3Aperture510.gif'
 
-integrationTime = 3
+integrationTime = 10
 expTime = 300
 
 #remember to change seqs! It's at the end
 wvlLowerCutoff = 3000
-wvlUpperCutoff = 5000
+wvlUpperCutoff = 8000
 
 run = 'PAL2012'
 
@@ -23,14 +34,12 @@ run = 'PAL2012'
 # December 8
 # First sequence, possible reflections at 12:07, 1" SE move at 12:45.
 seq0 = ['120530', '121033','121536', '122039', '122542', '123045', '123548', '124051', '124554', '125057', '125601', '130103', '130606']
-
 # Sequence during warming up, may need to omit.
 seq1 = ['131254', '131802', '132304', '132807']
 
 # December 10
 # Sequence during 2nd day on object. Moved to confirm position in 082422 between 90 and 105s.'080916' hot pix
 seq2 = ['074405', '074907', '075410', '075912', '080414', '080916', '081418', '081920', '082422']
-
 # Refocused and started guiding again at 8:37. Ommitting seq 083451, which occured during refocus.
 seq3 = ['084029', '084532', '085034', '085536', '090038']
 
@@ -42,17 +51,16 @@ seq4 = ['120152', '120654', '121157', '121700', '122203', '122706', '123209', '1
 seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238']
 seq6 = ['123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
 
-#seqs = [seq0,seq1]
-#utcDates = ['20121209', '20121209']
-#sunsetDates = ['20121208', '20121208']
-#calTimestamps = ['20121209-131132','20121209-133419']
+seqs = [seq0,seq1]
+utcDates = ['20121209', '20121209']
+sunsetDates = ['20121208', '20121208']
+calTimestamps = ['20121209-131132','20121209-133419']
 #use flatCal from 20121207!
 
-seqs = [seq2,seq3,seq4]
-utcDates = ['20121211', '20121211', '20121211']
-sunsetDates = ['20121210', '20121210', '20121210']
-calTimestamps = ['20121211-090613', '20121211-090613', '20121211-133056']
-#NumFiles = [-1,-1,14,14,14]
+#seqs = [seq2,seq3,seq4]
+#utcDates = ['20121211', '20121211', '20121211']
+#sunsetDates = ['20121210', '20121210', '20121210']
+#calTimestamps = ['20121211-090613', '20121211-090613', '20121211-133056']
 
 #seqs = [seq5,seq6]
 #utcDates = ['20121212', '20121212']
@@ -61,15 +69,18 @@ calTimestamps = ['20121211-090613', '20121211-090613', '20121211-133056']
 
 ######################## For fitpsf.py ########################
 
-npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11ImageStackBlueUpdated.npz'
-npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11fitpsfBlueUpdated.npz'
-giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec11fitpsfBlueUpdated.gif'
+npzLoadFile = '/Scratch/dataProcessing/SDSS_J0926/Dec11ImageStackAllInt10newwvlcal.npz'
+npzfitpsf = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfAllInt10newwvlcal.npz'
+giffitpsf = '/Scratch/dataProcessing/SDSS_J0926/Dec11fitpsfAllInt10newwvlcal.gif'
 
+#Dec8 
 #seq0:13
 #seq1:4
+#Dec10
 #seq2:9
 #seq3:5
 #seq4:17
+#Dec11
 #seq5:14
 #seq6:12
 
@@ -77,6 +88,8 @@ FramesPerFile = expTime/integrationTime
 
 #seqCorr = [-1,seq0seq1,seq0seq1+seq2seq3,seq0seq1+seq2seq3+seq4,seq0seq1+seq2seq3+seq4+seq5seq6]
 
+#NumFiles = [-1,17,17,17,17]
+#NumFiles = [-1,-1,14,31,31]
 NumFiles = [-1,-1,-1,-1,26]
 #NumFiles = [-1,17,31,48,74]
 guessX = [14,31,14,16]
@@ -84,6 +97,6 @@ guessY = [8,30,8,15]
 
 ######################## For lightcurve.py ########################
 
-npzLoadFitFile = '/Scratch/dataProcessing/SDSS_J0926/AllData/Dec8fitpsfBlueUpdated.npz'
-TotalNumFiles = 74
+npzLoadFitFile = '/Scratch/dataProcessing/SDSS_J0926/Dec8fitpsfBlue.npz'
+TotalNumFiles = 17
 

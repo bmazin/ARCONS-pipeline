@@ -378,7 +378,8 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
                cbar=False, cbarticks=None, cbarlabels=None, 
                plotFileName='arrayPlot.png',
                plotTitle='', sigma=None, 
-               pixelsToMark=[], pixelMarkColor='red'):
+               pixelsToMark=[], pixelMarkColor='red',
+               fignum=1):
     """
     Plots the 2D array to screen or if showMe is set to False, to
     file.  If normMin and normMax are None, the norm is just set to
@@ -411,6 +412,11 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
     pixelsToMark a list of pixels to mark in this image
 
     pixelMarkColor is the color to fill in marked pixels
+    
+    fignum - to specify which window the figure should be plotted in.
+             Default is 1. If None, automatically selects a new figure number.
+            Added 2013/7/19 2013, JvE
+    
     """
     if sigma != None:
        # Chris S. does not know what accumulatePositive is supposed to do
@@ -441,11 +447,11 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
               'ytick.labelsize': 10,
               'figure.figsize': figSize}
 
+
+    fig = plt.figure(fignum) ##JvE - Changed fignum=1 to allow caller parameter
     plt.clf()
     plt.rcParams.update(params)
-
-    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm, fignum=1)
-    fig = plt.figure(1)
+    plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm, fignum=False)
 
     for ptm in pixelsToMark:
         box = mpl.patches.Rectangle((ptm[0]-0.5,ptm[1]-0.5),\

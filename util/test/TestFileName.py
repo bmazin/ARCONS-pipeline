@@ -1,6 +1,8 @@
-from util import FileName
 import unittest
 import os
+from util import FileName
+from util import ObsFile
+
 class TestFileName(unittest.TestCase):
     """
     Test getting the raw and the timeMask file names
@@ -46,5 +48,30 @@ class TestFileName(unittest.TestCase):
         tmFn = fn.timeMask()
         self.assertGreater(len(tmFn),0)
 
+    def testPassObsFile(self):
+        run = 'LICK2012'
+        date = '20120919'
+        tstamp = '20120920-123350'
+        fn1 = FileName.FileName(run, date, tstamp)
+        obsFile = ObsFile.ObsFile(fn1.obs())
+        fn2 = FileName.FileName(obsFile=obsFile)
+        self.assertTrue(fn1.obs()==fn2.obs())
+        self.assertTrue(fn2.getComponents()==(run,date,tstamp))
+        
+    def testPassObsFileNameString(self):
+        run = 'LICK2012'
+        date = '20120919'
+        tstamp = '20120920-123350'
+        fn = FileName.FileName(run, date, tstamp)
+        fullFileNameStr = fn.obs()
+        self.assertTrue(FileName.FileName(obsFile=fullFileNameStr).obs() == fullFileNameStr)
+        self.assertTrue(FileName.FileName(obsFile=fullFileNameStr).timeMask() == fn.timeMask())
+        
+    def testPixRemapFile(self):
+        run = 'PAL2012'
+        fn = FileName.FileName(run)
+        pixRemapFn = fn.pixRemap()
+        self.assertTrue(os.path.exists(pixRemapFn), msg=pixRemapFn)    
+        
 if __name__ == '__main__':
     unittest.main()

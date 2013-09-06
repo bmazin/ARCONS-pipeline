@@ -1,0 +1,21 @@
+PSR             SDSS J092638.71+362402.4
+RAJ      09:26:38.715 
+DECJ      36:24:02.43 
+F0     0.00058867369060  
+F1     0.0
+F2     0.0
+PEPOCH        0.0
+START            56270.50385
+FINISH           56270.56466
+DM               0.0
+SOLARN0              10.00
+EPHEM             DE200
+CLK               UTC(NIST)
+NTOA                   722
+TRES                 46.87
+TZRMJD  56273.16431699472336
+TZRFRQ            1161.805
+TZRSITE                  1
+NITS                     1
+
+###this goes into tempo2 for barycentering 

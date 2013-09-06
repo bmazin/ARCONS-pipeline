@@ -16,6 +16,7 @@ INPUTS:
 '''
 
 import numpy as np
+import scipy.misc
 import datetime as dt
 import util.ObsFile as ObsFile
 import util.utils as utils
@@ -25,6 +26,7 @@ import matplotlib.pylab as mpl
 import matplotlib
 import pyfits
 import pickle
+
 
 def makeArp147Image(obsFileList='inputFiles.list',
                     hotPixFileList='hotPixFiles.list',
@@ -310,7 +312,41 @@ def makeArp147Image(obsFileList='inputFiles.list',
 
     
 
-
+def writeStackImages(result,outputBaseName='Arp147-'):
+    '''
+    Take a saved image stack (as returned by makeArp147Image()) and save out
+    the individual images as something digestible by Photoshop.
+    INPUTS:
+        result: as returned by makeArp147Image(); or alternatively, a filename (string),
+                in which case the result will be restored from that file.
+        outputBaseName: the initial part of the file names to be saved out.
+                        Format will be outputBaseName+'color-nnn.png', where color
+                        is red/green/blue, and nnn is the frame number.
+    '''
+    
+    bands = ['red','green','blue']
+    pngmax = 255
+    upperpercentile = 99.99
+    
+    if type(result) is str:
+        result = np.load(result)
+    
+    nimages = np.shape(result['stack'][bands[0]])[0]
+    for eachband in bands:
+        print '-----'+eachband+'------'
+        vals = np.copy(result['stack'][eachband]).flatten()
+        upperval = np.percentile(vals[~np.isnan(vals)],upperpercentile)
+        #upperval = np.nanmax(vals)
+        print 'Upper val:', upperval
+        for iimage in range(nimages):
+            fn = outputBaseName+eachband+'-'+str(iimage).zfill(3)+'.png'
+            im = result['stack'][eachband][iimage,:,:]
+            #im[np.isnan(im)] = 0
+            #im[im>upperval] = upperval
+            #im = im*pngmax/upperval
+            #scipy.misc.imsave(fn,im)
+            mpl.imsave(fname=fn,arr=im,vmin=0,vmax=upperval,cmap=mpl.cm.gray)                 
+            
 
 def makeRGBimage(result, fitsBaseName='Arp147-',
                   workingDir='/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/arp147/Arp147WorkingDir',
@@ -351,6 +387,8 @@ def makeRGBimage(result, fitsBaseName='Arp147-',
         hdu = pyfits.PrimaryHDU(component)
         hdu.writeto(os.path.join(workingDir, fileName))
         
+
+
 
 
 
