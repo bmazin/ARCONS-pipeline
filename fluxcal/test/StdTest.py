@@ -23,7 +23,7 @@ unitdict = {
         }
 h,k,c = unitdict['cgs']['h'],unitdict['cgs']['k'],unitdict['cgs']['c']
 
-objectName = "HR9087"
+objectName = "G158-100"
 #import the known spectrum of the calibrator and rebin to the histogram parameters given
 #must be imported into array with dtype float so division later does not have error
 std = MKIDStd.MKIDStd()
@@ -55,7 +55,7 @@ for feat in features:
 
 #set parameters for high wavelength tail interpolation
 smooth = 5
-fraction = 2.0/3.0
+fraction = 2.1/3.0
 newx = np.arange(int(x[fraction*len(x)]),13000)
 
 #func = interpolate.splrep(x[fraction*len(x):],y[fraction*len(x):],s=smooth)

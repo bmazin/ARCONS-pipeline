@@ -74,6 +74,6 @@ guessY = [12]
 
 ######################## For lightcurve.py ########################
 
-npzLoadFitFile = '~/scratch/standards/corot18_fit.npz'
+npzLoadFitFile = '~/scratch/standards/corot18/corot18_fit.npz'
 TotalNumFiles = 74
 

@@ -1,0 +1,13 @@
+datadir=/ScienceData/PAL2012/20121208
+flatdir=/Scratch/flatCalSolnFiles/20121211
+wvldir=/Scratch/waveCalSolnFiles/20121208
+fluxfile=obs_20121209-122039.h5
+skyfile=None
+flatfile=flatsol_combinedWvl_20121211.h5
+wvlfile=wvlCalFiles_combined_Dec082012.h5
+fluxdir=None
+fluxoutfile=None
+objectName=sdssj0926
+xpix = 16
+ypix = 8
+rad = 5

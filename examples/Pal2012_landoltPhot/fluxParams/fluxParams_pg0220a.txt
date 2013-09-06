@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2012/20121208
+flatdir=/Scratch/flatCalSolnFiles/20121211
+wvldir=/Scratch/waveCalSolnFiles/20121208
+fluxfile=obs_20121209-043516.h5
+skyfile=None
+flatfile=flatsol_20121211.h5
+wvlfile=calsol_20121209-042051.h5
+fluxdir=None
+fluxoutfile=None
+objectName=pg0220a
+xpix = 30
+ypix = 30
+rad = 6
+starttime = 70
+endtime = 140

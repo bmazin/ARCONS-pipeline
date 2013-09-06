@@ -34,6 +34,8 @@ from h5quicklook_v8_gui import Ui_h5quicklook
 c = 3.0E17 #[nm/s]
 h = 4.13567E-15 #[ev*s]
 
+bmapFromFile = False
+
 class StartQt4(QMainWindow):
 	def __init__(self,parent=None):
 		QWidget.__init__(self, parent)
@@ -72,7 +74,8 @@ class StartQt4(QMainWindow):
 
 		self.beammapfile = os.environ['BEAMMAP_PATH']#"beamimage.h5"
 		#load beam map from default beammap directory
-		self.loadbeammap()
+		if bmapFromFile == True:
+                    self.loadbeammap()
 		
 		#selection of bins is disabled.  Now automatically makes bins the same as the data range for 1 to 1 binning.
 		self.ui.nbins.setEnabled(False)
@@ -122,9 +125,12 @@ class StartQt4(QMainWindow):
 			self.ui.histogram_plot.canvas.ax.clear()
 			self.ui.histogram_plot.canvas.format_labels()
 			self.ui.histogram_plot.canvas.draw()
+                        if bmapFromFile == False:
+                            self.loadObsBmap()
 			self.display_obs_time()
 			self.display_header()
 			self.get_ut()
+
 		
 	def choosedark(self):
 		self.darkfile = QFileDialog.getOpenFileName(parent=None, caption=QString(str("Choose Dark File")),directory = ".",filter=QString(str("H5 (*.h5)")))
@@ -140,6 +146,14 @@ class StartQt4(QMainWindow):
 		self.savefile = QFileDialog.getSaveFileName(parent=None, caption=QString(str("Save File")), directory = ".")
 		os.rename(self.imfile, self.savefile)		
 		
+        def loadObsBmap(self):
+            h5file = openFile(str(self.datafile), mode = "r")
+            self.bmap = h5file.root.beammap.beamimage.read()
+            self.nxpix = shape(self.bmap)[1]
+	    self.nypix = shape(self.bmap)[0]
+            h5file.close()
+            print "Loaded beammap from obs file"
+
 	def get_ut(self):
 		#try:
 			h5file = openFile(str(self.datafile), mode = "r")
@@ -278,7 +292,7 @@ class StartQt4(QMainWindow):
 		return darray		
 	
 	def make_image(self):
-		
+		print "Generating Image..."
 		bmap = self.bmap
 		
 		self.set_dark_sub()

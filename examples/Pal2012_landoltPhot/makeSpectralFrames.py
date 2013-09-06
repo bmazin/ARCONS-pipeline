@@ -13,10 +13,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib
 
 """
-Created 2/7/2013 by Seth Meeker
-Routine for testing the application of FluxCal files.
 
 """
+
 def getTimeMaskFileName(obsFileName):
     scratchDir = os.getenv('INTERM_PATH')
     hotPixDir = os.path.join(scratchDir,'timeMasks')
@@ -112,6 +111,9 @@ def main():
     wvlfile = params[6].split('=')[1].strip()
     objectName = params[9].split('=')[1].strip()
 
+    #wvldir = "/Scratch/waveCalSolnFiles/oldbox_numbers/20121205"
+    #objectName = "crabNight1"
+
     if len(params)>10:
         xpix = int(params[10].split('=')[1].strip())
         ypix = int(params[11].split('=')[1].strip())
@@ -127,6 +129,7 @@ def main():
     obs = ObsFile(obsFileName)
     obs.loadWvlCalFile(wvlCalFileName)
     obs.loadFlatCalFile(flatCalFileName)
+    print "analyzing file %s"%(obsFileName)
     print "loaded data file and calibrations\n---------------------\n"
 
     nRow = obs.nRow
@@ -139,20 +142,11 @@ def main():
     #print nRow
     #print nCol
     #print nWvlBins
+    
 
-    #load/generate hot pixel mask file
-    HotPixFile = getTimeMaskFileName(obsFileName)
-    if not os.path.exists(HotPixFile):
-        hp.findHotPixels(obsFileName,HotPixFile)
-        print "Flux file pixel mask saved to %s"%(HotPixFile)
-    obs.loadHotPixCalFile(HotPixFile)
-    print "Hot pixel mask loaded %s"%(HotPixFile)
-
-    print "Making spectral cube"
-    #for pg0220 first sec should be 80 since object is moving around before this
-    #for pg0220A first sec should be 70, integration time is 140
-    #for landolt 9542 first sec should be 20, int time is -1
-    cubeDict = obs.getSpectralCube(firstSec=startTime, integrationTime=intTime, weighted=True)
+    #GET RAW PIXEL COUNT IMAGE TO CALCULATE CORRECTION FACTORS
+    print "Making raw cube to get dead time correction"
+    cubeDict = obs.getSpectralCube(firstSec=startTime, integrationTime=intTime, weighted=False)
 
     cube= np.array(cubeDict['cube'], dtype=np.double)
     wvlBinEdges= cubeDict['wvlBinEdges']
@@ -163,10 +157,62 @@ def main():
     print "cube shape ", np.shape(cube)
     print "effIntTime shape ", np.shape(effIntTime)
 
-
     #add third dimension to effIntTime for  broadcasting
     effIntTime = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
+    #put cube into counts/s in each pixel
     cube /= effIntTime
+
+    #CALCULATE DEADTIME CORRECTION
+    #NEED TOTAL COUNTS PER SECOND FOR EACH PIXEL TO DO PROPERLY
+    #ASSUMES SAME CORRECTION FACTOR APPLIED FOR EACH WAVELENGTH, MEANING NO WL DEPENDANCE ON DEAD TIME EFFECT
+    DTCorr = np.zeros((np.shape(cube)[0],np.shape(cube)[1]),dtype=float)
+    for f in range(0,np.shape(cube)[2]):
+        print cube[:,:,f]
+        print '-----------------------'
+        DTCorr += cube[:,:,f]
+        print DTCorr
+        print '\n=====================\n'
+    #Correct for 100 us dead time
+    DTCorrNew=DTCorr/(1-DTCorr*100e-6)
+    CorrFactors = DTCorrNew/DTCorr #This is what the frames need to be multiplied by to get their true values
+
+    print "Dead time correction factors = "
+    print CorrFactors
+
+
+
+    print "Making Weighted cube"
+    #REMAKE CUBE WITH FLAT WEIGHTS AND APPLY DEAD TIME CORRECTION AS WELL
+
+    #load/generate hot pixel mask file
+    HotPixFile = getTimeMaskFileName(obsFileName)
+    if not os.path.exists(HotPixFile): #check if hot pix file already exists
+        hp.findHotPixels(obsFileName,HotPixFile)
+        print "Flux file pixel mask saved to %s"%(HotPixFile)
+    obs.loadHotPixCalFile(HotPixFile)
+    print "Hot pixel mask loaded %s"%(HotPixFile)
+
+    cubeDict = obs.getSpectralCube(firstSec=startTime, integrationTime=intTime, weighted=False)
+
+    cube= np.array(cubeDict['cube'], dtype=np.double)
+    wvlBinEdges= cubeDict['wvlBinEdges']
+    effIntTime= cubeDict['effIntTime']
+    print "median effective integration time = ", np.median(effIntTime)
+
+    nWvlBins=len(wvlBinEdges)-1
+    print "cube shape ", np.shape(cube)
+    print "effIntTime shape ", np.shape(effIntTime)
+
+    #add third dimension to effIntTime for broadcasting
+    effIntTime = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
+    #put cube into counts/s in each pixel
+    cube /= effIntTime
+
+    #add third dimension to CorrFactors for broadcasting
+    CorrFactors = np.reshape(CorrFactors,np.shape(CorrFactors)+(1,))
+    #apply dead time correction factors
+    cube*=CorrFactors    
+
     
     #calculate midpoints of wvl bins for plotting
     wvls = np.empty((nWvlBins),dtype=float)
