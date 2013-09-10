@@ -43,7 +43,7 @@ class MKIDStd:
         self._loadSDSSFilters()
         # h is in Joules/sec and c is in meters/sec. 
         # This k value is used in conversions between counts and ergs
-        self.k = (1*10**-10/1*10**7)/h/c
+        self.k = ((1.0*10**-10)/(1.0*10**7))/h/c
 
         self.vegaInCounts = "not loaded yet"
 

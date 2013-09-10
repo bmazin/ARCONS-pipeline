@@ -1,4 +1,5 @@
 import numpy as np
+import sys, os
 import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from util import MKIDStd
@@ -9,6 +10,8 @@ from scipy.optimize.minpack import curve_fit
 from math import exp
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from headers import pipelineFlags
+import tables
 
 #normalizes a throughput file with the correct curve shape to the correct absolute height as measured by 
 #a file that was generated on a better night of data.
@@ -65,15 +68,62 @@ curveThru = np.append(IcurveThru, curveThruEnd)
 #curveThru = interpolate.griddata(IWvls,IcurveThru,wvls,'linear')
 print "interpolation done"
 
-plt.plot(wvls,curveThru)
-plt.xlim(3900,13000)
-plt.ylim(0,0.1)
+#plt.plot(wvls,curveThru)
+#plt.xlim(3900,13000)
+#plt.ylim(0,0.1)
 
 outarr = np.empty((len(wvls),2),dtype=float)
 outarr[:,0]=wvls
 outarr[:,1]=curveThru
 #save throughput curve to file
 np.savetxt("throughput.txt", outarr)
+
+#save absolute throughput measurement to fluxcal h5 file
+energyBinWidth = 0.1
+wvlStart = 3000
+wvlStop = 13000
+wvlBinEdges = ObsFile.makeWvlBins(energyBinWidth,wvlStart,wvlStop)
+
+fluxFactors = 1.0/curveThru
+print "flux Factors = "
+print fluxFactors
+
+fluxFlags = np.empty(np.shape(fluxFactors),dtype='int')
+fluxFlags.fill(pipelineFlags.fluxCal['good'])   #Initialise flag array filled with 'good' flags. JvE 5/1/2013.
+#set factors that will cause trouble to 1
+#self.fluxFlags[self.fluxFactors == np.inf] = 1
+fluxFlags[fluxFactors == np.inf] = pipelineFlags.fluxCal['infWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+fluxFactors[fluxFactors == np.inf]=1.0
+fluxFactors[np.isnan(fluxFactors)]=1.0
+fluxFlags[np.isnan(fluxFactors)] = pipelineFlags.fluxCal['nanWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+fluxFlags[fluxFactors <= 0]=pipelineFlags.fluxCal['LEzeroWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+fluxFactors[fluxFactors <= 0]=1.0
+
+fluxCalFileName = "fluxsol_absolute.h5"
+if os.path.isabs(fluxCalFileName) == True:
+    fullFluxCalFileName = fluxCalFileName
+else:
+    scratchDir = os.getenv('INTERM_PATH')
+    fluxDir = os.path.join(scratchDir,'fluxCalSolnFiles')
+    fullFluxCalFileName = os.path.join(fluxDir,fluxCalFileName)
+
+try:
+    fluxCalFile = tables.openFile(fullFluxCalFileName,mode='w')
+except:
+    print 'Error: Couldn\'t create flux cal file, ',fullFluxCalFileName
+
+calgroup = fluxCalFile.createGroup(fluxCalFile.root,'fluxcal','Table of flux calibration weights by wavelength')
+caltable = tables.Array(calgroup,'weights',object=fluxFactors,title='Flux calibration Weights indexed by wavelengthBin')
+flagtable = tables.Array(calgroup,'flags',object=fluxFlags,title='Flux cal flags indexed by wavelengthBin. 0 is Good')
+bintable = tables.Array(calgroup,'wavelengthBins',object=wvlBinEdges,title='Wavelength bin edges corresponding to third dimension of weights array')
+fluxCalFile.flush()
+fluxCalFile.close()
+print "Finished Flux Cal, written to %s"%(fullFluxCalFileName)
+
+plt.plot(wvls,1.0/curveThru)
+plt.xlim(3000,13000)
+plt.ylim(0,500)
+plt.show()
 
 peak = max(maxThru[(wvls>3900) & (wvls<6000)])
 peakwvl = wvls[maxThru==max(maxThru[(wvls>3900) & (wvls<6000)])]
@@ -83,11 +133,6 @@ curveThru /= curveThru[wvls == peakwvl]
 
 curveThru *= peak
 #print curveThru
-
-plt.plot(wvls,curveThru)
-plt.xlim(3900,13000)
-plt.ylim(0,0.1)
-plt.show()
 
 outarr = np.empty((len(wvls),2),dtype=float)
 outarr[:,0]=wvls
