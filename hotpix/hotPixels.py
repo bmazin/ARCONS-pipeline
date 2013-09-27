@@ -102,7 +102,7 @@ class headerDescription(tables.IsDescription):
     nCol = tables.UInt32Col(dflt=-1)   #To record how many pixel columns/rows were in
     nRow = tables.UInt32Col(dflt=-1)   #the data used to construct the mask.
     ticksPerSec = tables.Float64Col(dflt=np.nan)    #So that code which reads in the file can back out intervals in seconds if needed.
-    exptime = tables.Float64Col(dflt=np.nan)        #So that per-pixel effective exposure times can be calculated any time without having to refer to the original obs file. Added 6/21/2013, JvE, although not yet used elsewhere in the code.
+    expTime = tables.Float64Col(dflt=np.nan)        #So that per-pixel effective exposure times can be calculated any time without having to refer to the original obs file. Added 6/21/2013, JvE, although not yet used elsewhere in the code.
  
  
 def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
@@ -775,12 +775,12 @@ def getHotPixels(hotPixDict,integrationTime=-1,firstSec=0):
 
 if __name__ == "__main__":
     
-    paramFile = None
-    inputFile = None
+    paramFile = None    #'/Users/vaneyken/UCSB/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
+    inputFile = None    #'/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
     outputFile = None
     
     nArg = len(sys.argv)
-    if nArg == 1: paramFile = 'hotPixels.dict'
+    #if nArg == 1: paramFile = 'hotPixels.dict'
     if nArg > 1: paramFile = sys.argv[1]
     if nArg > 2: inputFile = sys.argv[2]
     if nArg > 3: outputFile = sys.argv[3]

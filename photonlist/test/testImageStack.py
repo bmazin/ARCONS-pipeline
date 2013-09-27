@@ -18,7 +18,8 @@ from util import utils
 
 def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default="/Scratch")+'/photonLists/20121211',
                    detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
-                   wvlMax=None, doWeighted=True, medCombine=False):
+                   wvlMax=None, doWeighted=True, medCombine=False,vPlateScale=0.1,
+                   nPixRA=250,nPixDec=250):
     '''
     Create an image stack
     INPUTS:
@@ -36,15 +37,14 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         medCombine - experimental, if True, do a median combine of the image stack
                      instead of just adding them all.... Prob. should be implemented
                      properly at some point, just a fudge for now.
+        vPlateScale (arcsec/pixel) - plate scale of virtual pixels in output image.
+        nPixRA, nPixDec - number of pixels in output image.
     
     OUTPUTS:
         Returns a stacked image object, saves the same out to a pickle file, and
         (depending whether it's still set to or not) saves out the individual non-
         stacked images as it goes. 
     '''
-    
-    nPixRA = 500        #Number of virtual pixels
-    nPixDec = 500
     
     #Get the list of filenames
     if fileNames[0]=='@':
@@ -57,7 +57,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         files = glob.glob(os.path.join(dir, fileNames))
 
     #Initialise empty image centered on Crab Pulsar
-    virtualImage = rdi.RADecImage(nPixRA=nPixRA,nPixDec=nPixDec,vPlateScale=0.1,
+    virtualImage = rdi.RADecImage(nPixRA=nPixRA,nPixDec=nPixDec,vPlateScale=vPlateScale,
                                   cenRA=1.4596725441339724, cenDec=0.38422539085925933)
     imageStack = []
                                   
@@ -100,7 +100,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
     except:
         warnings.warn('Unable to save results for some reason...')
     
-    return virtualImage, medComImage
+    return virtualImage, imageStack, medComImage
 
 
 

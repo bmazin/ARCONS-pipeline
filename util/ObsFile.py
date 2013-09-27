@@ -580,8 +580,10 @@ class ObsFile:
     def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
-        returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
-        integration time after accounting for time-masking.)
+        (with zero time at beginning of ObsFile).
+        Returns a list of:
+            timestamps (seconds from start of file),parabolaFitPeaks,baselines,effectiveIntTime (effective
+            integration time after accounting for time-masking.)
         parses packets from firstSec to firstSec+integrationTime.
         if integrationTime is -1, all time after firstSec is used.  
         
@@ -1044,14 +1046,15 @@ class ObsFile:
         else:
             if switchOnMask: self.switchOnHotPixTimeMask()
 
-        print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
-        print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
-        print "one interval"
-        for iRow in range(self.nRow):
-            for iCol in range(self.nCol):
-                print "iRow=",iRow," iCol=",iCol
-                for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
-                    print "   interval=",interval
+        #print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
+        #print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
+        #print "one interval"
+        #for iRow in range(self.nRow):
+            #for iCol in range(self.nCol):
+                #print "iRow=",iRow," iCol=",iCol
+                #for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
+                    #print "   interval=",interval
+
     def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
         self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
         if switchOnCosmicMask: self.switchOnCosmicTimeMask()
