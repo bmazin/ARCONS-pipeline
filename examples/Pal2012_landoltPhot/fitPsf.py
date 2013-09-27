@@ -65,7 +65,7 @@ FramesPerFile = param['FramesPerFile']
 #NumFrames = NumFiles
 
 NumFrames = 31
-print NumFrames
+print "There should be this many frames: ", NumFrames
 guessX = param['guessX'][0]
 guessY = param['guessY'][0]
 
@@ -73,15 +73,22 @@ stackDict = np.load(npzLoadFile)
 
 stack = stackDict['stack']
 wvls = stackDict['wvls']
-print len(wvls)
+print "The file actually has this many: ", len(wvls)
 paramsList = []
 errorsList = []
 fitImgList = []
 chisqList = []
 plt.ion()
 
+
+
 for iFrame in range(0,np.shape(stack)[0]):
     frame = stack[iFrame,:,:]
+    
+    #print "Frame max= ", np.nanmax(frame,axis=None)
+    #frame *= CorrFactors
+    #print "Corrected Frame max= ", np.nanmax(frame,axis=None)
+
     nanMask = np.isnan(frame)
 
     #for interval in xrange(len(NumFrames)-1):
@@ -90,29 +97,66 @@ for iFrame in range(0,np.shape(stack)[0]):
     #            guessX = guessX[interval]
     #            guessY = guessY[interval]
     #             print guessX, guessY
- 
-    apertureMask = aperture(guessX,guessY,radius=7)
+    '''
+    apertureMask = aperture(guessX,guessY,radius=4)
     err = np.sqrt(frame) #divide by 2 to constrain PSF fit even tighter to avoid fitting to wrong peak if PSF is divided by dead pixels
-    #err = np.ones(np.shape(frame))
-    err[apertureMask==1] = 1E2 #weight points closer to the expected psf higher
+    err[frame > 100]=np.inf
+    #err[frame<10] = 100
+    frame[nanMask] = 0 #set to finite value that will be ignored
+    err[nanMask] = np.inf #ignore these data points
+    err[frame==0] = np.inf
+    err[apertureMask==1] = 1.0 #np.sqrt(frame[apertureMask==1])/2.0 #weight points closer to the expected psf higher
+    
+    nearDeadCutoff = 1 #100/15 cps for 4000-6000 angstroms
+    err[frame<nearDeadCutoff] = np.inf
+    entireMask = (err==np.inf)
+    maFrame = np.ma.masked_array(frame,entireMask)
+    '''
+    apertureMask = aperture(guessX,guessY,radius=7)
+    
+    #if iFrame < 19:
+    #    err = np.ones(np.shape(frame))*10.0
+    #else:
+    #    err = np.zeros(np.shape(frame))
+    err = np.ones(np.shape(frame))*10.0
+    err[apertureMask==1] = np.inf #weight points closer to the expected psf higher
+    err[frame>100] = np.inf
     frame[nanMask]=0#set to finite value that will be ignored
-    err[nanMask] = 1E6 #ignore these data points
+    err[nanMask] = np.inf#ignore these data points
     nearDeadCutoff=1#100/15 cps for 4000-6000 angstroms
     err[frame<nearDeadCutoff] = np.inf
     entireMask = (err==np.inf)
     maFrame = np.ma.masked_array(frame,entireMask)
-    guessAmp = 40.
-    guessHeight = 10.
-    guessWidth=1.6
+
+    guessAmp = 30.
+    guessHeight = 5.
+    guessWidth = 1.3
     guessParams = [guessHeight,guessAmp,guessX,guessY,guessWidth]
-    limitedmin = 5*[True] 
+    limitedmin = 5*[True]
     limitedmax = 5*[True]
-    minpars = [0,0,0,0,.1] #default min pars, usually work fine
-    #minpars = [0,0,0,0,1] #tighter constraint on PSF width to avoid fitting wrong peak if PSF is divided by dead pixels
-    maxpars = [5000,10000,43,45,10]
+    minpars = [0,0,0,0,0.1] #default min pars, usually work fine
+    #minpars = [0,0,27,27,1] #tighter constraint on PSF width to avoid fitting wrong peak if PSF is divided by dead pixels
+    maxpars = [40,200,43,43,10]
+    #maxpars = [40,200,33,33,10]
+    if iFrame == 27:
+        minpars = [8,5,0,0,0.5]
+        maxpars = [30,25,43,45,1.1]
+    if iFrame == 28:
+        minpars = [8,5,0,0,0.5]
+        maxpars = [30,25,43,45,1.1]
+    if iFrame == 29:
+        minpars = [8,5,0,0,0.5]
+        maxpars = [30,25,43,45,1.1]
+    if iFrame == 30:
+        minpars = [8,5,0,0,0.5]
+        maxpars = [30,25,43,45,1.10]
+    
     usemoments=[True,True,True,True,True] #doesn't use our guess values, default
     #usemoments=[False,False,False,False,False]
-    
+
+    print "=========================="
+    print wvls[iFrame]
+    print "frame ",iFrame
     out = gaussfit(data=maFrame,err=err,params=guessParams,returnfitimage=True,quiet=True,limitedmin=limitedmin,limitedmax=limitedmax,minpars=minpars,maxpars=maxpars,circle=1,usemoments=usemoments,returnmp=True)
     mp = out[0]
 
@@ -184,4 +228,23 @@ errors = np.array(errorsList)
 np.savez(npzfitpsf,fitImg=cube,params=params,errors=errors,chisqs=chisqs,wvls=wvls)
 print 'saved'
 utils.makeMovie(fitImgList,frameTitles=wvls, cbar=True, outName=giffitpsf, normMin=0, normMax=50)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

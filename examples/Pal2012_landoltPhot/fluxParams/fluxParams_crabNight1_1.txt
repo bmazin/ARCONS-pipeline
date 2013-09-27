@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2012/20121205
+flatdir=/Scratch/flatCalSolnFilesWOldWvlCal/20121207
+wvldir=/Scratch/waveCalSolnFiles/20121205
+fluxfile=obs_20121206-052520.h5
+skyfile=None
+flatfile=flatsol_20121207.h5
+wvlfile=calsol_20121206-051341.h5
+fluxdir=None
+fluxoutfile=None
+objectName=crabNight1
+xpix = 12
+ypix = 9
+rad = 4
+starttime = 0
+endtime = -1

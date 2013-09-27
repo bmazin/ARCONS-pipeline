@@ -2,15 +2,26 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from sdssgaussfitter import twodgaussian
 
-rawfile = '/home/srmeeker/scratch/standards/sdssj0926_raw_0.npz'
 
-fitfile = '/home/srmeeker/scratch/standards/sdssj0926_fit_0.npz'
+rawfile = '/home/srmeeker/scratch/standards/Landolt9542_raw_0.npz'
+
+#rawfile = '/home/srmeeker/scratch/standards/pg0220a_raw_0.npz'
+#rawfile = '/home/srmeeker/scratch/standards/G158-100_raw_0.npz'
+#rawfile = '/home/srmeeker/ARCONS-pipeline/examples/Pal2012_landoltPhot/Landolt9542_V_all_0.npz'
+
+fitfile = '/home/srmeeker/scratch/standards/Landolt9542_fit_0.npz'
+#fitfile = '/home/srmeeker/scratch/standards/pg0220a_fit_0.npz'
+#fitfile = '/home/srmeeker/scratch/standards/G158-100_fit_0.npz'
+#fitfile = '/home/srmeeker/ARCONS-pipeline/examples/Pal2012_landoltPhot/Landolt9542_V_fit.npz'
+
 
 rawDict = np.load(rawfile)
 fitDict = np.load(fitfile)
 
 fit = fitDict['fitImg']
+params = fitDict['params']
 raw = rawDict['stack']
 wvls = rawDict['wvls']
 
@@ -26,8 +37,8 @@ for i in range(ny):
 for i in range(nx):
     ys[i,:] = np.array(np.arange(ny))
 
-print xs
-print ys
+#print xs
+#print ys
 
 for n in range(np.shape(raw)[0]):
     fig = plt.figure()
@@ -44,7 +55,7 @@ for n in range(np.shape(raw)[0]):
     cset = ax.contour(xs,ys,fit[n], zdir='y', offset=60, cmap=cm.winter)
 
     ax.set_title(wvls[n])
-    ax.set_zlim(0, 100)
+    ax.set_zlim(0, 170)
     ax.set_xlabel('Col')
     ax.set_ylabel('Row')
     ax.set_zlabel('Counts')

@@ -28,7 +28,7 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         #        y = y[inds]
 
         #fit a tail to the end of the spectrum to interpolate out to desired wavelength in angstroms
-        fraction = 2.1/3
+        fraction = 4.0/5.0
         newx = np.arange(int(x[fraction*len(x)]),20000)
 
         slopeguess = (np.log(y[-1])-np.log(y[fraction*len(x)]))/(x[-1]-x[fraction*len(x)])
@@ -49,6 +49,8 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         calcx = np.array(newx,dtype=float)
         newy = best_fit(calcx)
 
+        plt.plot(calcx,newy) #plot exponential tail
+
         #func = interpolate.splrep(x[fration*len(x):],y[fraction*len(x):],s=smooth)
         #newx = np.arange(int(x[fraction*len(x)]),self.wvlBinEdges[-1])
         #newy = interpolate.splev(newx,func)
@@ -66,7 +68,7 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         rebinned = rebin(wl,flux,enBins)
         re_wl = rebinned[:,0]
         re_flux = rebinned[:,1]
-        #plt.plot(re_wl,re_flux,color='r')
+        plt.plot(re_wl,re_flux,) #plot rebinned spectrum with exp tail
         
         re_wl = re_wl[np.isnan(re_flux)==False]
         re_flux = re_flux[np.isnan(re_flux)==False]
@@ -111,7 +113,7 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         #weight = 1.0/weight
         #weight = weight/max(weight)
         print weight
-        f = interpolate.splrep(re_wl,re_flux,w=weight,k=3,s=max(re_flux)**200)
+        f = interpolate.splrep(re_wl,re_flux,w=weight,k=2,s=0)#max(re_flux)**300)
         new_flux = interpolate.splev(new_wl,f,der=0)
         return new_wl, new_flux
 
@@ -119,7 +121,7 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
 c=3.00E18 #Angs/s
 h=6.626E-27 #erg*s
 
-FileName = '/home/srmeeker/scratch/standards/G158-100_fit.npz'
+FileName = '/home/srmeeker/scratch/standards/G158-100_fit_0.npz'
 NumFrames = 31
 
 t = np.load(FileName)
@@ -143,17 +145,17 @@ ypos = params[:,3]
 #print len(wvls)
 #print len(binWidths)
 
-curve = 2*np.pi*amps*(widths**2) #spectrum of oberved object in counts/s
+curve = 2*np.pi*amps*widths*widths #spectrum of oberved object in counts/s
 curve /= binWidths #spectrum is now in counts/s/Angs
 
 diam = 500 #5 meter telescope
-area = np.pi * ((diam/2.0)**2 -(diam/4.0)**2)
+area = np.pi * ((diam/2.0)**2 -(100)**2)
 curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 #SETUP PLOTTING
 fig = plt.figure()
 ax = fig.add_subplot(111)
-plt.xlim(3700,13000)
+plt.xlim(3700,16000)
 #plt.ylim(0,0.001)
 
 #LOAD KNOWN SPECTRUM OF STANDARD
@@ -170,11 +172,19 @@ objectName = "G158-100"
 #convert from ergs/s to counts/s
 
 #Manually load G158 standard file. MKIDStd units may be wrong.
-scale = (1.0E16) #for .dat files strange unit scaling
-fname = 'fg158_100.dat'
+#scale = (1.0E16) #for .dat files strange unit scaling
+#fname = 'fg158_100.dat'# flux in 10^16 ergs/s/cm^2/Angs
+
+fname = "G158_Filippenko_1984.txt" #flux in micro-janksys
+scale = 10.0**6.0 #convert to janskys
+
 fdata = np.loadtxt(fname,dtype=float)
-x = np.array(fdata[:,0])
-y = np.array(fdata[:,1])/scale #flux in ergs/s/cm^2/Angs
+x = np.array(fdata[:,0]) #angstroms
+#y = np.array(fdata[:,1])/scale #flux in ergs/s/cm^2/Angs
+
+y = np.array(fdata[:,1])/scale #convert to flux in Janskys
+y = y*(3e-5)/(x**2) #flux in ergs/s/cm^2/Angs
+
 print y
 y = y/(h*c/x) #flux in counts/s/cm^2/Angs
 print y
@@ -183,9 +193,11 @@ print "Loaded standard spectrum of %s"%(objectName)
 newwl, newflux = cleanSpectrum(x,y,objectName,wvlBinEdges)
 print newwl
 print newflux
-#plt.plot(newwl,newflux)
-#plt.plot(x,y)
-#plt.show()
+plt.plot(newwl,newflux)
+plt.plot(x,y)
+plt.title("Standard spectrum with exponential tail fit")
+plt.legend(['Exponential Tail','Rebinned Spectrum','Final Refitted spectrum','Original Spectrum'],'br')
+plt.show()
 
 newa = rebin(newwl,newflux,wvlBinEdges)
 x = newa[:,0]
@@ -197,7 +209,7 @@ y = newa[:,1]
 ax.plot(wvls,curve)
 ax.plot(x,y)
 ax.set_title('Absolute Spectrum of  '+FileName.split('/')[-1].split('_')[0])
-ax.set_yscale('log')
+#ax.set_yscale('log')
 
 plt.show()
 
