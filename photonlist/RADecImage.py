@@ -2,9 +2,8 @@
 Author: Julian van Eyken                    Date: May 15 2013
 
 Package/class for handling of images created from photon lists that are derotated and
-mapped to sky coordinates.
+mapped to sky coordinates, and stacked.
 
-Under construction....
 '''
 
 import time
@@ -208,9 +207,13 @@ class RADecImage(object):
         if wvlMin is None:
             assert wvlMin is None and wvlMax is None
             print '(getting all wavelengths)'
-            tic = time.clock()
+            #tic = time.clock()
             photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')
-            print 'Time taken (s): ',time.clock()-tic
+            #print 'v1 time taken (s): ', time.clock()-tic
+            #tic = time.clock()
+            #photons = np.array([row.fetch_all_fields() for row in photTable.where('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')])
+            #photIndices = photTable.getWhereList('(arrivalTime>=firstSec) & (arrivalTime<=lastSec)')
+            #print 'v2 time taken (s): ', time.clock()-tic
             #print 'Doing by second method'
             #tic = time.clock()
             #photons2 = [x for x in photons.iterrows() if (x['arrivalTime']>=firstSec) and (x['arrivalTime']<=lastSec)]
