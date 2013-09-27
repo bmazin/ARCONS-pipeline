@@ -580,8 +580,10 @@ class ObsFile:
     def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
-        returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
-        integration time after accounting for time-masking.)
+        (with zero time at beginning of ObsFile).
+        Returns a list of:
+            timestamps (seconds from start of file),parabolaFitPeaks,baselines,effectiveIntTime (effective
+            integration time after accounting for time-masking.)
         parses packets from firstSec to firstSec+integrationTime.
         if integrationTime is -1, all time after firstSec is used.  
         
