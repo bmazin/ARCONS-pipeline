@@ -22,14 +22,24 @@ from scipy.optimize import curve_fit
 from scipy.stats import expon
 import time
 import pickle
+import logging
 class Cosmic:
 
     def __init__(self, fn, beginTime=0, endTime='exptime', \
-                     nBinsPerSec=10, flashMergeTime=1.0):
+                     nBinsPerSec=10, flashMergeTime=1.0, 
+                 loggingLevel=logging.CRITICAL,
+                 loggingHandler=logging.StreamHandler()):
+        
         """
         Opens fileName in MKID_DATA_DIR, sets roachList
         endTime is exclusive
         """
+        self.logger = logging.getLogger("cosmic")
+        self.logger.setLevel(loggingLevel)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        loggingHandler.setFormatter(formatter)
+        self.logger.addHandler(loggingHandler)
+        self.logger.info("begin init")
         self.fn = fn
         self.fileName = fn.obs();
         self.file = ObsFile(self.fileName)
@@ -64,6 +74,7 @@ class Cosmic:
         self.rNSurvived = {} # number of survivors from meanclip
         self.rNormed = {} # (value-mean)/sigma
         self.flashInterval = {}
+        self.logger.info("end of init")
     def __del__(self):
         """
         Close any open files
@@ -166,10 +177,8 @@ class Cosmic:
         rlAll = list(self.roachList)
         rlAll.append("all")
         ticksPerSecond = int(1.0/self.file.tickDuration)
-        print "ticksPerSecond=",ticksPerSecond
         offset = self.beginTime*ticksPerSecond
         scale = 1.0/(self.file.tickDuration*self.nBinsPerSec)
-        print "offset=",offset,"  scale=",scale
         for roach in rlAll:
             self.flashInterval[roach] = offset+scale*self.flashInterval[roach]
 
@@ -219,7 +228,7 @@ class Cosmic:
         """
         self.timeHgs = {}
         for iSec in range(self.beginTime, self.endTime):
-            print "Cosmic.makeTimeHgs:  iSec=%4d / %4d" % (iSec,self.endTime)
+            self.logger.info("in makeTimeHgs iSec=%4d / %4d" % (iSec,self.endTime))
             hgsThisSec = {}
             for iRow in range(self.file.nRow):
                 for iCol in range(self.file.nCol):
@@ -318,12 +327,14 @@ class Cosmic:
 
         """
 
+        self.logger.info("begin findCosmics")
         exptime = self.endTime-self.beginTime
         nBins = int(np.round(self.file.ticksPerSec*exptime+1))
         bins = np.arange(0, nBins, 1)
         timeHgValues = np.zeros(nBins, dtype=np.int64)
         frameSum = np.zeros((self.file.nRow,self.file.nCol))
         integrationTime = self.endTime - self.beginTime
+        self.logger.info("get all time stamps")
         for iRow in range(self.file.nRow):
             #print "Cosmic.findCosmics:  iRow=",iRow
             for iCol in range(self.file.nCol):
@@ -334,12 +345,14 @@ class Cosmic:
                     timestamps = \
                         (timestamps - self.beginTime)*self.file.ticksPerSec
                     # per Matt S. suggestion 2013-07-09
-                    ts64 = np.round(timestamps).astype(np.uint64)
-                    tsBinner.tsBinner(ts64, timeHgValues)
-                    frameSum[iRow,iCol] += ts64.size
+                    ts32 = np.round(timestamps).astype(np.uint32)
+                    tsBinner.tsBinner32(ts32, timeHgValues)
+                    frameSum[iRow,iCol] += ts32.size
+        self.logger.info("call populationFromTimeHgValues")
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
         #now build up all of the intervals in seconds
+        self.logger.info("build up intervals")
         i = interval()
         for cosmicTime in pfthgv['cosmicTimeList']:
             t0 = max(0,self.beginTime+(cosmicTime-50)/1.e6)
@@ -440,8 +453,8 @@ class Cosmic:
                 gtpl = self.getTimedPacketList(iRow,iCol,sec0,1)
         timestamps = gtpl['timestamps']
         timestamps *= cosmic.file.ticksPerSec
-        ts64 = timestamps.astype(np.uint64)
-        for ts in ts64:
+        ts32 = timestamps.astype(np.uint32)
+        for ts in ts32:
             tindex = ts-t0
             try:
                 listOfPixelsToMark[tindex].append((iRow,iCol))
@@ -495,12 +508,12 @@ class Cosmic:
                     # make it the type np.uint64
                     # round per Matt S. suggestion 2013-07-09
                     #ts64 = (timeStamps).astype(np.uint64)
-                    ts64round = np.round(timeStamps).astype(np.uint64)
-                    tsBinner.tsBinner(ts64round, timeHgValues)
+                    ts32round = np.round(timeStamps).astype(np.uint32)
+                    tsBinner.tsBinner(ts32round, timeHgValues)
         
                     temp = 1e6*(timeStamps-firstSec)
                     for i in range(len(timeStamps)):
-                        ts64 = ((timeStamps-firstSec)*1e6).astype(np.uint64)
+                        ts32 = ((timeStamps-firstSec)*1e6).astype(np.uint32)
                     # add these timestamps to the histogram timeHgValues
         remain0 = int(t0%1e6)
         remain1 = int(t1%1e6)
