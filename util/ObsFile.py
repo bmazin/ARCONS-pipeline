@@ -660,6 +660,10 @@ class ObsFile:
             timestamps = np.concatenate(timestamps)
             baselines = np.concatenate(baselines)
             peakHeights = np.concatenate(peakHeights)
+        else:
+            timestamps = np.array([])
+            baselines = np.array([])
+            peakHeights = np.array([])
 
 #        if self.timeAdjustFile != None:
 #            timestamps += self.firmwareDelay
