@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import inspect
 from util import ObsFile, FileName
 from cosmic.Cosmic import Cosmic
-import interval
+#import interval
 #from util.FileName import FileName
 #from util.ObsFile import ObsFile
 
@@ -82,7 +82,7 @@ class TestObsFile(unittest.TestCase):
     def testCalculateSlicesMiddle(self):
         "one interval in the middle of the set of timestamps"
         secs = np.arange(10)
-        inter = interval[2,6]
+        inter = interval([2,6])
         slices = ObsFile.calculateSlices(inter, secs)
         self.assertEquals(slices, ["0:2","7:10"])
         new = ObsFile.repackArray(secs, slices)
@@ -91,7 +91,7 @@ class TestObsFile(unittest.TestCase):
     def testCalculateSlicesBeginningAndEnd(self):
         "one interval at the beginning and one at the end"
         secs = np.arange(10)
-        inter = interval[0,3] | interval[8,9]
+        inter = interval([0,3]) | interval([8,9])
         slices = ObsFile.calculateSlices(inter, secs)
         new = ObsFile.repackArray(secs, slices)
         self.assertTrue(npEquals(new, np.array([4,5,6,7])))
@@ -110,7 +110,7 @@ class TestObsFile(unittest.TestCase):
         # specific to the file, pixel, and second we parsed
         self.assertEquals(len(ts),66)
         xs = [200000,400000]
-        inter = interval[xs[0],xs[1]]
+        inter = interval([xs[0],xs[1]])
         tsm,pfpm,blm = obsFile.parsePhotonPackets(packet, inter)
         # specific to the file, pixel, and second we parsed
         self.assertEquals(len(tsm),50)
@@ -200,11 +200,22 @@ iRow= 44  iCol= 43
         times1 = gtpl1['timestamps']
         peaks1 = gtpl1['peakHeights']
 
-        cosmicInterval = interval.interval()
-        cosmicInterval = cosmicInterval | interval.interval[58.25,58.75]
+        cosmicInterval = interval()
+        cosmicInterval = cosmicInterval | interval([58.25,58.75])
+
+        beginTime = 1.234
+        endTime = 5.432
+        stride = 12
+        threshold = 6543
+        nSigma = 7.8
+        populationMax = 2222
         ObsFile.ObsFile.writeCosmicIntervalToFile(cosmicInterval, 
                                                   obsFile.ticksPerSec, 
-                                                  'temp.h5')
+                                                  'temp.h5',
+                                                  beginTime, endTime, stride,
+                                                  threshold, nSigma, populationMax)
+
+        readInterval = ObsFile.ObsFile.readCosmicIntervalFromFile("temp.h5")
 
         obsFile.loadCosmicMask('temp.h5')
         gtpl2 = obsFile.getTimedPacketList(iRow,iCol,firstSec,integrationTime)
@@ -231,7 +242,7 @@ iRow= 44  iCol= 43
 
     def testGetTimedPacketList2(self):
         """
-        this seems to get a timestamp outside of beginTime, beginTime+expTime
+        this seems to get a timestamp outside of beginTime, beginTime+expTime.  Matt knows about this, and since it happens only for the first photon it is not a priority.
         """
         run = 'PAL2012'
         sundownDate = '20121211'

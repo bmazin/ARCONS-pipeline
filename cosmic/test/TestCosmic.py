@@ -391,7 +391,39 @@ class TestCosmic(unittest.TestCase):
                 np.array([30,35,26])))
 
 
-        
+    def testCountMaskedBins(self):
+        """count the number of time bins that the interval masks"""
+        i = interval([1,3]) | interval([10,20])
+        cmb = Cosmic.countMaskedBins(i)
+        self.assertEquals(12,cmb)
+
+    def testMask(self):
+        run = 'PAL2012'
+        obsDate = '20121211'
+        seq = '20121212-113212'
+        fn = FileName.FileName(run, obsDate, seq)
+        cosmic = Cosmic(fn, beginTime= 222, endTime=232,\
+                                 nBinsPerSec = 10, loggingLevel=logging.FATAL)
+
+        iRow = 44
+        iCol = 43
+        firstSec = 10
+        integrationTime = 5
+        gtpl0 = cosmic.file.getTimedPacketList(iRow, iCol, firstSec, integrationTime)
+
+        t0 = 11.5
+        t1 = 12.5
+        cosmic.file.cosmicMask = interval([t0,t1])
+        cosmic.file.cosmicMaskIsApplied = True
+        gtpl1 = cosmic.file.getTimedPacketList(iRow, iCol, firstSec, integrationTime)
+
+        print "number of photons = ",len(gtpl0['timestamps']),len(gtpl1['timestamps'])
+        plt.clf()
+        plt.plot(gtpl0['timestamps'],gtpl0['peakHeights'],label="all")
+        plt.plot(gtpl1['timestamps'],gtpl1['peakHeights'],'ro',label="not masked")
+        plt.legend(loc="lower right")
+        plt.savefig(inspect.stack()[0][3]+".png")
+
 if __name__ == '__main__':
     unittest.main()
 
