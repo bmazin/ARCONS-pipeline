@@ -109,7 +109,7 @@ for iSeq in range(len(seqs)):
             times.append(jd)
             titles.append('%.6f'%jd)
             frameData = ob.getPixelCountImage(firstSec=sec,integrationTime=integrationTime,weighted=True,scaleByEffInt=True)
-            frame = frameData['image']         
+            frame = frameData['image']
             showFrame = np.array(frame)
             showframes.append(showFrame)
             frame[deadMask == 0] = np.nan
