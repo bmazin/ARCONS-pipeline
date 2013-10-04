@@ -79,7 +79,7 @@ class Cosmic:
         """
         Close any open files
         """
-        #print "now in Cosmic.__del__ for ",self.fileName
+        # print "now in Cosmic.__del__ for ",self.fileName
         try:
             del self.file
         except:
@@ -352,25 +352,18 @@ class Cosmic:
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
         #now build up all of the intervals in seconds
-        self.logger.info("build up intervals")
+        self.logger.info("build up intervals:  nCosmicTime=%d"%len(pfthgv['cosmicTimeList']))
         i = interval()
+        iCount = 0
         for cosmicTime in pfthgv['cosmicTimeList']:
             t0 = max(0,self.beginTime+(cosmicTime-50)/1.e6)
             t1 = min(self.endTime,self.beginTime+(cosmicTime+50)/1.e6)
-            intTime = t1-t0
-            tempTs = np.array([])
-            for iRow in range(self.file.nRow):
-                for iCol in range(self.file.nCol):
-                    gtpl = self.file.getTimedPacketList(iRow, iCol, 
-                                                        t0, intTime)
-                    tempTs = np.append(tempTs, gtpl['timestamps'])
-            mean = tempTs.mean()
-            sigma = tempTs.std()
-            left  = mean-nSigma*sigma
-            #the cosmic events tend to have more peaks on the right side,
-            #so more data is masked out in that direction
-            right = mean+2*nSigma*sigma
+            intTime = t1-t0            
+            left = t0-nSigma*intTime
+            right = t1+2*nSigma*intTime
             i = i | interval[left,right]
+            self.logger.info("iCount=%d t0=%f t1=%f left=%f right=%f"%(iCount,t0,t1,left,right))
+            iCount+=1
         retval = {}
         retval['timeHgValues'] = timeHgValues
         retval['populationHg'] = pfthgv['populationHg']
@@ -380,6 +373,12 @@ class Cosmic:
         retval['interval'] = i
         return retval
 
+    @staticmethod
+    def countMaskedBins(i):
+        retval = 0
+        for x in i:
+            retval += x[1]-x[0]
+        return retval
 
     @staticmethod
     def populationFromTimeHgValues(timeHgValues,populationMax,stride,threshold):

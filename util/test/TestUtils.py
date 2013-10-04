@@ -31,7 +31,7 @@ class TestUtils(unittest.TestCase):
         listOfFrameObj = []
         frameTitles = []
         for iFrame in range(nrow):
-            print "iFrame=",iFrame
+            #print "iFrame=",iFrame
             frame = []
             for iRow in range(nrow):
                 if (iRow < iFrame):

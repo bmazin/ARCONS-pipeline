@@ -1238,7 +1238,9 @@ class ObsFile:
         self.cosmicMaskIsApplied = True
 
     @staticmethod
-    def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName):
+    def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName,
+                                  beginTime, endTime, stride,
+                                  threshold, nSigma, populationMax):
         h5f = tables.openFile(fileName, 'w')
 
         headerGroup = h5f.createGroup("/", 'Header', 'Header')
@@ -1246,6 +1248,12 @@ class ObsFile:
                                       cosmicHeaderDescription, 'Header')
         header = headerTable.row
         header['ticksPerSec'] = ticksPerSec
+        header['beginTime'] = beginTime
+        header['endTime'] = endTime
+        header['stride'] = stride
+        header['threshold'] = threshold
+        header['nSigma'] = nSigma
+        header['populationMax'] = populationMax 
         header.append()
         headerTable.flush()
         headerTable.close()
@@ -1497,4 +1505,9 @@ def repackArray(array, slices):
 
 class cosmicHeaderDescription(tables.IsDescription):
     ticksPerSec = tables.Float64Col() # number of ticks per second
-
+    beginTime = tables.Float64Col()   # begin time used to find cosmics (seconds)
+    endTime = tables.Float64Col()     # end time used to find cosmics (seconds)
+    stride = tables.Int32Col()
+    threshold = tables.Float64Col()
+    nSigma = tables.Int32Col()
+    populationMax = tables.Int32Col()
