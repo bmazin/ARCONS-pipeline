@@ -2,7 +2,8 @@ import time,calendar
 import string
 import numpy
 import scipy
-import sys, os
+import sys, os, inspect
+from gittle import Gittle
 import tables
 import pylab
 import glob
@@ -12,6 +13,7 @@ import binascii
 import math
 from scipy.signal import convolve
 import scipy.ndimage
+
 #from interval import interval
 
 """
@@ -36,7 +38,7 @@ printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
 rebin2D(a, ysize, xsize)
 replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True)
-
+getGitStatus()
 """
 
 def aperture(startpx,startpy,radius=3):
@@ -574,3 +576,40 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
         if not iterate: break 
 
     return outputarray
+
+def getGit():
+    """
+    return a Gittle, which controls the state of the git repository
+    """
+    utilInitFile = inspect.getsourcefile(sys.modules['util'])
+    if (not os.path.isabs(utilInitFile)):
+        utilInitFile = os.path.join(os.getcwd(),utilInitFile)
+    arconsRoot = os.path.split(os.path.split(utilInitFile)[0])[0]
+    print "arconsRoot=",arconsRoot
+    git = Gittle(arconsRoot)
+    return git
+    
+def getGitStatus():
+    """
+    returns a dictionary with the following keys;
+
+    repo : the repository (local directory)
+    log0 : the most recent log entry
+    remotes: the remote repository/repositories
+    remote_branches:  name and tag for the remote branches
+    head:  the current check out commit
+    has_commits:  boolean -- True if there is code here that has not been committed
+    modified_files:  a list of files that have been modified (including ones that are not tracked by git
+    modified_unstaged_files:  a list of "important" files that are modified but not committed
+    """
+    git = getGit()
+    return {"repo":git.repo,
+            "log0":git.log()[0],
+            "last_commit":git.last_commit,
+            "remotes":git.remotes,
+            "remote_branches":git.remote_branches,
+            "head":git.head,
+            "has_commits":git.has_commits,
+            "modified_files":git.modified_files,
+            "modified_unstaged_files":git.modified_unstaged_files
+            }
