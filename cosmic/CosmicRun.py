@@ -16,6 +16,7 @@ from interval import interval, inf, imath
 from cosmic import tsBinner
 import os
 import sys
+import logging
 class CosmicRun:
     
     def __init__(self, path):
@@ -27,6 +28,7 @@ class CosmicRun:
             temp = line.split("=")
             if len(temp) > 1:
                 self.s[temp[0].strip()] = temp[1].strip()
+                print temp[0].strip(), '=', temp[1].strip()
         file.close()
 
     def findv1(self):
@@ -40,18 +42,29 @@ class CosmicRun:
             if not os.path.exists(outfileName):
                 fn = FileName(self.s['run'], 
                               self.s['sundownDate'], 
-                              self.s['obsDate']+"-"+seq)
-                cosmic = Cosmic(fn, endTime=100)
+                              self.s['obsDate']+"-"+str(seq))
+                cosmic = Cosmic(fn, 
+                                beginTime=self.s['beginTime'],
+                                endTime=self.s['endTime'],
+                                loggingLevel = logging.INFO)
+
                 fc = cosmic.findCosmics(stride=int(self.s['stride']), 
                                         threshold=int(self.s['threshold']), 
                                         populationMax=populationMax,
-                                        nSigma=int(self.s['nSigma']))
+                                        nSigma=float(self.s['nSigma']))
                 outfile = open(outfileName, "wb")
                 pickle.dump(fc['cosmicTimeList'],outfile)
                 pickle.dump(fc['binContents'],outfile)
                 outfile.close()
                 cfn = "cosmicMask-%s.h5"%seq
-                ObsFile.writeCosmicIntervalToFile(fc['interval'],1.0e6, cfn)
+                ObsFile.writeCosmicIntervalToFile(fc['interval'],1.0e6, cfn,
+                                                  self.s['beginTime'],
+                                                  self.s['endTime'],
+                                                  int(self.s['stride']),
+                                                  int(self.s['threshold']),
+                                                  float(self.s['nSigma']),
+                                                  populationMax)
+
                 del cosmic
 
     def makemovie1(self):
@@ -111,12 +124,12 @@ class CosmicRun:
 
 
 if __name__ == '__main__':
-    print "abc"
     if len(sys.argv) >1:
         path = sys.argv[1]
     else:
         path = "."
     cosmicRun = CosmicRun(path)
     cosmicRun.findv1()
+    print "now call makemovie1"
     cosmicRun.makemovie1()
     print "glorious success"

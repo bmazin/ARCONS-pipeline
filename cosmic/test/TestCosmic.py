@@ -97,6 +97,34 @@ class TestCosmic(unittest.TestCase):
         self.assertEquals(populationHg[0][4], 1)
         self.assertEquals(populationHg[0][5], 1)
 
+    def test_pfthv2(self):
+        """
+        Demonstrate the static method  populationFromTimeHgValues
+
+        Put 1 photon in 10 successive time ticks (starting at tick 15), 
+        and 0 photons in the rest of the time ticks.
+
+        For a stride of 10, the method samples 7 time bins.  The bins overlap
+        by stride/2.
+
+        The populationHg returned reports that 4 of these bins have zero photons,
+        2 of the bins have 5 photons, and 1 bin has 10 photons.
+
+        """
+        length = 40
+        timeHgValues = np.zeros(length, dtype=np.int64)
+        for i in range(15,25,1):
+            timeHgValues[i] = 1
+
+        populationMax = 40
+        stride = 10
+        threshold = 4
+        pfthv = Cosmic.populationFromTimeHgValues(timeHgValues, populationMax,
+                                                  stride, threshold)
+        self.assertEquals(populationMax, len(pfthv['populationHg'][0]))
+        self.assertEquals(4, pfthv['populationHg'][0][0])
+        self.assertEquals(2, pfthv['populationHg'][0][5])
+        self.assertEquals(1, pfthv['populationHg'][0][10])
 
     def test_findCosmics(self):
         run = 'PAL2012'
@@ -423,6 +451,87 @@ class TestCosmic(unittest.TestCase):
         plt.plot(gtpl1['timestamps'],gtpl1['peakHeights'],'ro',label="not masked")
         plt.legend(loc="lower right")
         plt.savefig(inspect.stack()[0][3]+".png")
+
+    def testSecondBoundary(self):
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '121229'
+        t0 = 123
+        t1 = 133
+
+        nSigma = 1
+        stride = 1
+        threshold = 15
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        tsum = None
+        for t in range(t0,t1,1):
+            beginTime = t-15e-5
+            endTime = t+15e-5
+            cosmic = Cosmic(fn, beginTime=beginTime, endTime=endTime, 
+                            loggingLevel=logging.CRITICAL)
+
+            fc = cosmic.findCosmics(stride=stride, 
+                                    threshold=threshold, 
+                                    populationMax=2000,
+                                    nSigma=nSigma)
+
+            if tsum == None:
+                tsum = np.array(fc['timeHgValues'])
+            else:
+                tsum += np.array(fc['timeHgValues'])
+        plt.clf()
+
+        dt = (endTime-beginTime)
+        x0 = (t-beginTime)*(len(tsum)-1)/dt
+        print "dt=",dt
+        print "x0=",x0
+        print "len(tsum)=",len(tsum)
+        x = np.arange(len(tsum))-x0
+        plt.plot(x,tsum, drawstyle='steps-mid')
+        ymin = -1
+        ymax = 1.1*tsum.max()
+        xAtMax = tsum.argmax()-x0
+        #plt.vlines(xAtMax, ymin, ymax, linestyles='dotted', label="beginning of second")
+        plt.text(xAtMax+10,ymax/2, "t at max=%.1f"%xAtMax, ha="left",va="center")
+        plt.ylim(-1,ymax)
+        plt.ylabel("number of photons per time tick")
+        plt.xlabel("ticks since beginning of second")
+        plt.title("run=%s obsDate=%s seq=%s t0=%d t1=%d"%(run,obsDate,seq,t0,t1))
+        plt.savefig(inspect.stack()[0][3]+".png")
+
+    def testSecondBoundary2(self):
+        run = 'PAL2012'
+        sundownDate = '20121211'
+        obsDate = '20121212'
+        seq = '121229'
+        t0 = 123
+        t1 = 133
+
+        nSigma = 1
+        stride = 1
+        threshold = 15
+        fn = FileName.FileName(run, sundownDate, obsDate+"-"+seq)
+        cosmic = Cosmic(fn, beginTime=t0, endTime=t1, 
+                        loggingLevel=logging.CRITICAL)
+
+        fc = cosmic.findCosmics(stride=stride, 
+                                threshold=threshold, 
+                                populationMax=2000,
+                                nSigma=nSigma)
+        print "len if timeHgValues=",len(fc['timeHgValues'])
+        plt.clf()
+        t = np.arange(len(fc['timeHgValues']))/1e6
+        plt.plot(t,fc['timeHgValues'])
+        plt.ylabel("number of photons per tick")
+        plt.xlabel("time after %.1f (sec)"%t0)
+        plt.title("run=%s obsDate=%s seq=%s t0=%d t1=%d"%(run,obsDate,seq,t0,t1))
+        plt.grid(axis='x')
+        #plt.yscale('symlog', linthreshy=0.9)
+        plt.yscale('log')
+        plt.ylim(ymin=-0.1)
+        plt.savefig(inspect.stack()[0][3]+".png")
+
 
 if __name__ == '__main__':
     unittest.main()

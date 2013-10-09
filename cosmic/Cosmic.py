@@ -54,17 +54,18 @@ class Cosmic:
         self._setAllSecs()
         self.exptime = self.file.getFromHeader('exptime')
         if endTime =='exptime':
-            self.endTime = self.exptime
+            self.endTime = float(self.exptime)
         else:
-            self.endTime = endTime
-        if (self.endTime > self.exptime or endTime < 0):
-            raise RuntimeError("bad endTime:  endTime=%d exptime=%d" % \
-                                   (endTime,self.exptime))
+            self.endTime = float(endTime)
+        if ( (self.endTime > self.exptime) or (endTime < 0)):
+            raise RuntimeError("bad endTime:  endTime=%s exptime=%s" % \
+                                   (str(endTime),str(self.exptime)))
 
-        self.beginTime = beginTime
+        self.beginTime = float(beginTime)
         self.timeHgs = "none"
         self.nBinsPerSec = nBinsPerSec
         self.flashMergeTime = flashMergeTime
+
         self.times = \
         np.arange(self.beginTime, self.endTime, 1.0/self.nBinsPerSec)
 
@@ -355,12 +356,16 @@ class Cosmic:
         self.logger.info("build up intervals:  nCosmicTime=%d"%len(pfthgv['cosmicTimeList']))
         i = interval()
         iCount = 0
+        secondsPerTick = self.file.tickDuration
         for cosmicTime in pfthgv['cosmicTimeList']:
-            t0 = max(0,self.beginTime+(cosmicTime-50)/1.e6)
-            t1 = min(self.endTime,self.beginTime+(cosmicTime+50)/1.e6)
-            intTime = t1-t0            
-            left = t0-nSigma*intTime
-            right = t1+2*nSigma*intTime
+            #t0 = max(0,self.beginTime+(cosmicTime-50)/1.e6)
+            #t1 = min(self.endTime,self.beginTime+(cosmicTime+50)/1.e6)
+            #intTime = t1-t0            
+            t0 = self.beginTime+cosmicTime*secondsPerTick
+            dt = stride*secondsPerTick
+            t1 = t0+dt
+            left = max(self.beginTime, t0-nSigma*dt)
+            right = min(self.endTime, t1+2*nSigma*dt)
             i = i | interval[left,right]
             self.logger.info("iCount=%d t0=%f t1=%f left=%f right=%f"%(iCount,t0,t1,left,right))
             iCount+=1
@@ -374,9 +379,9 @@ class Cosmic:
         return retval
 
     @staticmethod
-    def countMaskedBins(i):
+    def countMaskedBins(maskInterval):
         retval = 0
-        for x in i:
+        for x in maskInterval:
             retval += x[1]-x[0]
         return retval
 
