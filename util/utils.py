@@ -601,6 +601,7 @@ def getGitStatus():
     has_commits:  boolean -- True if there is code here that has not been committed
     modified_files:  a list of files that have been modified (including ones that are not tracked by git
     modified_unstaged_files:  a list of "important" files that are modified but not committed
+
     """
     git = getGit()
     return {"repo":git.repo,
