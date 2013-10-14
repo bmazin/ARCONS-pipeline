@@ -67,6 +67,38 @@ class TestObsFile(unittest.TestCase):
 
         del obsFile
 
+    def testGetPackets(self):
+        fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
+        obsFile = ObsFile.ObsFile(fn.obs())
+        exptime0 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime0, 300)
+        timeAdjustments = fn.timeAdjustments()
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+        exptime1 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime1, 298)
+
+
+        exptime1 = 4
+        iRow = 30
+        iCol = 32
+
+        fields = ['peakHeights']
+
+        # mask out from 0.5 to 0.75 each second
+        inter = interval()
+        for sec in range(exptime1):
+            inter = inter | interval([sec+0.5, sec+0.75])
+        obsFile.cosmicMask = inter
+        obsFile.switchOnCosmicTimeMask()
+
+        print "now call getPackets"
+        tpl = obsFile.getPackets(iRow, iCol, 0, exptime1, fields=fields)
+        print "now make plot"
+
+        plt.clf()
+        plt.plot(tpl['timestamps'], tpl['peakHeights'])
+        plt.savefig(inspect.stack()[0][3]+".png")
+
     def testGetFrame(self):
         """
         Demonstrate the getFrame method of ObsFile and check a specific result
