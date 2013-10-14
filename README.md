@@ -16,6 +16,8 @@ PyGuide (http://www.astro.washington.edu/users/rowen/PyGuide/Manual.html)
 
 (you can check if you have them with help('modules') within the (i)python interpreter)
 
+gittle -- represents the state of the git repository in python (easy_install gittle)
+
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
