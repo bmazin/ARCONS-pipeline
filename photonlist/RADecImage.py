@@ -10,6 +10,7 @@ import time
 import numpy as np
 import tables
 import matplotlib.pyplot as mpl
+import pyfits
 import hotpix.hotPixels as hp
 from util import utils
 import photonlist.photlist as pl
@@ -462,7 +463,17 @@ class RADecImage(object):
         '''
         Display the current image. Currently just a short-cut to utils.plotArray,
         but needs updating to mark RA and Dec on the axes.
+        
+        INPUTS:
+            normMin, normMax: Minimum and maximum values for the color-scale stretch
+            expWeight: if True, scale each virtual pixel by its exposure time
+            pclip: Apply a percentile clip to the image at the lower [pclip] and upper [100-pclip]'th
+                    percentiles (where pclip is in percent). Overrides normMin and normMax.
+            colorMap: as for plotArray, can specify the matplotlib color map to use.
+            image: if set to a 2D array, displays that array instead of the default image.
+            logScale: if True, display the intensities on a log scale.
         '''
+        
         if expWeight:
             toDisplay = np.copy(self.image*self.expTimeWeights)
         else:
@@ -471,6 +482,12 @@ class RADecImage(object):
         if logScale is True: toDisplay = np.log10(toDisplay)
         
         if image is not None: toDisplay = image
+        
+        #####################
+        #Rotate by 180deg so north is up and east is left - just a fudge for now, need to
+        #sort this out properly.
+        toDisplay = np.rot90(np.rot90(toDisplay))
+        #####################
         
         if pclip:
             normMin = np.percentile(toDisplay[np.isfinite(toDisplay)],q=pclip)
@@ -488,7 +505,27 @@ class RADecImage(object):
         #           np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]])
 
         
+    def writeFits(self, fileName='RADecImage.fits', expWeight=True):
+        '''
+        Write the current image (if present) to a fits file.
+        
+        INPUTS:
+            fileName - name of output file to write
+            expWeight - if True, scale by the per-pixel exposure time weights.
+        '''
+        
+        if self.image is None:
+            raise RuntimeError, 'No current image to write to FITS file'
+        
+        if expWeight is True:
+            hdu = pyfits.PrimaryHDU(self.image*self.expTimeWeights)
+        else:
+            hdu = pyfits.PrimaryHDU(self.image)
+        
+        hdu.writeto(fileName)
+        
 
+    
 
 def test(photListFileName='/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/corot18/testPhotonList-blosc.h5',
          vPlateScale=0.1, integrationTime=-1,firstSec=0):
