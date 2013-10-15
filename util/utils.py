@@ -13,6 +13,7 @@ import binascii
 import math
 from scipy.signal import convolve
 import scipy.ndimage
+import ds9
 
 #from interval import interval
 
@@ -38,6 +39,7 @@ printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
 rebin2D(a, ysize, xsize)
 replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True)
+stdDev_filterNaN(inputarray, size=5, *nkwarg, **kwarg)
 getGitStatus()
 """
 
@@ -182,6 +184,85 @@ def convertHexToDeg(ra, dec):
       pass
 
    return(hh*15.+mm/4.+ss/240., sign*(deg+(arcmin*5./3.+arcsec*5./180.)/100.) )
+
+
+def ds9Array(xyarray, colormap='B', normMin=None, normMax=None,
+             sigma=None, scale=None,
+             #pixelsToMark=[], pixelMarkColor='red',
+             frame=None):
+    """
+    
+    Display a 2D array as an image in DS9 if available. Similar to 'plotArray()'
+    
+    xyarray is the array to plot
+
+    colormap - string, takes any value in the DS9 'color' menu.
+
+    normMin minimum used for normalizing color values
+
+    normMax maximum used for normalizing color values
+
+    sigma calculate normMin and normMax as this number of sigmas away
+    from the mean of positive values
+
+    scale - string, can take any value allowed by ds9 xpa interface.
+    Allowed values include:
+        linear|log|pow|sqrt|squared|asinh|sinh|histequ
+        mode minmax|<value>|zscale|zmax
+        limits <minvalue> <maxvalue>
+    e.g.: scale linear
+        scale log 100
+        scale datasec yes
+        scale histequ
+        scale limits 1 100
+        scale mode zscale
+        scale mode 99.5 
+        ...etc.
+    For more info see:
+        http://hea-www.harvard.edu/saord/ds9/ref/xpa.html#scale
+
+    ## Not yet implemented: pixelsToMark a list of pixels to mark in this image
+
+    ## Not yet implemented: pixelMarkColor is the color to fill in marked pixels
+    
+    frame - to specify which DS9 frame number the array should be displayed in.
+             Default is None. 
+    
+    """
+    if sigma != None:
+       # Chris S. does not know what accumulatePositive is supposed to do
+       # so he changed the next two lines.
+       #meanVal = numpy.mean(accumulatePositive(xyarray))
+       #stdVal = numpy.std(accumulatePositive(xyarray))
+       meanVal = numpy.mean(xyarray)
+       stdVal = numpy.std(xyarray)
+       normMin = meanVal - sigma*stdVal
+       normMax = meanVal + sigma*stdVal
+
+
+    d = ds9.ds9()   #Open a ds9 instance
+    if type(frame) is int:
+        d.set('frame '+str(frame))
+        
+    d.set_np2arr(xyarray)
+    #d.view(xyarray, frame=frame)
+    d.set('zoom to fit')
+    d.set('cmap '+colormap)
+    if normMin is not None and normMax is not None:
+        d.set('scale '+str(normMin)+' '+str(normMax))
+    if scale is not None:
+        d.set('scale '+scale)
+
+    
+    #plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm, fignum=False)
+
+    #for ptm in pixelsToMark:
+    #    box = mpl.patches.Rectangle((ptm[0]-0.5,ptm[1]-0.5),\
+    #                                    1,1,color=pixelMarkColor)
+    #    #box = mpl.patches.Rectangle((1.5,2.5),1,1,color=pixelMarkColor)
+    #    fig.axes[0].add_patch(box)
+
+ 
 
 def gaussian_psf(fwhm, boxsize, oversample=50):
     
@@ -351,8 +432,12 @@ def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
     simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
     noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
     (but note that quantitative applications are probably limited.)
+    
     Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
     calling arguments are passed.
+    
+    Note: mode='reflect' looks like it would repeat the edge row/column in the
+    'reflection'; 'mirror' does not, and may make more sense for our applications.
     
     Arguments/return values are same as for scipy median_filter.
     INPUTS:
@@ -374,6 +459,23 @@ def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
     '''     
     return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
                                                  *nkwarg, **kwarg)
+
+def nanStdDev(x):
+    '''
+    NaN resistant standard deviation - basically scipy.stats.tstd, but
+    with NaN rejection, and returning NaN if there aren't enough non-NaN
+    input values, instead of just crashing. Used by stdDev_filterNaN.
+    INPUTS:
+        x - array of input values
+    OUTPUTS:
+        The standard deviation....
+    '''
+    xClean = x[~numpy.isnan(x)]
+    if numpy.size(xClean) > 1 and xClean.min() != xClean.max():
+        return scipy.stats.tstd(xClean)
+    #Otherwise...
+    return numpy.nan
+    
     
 def plotArray( xyarray, colormap=mpl.cm.gnuplot2, 
                normMin=None, normMax=None, showMe=True,
@@ -577,6 +679,35 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
 
     return outputarray
 
+
+def stdDev_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
+    '''
+    Calculated a moving standard deviation across a 2D (image) array. The standard
+    deviation is calculated for a box of side 'size', centered at each pixel (element)
+    in the array. NaN values are ignored, and the center pixel at which the box is located
+    is masked out, so that only the surrounding pixels are included in calculating the
+    std. dev. Thus each element in the array can later be compared against
+    this std. dev. map in order to effectively find outliers.
+    
+    Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
+    calling arguments are passed.
+    
+    Arguments/return values are same as for scipy median_filter.
+    INPUTS:
+        inputarray : array-like, input array to filter (can be n-dimensional)
+        size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
+                scalar, then same value is used for all dimensions.
+    OUTPUTS:
+        NaN-resistant std. dev. filtered version of inputarray.
+    
+    '''  
+    
+    #Can set 'footprint' as follows to remove the central array element:
+    #footprint = numpy.ones((size,size))
+    #footprint[size/2,size/2] = 0
+            
+    return scipy.ndimage.filters.generic_filter(inputarray, nanStdDev, 
+                                                size=size, *nkwarg, **kwarg)
 def getGit():
     """
     return a Gittle, which controls the state of the git repository
