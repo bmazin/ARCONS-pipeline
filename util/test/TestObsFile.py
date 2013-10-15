@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import inspect
 from util import ObsFile, FileName
 from cosmic.Cosmic import Cosmic
+import time
+import cProfile
+import re
+import StringIO, pstats
 #import interval
 #from util.FileName import FileName
 #from util.ObsFile import ObsFile
@@ -67,6 +71,17 @@ class TestObsFile(unittest.TestCase):
 
         del obsFile
 
+    def testMakeMask(self):
+        """
+        tests that makeMask gets the same results as the __contains__
+        method of interval
+        """
+        timestamps = np.array([1.1, 2.2, 3.3, 4.4, 8.8])
+        inter = interval([1.9,2.5],[4.3,5.3])
+        mask = ObsFile.ObsFile.makeMask(timestamps,inter)
+        for i in range(len(timestamps)):
+            self.assertTrue(mask[i] == inter.__contains__(timestamps[i]))
+
     def testGetPackets(self):
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
@@ -92,13 +107,124 @@ class TestObsFile(unittest.TestCase):
         obsFile.switchOnCosmicTimeMask()
 
         print "now call getPackets"
+        start = time.clock()
         tpl = obsFile.getPackets(iRow, iCol, 0, exptime1, fields=fields)
-        print "now make plot"
+        elapsed = (time.clock() - start)
+        print "getPackets elapsed=",elapsed
 
+        print "now call getTimedPacketList"
+        start = time.clock()
+        gtpl = obsFile.getTimedPacketList(iRow, iCol, 0, exptime1)
+        elapsed = (time.clock() - start)
+        print "getTimedPackeList elapsed=",elapsed
+
+        print "compare"
+        print "len(tpl['timestamps'])=",len(tpl['timestamps'])
+        print "len(gtpl['timestamps'])=",len(gtpl['timestamps'])
+        print "now make plot"
         plt.clf()
         plt.plot(tpl['timestamps'], tpl['peakHeights'])
         plt.savefig(inspect.stack()[0][3]+".png")
 
+    def testGetPacketsProfile(self):
+        fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
+        obsFile = ObsFile.ObsFile(fn.obs())
+        exptime0 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime0, 300)
+        timeAdjustments = fn.timeAdjustments()
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+        exptime1 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime1, 298)
+
+        exptime1 = 10
+        iRow = 30
+        iCol = 32
+
+        fields = ['peakHeights']
+
+        # mask out from 0.5 to 0.75 each second
+        inter = interval()
+        for sec in range(exptime1):
+            inter = inter | interval([sec+0.1, sec+0.11])
+            inter = inter | interval([sec+0.2, sec+0.21])
+            inter = inter | interval([sec+0.3, sec+0.31])
+            inter = inter | interval([sec+0.4, sec+0.41])
+            inter = inter | interval([sec+0.5, sec+0.51])
+            inter = inter | interval([sec+0.6, sec+0.61])
+            inter = inter | interval([sec+0.7, sec+0.71])
+            inter = inter | interval([sec+0.8, sec+0.81])
+            inter = inter | interval([sec+0.9, sec+0.91])
+        obsFile.cosmicMask = inter
+        obsFile.switchOnCosmicTimeMask()
+
+
+        print "now call getPackets"
+        start = time.clock()
+        pr = cProfile.Profile()
+        pr.enable()
+        start = time.clock()
+        tpl = obsFile.getPackets(iRow, iCol, 0, exptime1, fields=fields)
+        pr.disable()
+        s = StringIO.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        #print s.getvalue()
+        elapsed = (time.clock() - start)
+        print "getPackets elapsed=",elapsed
+
+
+    def testGetPacketsAndGetTimedPacketList(self):
+        fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
+        obsFile = ObsFile.ObsFile(fn.obs())
+        exptime0 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime0, 300)
+        timeAdjustments = fn.timeAdjustments()
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+        exptime1 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime1, 298)
+
+        exptime1 = 100
+        iRow = 30
+        iCol = 32
+
+        fields = ['peakHeights', 'baselines']
+
+        # mask out from 0.5 to 0.75 each second
+        inter = interval()
+        for sec in range(exptime1):
+            inter = inter | interval([sec+0.1, sec+0.11])
+            inter = inter | interval([sec+0.2, sec+0.21])
+            inter = inter | interval([sec+0.3, sec+0.31])
+            inter = inter | interval([sec+0.4, sec+0.41])
+            inter = inter | interval([sec+0.5, sec+0.51])
+            inter = inter | interval([sec+0.6, sec+0.61])
+            inter = inter | interval([sec+0.7, sec+0.71])
+            inter = inter | interval([sec+0.8, sec+0.81])
+            inter = inter | interval([sec+0.9, sec+0.91])
+        obsFile.cosmicMask = inter
+        obsFile.switchOnCosmicTimeMask()
+
+        print "now call getTimedPacketList"
+        start = time.clock()
+        gtpl = obsFile.getTimedPacketList(iRow, iCol, 0, exptime1)
+        elapsed = (time.clock() - start)
+        print "getTimedPackeList elapsed=",elapsed
+
+        print "now call getPackets"
+        start = time.clock()
+        tpl = obsFile.getPackets(iRow, iCol, 0, exptime1, fields=fields)
+        elapsed = (time.clock() - start)
+        print "getPackets elapsed=",elapsed
+
+
+        print "compare"
+        print "tpl keys=",tpl.keys()
+        print "gtpl keys=",gtpl.keys()
+        print "len(tpl['timestamps'])=",len(tpl['timestamps'])
+        print "len(gtpl['timestamps'])=",len(gtpl['timestamps'])
+        self.assertTrue((tpl['timestamps'] == gtpl['timestamps']).all())
+        self.assertTrue((tpl['baselines'] == gtpl['baselines']).all())
     def testGetFrame(self):
         """
         Demonstrate the getFrame method of ObsFile and check a specific result
@@ -157,6 +283,7 @@ class TestObsFile(unittest.TestCase):
         plt.title("mask times from %d to %d ticks" % (xs[0],xs[1]))
         plt.savefig(fn.makeName(inspect.stack()[0][3]+"_",""))
 
+    
     def testNumpyPytablesConflict(self):
         '''
         Author: Julian van Eyken                Date: June 17 2013

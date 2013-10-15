@@ -64,6 +64,7 @@ from util.FileName import FileName
 from scipy import pi
 from tables.nodes import filenode
 from headers import TimeMask
+import time
 
 class ObsFile:
     h = 4.135668e-15 #eV s
@@ -988,7 +989,7 @@ class ObsFile:
 
         return a dictionary containing errectiveIntTime (n seconds), the array of timestamps and other fields requested
         """
-        parse = {'peakHeights': True}
+        parse = {'peakHeights': True, 'baselines': True}
         for key in parse.keys():
             try:
                 fields.index(key)
@@ -1031,6 +1032,7 @@ class ObsFile:
         # create empty arrays
         timestamps = np.empty(nPackets, dtype=np.float)
         if parse['peakHeights']: peakHeights=np.empty(nPackets, np.int16)
+        if parse['baselines']: baselines=np.empty(nPackets, np.int16)
 
         # fill in the arrays one second at a time
         ipt = 0
@@ -1041,28 +1043,72 @@ class ObsFile:
                 t + np.bitwise_and(pixels,self.timestampMask)*self.tickDuration
             if parse['peakHeights']:
                 peakHeights[ipt:iptNext] = np.bitwise_and(
-                    np.right_shift(pixels, self.nBitsAfterParabolaPeak), self.pulseMask)
+                    np.right_shift(pixels, self.nBitsAfterParabolaPeak), 
+                    self.pulseMask)
+
+            if parse['baselines']:
+                baselines[ipt:iptNext] = np.bitwise_and(
+                    np.right_shift(pixels, self.nBitsAfterBaseline), 
+                    self.pulseMask)
 
             ipt = iptNext
             t += 1
         # create a mask, "True" mean mask value
+        start = time.clock()
+        # the call the makeMask dominates the running time
         mask = ObsFile.makeMask(timestamps, inter)
+        elapsed = (time.clock() - start)
+        #print "In Obsfile:  elapsed due to makeMask=",elapsed
         # compress out all the masked values
         tsMaskedArray = ma.array(timestamps,mask=mask)
         timestamps = ma.compressed(tsMaskedArray)
         #timestamps = ma.compressed(ma.array(timestamps,mask))
         # build up the dictionary of values and return it
-        retval =  {"effectiveIntTime": effectiveIntTime,
+        retval =  {"effIntTime": effectiveIntTime,
                 "timestamps":timestamps}
         if parse['peakHeights']: 
-            retval['peakHeights'] = ma.compressed(ma.array(peakHeights,mask=mask))
+            retval['peakHeights'] = \
+                ma.compressed(ma.array(peakHeights,mask=mask))
+        if parse['baselines']: 
+            retval['baselines'] = \
+                ma.compressed(ma.array(baselines,mask=mask))
         return retval
 
     @staticmethod
-    def makeMask(timestamps, inter):
+    def makeMask01(timestamps, inter):
         def myfunc(x): return inter.__contains__(x)
         vecfunc = vectorize(myfunc,otypes=[np.bool])
         return vecfunc(timestamps)
+
+    @staticmethod
+    def makeMask(timestamps, inter):
+        """
+        return an array of booleans, the same length as timestamps,
+        with that value inter.__contains__(timestamps[i])
+        """
+        retval = np.empty(len(timestamps),dtype=np.bool)
+        ainter = np.array(inter)
+        t0s = ainter[:,0]
+        t1s = ainter[:,1]
+
+        tMin = t0s[0]
+        tMax = t1s[-1]
+                       
+        for i in range(len(timestamps)):
+            ts = timestamps[i]
+            if ts < tMin:
+                retval[i] = False
+            elif ts > tMax:
+                retval[i] = False
+            else:
+                tIndex = np.searchsorted(t0s, ts)
+                t0 = t0s[tIndex-1]
+                t1 = t1s[tIndex-1]
+                if ts < t1:
+                    retval[i] = True
+                else:
+                    retval[i] = False
+        return retval
 
     def loadCentroidListFile(self, centroidListFileName):
         """
