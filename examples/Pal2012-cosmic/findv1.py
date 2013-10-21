@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 import numpy as np
 from util.ObsFile import ObsFile 
@@ -6,19 +9,23 @@ from util import utils
 from util import hgPlot
 from cosmic.Cosmic import Cosmic
 import tables
-import matplotlib.pyplot as plt
 from hotpix import hotPixels
 import pickle
+from interval import interval, inf, imath
 
 run = 'PAL2012'
 sundownDate = '20121211'
 obsDate = '20121212'
 # December 11
 # Final sequence, toward end of run, thin high clouds at around 12:50, moved to confirm position at '122234', also at '130752' at 125s. (16,15)
+
 seq5 = ['112709', '113212', '113714', '114216', '114718', '115220', '115722', '120224', '120727', '121229', '121732', '122234', '122736', '123238', '123740', '124242', '124744', '125246', '125748', '130250', '130752', '131254', '131756', '132258', '132800', '133303']
 
+#seq5 = ['133303']
+
+nSigma = 7
 stride = 10
-threshold = 40
+threshold = 50
 populationMax=2000
 ySum = np.zeros(populationMax)
 frameSum = 'none'
@@ -26,8 +33,12 @@ frameSum = 'none'
 for seq in seq5:
     print "seq=",seq
     fn = FileName(run, sundownDate, obsDate+"-"+seq)
-    cosmic = Cosmic(fn, endTime='exptime')
-    fc = cosmic.findCosmics(stride, threshold, populationMax)
+    #cosmic = Cosmic(fn, endTime='exptime')
+    cosmic = Cosmic(fn, beginTime=0)
+    fc = cosmic.findCosmics(stride=stride, 
+                            threshold=threshold, 
+                            populationMax=populationMax,
+                            nSigma=nSigma)
     if frameSum == 'none':
         frameSum = fc['frameSum']
     else:
@@ -36,6 +47,8 @@ for seq in seq5:
     pickle.dump(fc['cosmicTimeList'],outfile)
     pickle.dump(fc['binContents'],outfile)
     outfile.close()
+    cfn = "cosmicMax-%s.h5"%seq
+    ObsFile.writeCosmicIntervalToFile(fc['interval'],1.0e6, cfn)
     populationHg = fc['populationHg']
     yPlot = populationHg[0].astype(np.float)
     ySum += yPlot

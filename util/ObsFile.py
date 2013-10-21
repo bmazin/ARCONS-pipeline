@@ -55,6 +55,8 @@ import sys, os
 import warnings
 import tables
 import numpy as np
+from numpy import vectorize
+from numpy import ma
 import matplotlib.pyplot as plt
 from util import utils
 from interval import interval, inf, imath
@@ -62,6 +64,7 @@ from util.FileName import FileName
 from scipy import pi
 from tables.nodes import filenode
 from headers import TimeMask
+import time
 
 class ObsFile:
     h = 4.135668e-15 #eV s
@@ -647,6 +650,7 @@ class ObsFile:
         baselines = []
         peakHeights = []
 
+        # pixelData is an array of data for this iRow,iCol, at each good time
         for t in range(len(pixelData)):
             interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
             
@@ -978,6 +982,137 @@ class ObsFile:
                 nphoton = pl['timestamps'].size
                 frame[iRow][iCol] += nphoton
         return frame
+    
+    # a different way to get, with the functionality of getTimedPacketList
+    def getPackets(self, iRow, iCol, firstSec, integrationTime, fields=()):
+        """
+        get and parse packets for pixel iRow,iCol starting at firstSec for integrationTime seconds.
+
+        files is a list of strings to indicate what to parse in addition to timestamps
+        (All it know how to do right now is peakHeights)
+
+        return a dictionary containing errectiveIntTime (n seconds), the array of timestamps and other fields requested
+        """
+        parse = {'peakHeights': True, 'baselines': True}
+        for key in parse.keys():
+            try:
+                fields.index(key)
+            except ValueError:
+                parse[key] = False
+
+        lastSec = firstSec+integrationTime
+        # Work out inter, the times to mask
+        # start with nothing being masked
+        inter = interval()
+        # mask the hot pixels if requested
+        if self.hotPixIsApplied:
+            inter = self.getPixelBadTimes(iRow, iCol)
+        # mask cosmics if requested
+        if self.cosmicMaskIsApplied:
+            inter = inter | self.cosmicMask
+
+        # mask the fraction of the first integer second not requested
+        firstSecInt = int(np.floor(firstSec))
+        if (firstSec > firstSecInt):
+            inter = inter | interval([firstSecInt, firstSec])
+        # mask the fraction of the last integer second not requested
+        lastSecInt = int(np.ceil(firstSec+integrationTime))
+        integrationTimeInt = lastSecInt-firstSecInt
+        if (lastSec < lastSecInt):
+            inter = inter | interval([lastSec, lastSecInt])
+        #Calculate the total effective time for the integration after removing
+        #any 'intervals':
+        integrationInterval = interval([firstSec, lastSec])
+        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel.
+        effectiveIntTime = integrationTime - utils.intervalSize(maskedIntervals)
+
+        pixelData = self.getPixel(iRow, iCol, firstSec=firstSecInt, 
+                                  integrationTime=integrationTimeInt)
+        # calculate how long a np array needs to be to hold everything
+        nPackets = 0
+        for pixels in pixelData:
+            nPackets += len(pixels)
+
+        # create empty arrays
+        timestamps = np.empty(nPackets, dtype=np.float)
+        if parse['peakHeights']: peakHeights=np.empty(nPackets, np.int16)
+        if parse['baselines']: baselines=np.empty(nPackets, np.int16)
+
+        # fill in the arrays one second at a time
+        ipt = 0
+        t = firstSecInt
+        for pixels in pixelData:
+            iptNext = ipt+len(pixels)
+            timestamps[ipt:iptNext] = \
+                t + np.bitwise_and(pixels,self.timestampMask)*self.tickDuration
+            if parse['peakHeights']:
+                peakHeights[ipt:iptNext] = np.bitwise_and(
+                    np.right_shift(pixels, self.nBitsAfterParabolaPeak), 
+                    self.pulseMask)
+
+            if parse['baselines']:
+                baselines[ipt:iptNext] = np.bitwise_and(
+                    np.right_shift(pixels, self.nBitsAfterBaseline), 
+                    self.pulseMask)
+
+            ipt = iptNext
+            t += 1
+        # create a mask, "True" mean mask value
+        start = time.clock()
+        # the call the makeMask dominates the running time
+        mask = ObsFile.makeMask(timestamps, inter)
+        elapsed = (time.clock() - start)
+        #print "In Obsfile:  elapsed due to makeMask=",elapsed
+        # compress out all the masked values
+        tsMaskedArray = ma.array(timestamps,mask=mask)
+        timestamps = ma.compressed(tsMaskedArray)
+        #timestamps = ma.compressed(ma.array(timestamps,mask))
+        # build up the dictionary of values and return it
+        retval =  {"effIntTime": effectiveIntTime,
+                "timestamps":timestamps}
+        if parse['peakHeights']: 
+            retval['peakHeights'] = \
+                ma.compressed(ma.array(peakHeights,mask=mask))
+        if parse['baselines']: 
+            retval['baselines'] = \
+                ma.compressed(ma.array(baselines,mask=mask))
+        return retval
+
+    @staticmethod
+    def makeMask01(timestamps, inter):
+        def myfunc(x): return inter.__contains__(x)
+        vecfunc = vectorize(myfunc,otypes=[np.bool])
+        return vecfunc(timestamps)
+
+    @staticmethod
+    def makeMask(timestamps, inter):
+        """
+        return an array of booleans, the same length as timestamps,
+        with that value inter.__contains__(timestamps[i])
+        """
+        retval = np.empty(len(timestamps),dtype=np.bool)
+        ainter = np.array(inter)
+        t0s = ainter[:,0]
+        t1s = ainter[:,1]
+
+        tMin = t0s[0]
+        tMax = t1s[-1]
+                       
+        for i in range(len(timestamps)):
+            ts = timestamps[i]
+            if ts < tMin:
+                retval[i] = False
+            elif ts > tMax:
+                retval[i] = False
+            else:
+                tIndex = np.searchsorted(t0s, ts)
+                t0 = t0s[tIndex-1]
+                t1 = t1s[tIndex-1]
+                if ts < t1:
+                    retval[i] = True
+                else:
+                    retval[i] = False
+        return retval
 
     def loadCentroidListFile(self, centroidListFileName):
         """
@@ -1242,7 +1377,9 @@ class ObsFile:
         self.cosmicMaskIsApplied = True
 
     @staticmethod
-    def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName):
+    def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName,
+                                  beginTime, endTime, stride,
+                                  threshold, nSigma, populationMax):
         h5f = tables.openFile(fileName, 'w')
 
         headerGroup = h5f.createGroup("/", 'Header', 'Header')
@@ -1250,6 +1387,12 @@ class ObsFile:
                                       cosmicHeaderDescription, 'Header')
         header = headerTable.row
         header['ticksPerSec'] = ticksPerSec
+        header['beginTime'] = beginTime
+        header['endTime'] = endTime
+        header['stride'] = stride
+        header['threshold'] = threshold
+        header['nSigma'] = nSigma
+        header['populationMax'] = populationMax 
         header.append()
         headerTable.flush()
         headerTable.close()
@@ -1501,4 +1644,11 @@ def repackArray(array, slices):
 
 class cosmicHeaderDescription(tables.IsDescription):
     ticksPerSec = tables.Float64Col() # number of ticks per second
+    beginTime = tables.Float64Col()   # begin time used to find cosmics (seconds)
+    endTime = tables.Float64Col()     # end time used to find cosmics (seconds)
+    stride = tables.Int32Col()
+    threshold = tables.Float64Col()
+    nSigma = tables.Int32Col()
+    populationMax = tables.Int32Col()
+
 

@@ -4,3 +4,4 @@ fooprof
 build
 tsBinner.so
 tsBinner.c
+*.log

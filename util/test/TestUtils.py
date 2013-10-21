@@ -31,7 +31,7 @@ class TestUtils(unittest.TestCase):
         listOfFrameObj = []
         frameTitles = []
         for iFrame in range(nrow):
-            print "iFrame=",iFrame
+            #print "iFrame=",iFrame
             frame = []
             for iRow in range(nrow):
                 if (iRow < iFrame):
@@ -66,5 +66,13 @@ class TestUtils(unittest.TestCase):
                         delay=1.0, colormap=mpl.cm.gray,
                         listOfPixelsToMark=listOfPixelsToMark, 
                         pixelMarkColor='red')
+    def testGetGitStatus(self):
+        """
+        Test that the getStatus method does not crash and returns 
+        a dictionary with more than 2 keys
+        """
+        gs = utils.getGitStatus()
+        self.assertTrue(len(gs.keys()) > 2)
+
 if __name__ == '__main__':
     unittest.main()
