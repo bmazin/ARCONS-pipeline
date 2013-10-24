@@ -707,7 +707,11 @@ class ObsFile:
                 secImg[iRow, iCol] = pcount['counts']
                 effIntTimes[iRow, iCol] = pcount['effIntTime']
         if scaleByEffInt is True:
-            secImg *= (integrationTime / effIntTimes)                    
+            if integrationTime == -1:
+                totInt = self.getFromHeader('exptime')
+            else:
+                totInt = integrationTime
+            secImg *= (totInt / effIntTimes)                    
         #if getEffInt is True:
         return{'image':secImg, 'effIntTimes':effIntTimes}
         #else:
