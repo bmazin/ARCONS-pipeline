@@ -27,8 +27,9 @@ class FileName:
             run - string, name of folder which contains all obs files for this run
             date - string, date (usually of sunset), name of folder in which obs files for this date are stored
             tstamp - string, timestamp of the obs. file.
-            obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out the required parameters automatically.
-                      Alternatively, obsFile can also be a string containing a full obs file path name instead.
+            obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out 
+                      the required parameters automatically. Alternatively, obsFile can also be a string containing
+                      a full obs file path name instead.
             mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_DATA_DIR' if not specified.)
             intermDir - data reduction product directory (uses path pointed to by system variable 'INTERM_DIR' if not specified.
         '''
@@ -41,6 +42,7 @@ class FileName:
 
         self.mkidDataDir = mkidDataDir
         self.intermDir = intermDir
+        self.obsFile = obsFile
         if obsFile is None:
             self.run = run
             self.date = date
@@ -139,7 +141,7 @@ class FileName:
 
 
     def flatSoln(self):
-        if self.tstamp == '' or self.tstamp == None:
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
@@ -151,7 +153,7 @@ class FileName:
                 "flatsol_" + self.tstamp + '.h5'
 
     def flatInfo(self):
-        if self.tstamp == '' or self.tstamp == None:
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
@@ -164,7 +166,7 @@ class FileName:
 
 
     def oldFlatInfo(self):
-        if self.tstamp == '' or self.tstamp == None:
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'oldFlatCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
