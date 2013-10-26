@@ -58,6 +58,16 @@ class TestFileName(unittest.TestCase):
         self.assertTrue(fn1.obs()==fn2.obs())
         self.assertTrue(fn2.getComponents()==(run,date,tstamp))
         
+    def testFlatCalFromObsFile(self):
+        run = 'LICK2012'
+        date = '20120919'
+        tstamp = '20120920-123350'
+        fn = FileName.FileName(run, date, tstamp)
+        obsFile = ObsFile.ObsFile(fn.obs())
+        flatCalFN1 = FileName.FileName(run, date, tstamp='').flatSoln()
+        flatCalFN2 = FileName.FileName(obsFile=obsFile).flatSoln()        
+        self.assertTrue(flatCalFN1==flatCalFN2)
+        
     def testPassObsFileNameString(self):
         run = 'LICK2012'
         date = '20120919'
