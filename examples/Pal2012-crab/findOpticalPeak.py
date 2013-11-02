@@ -80,7 +80,11 @@ print radioPeakPhase,'+/-',errorRadioPeakPhase, ' in phase'
 print (1.-radioPeakPhase)*period,'+/-',errorRadioPeakPhase*period, ' us'
 
 peakPhaseLag = radioPeakPhase-peakPhase
-errorPeakPhaseLag = np.sqrt(errorPeakPhase**2+errorRadioPeakPhase**2)
+
+radioTimingError = 10. #us
+radioTimingPhase = radioTimingError/period
+
+errorPeakPhaseLag = np.sqrt(errorPeakPhase**2+errorRadioPeakPhase**2+radioTimingPhase**2)
 peakLag = peakPhaseLag*period
 errorPeakLag = errorPeakPhaseLag*period
 print 'optical-radio lag'
