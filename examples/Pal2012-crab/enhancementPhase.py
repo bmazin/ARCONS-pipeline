@@ -88,8 +88,7 @@ def align_yaxis(ax1, v1, ax2, v2):
     miny, maxy = ax2.get_ylim()
     ax2.set_ylim(miny+dy, maxy+dy)
 
-def indexToPhase(indices):
-    radioIndexOffset = 0.5#Guppi offset, found as shift in unrotated,rotated radio profiles
+def indexToPhase(indices,radioIndexOffset=0.5):
     radioArrivalPhases = (indices+radioIndexOffset)/2048.+phaseShift
     return radioArrivalPhases
 
@@ -243,6 +242,8 @@ ax.set_ylabel('Standard Deviations of Peak Height from Average Peak')
 ax.set_xlabel('Pulse Offset Relative to GRP (number of periods)')
 ax.set_ylim((0,8))
 
+np.savez('sigP2.npz',idxOffsets=idxOffsets,nSigmaByIdxOffset=nSigmaByIdxOffset)
+
 giantPeakHeights = np.sum(indProfiles[:,idx0,peakBins][finalMask],axis=1)
 peakHeights = np.sum(indProfiles[:,:,peakBins][finalMask],axis=2)
 #index peakHeights[iGRP,iIdxOffset]
@@ -329,9 +330,11 @@ radioProfile = radioProfile*np.max(overallCoincidentProfile)/np.max(radioProfile
 
 radioPhases = indexToPhase(radioIndices)
 radioPhaseBins = indexToPhase(radioIndexBins)
+
 radioPhaseBinCenters = radioPhaseBins[0:-1]+np.diff(radioPhaseBins)/2.
 
 print 'radioIndexBins',radioIndexBins,np.diff(radioIndexBins)
+print 'radioPhaseBinEdges',radioPhaseBins,np.diff(radioPhaseBins)
 
 radioBinned = np.digitize(radioPhases,bins=radioPhaseBins)
 enhancements = []
