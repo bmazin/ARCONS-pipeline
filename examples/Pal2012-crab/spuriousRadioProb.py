@@ -71,10 +71,27 @@ def probsOfGRP(nRadioBins=15,lowerStrengthHistEdge=.12):
 
     nRadioIndexBins = np.max(peakDetectedIndices)-np.min(peakDetectedIndices)+1
 
+    peakDetectionMask3 = giantDict[strengthLabel]>= .175
+    noiseDetectionMask3 = giantDict['TestMax']>= .175
+    radioStrength3 = giantDict[strengthLabel][peakDetectionMask3]
+    peakDetectedIndices3 = giantDict['Index'][peakDetectionMask3]
+    noiseDetectedIndices3 = giantDict['TestIndex'][noiseDetectionMask3]
+    clipPeakIndexMask3 = peakDetectedIndices3 <= endPeakIndex
+    clipPeakIndexMask3 = np.logical_and(clipPeakIndexMask3,peakDetectedIndices3 >= startPeakIndex)
+    clipNoiseIndexMask3 = noiseDetectedIndices3 <= endNoiseIndex
+    clipNoiseIndexMask3 = np.logical_and(clipNoiseIndexMask3,noiseDetectedIndices3 >= startNoiseIndex)
+    peakDetectedIndices3 = giantDict['Index'][peakDetectionMask3]
+    noiseDetectedIndices3 = noiseDetectedIndices3[clipNoiseIndexMask3]
+    peakDetectedIndices3 = peakDetectedIndices3[clipPeakIndexMask3]
+
+    print 'peakDetectionMask3',np.sum(peakDetectionMask3),np.shape(peakDetectionMask3)
+    print 'noiseDetectionMask3',np.sum(noiseDetectionMask3),np.shape(noiseDetectionMask3)
+    print 'clipPeakIndexMask3',np.sum(clipPeakIndexMask3),np.shape(clipPeakIndexMask3)
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    histPeakIndices,peakIndexBins = np.histogram(peakDetectedIndices,bins=nRadioIndexBins)
-    histNoiseIndices,noiseIndexBins = np.histogram(noiseDetectedIndices,bins=nRadioIndexBins)
+    histPeakIndices,peakIndexBins = np.histogram(peakDetectedIndices3,bins=nRadioIndexBins)
+    histNoiseIndices,noiseIndexBins = np.histogram(noiseDetectedIndices3,bins=nRadioIndexBins)
     ax.step(indexToPhase(peakIndexBins[0:-1]),histPeakIndices)
     ax.step(indexToPhase(peakIndexBins[0:-1]),histNoiseIndices)
     print 'nPeak,nNoise',np.sum(histPeakIndices),np.sum(histNoiseIndices)
