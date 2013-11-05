@@ -12,23 +12,19 @@ import matplotlib
 from functools import partial
 
 class PopUp(QMainWindow):
-    def __init__(self, parent=None,plotFunc=None,title='',separateProcess=False):
-        if separateProcess:
-            proc = Process(target=PopUp,kwargs={'plotFunc':plotFunc,'title':title})
-            proc.start()
-            return None
-        if parent==None:
-            app = QApplication(sys.argv)
-        QMainWindow.__init__(self, parent)
+    def __init__(self, parent=None,plotFunc=None,title='',separateProcess=False, image=None,showMe=True):
+        self.parent = parent
+        if self.parent == None:
+            self.app = QApplication([])
+        super(PopUp,self).__init__(parent)
         self.setWindowTitle(title)
         self.plotFunc = plotFunc
         self.create_main_frame(title)
         self.create_status_bar()
         if plotFunc != None:
             plotFunc(fig=self.fig,axes=self.axes)
-        self.show()
-        if parent==None:
-            app.exec_()
+        if showMe == True:
+            self.show()
 
     def draw(self):
         self.fig.canvas.draw()
@@ -64,6 +60,12 @@ class PopUp(QMainWindow):
         cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
         self.draw()
 
+    def show(self):
+        super(PopUp,self).show()
+        if self.parent == None:
+            self.app.exec_()
+
+        
 def onscroll_cbar(fig, event):
     if event.inaxes is fig.cbar.ax:
         increment=0.05
@@ -86,11 +88,29 @@ def onclick_cbar(fig,event):
             fig.cbar.mappable.set_clim(fig.oldClim[0],1/event.ydata*fig.oldClim[1])
             fig.canvas.draw()
 
+def plotArray(*args,**kwargs):
+    wait = kwargs.pop('wait',False)
+    def f(*args,**kwargs):
+        form = PopUp(showMe=False)
+        form.plotArray(*args,**kwargs)
+        form.show()
+    if wait==True:
+        f(*args,**kwargs)
+        return None
+    else:
+        proc = Process(target=f,args=args,kwargs=kwargs)
+        proc.start()
+        return proc
+
+
 def main():
-    app = QApplication(sys.argv)
-    form = AppForm()
+    print 'non-blocking PopUp A, close when done'
+    plotArray(title='A',image=np.arange(12).reshape(4,3))
+    print 'blocking PopUp, close when done'
+    form = PopUp(showMe=False,title='B')
+    form.plotArray(np.arange(9).reshape(3,3))
     form.show()
-    app.exec_()
+    print 'done'
 
 
 if __name__ == "__main__":
