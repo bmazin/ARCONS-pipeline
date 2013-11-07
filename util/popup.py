@@ -53,10 +53,12 @@ class PopUp(QMainWindow):
 
 
     def plotArray(self,image,normNSigma=3,title=''):
-        handleMatshow = self.axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
-        self.fig.cbar = self.fig.colorbar(handleMatshow)
+        self.image = image
+        self.handleMatshow = self.axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
+        self.fig.cbar = self.fig.colorbar(self.handleMatshow)
         self.axes.set_title(title)
         cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
+        cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
         cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
         self.draw()
 
@@ -65,6 +67,16 @@ class PopUp(QMainWindow):
         if self.parent == None:
             self.app.exec_()
 
+    def hoverCanvas(self,event):
+        if event.inaxes is self.axes:
+            col = int(round(event.xdata))
+            row = int(round(event.ydata))
+            self.status_text.setText('({:d},{:d}) {}'.format(row,col,self.image[row,col]))
+            
+
+    def create_status_bar(self):
+        self.status_text = QLabel("Awaiting orders.")
+        self.statusBar().addWidget(self.status_text, 1)
         
 def onscroll_cbar(fig, event):
     if event.inaxes is fig.cbar.ax:
@@ -89,6 +101,7 @@ def onclick_cbar(fig,event):
             fig.canvas.draw()
 
 def plotArray(*args,**kwargs):
+    #Waring: Does not play well with matplotlib state machine style plotting!
     wait = kwargs.pop('wait',False)
     def f(*args,**kwargs):
         form = PopUp(showMe=False)
@@ -106,6 +119,7 @@ def plotArray(*args,**kwargs):
 def main():
     print 'non-blocking PopUp A, close when done'
     plotArray(title='A',image=np.arange(12).reshape(4,3))
+    plotArray(title='C',image=np.arange(12).reshape(3,4))
     print 'blocking PopUp, close when done'
     form = PopUp(showMe=False,title='B')
     form.plotArray(np.arange(9).reshape(3,3))
