@@ -234,11 +234,11 @@ ax = fig.add_subplot(111)
 radioBinCenters = radioBins[0:-1]+np.diff(radioBins)/2.
 #ax.errorbar(radioCalibrationFactor*radioBinCenters,enhancements,yerr=enhancementErrors,marker='.',color='g',label='Enhancement')
 ax.errorbar(radioCalibrationFactor*radioBinCenters,100.*enhancements,yerr=100.*enhancementErrors,marker='.',color='k',linestyle='')
-ax.plot(radioCalibrationFactor*np.array(radioBins),100.*np.append(enhancements,enhancements[-1]),label='Enhancement',drawstyle='steps-post',color='k')
-ax.plot(radioCalibrationFactor*filledStrengthBins,100.*probGRP*overallEnhancement,color='.5',label='Enhancement depressed by\nFalse GRP Triggers',linestyle='--')
+ax.plot(radioCalibrationFactor*np.array(radioBins),100.*np.append(enhancements,enhancements[-1]),label='Measured Enhancement',drawstyle='steps-post',color='k')
+ax.plot(radioCalibrationFactor*filledStrengthBins,100.*probGRP*overallEnhancement,color='.5',label='Constant Enhancement depressed by\nFalse GRP Triggers',linestyle='--')
 ax.set_xlabel('GRP Peak Flux Density (Jy)')
 ax.set_xscale('log')
-ax.set_ylabel('Optical Enhancement of GRP-Coincident Pulses (%)')
+ax.set_ylabel('Optical Enhancement of GRP-Accompanied Pulses (%)')
 startTick = 20.
 endTick = 90.
 tickWidth = 10.
@@ -251,7 +251,7 @@ ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%f'))
 ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, pos: str(x)))
 ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(2.))
 ax.set_xlim([startTick,endTick])
-ax.set_ylim((-1.5,7))
+ax.set_ylim((-1.9,7))
 ax.legend(loc='lower right')
 
 print 'range',radioBinCenters[0],radioBinCenters[-1]

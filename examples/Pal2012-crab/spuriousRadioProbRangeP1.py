@@ -27,11 +27,18 @@ def probsOfGRP(nRadioBins=15,strengthMin=.175,startPeakIndex=None,endPeakIndex=N
     #labelsOld = 'BTOA Max_P1 Mean_P1 Max_P2 Mean_P2'
     #labelsOld2 = 'BTOA Max_P1 Mean_P1 Max_P2 Mean_P2'
 
+    #mask out any interpulses in pulses that also have a (weak) main pulse GRP
+    overlapPNs = np.load('overlapP1.npz')['overlap']
+    pulseNumbers = table[:,np.argmax('pulseNumber'==labels)]
+    mainPulseMask = np.logical_not(np.in1d(pulseNumbers,overlapPNs))
+    #mainPulseMask = np.logical_or(np.logical_not(mainPulseMask),table[:,np.argmax('TestMax'==labels)]>0.)
+    table = table[mainPulseMask]
+    print 'table',len(table)
+
     giantDict = dict()
     for iLabel,label in enumerate(labels):
         giantDict[label] = table[:,np.argmax(label==labels)]
 
-    peakToCheck = 2
     noiseStrengthLabel = 'TestMax'
     strengthLabel = 'Max'
 
@@ -40,6 +47,7 @@ def probsOfGRP(nRadioBins=15,strengthMin=.175,startPeakIndex=None,endPeakIndex=N
     #count number of detections in the test range and the P2 peak range
     peakDetectionMask = giantDict[strengthLabel]>=strengthMin
     noiseDetectionMask = giantDict[noiseStrengthLabel]>=strengthMin
+    print 'peakDetectionMask',np.sum(peakDetectionMask),np.shape(peakDetectionMask)
 
     noiseDetections = giantDict[noiseStrengthLabel][noiseDetectionMask]
     peakDetections = giantDict[strengthLabel][peakDetectionMask]

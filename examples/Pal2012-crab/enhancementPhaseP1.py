@@ -118,12 +118,25 @@ idxOffsets = dataFile.root.idxOffsets.read()
 indProfiles = dataFile.root.indProfiles.read()
 radioIndices = dataFile.root.radioIndices.read()
 
+overlapPNs = np.load('overlapP1.npz')['overlap']
+mainPulseMask = np.logical_not(np.in1d(giantPulseNumbers,overlapPNs))
+
+#mainPulseMask = np.logical_not(mainPulseMask)
+
+radioMax = radioMax[mainPulseMask]
+counts = counts[mainPulseMask]
+giantPulseNumbers = giantPulseNumbers[mainPulseMask]
+pulseNumberTable = pulseNumberTable[mainPulseMask]
+giantPulseNumberMask = giantPulseNumberMask[mainPulseMask]
+indProfiles = indProfiles[mainPulseMask]
+radioIndices = radioIndices[mainPulseMask]
+
 #radioIndexBins=np.array([1369,1371,1373,1375,1378,1381,1385,1389,1395])-.5
 #radioIndexBinsFine = np.arange(1369,1396)-.5
 radioIndexBins = np.arange(143,179,1)-.5
 radioIndexBinsFine = np.arange(143,179)-.5
 
-if bUseFineIndexBins == True:
+if bUseFineIndexBins == True:#For statistical test, use fine binning, for figure, use coarse
     radioIndexBins = radioIndexBinsFine
 
 
@@ -183,7 +196,7 @@ print 'opticalPeakPhaseBins',peakBins
 
 nRadioBins=15
 
-radioStrengthCutoff = .155#0.175
+radioStrengthCutoff = .155#0.155
 radioCutoffMask = radioStrength >= radioStrengthCutoff
 strongMask = np.logical_and(radioCutoffMask,dimMask)
 #finalMask = np.logical_and(strongMask,radioPeakMask)
@@ -348,7 +361,7 @@ globalEnhancements = []
 globalEnhancementErrors = []
 #non-GRP pulse enhancements
 profiles = []
-radioStrengthCutoff = .155#0.175
+radioStrengthCutoff = .155#0.155
 radioCutoffMask = radioStrength >= radioStrengthCutoff
 strongMask = np.logical_and(radioCutoffMask,dimMask)
 strongMask = np.logical_and(strongMask,radioPhaseMask)

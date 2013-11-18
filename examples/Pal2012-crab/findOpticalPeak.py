@@ -53,7 +53,7 @@ print np.argmax(profile)
 
 maxIdx = np.argmax(profile)
 peakPhase = binCenters[maxIdx]
-errorPeakPhase = binCenters[maxIdx+1]-binCenters[maxIdx]
+errorPeakPhase = (binCenters[maxIdx+1]-binCenters[maxIdx])/2.
 
 print 'optical main pulse peak'
 print peakPhase,'+/-',errorPeakPhase,' in phase'
@@ -73,7 +73,7 @@ ax2.plot(radioProfilePhaseBins,radioProfile,c=(.4,.5,.8),label='Radio Pulse')
 
 maxRadioIdx = np.argmax(radioProfile)
 radioPeakPhase = radioProfilePhaseBins[maxRadioIdx]
-errorRadioPeakPhase = radioProfilePhaseBins[maxRadioIdx+1]-radioProfilePhaseBins[maxRadioIdx]
+errorRadioPeakPhase = (radioProfilePhaseBins[maxRadioIdx+1]-radioProfilePhaseBins[maxRadioIdx])/2.
 
 print 'radio main pulse peak'
 print radioPeakPhase,'+/-',errorRadioPeakPhase, ' in phase'

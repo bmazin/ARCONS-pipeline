@@ -25,6 +25,10 @@ def probsOfGRP(nRadioBins=15,lowerStrengthHistEdge=.1):
     table = np.loadtxt(path+'giantPulseList_P1_3sigma_indices.txt',skiprows=1,usecols=range(len(labels)))
     print 'table',np.shape(table)
 
+    overlapPNs = np.load('overlapP1.npz')['overlap']
+    pulseNumbers = table[:,np.argmax('pulseNumber'==labels)]
+    mainPulseMask = np.logical_not(np.in1d(pulseNumbers,overlapPNs))
+    table = table[mainPulseMask]
 
     giantDict = dict()
     for iLabel,label in enumerate(labels):
@@ -165,11 +169,11 @@ def probsOfGRP(nRadioBins=15,lowerStrengthHistEdge=.1):
     #percentiles = np.arange(0,100.1,100./nRadioBins)
     #percentiles = np.logspace(-1,2,nRadioBins,base=2)
     #percentiles = np.array([0,15,30,42,47,52,57,62,67,75,85,90])
-    percentiles = np.array([0,15,30,44,50,55,60,65,70,75,85,90])
+    #percentiles = np.array([0,15,30,44,50,55,60,65,70,75,85,90])
     #percentiles = np.array([0,18,37,53,62,70,77,84,90])
     #percentiles = np.array([0,15,34,50,59,66,73,80,86,90])
     #percentiles = np.array([0,15,30,45,50,55,60,65,70,75,85,90])
-    percentiles = np.arange(0,100,10)
+    percentiles = np.arange(0,100,5)
     radioStrengthBins = []
     for perc in percentiles:
         radioStrengthBins.append(scipy.stats.scoreatpercentile(radioStrength2[clipPeakIndexMask2],perc))

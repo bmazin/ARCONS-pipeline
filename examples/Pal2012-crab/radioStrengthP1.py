@@ -54,6 +54,17 @@ idxOffsets = dataFile.root.idxOffsets.read()
 indProfiles = dataFile.root.indProfiles.read()
 radioIndices = dataFile.root.radioIndices.read()
 
+overlapPNs = np.load('overlapP1.npz')['overlap']
+mainPulseMask = np.logical_not(np.in1d(giantPulseNumbers,overlapPNs))
+
+radioMax = radioMax[mainPulseMask]
+counts = counts[mainPulseMask]
+giantPulseNumbers = giantPulseNumbers[mainPulseMask]
+pulseNumberTable = pulseNumberTable[mainPulseMask]
+giantPulseNumberMask = giantPulseNumberMask[mainPulseMask]
+indProfiles = indProfiles[mainPulseMask]
+radioIndices = radioIndices[mainPulseMask]
+
 radioStrength = radioMax
 print 'radioMax',np.min(radioMax),np.median(radioMax),np.max(radioMax)
 print np.shape(radioMax,),np.shape(radioIndices),np.shape(counts)

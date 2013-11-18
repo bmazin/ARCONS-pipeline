@@ -263,8 +263,8 @@ fig = plt.figure()
 ax = fig.add_subplot(111)
 ax2 = ax.twinx()
 pltHandle2 = ax2.plot(radioProfilePhaseBins,radioProfile,c=(.4,.5,.8),label='Radio Pulse')
-pltHandle0 = ax.errorbar(phaseBinCenters,overallCoincidentProfile,yerr=stdProfile,c='k',label='Optical GRP-coincident Pulse')
-pltHandle1 = ax.plot(phaseBinCenters,avgProfile,c='r',label='Optical non-GRP-coincident Pulse')
+pltHandle0 = ax.errorbar(phaseBinCenters,overallCoincidentProfile,yerr=stdProfile,c='k',label='Optical GRP-accompanied Pulse')
+pltHandle1 = ax.plot(phaseBinCenters,avgProfile,c='r',label='Optical non-GRP-accompanied Pulse')
 pltHandles = [pltHandle0,pltHandle1[0],pltHandle2[0]]
 pltLabels = [pltHandle.get_label() for pltHandle in pltHandles]
 
@@ -297,8 +297,8 @@ doubleRadioProfilePhaseBins = np.concatenate([radioProfilePhaseBins-1,radioProfi
 doubleRadioProfile = np.concatenate([radioProfile,radioProfile,radioProfile])
 ax2 = ax.twinx()
 pltHandle2 = ax2.plot(doubleRadioProfilePhaseBins,doubleRadioProfile,c=(.4,.5,.8),label='Radio Pulse')
-pltHandle0 = ax.plot(doublePhaseBins,doubleOverallCoincidentProfile,c='k',label='Optical GRP-coincident Pulse')
-pltHandle1 = ax.plot(doublePhaseBins,doubleAvgProfile,c='r',label='Optical non-GRP-coincident Pulse')
+pltHandle0 = ax.plot(doublePhaseBins,doubleOverallCoincidentProfile,c='k',label='Optical GRP-accompanied Pulse')
+pltHandle1 = ax.plot(doublePhaseBins,doubleAvgProfile,c='r',label='Optical non-GRP-accompanied Pulse')
 pltHandles = [pltHandle0[0],pltHandle1[0],pltHandle2[0]]
 pltLabels = [pltHandle.get_label() for pltHandle in pltHandles]
 
@@ -375,7 +375,7 @@ for iBin,bin in enumerate(radioPhaseBins[0:-1]):
     nSigmaOverOverall=(enhancement-overallEnhancement)/enhancementError
     enhancementNSigmasOverOverall.append(nSigmaOverOverall)
     #print '{:.3}+/-{:.3}({:.3},{:.3})'.format(enhancement,enhancementError,enhancementNSigma,(enhancement-overallEnhancement)/enhancementError)
-    print '{}\t{:.5}\t{}\t{:.3}\t{:.3}\t{:.3}'.format(radioIndexBins[iBin],bin,np.sum(binMask),enhancement,enhancementError,nSigmaOverOverall)
+    print '{}\t{:.5}\t{}\t{:.5}\t{:.5}\t{:.5}'.format(radioIndexBins[iBin],bin,np.sum(binMask),enhancement,enhancementError,nSigmaOverOverall)
 
     globalEnhancement = (giantPeakHeight-overallPeakHeight)/overallPeakHeight
     globalEnhancementError = peakSigma/overallPeakHeight
@@ -423,7 +423,7 @@ ax2.axhline(0.,linewidth=1.,c='k')
 ax2.axvline(opticalPeakPhase,c='gray',linestyle='--')
 
 ax2.set_xlabel('GRP Arrival Phase')
-ax2.set_ylabel('Optical Enhancement of\nGRP-Coincident Pulses (%)')
+ax2.set_ylabel('Optical Enhancement of\nGRP-Accompanied Pulses (%)')
 ax2.set_ylim((-1.,16))
 ax2.set_xlim((.991,1.005))
 ax.set_xlim((.991,1.005))
