@@ -25,7 +25,15 @@ If you are having troubles with PyTables (which you shouldn't since it is built 
 
 ***
 
-Another package you will need is interval.  It depends on crlibm
+Another package you will need is pyinterval.  It depends on crlibm
+
+NOTE:  the python package interval is not the same thing.  If this
+got installed by mistake, things might not work so well.  A tell-tale
+sign that you have the correct thing installed is that this line 
+works in ipython:
+
+from interval import interval, inf, imath
+
 
 On Turk, these packages installed in the usual way without fuss.
 
