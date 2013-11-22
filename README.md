@@ -18,6 +18,9 @@ PyGuide (http://www.astro.washington.edu/users/rowen/PyGuide/Manual.html)
 
 gittle -- represents the state of the git repository in python (easy_install gittle)
 
+ds9 -- need to download pyds9 and install.  Instructions here:
+http://hea-www.harvard.edu/saord/ds9/pyds9/
+
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
