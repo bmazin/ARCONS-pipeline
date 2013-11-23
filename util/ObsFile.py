@@ -617,7 +617,7 @@ class ObsFile:
         #Make sure we include *all* the complete seconds that overlap the requested range
         integerIntTime = int(np.ceil(lastSec)-np.floor(firstSec)) 
         pixelData = self.getPixel(iRow, iCol, firstSec=int(np.floor(firstSec)),
-                                  integrationTime=integerIntTime)
+                                          integrationTime=integerIntTime)
 
         if integrationTime == -1 or integerIntTime > len(pixelData):
             lastSec = int(np.floor(firstSec))+len(pixelData)
@@ -629,12 +629,11 @@ class ObsFile:
 
         if self.cosmicMaskIsApplied:
             inter = inter | self.cosmicMask
-
-        
+            
         if (type(firstSec) is not int) or (type(integrationTime) is not int):
             #Also exclude times outside firstSec to lastSec. Allows for sub-second
-            #(floating point) values in firstSec and integrationTime
-            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits (??? REDUNDANT? JvE 6/19/2013)
+            #(floating point) values in firstSec and integrationTime in the call to parsePhotonPackets.
+            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
 
         #Inter now contains a single 'interval' instance, which contains a list of
         #times to exclude, in seconds, including all times outside the requested
@@ -643,7 +642,7 @@ class ObsFile:
         #Calculate the total effective time for the integration after removing
         #any 'intervals':
         integrationInterval = interval([firstSec, lastSec])
-        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel.
+        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel (for calculating eff. int. time)
         effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
 
         timestamps = []
@@ -652,8 +651,7 @@ class ObsFile:
 
         # pixelData is an array of data for this iRow,iCol, at each good time
         for t in range(len(pixelData)):
-            interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
-            
+            interTicks = (inter - (np.floor(firstSec) + t)) * self.ticksPerSec         
             times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
             times = np.floor(firstSec) + self.tickDuration * times + t
             timestamps.append(times)
@@ -1586,7 +1584,6 @@ def calculateSlices_old(inter, timestamps):
         slices.append(slce)
     return slices
 
-
 def calculateSlices(inter, timestamps):
     '''
     Hopefully a quicker version of  the original calculateSlices. JvE 3/8/2013
@@ -1609,7 +1606,13 @@ def calculateSlices(inter, timestamps):
     for eachComponent in inter.components:
         #Check if eachComponent of the interval overlaps the timerange of the 
         #timestamps - if not, skip to the next component.
+
         if eachComponent & timerange == interval(): continue
+        #[
+        #Possibly a bit faster to do this and avoid interval package, but not fully tested:
+        #if eachComponent[0][1] < timestamps[0] or eachComponent[0][0] > timestamps[-1]: continue
+        #]
+
         imin = np.searchsorted(timestamps, eachComponent[0][0], side='left') #Find nearest timestamp to lower bound
         imax = np.searchsorted(timestamps, eachComponent[0][1], side='right') #Nearest timestamp to upper bound
         #As long as we're not about to create a wasteful '0:0' slice, go ahead 
@@ -1656,3 +1659,9 @@ class cosmicHeaderDescription(tables.IsDescription):
     populationMax = tables.Int32Col()
 
 
+#Temporary test
+if __name__ == "__main__":
+    obs = ObsFile(FileName(run='PAL2012', date='20121210', tstamp='20121211-051650').obs())
+    obs.loadWvlCalFile(FileName(run='PAL2012',date='20121210',tstamp='20121211-052230').calSoln())
+    obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
+    beforeImg = obs.getPixelCountImage(weighted=False,fluxWeighted=False,scaleByEffInt=True)

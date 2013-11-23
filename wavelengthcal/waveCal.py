@@ -23,6 +23,11 @@ where paramFile has the same parameters as e.g. waveCal.dict
 Depends on readDict.py, mpfit.py, smooth.py, fitFunctions.py
 
 see README.txt for more info
+
+
+** NOTE - need to update to get # detector rows/columns from 
+input data files instead of from parameter file - JvE 11/13/2013.**
+
 '''
 #!/bin/env python
 

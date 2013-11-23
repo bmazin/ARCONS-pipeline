@@ -118,6 +118,8 @@ Pipeline components:
 
 /hotpix contains tools for finding location and time of hot (and possibly 'cold') pixels
 
+/photonlist contains tools for creating calibrated photon lists and creating stacked, RA/dec-mapped images from them.
+
 Each directory contains a /test subdirectory, where code to test the module will be stored.
 
 ***
