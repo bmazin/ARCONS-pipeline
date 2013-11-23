@@ -13,6 +13,7 @@ import binascii
 import math
 from scipy.signal import convolve
 import scipy.ndimage
+import scipy.stats
 import ds9
 
 #from interval import interval
