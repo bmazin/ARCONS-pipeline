@@ -208,6 +208,12 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
  
  
 if __name__ == "__main__":
+    '''
+    To call from command line:
+    
+        python quantifyHotTime inputfilename [startTime endTime]
+    
+    '''
     
     inputFileName = None
     startTime = 0
