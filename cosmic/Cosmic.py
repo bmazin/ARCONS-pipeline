@@ -17,7 +17,11 @@ from util import FileName
 import inspect
 from interval import interval, inf, imath
 from headers import TimeMask
-from cosmic import tsBinner
+try:
+    from cosmic import tsBinner
+except ImportError:
+    print "trouble importing tsBinner.  Follow directions in cosmic/README.txt"
+
 from scipy.optimize import curve_fit
 from scipy.stats import expon
 import time

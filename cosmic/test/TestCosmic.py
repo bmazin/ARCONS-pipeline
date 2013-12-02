@@ -10,7 +10,11 @@ import numpy as np
 from util import hgPlot
 from util import ObsFile
 from scipy.stats import poisson,expon
-from cosmic import tsBinner
+try:
+    from cosmic import tsBinner
+except ImportError:
+    print "trouble importing tsBinner.  Follow directions in cosmic/README.txt"
+
 import sys
 import logging
 import warnings
