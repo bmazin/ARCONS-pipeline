@@ -37,6 +37,15 @@ from interval import interval, inf, imath
 
 On Turk, these packages installed in the usual way without fuss.
 
+On bender, there was a problem with the how libcrlibm.a was build:
+relocation R_X86_64_32S against `.rodata' can not be used when making
+a shared object; recompile with -fPIC
+
+To fix this, in the crlibm source tree,in scs_lib/Makefile add the -fPIC 
+option in this line:
+CPPFLAGS = -fPIC 
+
+
 On a Mac, you need to do this:
 
 I downloaded crlibm-1.0beta4.tar.gz from 
@@ -126,3 +135,20 @@ A beginner's guide and the observing log for the Palomar 2012 run are in example
 
 ***
 This document uses the markdown syntax, see http://daringfireball.net/projects/markdown/
+
+
+***
+Getting it working on bender during the Palomar 2013 run.  
+
+Bender has the canopy version of python installed.  To get pyqt working:
+
+yum install qt4
+
+I then tried yum install PyQt4 but the canopy version of python did
+not pick it up.
+
+sudo scp -r stoughto@turk.physics.ucsb.edu:/usr/local/epd/lib/python2.7/site-packages/PyQt4 .
+This needs the same version of sip.  On turk, sip -V says it is version 4.13.2 so I downloaded sip-4.13.3.zip,
+unzip, python configure.py; make; sudo make install.
+
+
