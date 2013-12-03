@@ -48,12 +48,12 @@ Dependencies: pytables; pyinterval; headers.TimeMask; util.ObsFile; numpy;
               matplotlib; util.readDict
 
 To do:
-    - Extend to check for 'cold' pixels
+    - Extend to check for 'cold' pixels. DONE/IN-PROGRESS 11/22/2013.
     - Suppress annoying invalid value warnings that come up (and can be ignored)
     - Speed up (most time is spent reading the h5 file; significant overhead can
-        probably be saved by reading in the whole file at once instead of
+        maybe be saved by reading in the whole file at once instead of
         second-by-second).
-    - At some point, perhaps update to allow sub-second time steps.
+    - At some point, perhaps update to allow sub-second time steps. THINK THIS SHOULD WORK OKAY NOW - BUT NEED TO TEST TO BE SURE. 11/27/2013.
     - Time intervals are currently stored in units of seconds - need to convert
         to clock ticks for consistency with TimeInterval class. FIXED - 02/12/2013.
     - If necessary, apply algorithm only at the red end, where hot-pixel
@@ -62,6 +62,10 @@ To do:
         efficient.
     - Current image display in checkInterval is wrong way up - need to update
       to use Danica's image display routine.
+    
+    - NOTE - HAVE NOT PROPERLY CODED TO MAKE SURE THAT TIME STEPS ARE PROPERLY
+      CONSECUTIVE IN INTEGER 'TICKS' FOR THE RECORDED INTERVALS - SHOULD PROBABLY
+      LOOK INTO THIS.
 
 See individual routines for more detail.
 
@@ -78,6 +82,7 @@ import matplotlib.pylab as mpl
 import util.ObsFile as ObsFile
 import util.utils as utils
 import headers.TimeMask as tm
+from headers import pipelineFlags as pflags
 import util.readDict as readDict
 
 
@@ -86,6 +91,8 @@ headerTableName = 'header'
 dataGroupName = 'timeMasks' #data *table* name is constructed on a per-pixel basis (see constructDataTableName)
 nRowColName = 'nRow'        #Name of the no.-of-rows column in the header for the output .h5 file.
 nColColName = 'nCol'        #Ditto for no.-of-columns column.
+startTimeColName = 'startTime'  #Header column name for recording start time of time-mask data, in sec from beginning of obs. file.
+endTimeColName = 'endTime'      #Ditto for end time.
 obsFileColName = 'obsFileName' #Ditto for the column containing the name of the original obs. file.
 ticksPerSecColName = 'ticksPerSec'  #Ditto for column containing number of clock ticks per second for original obs. file.
 expTimeColName = 'expTime'  #Ditto for column containing total exposure time
@@ -103,17 +110,22 @@ class headerDescription(tables.IsDescription):
     nRow = tables.UInt32Col(dflt=-1)   #the data used to construct the mask.
     ticksPerSec = tables.Float64Col(dflt=np.nan)    #So that code which reads in the file can back out intervals in seconds if needed.
     expTime = tables.Float64Col(dflt=np.nan)        #So that per-pixel effective exposure times can be calculated any time without having to refer to the original obs file. Added 6/21/2013, JvE, although not yet used elsewhere in the code.
+    startTime = tables.Float64Col(dflt=np.nan)      #To record start and end times within the obs file for which the time masks were created.
+    endTime = tables.Float64Col(dflt=np.nan)
  
- 
-def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
-                  obsFile=None, inputFileName=None, image=None,
+def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.0,
+                  nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
                   display=False, weighted=False, maxIter=5):
     '''
-    To find the hot pixels in a given time interval for an observation file.
-    Compares the ratio of flux in each pixel to the median of the flux in an
+    To find the hot (and cold) pixels in a given time interval for an observation file.
+    This is the guts of the bad pixel finding algorithm, but only works on a single time
+    interval. Compares the ratio of flux in each pixel to the median of the flux in an
     enclosing box. If the ratio is too high -- i.e. the flux is too tightly 
     distributed compared to a Gaussian PSF of the expected FWHM -- then the 
     pixel is flagged as bad.
+    
+    Cold pixels are indentified as those with a flux significantly below the median
+    flux of the surrounding pixels.
     
     Main return value is a 2D integer array of flags corresponding to 
     the input image (see OUTPUTS below).
@@ -134,9 +146,11 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
                     pixels).
         boxSize: Scalar integer. Size of edge of box used for calculating median 
                     flux in the region surrounding each pixel.
-        nSigma: Scalar float. If the flux ratio for a pixel is (nSigma x expected
+        nSigmaHot: Scalar float. If the flux ratio for a pixel is (nSigmaHot x expected
                     error) above the max expected given the PSF FWHM, then flag it 
                     as hot.
+        nSigmaCold: If the flux for a pixel is more than nSigmaCold*expected error
+                    below the median in the surrounding box, then flag it as cold.
         display: Boolean. If true, then display the input image and mark those 
                     flagged as hot with a dot.
         maxIter: Scalar integer. Maximum number of iterations allowed.
@@ -193,53 +207,91 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
         
     #For now, assume 0 counts in a pixel means the pixel is dead.
     #Turn such pixel values into NaNs.
+    deadMask = (im<1)
     im[im < 1] = np.nan
     
-    oldHotMask = np.zeros(shape=np.shape(im), dtype=bool)  #Initialise a mask (all False) for comparison on each iteration.
+    oldHotMask = np.zeros(shape=np.shape(im), dtype=bool)   #Initialise a mask for hot pixels (all False) for comparison on each iteration.
+    oldColdMask = np.zeros(shape=np.shape(im), dtype=bool)  #Same for cold pixels
     
     for iIter in range(maxIter):
         #Calculate median filtered image
         #Each pixel takes the median of itself and the surrounding boxSize x boxSize box.
         #(Not sure what edge effects there may be...)
-        medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror') #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection'; 'mirror' does not, and makes more sense for this application.
+        #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection';
+        #'mirror' does not, and makes more sense for this application.
+        medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror') 
+        
+        #Calculate the standard-deviation filtered image,
+        #using a kernel footprint that will miss out the central pixel:
+        footprint = np.ones((boxSize,boxSize))
+        footprint[boxSize/2,boxSize/2] = 0      #Can move this definition outside the loop if it needed, but prob. okay at the moment. 
+        stdFiltImage = utils.stdDev_filterNaN(im, boxSize, mode='mirror', footprint=footprint)
     
         #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
         #Also calculate the error in the same quantity.
         diff = im - maxRatio * medFiltImage
         diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)
         
-        #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged
+        #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged as hot:
         #(True=>bad pixel; False=> good pixel).
-        hotMask = (diff > (nSigma * diffErr)) | oldHotMask
+        hotMask = (diff > (nSigmaHot * diffErr)) | oldHotMask
+        
+        #And any pixel that is more than nSigma *below* the std. dev. of the surrounding box (not including itself)
+        #should be flagged as cold:
+        coldMask = ((medFiltImage - im) > nSigmaCold * stdFiltImage) | oldColdMask 
 
         #If no change between between this and the last iteration then stop iterating
-        if np.all(hotMask == oldHotMask): break
+        if np.all(hotMask == oldHotMask) and np.all(coldMask == oldColdMask): break
 
         #Otherwise update 'oldHotMask' and set all detected bad pixels to NaN for the next iteration
         oldHotMask = np.copy(hotMask)
         im[hotMask] = np.nan
-                
+        oldColdMask = np.copy(coldMask)
+        im[coldMask] = np.nan
     
+
+    #Finished with loop, now combine the hot and cold masks:
+    assert np.all(coldMask & hotMask == False)  #Presumably a pixel can't be both hot AND cold....
+    mask = np.empty_like(hotMask,dtype=int)
+    mask.fill(pflags.badPixCal['good'])
+    mask[hotMask] = pflags.badPixCal['hot']
+    mask[coldMask] = pflags.badPixCal['cold']
+    mask[deadMask] = pflags.badPixCal['dead']
+        
     if display:
         imForDisplay = np.copy(imOriginal)
+        cleanImForDisplay = np.copy(imForDisplay)
         imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
+        cleanImForDisplay[mask!=pflags.badPixCal['good']] = 0   #An image with only good pixels
         
         #utils.plotArray(im, cbar=True)
         fig = mpl.figure(figsize=(10, 10))
-        mpl.matshow(imForDisplay, vmax=np.percentile(imForDisplay, 99.5), fignum=False)
+        mpl.matshow(imForDisplay, vmax=np.percentile(imForDisplay, 98.0), fignum=False,
+                    origin='lower')  #, cmap=mpl.cm.hot)
         mpl.colorbar()
+                
         x = np.arange(np.shape(imForDisplay)[1])
         y = np.arange(np.shape(imForDisplay)[0])
         xx, yy = np.meshgrid(x, y)
-        
         if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y')
+        if np.sum(coldMask) > 0: mpl.scatter(xx[coldMask], yy[coldMask], c='w')
+        if np.sum(deadMask) > 0: mpl.scatter(xx[deadMask], yy[deadMask], c='b')
         #if obsFile is None:
         #    plotTitle = ('im' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
         if obsFile is not None:
             plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
             mpl.suptitle(plotTitle)
 
-    return {'mask':hotMask, 'image':im, 'medfiltimage':medFiltImage,
+        #fig = mpl.figure(figsize=(10, 10))
+        #mpl.matshow(cleanImForDisplay, vmax=np.percentile(imForDisplay, 98.0),
+        #            cmap=mpl.cm.hot, fignum=False, origin='lower')
+        #mpl.colorbar()
+        
+        if obsFile is not None:
+            plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
+            mpl.suptitle(plotTitle)
+
+    return {'mask':mask, 'image':im, 'medfiltimage':medFiltImage,
             'maxratio':maxRatio, 'diff':diff, 'differr':diffErr, 'niter':iIter + 1}
 
 
@@ -252,10 +304,10 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigma=3.0,
 def findHotPixels(inputFileName=None, outputFileName=None,
                   paramFile=None,
                   timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
-                  boxSize=5, nSigma=3.0, display=False, weighted=False,
-                  maxIter=5):
+                  boxSize=5, nSigmaHot=3.0, nSigmaCold=3.0, display=False,
+                  weighted=False, maxIter=5):
     '''
-    To find hot pixels (and possibly cold pixels too at some point...).
+    To find hot (and cold) pixels .
     This routine is the main code entry point.
     
     
@@ -286,7 +338,8 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                     error) above the max expected given the PSF FWHM, then flag it 
                     as hot. Larger value => lower sensitivity.
         display: Boolean. If true, then display the input image and mark those 
-                    flagged as hot with a dot.
+                    flagged as hot with a dot. NB - UPDATED TO ONLY SHOW FIRST AND
+                    LAST TIME SLICES FOR NOW.
         'weighted': boolean, set to True to use flat cal weights (see flatcal/ 
                     and and util.obsFile.getPixelCountImage() )
         
@@ -342,7 +395,8 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         if endTime is None: endTime = params['endTime']
         if fwhm is None: fwhm = params['fwhm']
         if boxSize is None: boxSize = params['boxSize']
-        if nSigma is None: nSigma = params['nSigma']
+        if nSigmaHot is None: nSigmaHot = params['nSigmaHot']
+        if nSigmaCold is None: nSigmaCold = params['nSigmaCold']
         if display is None: display = params['display']
         if maxIter is None: maxIter = params['maxIter']
     else:
@@ -354,12 +408,18 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     if startTime is None: startTime = 0
     if endTime is None: pass
     if maxIter is None: maxIter = 5
+    if outputFileName is None: outputFileName = 'badPixTimeMask.h5'
     
     obsFile = ObsFile.ObsFile(inputFileName)
     expTime = obsFile.getFromHeader('exptime')
     if endTime < 0: endTime = expTime
     stepStarts = np.arange(startTime, endTime, timeStep)  #Start time for each step (in seconds).
     stepEnds = stepStarts + timeStep                      #End time for each step
+    assert(np.sum(stepEnds>endTime)<=1)                   #Shouldn't be more than one end time that runs over
+    stepEnds[stepEnds>endTime] = endTime                  #Clip any time steps that run over the end of the requested time range.
+    assert(np.all((stepStarts >= startTime) & (stepStarts <= endTime)))
+    assert(np.all((stepEnds >= startTime) & (stepEnds <= endTime)))
+
     nSteps = len(stepStarts)
     stepStartsTicks = stepStarts * obsFile.ticksPerSec
     stepEndsTicks = stepEnds * obsFile.ticksPerSec
@@ -370,21 +430,12 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     #Get the mask for each time step
     for i, eachTime in enumerate(stepStarts):
         print str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
+        displayThisOne = display and (i==0 or i==len(stepStarts)-1)
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
-                                     fwhm=fwhm, boxSize=boxSize, nSigma=nSigma,
-                                     display=display, weighted=weighted,
+                                     fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
+                                     nSigmaCold=nSigmaCold, display=displayThisOne, weighted=weighted,
                                      maxIter=maxIter)['mask']
- 
-    
-    #Initialise an empty list that will eventually be a list of entries corresponding to:
-    #  [xpos, ypos, badTimeList]
-    #
-    #where badTimeList is a nested list of tuples indicating bad time intervals and 
-    #reasons for flagging:
-    #   
-    #  [(start time 1, end time1, flag number 1), (Start time 2, end time 2, flag 2), ...] 
-    #
-    #(with times in seconds).
+                                     #Note checkInterval call should automatically clip at end of obsFile, so don't need to worry about endTime.
     
     timeMaskData = []  
 
@@ -422,13 +473,13 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     
     
     #Write it all out to the .h5 file
-    writeHotPixels(timeMaskData, obsFile, outputFileName)
+    writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=startTime, endTime=endTime)
     
 
 
 
 
-def writeHotPixels(timeMaskData, obsFile, outputFileName):
+def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTime=None):
     '''
     Write the output hot-pixel time masks table to an .h5 file. Called by
     findHotPixels().
@@ -438,6 +489,9 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
         obsFile - the ObsFile object from which the data to be written
                         was derived.
         outputFileName - string, the pathname of the .h5 file to write to.
+        startTime, endTime - start and end times of the time mask data, in 
+                        seconds from the start of the obsFile. These values
+                        are written into the header information.
     
     OUTPUTS:
         Writes an .h5 file to filename outputFileName. See findHotPixels()
@@ -448,6 +502,9 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
         behaviour of the input file name for an ObsFile instance. (i.e., 
         unless the path provided is absolute, $MKID_DATA_DIR is prepended
         to the file name.
+        
+        11/22/2013 (actually a few days before): added startTime, and endTime to saved
+        header information. Had also added expTime to saved header info some time ago....
     '''
     
     if (os.path.isabs(outputFileName)):
@@ -466,8 +523,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
     try:    
         #Construct groups for header and time mask data.
         headerGroup = fileh.createGroup("/", headerGroupName, 'Header')
-        timeMaskGroup = fileh.createGroup("/", dataGroupName, 'Time masks for temporarily bad pixels')
-
+        timeMaskGroup = fileh.createGroup("/", dataGroupName, 'Time masks for bad pixels')
 
         #Fill in header info (just a one-row table)
         headerTable = fileh.createTable(headerGroup, headerTableName, headerDescription,
@@ -478,11 +534,31 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
         header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
         header[ticksPerSecColName] = obsFile.ticksPerSec
         header[expTimeColName] = obsFile.getFromHeader('exptime')    #Newly implemented - SHOULD DOUBLE CHECK! Should automatically account for any of Matt's time corrections JvE 7/08/2013.
+        if startTime is not None:
+            header[startTimeColName] = startTime
+        else:
+            header[startTimeColName] = np.nan
+        if endTime is not None:
+            header[endTimeColName] = endTime
+        else:
+            header[endTimeColName] = np.nan
+            
         header.append()
         headerTable.flush()
         headerTable.close()
 
-        #Fill in the time mask info          
+        
+        #Establish a mapping indicating which bad pixel map flag numbers (uesd in this bad pixel masking
+        #code) correspond to which timeMaskReason enumeration values (used by the headers.timeMask 
+        #table format in the output files):
+        flagMap = {
+                   pflags.badPixCal['hot']: tm.timeMaskReason['hot pixel'],
+                   pflags.badPixCal['cold']: tm.timeMaskReason['cold pixel'],
+                   pflags.badPixCal['dead']: tm.timeMaskReason['dead pixel']
+                   }
+                  
+ 
+        #Fill in the time mask info
         for eachPixelEntry in timeMaskData:
             
             #One table for every pixel:
@@ -493,10 +569,15 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName):
             for eachPeriod in eachPixelEntry[2]:
                 row['tBegin'] = eachPeriod[0]
                 row['tEnd'] = eachPeriod[1]
-                if eachPeriod[2] == 1: 
-                    row['reason'] = tm.timeMaskReason['hot pixel']
-                else:
-                    row['reason'] = tm.timeMaskReason['unknown'] #For now - other reasons (e.g. cold pixels) can be added later.
+                row['reason'] = flagMap.get(eachPeriod[2],'unknown') #Map flag number to time mask reason using flagMap dictionary (default is 'unknown').
+                #if eachPeriod[2] == pflags.badPixCal['hot']: 
+                #    row['reason'] = tm.timeMaskReason['hot pixel']
+                #elif eachPeriod[2] == pflags.badPixCal['cold']:
+                #    row['reason'] = tm.timeMaskReason['cold pixel']
+                #elif eachPeriod[2] == pflags.badPixCal['dead']:
+                #    row['reason'] = tm.timeMaskReason['dead pixel']
+                #else:
+                #    row['reason'] = tm.timeMaskReason['unknown'] #For now - other reasons (e.g. cold pixels) can be added later.
                 row.append()
                 
             timeMaskTable.flush()
@@ -553,7 +634,10 @@ def readHotPixels(inputFile,nodePath=None):
                             hot pixel masking info was derived.
             'ticksPerSecond' - number of clock ticks per second assumed in creating
                                the output file.
-                               
+            'expTime' - duration of original obs file (sec).
+            'startTime' - start time of the time mask file within the original obs file (sec).
+            'endTime' - end time of the time mask file within the original obs file (sec).
+            
         Note - would probably make more sense to return an object here at some point, instead
         of a dictionary....
     
@@ -620,7 +704,10 @@ def readHotPixels(inputFile,nodePath=None):
             >>> 0.8 in interval.union(hpData['intervals'][44,5])
             True
             
-            
+    
+    NOTES:
+        Added expTime, startTime, and endTime return values, JvE, 11/22/2013
+        
     '''
     
     if type(inputFile) is str:
@@ -642,12 +729,16 @@ def readHotPixels(inputFile,nodePath=None):
     
     try:        
         #Get the header info
-        headerInfo = fileh.getNode(nodePath + headerGroupName, headerTableName)[0] #The one row from the header
+        headerTable = fileh.getNode(nodePath + headerGroupName, headerTableName)
+        headerInfo = headerTable[0] #The one row from the header
         nRow = headerInfo[nRowColName]
         nCol = headerInfo[nColColName]
         obsFileName = headerInfo[obsFileColName]
         ticksPerSec = headerInfo[ticksPerSecColName]
-    
+        expTime = headerInfo[expTimeColName] if expTimeColName in headerTable.colnames else None 
+        startTime = headerInfo[startTimeColName] if startTimeColName in headerTable.colnames else None 
+        endTime = headerInfo[endTimeColName] if endTimeColName in headerTable.colnames else None 
+            
         #Intialise two ragged object arrays, one to take lists of Interval objects
         timeIntervals = np.empty((nRow, nCol), dtype='object')
         timeIntervals.fill([])
@@ -670,7 +761,8 @@ def readHotPixels(inputFile,nodePath=None):
         #Return a simple dictionary
         return {"intervals":timeIntervals, "reasons":reasons,
                 "reasonEnum":reasonEnum, "nRow":nRow, "nCol":nCol,
-                "obsFileName":obsFileName, "ticksPerSecond":ticksPerSec}
+                "obsFileName":obsFileName, "ticksPerSecond":ticksPerSec,
+                "expTime":expTime, "startTime":startTime, "endTime":endTime}
 
 
     finally:
@@ -775,8 +867,8 @@ def getHotPixels(hotPixDict,integrationTime=-1,firstSec=0):
 
 if __name__ == "__main__":
     
-    paramFile = None    #'/Users/vaneyken/UCSB/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
-    inputFile = None    #'/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
+    paramFile = '/Users/vaneyken/UCSB/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
+    inputFile = '/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
     outputFile = None
     
     nArg = len(sys.argv)
@@ -785,7 +877,7 @@ if __name__ == "__main__":
     if nArg > 2: inputFile = sys.argv[2]
     if nArg > 3: outputFile = sys.argv[3]
     findHotPixels(paramFile=paramFile, inputFileName=inputFile,
-                  outputFileName=outputFile)
+                  outputFileName=outputFile, endTime=4.5)
     
     
 

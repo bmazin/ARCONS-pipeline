@@ -71,7 +71,8 @@ class PopUp(QMainWindow):
         if event.inaxes is self.axes:
             col = int(round(event.xdata))
             row = int(round(event.ydata))
-            self.status_text.setText('({:d},{:d}) {}'.format(row,col,self.image[row,col]))
+            if row < np.shape(self.image)[0] and col < np.shape(self.image)[1]:
+                self.status_text.setText('({:d},{:d}) {}'.format(row,col,self.image[row,col]))
             
 
     def create_status_bar(self):

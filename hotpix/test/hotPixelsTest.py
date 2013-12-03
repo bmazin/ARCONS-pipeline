@@ -1,15 +1,14 @@
-import hotpix.hotPixels as hp
-import numpy as np
-from interval import interval
 import sys
-import util.ObsFile as of
-import matplotlib.pylab as mpl
 import numpy as np
+import matplotlib.pylab as mpl
+from interval import interval
+import hotpix.hotPixels as hp
+from util.FileName import FileName 
 
 '''Internal consistency checks for hotPixels.py'''
 
 
-def hotPixelsTest(testFileName='obs_20121209-044636.h5'):
+def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20121209-044636').obs()):
     '''
     Runs some basic checks for consistency between intermediate output
     masks and the final 'bad time lists'.
@@ -34,18 +33,20 @@ def hotPixelsTest(testFileName='obs_20121209-044636.h5'):
     timeStep = 2        #In seconds (deliberately equal to start time - end time)
     fwhm = 3.0
     boxSize = 5
-    nSigma = 3.0
+    nSigmaHot = 2.5
+    nSigmaCold = 2.0
 
     hp.findHotPixels(paramFile=paramFile, inputFileName=testFileName,
                      outputFileName=outputFile, timeStep=timeStep,
                      startTime=testStartTime, endTime=testEndTime,
-                     fwhm=fwhm, boxSize=boxSize, nSigma=nSigma, display=True)
+                     fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
+                     nSigmaCold=nSigmaCold, display=True)
     
     intermediateOutput = hp.checkInterval(inputFileName=testFileName, display=True,
                                           firstSec=testStartTime,
                                           intTime=testEndTime - testStartTime,
                                           fwhm=fwhm, boxSize=boxSize,
-                                          nSigma=nSigma)
+                                          nSigmaHot=nSigmaHot, nSigmaCold=nSigmaCold)
     
     hpOutput = hp.readHotPixels(outputFile)
 

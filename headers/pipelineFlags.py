@@ -37,3 +37,13 @@ waveCal = {
            'undefined':20,          #Flagged, but reason is undefined.
            'undetermined':99        #Flag status is undetermined.
            }
+
+#Bad pixel calibration flags (including hot pixels, cold pixels, etc.)
+badPixCal = {
+             'good':0,              #No flagging.
+             'hot':1,               #Hot pixel
+             'cold':2,              #Cold pixel
+             'dead':3,              #Dead pixel
+             'undefined':20,        #Flagged, but reason is undefined.
+             'undetermined':99      #Flag status is undetermined.
+             }
