@@ -1,7 +1,7 @@
 #!/bin/python
 
 '''
-Author: Paul Szypryt		Date: July 1, 2013
+Author: Paul Szypryt		Date: July 11, 2013
 '''
 
 import numpy as np
@@ -15,11 +15,11 @@ import hotpix.hotPixels as hp
 import os
 from time import time
 import sys
+import LoadImageStack
 
 from PyQt4.QtGui import *
 from PyQt4.QtGui import *
 from DisplayStack_gui import Ui_DisplayStack_gui
-
 
 class DisplayStack(QMainWindow):
 
@@ -57,7 +57,7 @@ class DisplayStack(QMainWindow):
 
 
         # Load image stack button
-        self.ui.loadStackButton.clicked.connect(self.chooseStack)
+        #self.ui.loadStackButton.clicked.connect(self.chooseStack)
 
     # 1) Initialize Variables
     def initializeVariables(self):
@@ -362,7 +362,7 @@ class DisplayStack(QMainWindow):
                     for iSec in np.arange(0,self.exptime,self.integrationTime):
                         #add seconds offset to julian date, move jd to center of bin
                         self.jd = self.startJD + iSec/(24.*3600.) + self.integrationTime/2./(24.*3600.)
-                        'Creating frame for time ' + self.jd
+                        'Creating frame for time ' + str(self.jd)
                         self.frameData = self.ob.getPixelCountImage(firstSec=iSec,integrationTime=self.integrationTime,weighted=self.weighted,getRawCount=self.useRawCounts,scaleByEffInt=self.scaleByEffInt)
                         self.frame = self.frameData['image']         
                         if self.useDeadPixelMasking:
@@ -382,17 +382,18 @@ class DisplayStack(QMainWindow):
             print 'Invalid parameter file...'
 
     # Choose an image stack
+    '''
     def chooseStack(self):
         self.defaultLoadStackDirectory = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks')
         self.stackName = QFileDialog.getOpenFileName(parent=None, directory=self.defaultLoadStackDirectory, caption=str("Choose Image Stack"), filter=str("NPZ (*.npz)")) 
         if self.stackName == '':
             print 'No file chosen'
-        else:
-            self.loadStack()
-
-    # Load that image stack for viewing
-    def loadStack(self):
-        
+        else:          
+            loadStackApp = LoadImageStack.LoadImageStack()
+            loadStackApp.show()
+            loadStackApp.exec_()
+            # Change to a QDialog...
+    '''
 
 # Start up main gui
 if __name__ == "__main__":
