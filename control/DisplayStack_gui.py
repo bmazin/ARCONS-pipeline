@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'DisplayStack_gui.ui'
 #
-# Created: Wed Oct  2 15:02:44 2013
+# Created: Wed Oct  9 16:24:28 2013
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
