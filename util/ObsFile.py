@@ -1200,6 +1200,10 @@ class ObsFile:
         self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
         if switchOnCosmicMask: self.switchOnCosmicTimeMask()
 
+    def setCosmicMask(self, cosmicMask, switchOnCosmicMask=True):
+        self.cosmicMask = cosmicMask
+        if switchOnCosmicMask: self.switchOnCosmicTimeMask()
+
     def loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False):
         """
         loads obsfile specific adjustments to add to all timestamps read

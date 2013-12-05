@@ -49,7 +49,8 @@ class Cosmic:
         self.file = ObsFile(self.fileName)
         # apply Matt's time fix
         timeAdjustments = self.fn.timeAdjustments()
-        self.file.loadTimeAdjustmentFile(timeAdjustments)
+        if os.path.exists(timeAdjustments):
+            self.file.loadTimeAdjustmentFile(timeAdjustments)
         # apply Julian's time masks
         timeMaskFile = self.fn.timeMask();
         if os.path.exists(timeMaskFile):
@@ -371,7 +372,7 @@ class Cosmic:
             left = max(self.beginTime, t0-nSigma*dt)
             right = min(self.endTime, t1+2*nSigma*dt)
             i = i | interval[left,right]
-            self.logger.info("iCount=%d t0=%f t1=%f left=%f right=%f"%(iCount,t0,t1,left,right))
+            self.logger.debug("iCount=%d t0=%f t1=%f left=%f right=%f"%(iCount,t0,t1,left,right))
             iCount+=1
         retval = {}
         retval['timeHgValues'] = timeHgValues
