@@ -20,23 +20,23 @@ obsDate = '20131205'
 seq = '033506'
 
 populationMax=1000
-
-
 beginTime = 0
-expTime = 300
+endTime = 100
 
-
+stride = 1000
 fn = FileName(run, sundownDate, obsDate+"-"+seq)
-cosmic = Cosmic(fn, beginTime=0, endTime=10, loggingLevel=logging.INFO)
-fcd = cosmic.findCosmics(nSigma=10, stride=1000, threshold=15)
-print "done:  fcd.keys=",fcd.keys()
-maskedTime = Cosmic.countMaskedBins(fcd['interval'])
-maskedPercent = 100*maskedTime/(cosmic.endTime-cosmic.beginTime)
-print "maskedPercent=",maskedPercent
+cosmic = Cosmic(fn, beginTime=beginTime, endTime=endTime, loggingLevel=logging.INFO)
+timeHgValues,frameSum = cosmic.getTimeHgAndFrameSum(beginTime,endTime)
 
-print "length of populationHg=",len(fcd('populationHg')[0])
+lthgv=len(timeHgValues)
+print "length of timeHgValues=",lthgv
+nStride=lthgv/stride
+
+binnedTimeHgValues = np.reshape(timeHgValues[0:nStride*stride],[nStride,stride]).sum(axis=1)
 #plt.xkcd()
-plt.plot(fcd['populationHg'][1],fcd['populationHg'][0],
+dt = cosmic.file.tickDuration*stride
+times = cosmic.beginTime + dt*np.arange(nStride)
+plt.plot(times,binnedTimeHgValues,
          drawstyle='steps-mid',label="all data")
 #plt.xlim(xmax=1000)
 #plt.xscale('symlog',linthreshx=0.9)
