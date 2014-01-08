@@ -1214,7 +1214,7 @@ class ObsFile:
         except Exception as inst:
             if verbose==True:
                 print 'Error loading time adjustment file',timeAdjustFileName
-            raise Exception
+            raise inst
                 
     def loadWvlCalFile(self, wvlCalFileName):
         """
