@@ -17,9 +17,12 @@ from functools import partial
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_pdf import PdfPages
 
+
+from util.popup import PopUp,plotArray,pop
 from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
+import hotpix.hotPixels as hp
 
 def onscroll_cbar(fig, event):
     if event.inaxes is fig.cbar.ax:
@@ -56,8 +59,6 @@ class FlatCal:
         flatTstamp = self.params['flatTstamp']
         wvlSunsetDate = self.params['wvlSunsetDate']
         wvlTimestamp = self.params['wvlTimestamp']
-        needTimeAdjust = self.params['needTimeAdjust']
-        needHotPix = self.params['needHotPix']
         obsSequence = self.params['obsSequence']
 
         obsFNs = [FileName(run=run,date=sunsetDate,tstamp=obsTstamp) for obsTstamp in obsSequence]
@@ -72,7 +73,12 @@ class FlatCal:
         for iObs,obs in enumerate(self.obsList):
            obs.loadWvlCalFile(wvlCalFileName)
            obs.loadTimeAdjustmentFile(timeAdjustFileName)
-           obs.loadHotPixCalFile(timeMaskFileNames[iObs])
+           timeMaskFileName = timeMaskFileNames[iObs]
+           if not os.path.exists(timeMaskFileName):
+                print 'Running hotpix for ',obs
+                hp.findHotPixels(self.obsFileNames[iObs],timeMaskFileName)
+                print "Flux file pixel mask saved to %s"%(timeMaskFileName)
+           obs.loadHotPixCalFile(timeMaskFileName)
         self.wvlFlags = self.obsList[0].wvlFlagTable
 
         self.nRow = self.obsList[0].nRow
@@ -109,14 +115,15 @@ class FlatCal:
                 #add third dimension for broadcasting
                 effIntTime = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
                 cube /= effIntTime
+                cube[np.isnan(cube)]=0
                 frame = np.sum(cube,axis=2)
-                frame[np.isnan(frame)]=0
+                #frame[np.isnan(frame)]=0
                 self.frames.append(frame)
-                #self.plotArray(frame)
+                #plotArray(frame)
                 self.spectralCubes.append(cube)
                 self.cubeEffIntTimes.append(effIntTime)
         self.spectralCubes = np.array(self.spectralCubes)
-        #self.plotArray(self.frames[0])
+        #plotArray(self.frames[0])
 
     def checkCountRates(self):
         medianCountRates = np.array([np.median(frame[frame!=0]) for frame in self.frames])
@@ -147,13 +154,15 @@ class FlatCal:
                 trimmedSpectrum = goodSpectrum[self.fractionOfPixelsToTrim*nGoodPixels:(1-self.fractionOfPixelsToTrim)*nGoodPixels]
 
                 #trimmedPixelWeights = 1/np.sqrt(trimmedSpectrum)
-#                nBins=self.intTime*(np.max(goodSpectrum)-np.min(goodSpectrum))
-#                histGood,binEdges = np.histogram(self.intTime*goodSpectrum,bins=nBins)
+                #histGood,binEdges = np.histogram(self.intTime*goodSpectrum,bins=nBins)
+                #histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
 #                plt.plot(binEdges[0:-1],histGood)
-#                histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
+#                def f(fig,axes):
+#                    axes.plot(binEdges[0:-1],histGood)
+#                    axes.plot(binEdges[0:-1],histTrim)
+#                pop(plotFunc=f)
 #                plt.plot(binEdges[0:-1],histTrim)
                 wvlAverages[iWvl] = np.mean(trimmedSpectrum)
-#                print iCube,iWvl,self.intTime*wvlAverages[iWvl],self.intTime*np.median(goodSpectrum)
 #                plt.show()
             weights = np.divide(wvlAverages,cube)
             weights[weights==0] = np.nan
@@ -186,9 +195,8 @@ class FlatCal:
         spectralCubesReordered = self.spectralCubes[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
         cubeDeltaWeightsReordered = self.maskedCubeDeltaWeights[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
 
-        #trim the beginning and end off the sorted weights for each wvl for each pixel, to exclude extriems from averages
+        #trim the beginning and end off the sorted weights for each wvl for each pixel, to exclude extremes from averages
         nCubes = np.shape(self.maskedCubeWeights)[0]
-        #fractionOfChunksToTrim=.15 #off both top and bottom
         trimmedWeights = sortedWeights[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
         trimmedSpectralCubesReordered = spectralCubesReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
         trimmedCubeDeltaWeightsReordered = cubeDeltaWeightsReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
@@ -196,8 +204,8 @@ class FlatCal:
         self.flatWeights,summedAveragingWeights = np.ma.average(trimmedWeights,axis=0,weights=trimmedCubeDeltaWeightsReordered**-2.,returned=True)
         self.deltaFlatWeights = np.sqrt(summedAveragingWeights**-1.)#Uncertainty in weighted average is sqrt(1/sum(averagingWeights))
         self.flatFlags = self.flatWeights.mask
-        flagImage = np.shape(self.flatFlags)[2]-np.sum(self.flatFlags,axis=2)
-        #self.plotArray(flagImage)
+        #flagImage = np.shape(self.flatFlags)[2]-np.sum(self.flatFlags,axis=2)
+        #plotArray(flagImage)
 
 #        X,Y,Z=np.mgrid[0:self.nRow,0:self.nCol,0:self.nWvlBins]
 #        Z=self.wvlBinEdges[Z]
@@ -272,6 +280,7 @@ class FlatCal:
             image = self.flatFlags[:,:,iWvl]
             image += 2*self.wvlFlags
             image = 3-image
+
             cmap = matplotlib.cm.gnuplot2
             handleMatshow = ax.matshow(image,cmap=cmap,origin='lower')
             cbar = fig.colorbar(handleMatshow)
@@ -390,15 +399,6 @@ class FlatCal:
             wvlAverages[iWvl] = np.median(goodSpectrum)
         np.savez(npzFileName,median=wvlAverages,averageSpectra=np.array(self.averageSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data),deltaWeights=np.array(self.deltaFlatWeights.data),mask=self.flatFlags)
 
-    def plotArray(self,image,normNSigma=3,title=''):
-        self.fig = plt.figure()
-        self.axes = self.fig.add_subplot(111)
-        handleMatshow = self.axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
-        self.fig.cbar = self.fig.colorbar(handleMatshow)
-        self.axes.set_title(title)
-        cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
-        cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
-        plt.show()
 
 if __name__ == '__main__':
     paramFile = sys.argv[1]
