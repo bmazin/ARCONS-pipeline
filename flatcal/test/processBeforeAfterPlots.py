@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from util.popup import PopUp,plotArray
+from util.popup import PopUp,plotArray,pop
 import itertools
+
+from fitFunctions import gaussian
+import mpfit
 
 
 #from http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
@@ -23,6 +26,50 @@ def polyval2d(x, y, m):
         z += a * x**i * y**j
     return z
 
+
+def fitGauss(dataList,nBins=301):
+
+    hist,histBinEdges = np.histogram(dataList,bins=nBins)
+    histBinCenters = histBinEdges[0:-1]+np.diff(histBinEdges)/2.
+
+    amplitude = 0.95*np.max(hist)
+    x_offset = histBinCenters[np.argmax(hist)]
+    sigma = np.std(dataList)*.8
+    y_offset = 1.e-8
+
+    params=[sigma, x_offset, amplitude, y_offset]  # First guess at fit params
+    errs = np.sqrt(hist)
+    errs[np.where(errs == 0.)] = 1.
+    quiet = True
+
+    parinfo = [ {'n':0,'value':params[0],'limits':[sigma/10., 10*sigma], 'limited':[True,True],'fixed':False,'parname':"Sigma",'error':0},
+       {'n':1,'value':params[1],'limits':[x_offset-sigma*2, x_offset+sigma*2],'limited':[True,True],'fixed':False,'parname':"x offset",'error':0},
+       {'n':2,'value':params[2],'limits':[0.5*amplitude, 2.*amplitude],'limited':[True,True],'fixed':False,'parname':"Amplitude",'error':0},
+       {'n':3,'value':params[3],'limited':[False,False],'fixed':True,'parname':"y_offset",'error':0}]
+
+    fa = {'x':histBinCenters,'y':hist,'err':errs}
+
+    m = mpfit.mpfit(gaussian, functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
+    if m.status <= 0:
+        print m.status, m.errmsg
+
+    mpp = m.params                                #The fit params
+    mpperr = m.perror
+
+    for k,p in enumerate(mpp):
+        parinfo[k]['value'] = p
+        parinfo[k]['error'] = mpperr[k]
+        if k==0: sigma = p
+        if k==1: x_offset = p
+        if k==2: amplitude = p
+        if k==3: y_offset = p
+
+    def gaussFitFunc(x):
+        return y_offset + amplitude * np.exp( - (( x - x_offset)**2) / ( 2. * (sigma**2)))
+    gaussFit = gaussFitFunc(histBinCenters)
+    resolution = np.abs(x_offset/(2.355*sigma))
+
+    return {'gaussFit':gaussFit,'resolution':resolution,'sigma':sigma,'x_offset':x_offset,'amplitude':amplitude,'y_offset':y_offset,'hist':hist,'histBinEdges':histBinEdges,'gaussFitFunc':gaussFitFunc,'histBinCenters':histBinCenters,'parinfo':parinfo}
 
 imgDict = np.load('beforeAfterImgs.npz')
 beforeImg = imgDict['beforeImg']
@@ -51,6 +98,15 @@ plotArray(title='with flatcal',image=afterImg)
 beforeHist,beforeHistEdges = np.histogram(beforeList,bins=200)
 afterHist,afterHistEdges = np.histogram(afterList,bins=300)
 
+def plotFunc(fig,axes):
+    axes.plot(beforeHistEdges[0:-1],beforeHist,label='without flatcal')
+    axes.plot(afterHistEdges[0:-1],afterHist,label='with flatcal')
+    axes.set_title('Distribution of pixel counts')
+    axes.set_xlabel('Counts')
+    axes.set_ylabel('Num of Pixels')
+    axes.legend()
+pop(plotFunc=plotFunc)
+
 
 print 'before:'
 print 'count',len(beforeList)
@@ -60,8 +116,8 @@ print 'after:'
 print 'count',len(afterList)
 print 'sdev',np.std(afterList)
 
+# Fit a 3rd order, 2d polynomial to the non-flatcal image
 xx,yy = np.meshgrid(np.arange(nCols),np.arange(nRows))
-print xx
 
 z = beforeImg.ravel()
 x = xx.ravel()
@@ -71,23 +127,42 @@ x = x[z != 0]
 y = y[z != 0]
 z = z[z != 0]
 
-
-# Fit a 3rd order, 2d polynomial
-m = polyfit2d(x,y,z)
-print m
+beforePolyFitCoeffs = polyfit2d(x,y,z)
+print 'poly fit to non-flatcal image:'
+print beforePolyFitCoeffs
 
 # Evaluate it on a grid...
-beforeImgFit = polyval2d(xx, yy, m)
-plotArray(beforeImgFit,vmin=0,title='poly fit to non-flatcal image')
+beforeImgFit = polyval2d(xx, yy, beforePolyFitCoeffs)
 
-afterImgSub = afterImg - np.mean(afterList)
+
+# Fit a 3rd order, 2d polynomial to the flatcal image
+
+z = afterImg.ravel()
+x = xx.ravel()
+y = yy.ravel()
+
+x = x[z != 0]
+y = y[z != 0]
+z = z[z != 0]
+
+afterPolyFitCoeffs = polyfit2d(x,y,z)
+print 'poly fit to flatcal image:'
+print afterPolyFitCoeffs
+
+# Evaluate it on a grid...
+afterImgFit = polyval2d(xx, yy, afterPolyFitCoeffs)
+
+plotArray(beforeImgFit,vmin=0,title='poly fit to non-flatcal\'d image')
+plotArray(afterImgFit,vmin=0,title='poly fit to flatcal\'d image')
+
+afterImgSub = afterImg / np.mean(afterList)
 afterImgSub[deadAfterImg] = 0
 
-beforeImgSub = beforeImg - beforeImgFit
+beforeImgSub = beforeImg / beforeImgFit
 beforeImgSub[deadBeforeImg] = 0
 
-plotArray(beforeImgSub,title='without flatcal minus poly fit')
-plotArray(afterImgSub,title='with flatcal minus mean')
+plotArray(beforeImgSub,title='without flatcal / poly fit')
+plotArray(afterImgSub,title='with flatcal / mean')
 
 afterImgSub[deadAfterImg] = np.nan
 beforeImgSub[deadBeforeImg] = np.nan
@@ -99,21 +174,46 @@ subBeforeHist,subBeforeHistEdges = np.histogram(subBeforeList,bins=300)
 subAfterHist,subAfterHistEdges = np.histogram(subAfterList,bins=300)
 
 # Plot
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.plot(beforeHistEdges[0:-1],beforeHist,label='without flatcal')
-ax.plot(afterHistEdges[0:-1],afterHist,label='with flatcal')
-ax.set_title('Distribution of pixel counts')
-ax.set_xlabel('Counts')
-ax.set_ylabel('Num of Pixels')
-ax.legend()
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.set_title('Distribution of pixel counts after subtracting')
-ax.plot(subBeforeHistEdges[0:-1],subBeforeHist,label='non-flatcal image - poly fit')
-ax.plot(subAfterHistEdges[0:-1],subAfterHist,label='flatcal - mean count')
-ax.set_xlabel('Counts')
-ax.set_ylabel('Num of Pixels')
-ax.legend()
-plt.show()
+
+def plotFunc(fig,axes):
+    axes.set_title('Distribution of pixel counts after subtracting')
+    axes.plot(subBeforeHistEdges[0:-1],subBeforeHist,label='non-flatcal image / poly fit')
+    axes.plot(subAfterHistEdges[0:-1],subAfterHist,label='flatcal / mean count')
+    axes.set_xlabel('Counts')
+    axes.set_ylabel('Num of Pixels')
+    axes.legend()
+pop(plotFunc=plotFunc)
+
+subBeforeGaussFitDict = fitGauss(subBeforeList)
+histBinEdges = subBeforeGaussFitDict['histBinEdges']
+histBinCenters = subBeforeGaussFitDict['histBinCenters']
+hist = subBeforeGaussFitDict['hist']
+x = np.linspace(np.min(histBinEdges),np.max(histBinEdges),1000)
+y = subBeforeGaussFitDict['gaussFitFunc'](x)
+
+def plotFunc(fig,axes):
+    axes.plot(x,y,'b')
+    axes.errorbar(subBeforeGaussFitDict['histBinCenters'],hist,color='k')
+    axes.set_title('Distribution of pixel counts for non-flatcal\'d image')
+pop(plotFunc=plotFunc)
+
+subAfterGaussFitDict = fitGauss(subAfterList)
+histBinEdges = subAfterGaussFitDict['histBinEdges']
+histBinCenters = subAfterGaussFitDict['histBinCenters']
+hist = subAfterGaussFitDict['hist']
+x = np.linspace(np.min(histBinEdges),np.max(histBinEdges),1000)
+y = subAfterGaussFitDict['gaussFitFunc'](x)
+
+def plotFunc(fig,axes):
+    axes.plot(x,y,'b')
+    hist = subAfterGaussFitDict['hist']
+    axes.errorbar(subAfterGaussFitDict['histBinCenters'],hist,color='k')
+    axes.set_title('Distribution of pixel counts for flatcal\'d image')
+pop(plotFunc=plotFunc)
+
+beforeSigmaDict = (item for item in subBeforeGaussFitDict['parinfo'] if item['parname'] == 'Sigma').next()
+print beforeSigmaDict
+print 'non-flatcal\'d sigma',beforeSigmaDict['value'],'+/-',beforeSigmaDict['error']
+afterSigmaDict = (item for item in subAfterGaussFitDict['parinfo'] if item['parname'] == 'Sigma').next()
+print 'flatcal\'d sigma',afterSigmaDict['value'],'+/-',afterSigmaDict['error']
 
