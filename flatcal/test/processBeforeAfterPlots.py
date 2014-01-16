@@ -5,6 +5,7 @@ import itertools
 
 from fitFunctions import gaussian
 import mpfit
+from peakWidth import peakWidth
 
 
 #from http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
@@ -80,7 +81,9 @@ def fitGauss(dataList,nBins=201):
 
     return {'gaussFit':gaussFit,'resolution':resolution,'sigma':sigma,'x_offset':x_offset,'amplitude':amplitude,'y_offset':y_offset,'hist':hist,'histBinEdges':histBinEdges,'gaussFitFunc':gaussFitFunc,'histBinCenters':histBinCenters,'parinfo':parinfo}
 
-imgDict = np.load('beforeAfterImgsGem.npz')
+fileName = 'beforeAfterImgsGem.npz'
+print fileName
+imgDict = np.load(fileName)
 beforeImg = imgDict['beforeImg']
 afterImg = imgDict['afterImg']
 deadBeforeImg = beforeImg == 0
@@ -117,13 +120,9 @@ def plotFunc(fig,axes):
 pop(plotFunc=plotFunc)
 
 
-print 'before:'
-print 'count',len(beforeList)
-print 'sdev',np.std(beforeList)
+print 'before count',len(beforeList)
 
-print 'after:'
-print 'count',len(afterList)
-print 'sdev',np.std(afterList)
+print 'after count',len(afterList)
 
 # Fit a 3rd order, 2d polynomial to the non-flatcal image
 xx,yy = np.meshgrid(np.arange(nCols),np.arange(nRows))
@@ -137,8 +136,6 @@ y = y[z != 0]
 z = z[z != 0]
 
 beforePolyFitCoeffs = polyfit2d(x,y,z)
-print 'poly fit to non-flatcal image:'
-print beforePolyFitCoeffs
 
 # Evaluate it on a grid...
 beforeImgFit = polyval2d(xx, yy, beforePolyFitCoeffs)
@@ -155,8 +152,6 @@ y = y[z != 0]
 z = z[z != 0]
 
 afterPolyFitCoeffs = polyfit2d(x,y,z)
-print 'poly fit to flatcal image:'
-print afterPolyFitCoeffs
 
 # Evaluate it on a grid...
 afterImgFit = polyval2d(xx, yy, afterPolyFitCoeffs)
@@ -179,9 +174,14 @@ beforeImgSub[deadBeforeImg] = np.nan
 
 subAfterList = afterImgSub[~np.isnan(afterImgSub)]
 subBeforeList = beforeImgSub[~np.isnan(beforeImgSub)]
-print np.shape(subBeforeList),np.shape(subAfterList)
 subBeforeHist,subBeforeHistEdges = np.histogram(subBeforeList,bins=300)
 subAfterHist,subAfterHistEdges = np.histogram(subAfterList,bins=300)
+
+beforeFwhm = peakWidth(subBeforeHistEdges[0:-1],subBeforeHist)
+afterFwhm = peakWidth(subAfterHistEdges[0:-1],subAfterHist)
+
+print 'unflatfielded sigma', beforeFwhm['sigma']
+print 'flatfielded sigma', afterFwhm['sigma']
 
 # Plot
 
@@ -194,32 +194,32 @@ def plotFunc(fig,axes):
     axes.legend()
 pop(plotFunc=plotFunc)
 
-subBeforeGaussFitDict = fitGauss(subBeforeList)
-histBinEdges = subBeforeGaussFitDict['histBinEdges']
-histBinCenters = subBeforeGaussFitDict['histBinCenters']
-x = np.linspace(np.min(histBinEdges),np.max(histBinEdges),1000)
-y = subBeforeGaussFitDict['gaussFitFunc'](x)
-
-subAfterGaussFitDict = fitGauss(subAfterList)
-histBinEdges = subAfterGaussFitDict['histBinEdges']
-histBinCenters = subAfterGaussFitDict['histBinCenters']
-
-x2 = np.linspace(np.min(histBinEdges),np.max(histBinEdges),1000)
-y2 = subAfterGaussFitDict['gaussFitFunc'](x2)
-
-def plotFunc(fig,axes):
-    hist = subBeforeGaussFitDict['hist']
-    axes.plot(x,y,'b')
-    axes.errorbar(subBeforeGaussFitDict['histBinCenters'],hist,color='m')
-    axes.plot(x2,y2,'g')
-    hist = subAfterGaussFitDict['hist']
-    axes.errorbar(subAfterGaussFitDict['histBinCenters'],hist,color='r')
-    axes.set_title('Distribution of pixel counts')
-pop(plotFunc=plotFunc)
-
-beforeSigmaDict = (item for item in subBeforeGaussFitDict['parinfo'] if item['parname'] == 'Sigma').next()
-print beforeSigmaDict
-print 'non-flatcal\'d sigma',beforeSigmaDict['value'],'+/-',beforeSigmaDict['error']
-afterSigmaDict = (item for item in subAfterGaussFitDict['parinfo'] if item['parname'] == 'Sigma').next()
-print 'flatcal\'d sigma',afterSigmaDict['value'],'+/-',afterSigmaDict['error']
+#subBeforeGaussFitDict = fitGauss(subBeforeList)
+#histBinEdges = subBeforeGaussFitDict['histBinEdges']
+#histBinCenters = subBeforeGaussFitDict['histBinCenters']
+#x = np.linspace(np.min(histBinEdges),np.max(histBinEdges),1000)
+#y = subBeforeGaussFitDict['gaussFitFunc'](x)
+#
+#subAfterGaussFitDict = fitGauss(subAfterList)
+#histBinEdges = subAfterGaussFitDict['histBinEdges']
+#histBinCenters = subAfterGaussFitDict['histBinCenters']
+#
+#x2 = np.linspace(np.min(histBinEdges),np.max(histBinEdges),1000)
+#y2 = subAfterGaussFitDict['gaussFitFunc'](x2)
+#
+#def plotFunc(fig,axes):
+#    hist = subBeforeGaussFitDict['hist']
+#    axes.plot(x,y,'b')
+#    axes.errorbar(subBeforeGaussFitDict['histBinCenters'],hist,color='m')
+#    axes.plot(x2,y2,'g')
+#    hist = subAfterGaussFitDict['hist']
+#    axes.errorbar(subAfterGaussFitDict['histBinCenters'],hist,color='r')
+#    axes.set_title('Distribution of pixel counts')
+#pop(plotFunc=plotFunc)
+#
+#beforeSigmaDict = (item for item in subBeforeGaussFitDict['parinfo'] if item['parname'] == 'Sigma').next()
+#print beforeSigmaDict
+#print 'non-flatcal\'d sigma',beforeSigmaDict['value'],'+/-',beforeSigmaDict['error']
+#afterSigmaDict = (item for item in subAfterGaussFitDict['parinfo'] if item['parname'] == 'Sigma').next()
+#print 'flatcal\'d sigma',afterSigmaDict['value'],'+/-',afterSigmaDict['error']
 
