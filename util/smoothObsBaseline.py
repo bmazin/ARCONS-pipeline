@@ -64,7 +64,7 @@ def getTimedPacketList(pixelData):
 
     return {'timestamps':timestamps,'baselines':baselines,'rowBreakIndices':rowBreaks}
 
-def smoothBaselines(baselines,timestamps,timeToAverage=500e-3,upperTrimFraction=0.5):
+def smoothBaselines(baselines,timestamps,timeToAverage=500e-3,trimFraction=0.5):
     #A time based smoothing
     #For each baseline point, all points within a given time interval around the point is
     #trimmed and averaged to make a new baseline point
@@ -72,14 +72,14 @@ def smoothBaselines(baselines,timestamps,timeToAverage=500e-3,upperTrimFraction=
     for i,ts in enumerate(timestamps):
         startIdx = np.searchsorted(timestamps,ts-timeToAverage/2.)
         endIdx = np.searchsorted(timestamps,ts+timeToAverage/2.)
-        trimmedSample = scipy.stats.mstats.trim(baselines[startIdx:endIdx],(upperTrimFraction,0),relative=True)
+        trimmedSample = scipy.stats.mstats.trim(baselines[startIdx:endIdx],(trimFraction,0),relative=True)
         if np.all(trimmedSample.mask) == False: #if there are some points that are not trimmed, take the average
             modBases[i] = int(np.ma.mean(trimmedSample))
     return modBases
 
-def smoothObs(run,sunsetDate,timestamp):
+def smoothObs(run,sunsetDate,timestamp,timeToAverage=500e-3,trimFraction=0.5):
     smoothRun = run+'s'
-    obsFileName = FileName(run=smoothRun,date=sunsetDate,tstamp=timestamp).obs()
+    obsFileName = FileName(run=smoothRun,date=sunsetDate,tstamp=timestamp).cal()
     obs = tables.openFile(obsFileName,mode='a')
     #get the name of the datasets
     for group in obs.root:
@@ -98,17 +98,17 @@ def smoothObs(run,sunsetDate,timestamp):
                     timestamps = parsedDict['timestamps']
                     baselines = parsedDict['baselines']
                     print len(timestamps)
-                    modBases = smoothBaselines(baselines=baselines,timestamps=timestamps)
+                    modBases = smoothBaselines(baselines=baselines,timestamps=timestamps,timeToAverage=timeToAverage,trimFraction=trimFraction)
                     modBasesSplit = np.split(modBases,parsedDict['rowBreakIndices'])
 
 #                    def f(fig,axes):
 #                        axes.plot(timestamps)
 #                    pop(plotFunc=f)
 #                    def f(fig,axes):
-#                        axes.plot(timestamps,baselines,'rx')
-#                        axes.plot(timestamps,np.bitwise_and(modBases,pulseMask),'b.')
+#                        axes.plot(timestamps,baselines,'rx-')
+#                        axes.plot(timestamps,np.bitwise_and(modBases,pulseMask),'b.-')
 #                    pop(plotFunc=f)
-
+#
                     for iRow in range(len(dataset)):
                         if len(dataset[iRow]) > 0:
                             dataset[iRow] = np.bitwise_and(dataset[iRow],deleteBaseMask) + np.left_shift(np.bitwise_and(modBasesSplit[iRow],pulseMask),nBitsAfterBaseline)
@@ -122,9 +122,9 @@ def smoothObs(run,sunsetDate,timestamp):
 
 def main():
     run='PAL2012'
-    sunsetDate='20121205'
-    ts='20121206-035810'
-    smoothObs(run,sunsetDate,ts)
+    sunsetDate='20121210'
+    ts='20121211-090613-5'
+    smoothObs(run,sunsetDate,ts,timeToAverage=200e-3,trimFraction=0.5)
 
 if __name__=='__main__':
     main()
