@@ -403,7 +403,7 @@ class ObsFile:
         return pixelData
 
 
-    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True): #,getTimes=False):
+    def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True,timeSpacingCut=None): #,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used. 
@@ -426,7 +426,7 @@ class ObsFile:
         #    
         #else:
         
-        x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime)
+        x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         timestamps, parabolaPeaks, baselines, effIntTime = \
             x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
         parabolaPeaks = np.array(parabolaPeaks,dtype=np.double)
@@ -580,7 +580,7 @@ class ObsFile:
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
 
-    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
+    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1, timeSpacingCut=None):
         """
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
         (with zero time at beginning of ObsFile).
@@ -667,6 +667,13 @@ class ObsFile:
             baselines = np.array([])
             peakHeights = np.array([])
 
+        if timeSpacingCut != None:
+            timeSpacing = np.diff(timestamps)
+            if len(timestamps) > 0:
+                timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) #include first photon and photons after who are at least timeSpacingCut after the previous photon
+                timestamps = timestamps[timeSpacingMask]
+                peakHeights = peakHeights[timeSpacingMask]
+                baselines = baselines[timeSpacingMask]
 #        if self.timeAdjustFile != None:
 #            timestamps += self.firmwareDelay
             #timestamps += np.max(self.roachDelays)
@@ -766,7 +773,7 @@ class ObsFile:
         #else:
         #    return secImg
     
-    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None):
+    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None,timeSpacingCut=None):
         """
         Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
         If integration time is -1, all time after firstSec is used.
@@ -781,7 +788,7 @@ class ObsFile:
                                   firstSec=firstSec,integrationTime=integrationTime,
                                   weighted=weighted,wvlStart=wvlStart,wvlStop=wvlStop,
                                   wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
-                                  wvlBinEdges=wvlBinEdges)
+                                  wvlBinEdges=wvlBinEdges,timeSpacingCut=timeSpacingCut)
                 cube[iRow][iCol] = x['spectrum']
                 effIntTime[iRow][iCol] = x['effIntTime']
                 wvlBinEdges = x['wvlBinEdges']
@@ -790,7 +797,7 @@ class ObsFile:
 
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
-                         wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None):
+                         wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None,timeSpacingCut=None):
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime,
         and an array giving the cutoff wavelengths used to bin the wavelength values
@@ -812,7 +819,7 @@ class ObsFile:
         JvE 3/5/2013
         ----
         """
-        x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime)
+        x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime = x['wavelengths'], x['effIntTime']
         
         if self.flatCalFile != None and ((wvlBinEdges == None and energyBinWidth == None and wvlBinWidth == None) or weighted == True):
@@ -1206,15 +1213,10 @@ class ObsFile:
         adjustments are read from timeAdjustFileName
         it is suggested to pass timeAdjustFileName=FileName(run=run).timeAdjustments()
         """
-        try:
-            self.timeAdjustFile = tables.openFile(timeAdjustFileName)
-            self.firmwareDelay = self.timeAdjustFile.root.timeAdjust.firmwareDelay.read()[0]['firmwareDelay']
-            roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
-            self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
-        except Exception as inst:
-            if verbose==True:
-                print 'Error loading time adjustment file',timeAdjustFileName
-            raise inst
+        self.timeAdjustFile = tables.openFile(timeAdjustFileName)
+        self.firmwareDelay = self.timeAdjustFile.root.timeAdjust.firmwareDelay.read()[0]['firmwareDelay']
+        roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
+        self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
                 
     def loadWvlCalFile(self, wvlCalFileName):
         """
