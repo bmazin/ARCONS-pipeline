@@ -49,7 +49,8 @@ class Cosmic:
         self.file = ObsFile(self.fileName)
         # apply Matt's time fix
         timeAdjustments = self.fn.timeAdjustments()
-        self.file.loadTimeAdjustmentFile(timeAdjustments)
+        if os.path.exists(timeAdjustments):
+            self.file.loadTimeAdjustmentFile(timeAdjustments)
         # apply Julian's time masks
         timeMaskFile = self.fn.timeMask();
         if os.path.exists(timeMaskFile):
@@ -79,7 +80,7 @@ class Cosmic:
         self.rNSurvived = {} # number of survivors from meanclip
         self.rNormed = {} # (value-mean)/sigma
         self.flashInterval = {}
-        self.logger.info("end of init")
+        self.logger.info("end of init:  beginTime=%s endTime=%s"%(str(self.beginTime),str(self.endTime)))
     def __del__(self):
         """
         Close any open files
@@ -336,23 +337,7 @@ class Cosmic:
         exptime = self.endTime-self.beginTime
         nBins = int(np.round(self.file.ticksPerSec*exptime+1))
         bins = np.arange(0, nBins, 1)
-        timeHgValues = np.zeros(nBins, dtype=np.int64)
-        frameSum = np.zeros((self.file.nRow,self.file.nCol))
-        integrationTime = self.endTime - self.beginTime
-        self.logger.info("get all time stamps")
-        for iRow in range(self.file.nRow):
-            #print "Cosmic.findCosmics:  iRow=",iRow
-            for iCol in range(self.file.nCol):
-                gtpl = self.file.getTimedPacketList(iRow,iCol,self.beginTime, 
-                                                    integrationTime)
-                timestamps = gtpl['timestamps']
-                if timestamps.size > 0:
-                    timestamps = \
-                        (timestamps - self.beginTime)*self.file.ticksPerSec
-                    # per Matt S. suggestion 2013-07-09
-                    ts32 = np.round(timestamps).astype(np.uint32)
-                    tsBinner.tsBinner32(ts32, timeHgValues)
-                    frameSum[iRow,iCol] += ts32.size
+        timeHgValues,frameSum = self.getTimeHgAndFrameSum(self.beginTime,self.endTime)
         self.logger.info("call populationFromTimeHgValues")
         pfthgv = Cosmic.populationFromTimeHgValues\
             (timeHgValues,populationMax,stride,threshold)
@@ -371,7 +356,7 @@ class Cosmic:
             left = max(self.beginTime, t0-nSigma*dt)
             right = min(self.endTime, t1+2*nSigma*dt)
             i = i | interval[left,right]
-            self.logger.info("iCount=%d t0=%f t1=%f left=%f right=%f"%(iCount,t0,t1,left,right))
+            self.logger.debug("iCount=%d t0=%f t1=%f left=%f right=%f"%(iCount,t0,t1,left,right))
             iCount+=1
         retval = {}
         retval['timeHgValues'] = timeHgValues
@@ -381,7 +366,27 @@ class Cosmic:
         retval['frameSum'] = frameSum
         retval['interval'] = i
         return retval
+    def getTimeHgAndFrameSum(self, beginTime, endTime):
+        integrationTime = endTime - beginTime
+        nBins = int(np.round(self.file.ticksPerSec*integrationTime+1))
+        timeHgValues = np.zeros(nBins, dtype=np.int64)
+        frameSum = np.zeros((self.file.nRow,self.file.nCol))
+        self.logger.info("get all time stamps for integrationTime=%f"%integrationTime)
+        for iRow in range(self.file.nRow):
+            #print "Cosmic.findCosmics:  iRow=",iRow
+            for iCol in range(self.file.nCol):
+                gtpl = self.file.getTimedPacketList(iRow,iCol,beginTime, 
+                                                    integrationTime)
+                timestamps = gtpl['timestamps']
+                if timestamps.size > 0:
+                    timestamps = \
+                        (timestamps - beginTime)*self.file.ticksPerSec
+                    # per Matt S. suggestion 2013-07-09
+                    ts32 = np.round(timestamps).astype(np.uint32)
+                    tsBinner.tsBinner32(ts32, timeHgValues)
+                    frameSum[iRow,iCol] += ts32.size
 
+        return timeHgValues,frameSum
     @staticmethod
     def countMaskedBins(maskInterval):
         retval = 0
