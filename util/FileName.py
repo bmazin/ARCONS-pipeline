@@ -63,7 +63,6 @@ class FileName:
             # here and then again a few lines down.  July 11, 2013
             dirs = os.path.dirname(os.path.normpath(fullObsFileName)).split(os.sep)
             #Pull out the relevant bits
-            print dirs
             self.run = dirs[-2]
             self.date = dirs[-1]
             self.tstamp = (os.path.basename(fullObsFileName)
