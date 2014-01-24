@@ -63,12 +63,15 @@ class FileName:
             # here and then again a few lines down.  July 11, 2013
             dirs = os.path.dirname(os.path.normpath(fullObsFileName)).split(os.sep)
             #Pull out the relevant bits
-
+            print dirs
             self.run = dirs[-2]
             self.date = dirs[-1]
             self.tstamp = (os.path.basename(fullObsFileName)
-                           .partition('obs_')[2]
+                           .partition('_')[2]
                            .rpartition('.h5')[0])
+
+            #print self.tstamp
+            #print os.path.basename(fullObsFileName).partition('_')[-1].rpartition('.h5')[0]
 
     def makeName(self, prefix="plot_", suffix="png"):
         return prefix+self.tstamp+suffix
