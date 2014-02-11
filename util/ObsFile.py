@@ -1237,10 +1237,19 @@ class ObsFile:
         adjustments are read from timeAdjustFileName
         it is suggested to pass timeAdjustFileName=FileName(run=run).timeAdjustments()
         """
+
         self.timeAdjustFile = tables.openFile(timeAdjustFileName)
         self.firmwareDelay = self.timeAdjustFile.root.timeAdjust.firmwareDelay.read()[0]['firmwareDelay']
         roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
-        self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
+        try:
+            self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
+        except IndexError:
+            self.timeAdjustFile.close()
+            self.timeAdjustFile=None
+            del self.firmwareDelay
+            if verbose:
+                print 'Unable to load time adjustment for '+self.fileName
+            raise
                 
     def loadWvlCalFile(self, wvlCalFileName):
         """
