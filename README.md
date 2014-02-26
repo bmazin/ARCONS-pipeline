@@ -24,7 +24,14 @@ http://hea-www.harvard.edu/saord/ds9/pyds9/
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
+To make nicer looking plots, you need the packages configobj and mpltools
 
+  $ easy_install configobj
+  $ git clone git@github.com:tonysyu/mpltools.git
+  $ cd mpltools
+  $ python setup.py install
+
+***
 Another package you will need is pyinterval.  It depends on crlibm
 
 NOTE:  the python package interval is not the same thing.  If this
