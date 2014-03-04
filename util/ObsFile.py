@@ -27,7 +27,7 @@ getAperturePixelCountImage(self, firstSec=0, integrationTime= -1, y_values=range
 getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None)
 getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000, wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None)
 getPixelBadTimes(self, pixelRow, pixelCol)
-getDeadPixels(self, showMe=False, weighted=True)
+getDeadPixels(self, showMe=False, weighted=True, getRawCount=False)
 getNonAllocPixels(self, showMe=False)
 getRoachNum(self,iRow,iCol)
 getFrame(self, firstSec=0, integrationTime=-1)
@@ -937,13 +937,13 @@ class ObsFile:
         inter = interval.union(self.hotPixTimeMask['intervals'][pixelRow, pixelCol])
         return inter
 
-    def getDeadPixels(self, showMe=False, weighted=True):
+    def getDeadPixels(self, showMe=False, weighted=True, getRawCount=False):
         """
         returns a mask indicating which pixels had no counts in this observation file
         1's for pixels with counts, 0's for pixels without counts
         if showMe is True, a plot of the mask pops up
         """
-        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted))['counts'] for iCol in range(self.nCol)] for iRow in range(self.nRow)])
+        countArray = np.array([[(self.getPixelCount(iRow, iCol, weighted=weighted,getRawCount=getRawCount))['counts'] for iCol in range(self.nCol)] for iRow in range(self.nRow)])
         deadArray = np.ones((self.nRow, self.nCol))
         deadArray[countArray == 0] = 0
         if showMe == True:
@@ -1223,7 +1223,7 @@ class ObsFile:
         roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
         try:
             self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
-        except IndexError:
+        except:
             self.timeAdjustFile.close()
             self.timeAdjustFile=None
             del self.firmwareDelay
