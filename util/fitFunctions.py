@@ -6,20 +6,25 @@ def benitez2(p, fjac=None, x=None, y=None, err=None):
     status = 0
     return([status, (y-model)/err])    
 
-def parabola(p, fjac=None, x=None, y=None, err=None):
+def parabola(p, fjac=None, x=None, y=None, err=None,return_models=False):
     #p[0] = x_offset
-    #p[1] = amplitude
-    #p[2] = y_offset
-    model = p[1] * (pow( (x - p[0]), 2 )) + p[2]
+    #p[1] = y_offset
+    #p[2] = amplitude
+    model = p[2] * (pow( (x - p[0]), 2 )) + p[1]
+    if return_models:
+        return [model]
     status = 0
     return([status, (y-model)/err])
 
-def gaussian(p, fjac=None, x=None, y=None, err=None):
+def gaussian(p, fjac=None, x=None, y=None, err=None,return_models=False):
     #p[0] = sigma
     #p[1] = x_offset
     #p[2] = amplitude
     #p[3] = y_offset
-    model = p[3] + p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+#    model = p[3] + p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    model = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    if return_models:
+        return [model]
     # Non-negative status value means MPFIT should continue, negative means
     # stop the calculation.
     status = 0
@@ -71,3 +76,144 @@ def threegaussian(p, fjac=None, x=None, y=None, err=None):
     model = gauss1 + gauss2 + gauss3
     status = 0
     return([status, (y-model)/err])
+
+def fourgaussian(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = sigma1
+    #p[1] = x_offset1
+    #p[2] = amplitude1
+    #p[3] = sigma2
+    #p[4] = x_offset2
+    #p[5] = amplitude2
+    #p[6] = sigma3
+    #p[7] = x_offset3
+    #p[8] = amplitude3
+    #p[9] = sigma4
+    #p[10] = x_offset4
+    #p[11] = amplitude4
+    gauss1 = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    gauss2 = p[5] * np.exp( - (pow(( x - p[4]),2) / ( 2. * pow(p[3],2))))
+    gauss3 = p[8] * np.exp( - (pow(( x - p[7]),2) / ( 2. * pow(p[6],2))))
+    gauss4 = p[11] * np.exp( - (pow(( x - p[10]),2) / ( 2. * pow(p[9],2))))
+    model = gauss1 + gauss2 + gauss3 + gauss4
+    if return_models:
+        return [gauss1, gauss2, gauss3, gauss4]
+    status = 0
+    return([status, (y-model)/err])
+
+def threegaussian_exp(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = sigma1
+    #p[1] = x_offset1
+    #p[2] = amplitude1
+    #p[3] = sigma2
+    #p[4] = x_offset2
+    #p[5] = amplitude2
+    #p[6] = sigma3
+    #p[7] = x_offset3
+    #p[8] = amplitude3
+    #p[9] = scale_factor
+    #p[10] = x_offset4
+    #p[11] = amplitude4
+    gauss1 = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    gauss2 = p[5] * np.exp( - (pow(( x - p[4]),2) / ( 2. * pow(p[3],2))))
+    gauss3 = p[8] * np.exp( - (pow(( x - p[7]),2) / ( 2. * pow(p[6],2))))
+    expo = p[11] * np.exp(p[9] * (x - p[10]))
+    model = gauss1 + gauss2 + gauss3 + expo
+    if return_models:
+        return [gauss1, gauss2, gauss3, expo]
+    status = 0
+    return([status, (y-model)/err])
+
+
+def threegaussian_exppow(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = sigma1
+    #p[1] = x_offset1
+    #p[2] = amplitude1
+    #p[3] = sigma2
+    #p[4] = x_offset2
+    #p[5] = amplitude2
+    #p[6] = sigma3
+    #p[7] = x_offset3
+    #p[8] = amplitude3
+    #p[9] = scale_factor
+    #p[10] = x_offset4
+    #p[11] = amplitude4
+    #p[12] = power4
+    gauss1 = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    gauss2 = p[5] * np.exp( - (pow(( x - p[4]),2) / ( 2. * pow(p[3],2))))
+    gauss3 = p[8] * np.exp( - (pow(( x - p[7]),2) / ( 2. * pow(p[6],2))))
+    expo = p[11] * np.exp(p[9] * (-(p[10] - x)**p[12]))
+    model = gauss1 + gauss2 + gauss3 + expo
+    if return_models:
+        return [gauss1, gauss2, gauss3, expo]
+    status = 0
+    return([status, (y-model)/err])
+
+def threegaussian_moyal(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = sigma1
+    #p[1] = x_offset1
+    #p[2] = amplitude1
+    #p[3] = sigma2
+    #p[4] = x_offset2
+    #p[5] = amplitude2
+    #p[6] = sigma3
+    #p[7] = x_offset3
+    #p[8] = amplitude3
+    #p[9] = sigma4
+    #p[10] = x_offset4
+    #p[11] = amplitude4
+    gauss1 = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    gauss2 = p[5] * np.exp( - (pow(( x - p[4]),2) / ( 2. * pow(p[3],2))))
+    gauss3 = p[8] * np.exp( - (pow(( x - p[7]),2) / ( 2. * pow(p[6],2))))
+    moyal = p[11] * np.exp( - 0.5 * (np.exp( - (-x - p[10])/p[9]) + (-x - p[10])/p[9] + 1))
+    model = gauss1 + gauss2 + gauss3 + moyal
+    if return_models:
+        return [gauss1, gauss2, gauss3, moyal]
+    status = 0
+    return([status, (y-model)/err])
+
+def threegaussian_power(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = sigma1
+    #p[1] = x_offset1
+    #p[2] = amplitude1
+    #p[3] = sigma2
+    #p[4] = x_offset2
+    #p[5] = amplitude2
+    #p[6] = sigma3
+    #p[7] = x_offset3
+    #p[8] = amplitude3
+    #p[9] = scale_factor4
+    #p[10] = x_offset4
+    #p[11] = amplitude4
+    gauss1 = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    gauss2 = p[5] * np.exp( - (pow(( x - p[4]),2) / ( 2. * pow(p[3],2))))
+    gauss3 = p[8] * np.exp( - (pow(( x - p[7]),2) / ( 2. * pow(p[6],2))))
+    power4 = p[11] * np.maximum((x - p[10]),0)**p[9]
+    model = gauss1 + gauss2 + gauss3 + power4
+    if return_models:
+        return [gauss1, gauss2, gauss3, power4]
+    status = 0
+    return([status, (y-model)/err])
+
+def threegaussian_lorentzian(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = sigma1
+    #p[1] = x_offset1
+    #p[2] = amplitude1
+    #p[3] = sigma2
+    #p[4] = x_offset2
+    #p[5] = amplitude2
+    #p[6] = sigma3
+    #p[7] = x_offset3
+    #p[8] = amplitude3
+    #p[9] = scale_factor4
+    #p[10] = x_offset4
+    #p[11] = amplitude4
+    gauss1 = p[2] * np.exp( - (pow(( x - p[1]),2) / ( 2. * pow(p[0],2))))
+    gauss2 = p[5] * np.exp( - (pow(( x - p[4]),2) / ( 2. * pow(p[3],2))))
+    gauss3 = p[8] * np.exp( - (pow(( x - p[7]),2) / ( 2. * pow(p[6],2))))
+    lorentz4 = p[11] / (1 + ((x - p[10])/p[9])**2)
+    model = gauss1 + gauss2 + gauss3 + lorentz
+    if return_models:
+        return [gauss1, gauss2, gauss3, lorentz]
+    status = 0
+    return([status, (y-model)/err])
+
