@@ -52,9 +52,11 @@ class PopUp(QMainWindow):
         self.statusBar().addWidget(self.status_text, 1)
 
 
-    def plotArray(self,image,normNSigma=3,title=''):
+    def plotArray(self,image,normNSigma=3,title='',**kwargs):
         self.image = image
-        self.handleMatshow = self.axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
+        cmap=matplotlib.cm.gnuplot2
+        cmap.set_bad('0.15')
+        self.handleMatshow = self.axes.matshow(image,cmap=cmap,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image),**kwargs)
         self.fig.cbar = self.fig.colorbar(self.handleMatshow)
         self.axes.set_title(title)
         cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
@@ -103,12 +105,12 @@ def onclick_cbar(fig,event):
 
 def plotArray(*args,**kwargs):
     #Waring: Does not play well with matplotlib state machine style plotting!
-    wait = kwargs.pop('wait',False)
+    block = kwargs.pop('block',False)
     def f(*args,**kwargs):
         form = PopUp(showMe=False)
         form.plotArray(*args,**kwargs)
         form.show()
-    if wait==True:
+    if block==True:
         f(*args,**kwargs)
         return None
     else:
@@ -116,6 +118,20 @@ def plotArray(*args,**kwargs):
         proc.start()
         return proc
 
+
+def pop(*args,**kwargs):
+    #Waring: Does not play well with matplotlib state machine style plotting!
+    block = kwargs.pop('block',False)
+    def f(*args,**kwargs):
+        form = PopUp(showMe=False,*args,**kwargs)
+        form.show()
+    if block==True:
+        f(*args,**kwargs)
+        return None
+    else:
+        proc = Process(target=f,args=args,kwargs=kwargs)
+        proc.start()
+        return proc
 
 def main():
     print 'non-blocking PopUp A, close when done'

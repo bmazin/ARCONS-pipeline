@@ -580,7 +580,7 @@ class ObsFile:
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
 
-    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1, timeSpacingCut=None):
+    def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1, timeSpacingCut=None,expTailTimescale=None):
         """
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
         (with zero time at beginning of ObsFile).
@@ -589,6 +589,11 @@ class ObsFile:
             integration time after accounting for time-masking.)
         parses packets from firstSec to firstSec+integrationTime.
         if integrationTime is -1, all time after firstSec is used.  
+        if timeSpacingCut is not None, photons sooner than timeSpacingCut seconds after the last photon are cut.
+            Typically we will set timeSpacingCut=1.e-3 (1 ms) to remove effects of photon pile-up
+        if expTailTimescale is not None, photons are assumed to exhibit an exponential decay back to baseline with e-fold time
+            expTailTimescale, this is used to subtract the exponential tail of one photon from the peakHeight of the next photon
+            This also attempts to counter effects of photon pile-up for short (<100 us) dead times.
         
         Now updated to take advantage of masking capabilities in parsePhotonPackets
         to allow for correct application of non-integer values in firstSec and
@@ -667,16 +672,31 @@ class ObsFile:
             baselines = np.array([])
             peakHeights = np.array([])
 
-        if timeSpacingCut != None:
+        if expTailTimescale != None and len(timestamps) > 0:
+            #find the time between peaks
             timeSpacing = np.diff(timestamps)
-            if len(timestamps) > 0:
-                timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) #include first photon and photons after who are at least timeSpacingCut after the previous photon
-                timestamps = timestamps[timeSpacingMask]
-                peakHeights = peakHeights[timeSpacingMask]
-                baselines = baselines[timeSpacingMask]
-#        if self.timeAdjustFile != None:
-#            timestamps += self.firmwareDelay
-            #timestamps += np.max(self.roachDelays)
+            timeSpacing[timeSpacing < 0] = 1.
+            timeSpacing = np.append(1.,timeSpacing)#arbitrarily assume the first photon is 1 sec after the one before it
+            relPeakHeights = peakHeights-baselines
+            
+            #assume each peak is riding on the tail of an exponential starting at the peak before it with e-fold time of expTailTimescale
+            print 'dt',timeSpacing[0:10]
+            expTails = (1.*peakHeights-baselines)*np.exp(-1.*timeSpacing/expTailTimescale)
+            print 'expTail',expTails[0:10]
+            print 'peak',peakHeights[0:10]
+            print 'peak-baseline',1.*peakHeights[0:10]-baselines[0:10]
+            print 'expT',np.exp(-1.*timeSpacing[0:10]/expTailTimescale)
+            #subtract off this exponential tail
+            peakHeights = np.array(peakHeights-expTails,dtype=np.int)
+            print 'peak',peakHeights[0:10]
+                
+            
+        if timeSpacingCut != None and len(timestamps) > 0:
+            timeSpacing = np.diff(timestamps)
+            timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) #include first photon and photons after who are at least timeSpacingCut after the previous photon
+            timestamps = timestamps[timeSpacingMask]
+            peakHeights = peakHeights[timeSpacingMask]
+            baselines = baselines[timeSpacingMask]
 
 
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
