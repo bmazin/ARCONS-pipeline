@@ -107,12 +107,14 @@ class FileName:
     def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
             self.date + os.sep + \
             "calsol_" + self.tstamp + '.h5'
 
     def calDriftInfo(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
             self.date + os.sep + \
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
