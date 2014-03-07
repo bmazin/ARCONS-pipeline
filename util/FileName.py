@@ -148,11 +148,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.h5'
 
@@ -160,11 +162,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.npz'
         else:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
