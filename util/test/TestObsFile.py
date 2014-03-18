@@ -83,6 +83,12 @@ class TestObsFile(unittest.TestCase):
             self.assertTrue(mask[i] == inter.__contains__(timestamps[i]))
 
     def testGetPackets(self):
+        """
+        test the getPackets method, which could replace getTimedPacketList.
+        by masking more efficiently.  Report hthe number of packets
+        returned and the time for the two methods
+        """
+
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
         exptime0 = obsFile.getFromHeader('exptime')
