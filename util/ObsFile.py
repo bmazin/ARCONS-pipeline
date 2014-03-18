@@ -621,83 +621,90 @@ class ObsFile:
         lastSec = firstSec + integrationTime
         #Make sure we include *all* the complete seconds that overlap the requested range
         integerIntTime = int(np.ceil(lastSec)-np.floor(firstSec)) 
-        pixelData = self.getPixel(iRow, iCol, firstSec=int(np.floor(firstSec)),
-                                          integrationTime=integerIntTime)
+        try:
+            pixelData = self.getPixel(iRow, iCol, firstSec=int(np.floor(firstSec)),
+                                              integrationTime=integerIntTime)
 
-        if integrationTime == -1 or integerIntTime > len(pixelData):
-            lastSec = int(np.floor(firstSec))+len(pixelData)
+            if integrationTime == -1 or integerIntTime > len(pixelData):
+                lastSec = int(np.floor(firstSec))+len(pixelData)
 
-        if self.hotPixIsApplied:
-            inter = self.getPixelBadTimes(iRow, iCol)
-        else:
-            inter = interval()
+            if self.hotPixIsApplied:
+                inter = self.getPixelBadTimes(iRow, iCol)
+            else:
+                inter = interval()
 
-        if self.cosmicMaskIsApplied:
-            inter = inter | self.cosmicMask
-            
-        if (type(firstSec) is not int) or (type(integrationTime) is not int):
-            #Also exclude times outside firstSec to lastSec. Allows for sub-second
-            #(floating point) values in firstSec and integrationTime in the call to parsePhotonPackets.
-            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
-
-        #Inter now contains a single 'interval' instance, which contains a list of
-        #times to exclude, in seconds, including all times outside the requested
-        #integration if necessary.
-
-        #Calculate the total effective time for the integration after removing
-        #any 'intervals':
-        integrationInterval = interval([firstSec, lastSec])
-        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel (for calculating eff. int. time)
-        effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
-
-        timestamps = []
-        baselines = []
-        peakHeights = []
-
-        # pixelData is an array of data for this iRow,iCol, at each good time
-        for t in range(len(pixelData)):
-            interTicks = (inter - (np.floor(firstSec) + t)) * self.ticksPerSec         
-            times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
-            times = np.floor(firstSec) + self.tickDuration * times + t
-            timestamps.append(times)
-            baselines.append(bases)
-            peakHeights.append(peaks)
-            
-        if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
-            timestamps = np.concatenate(timestamps)
-            baselines = np.concatenate(baselines)
-            peakHeights = np.concatenate(peakHeights)
-        else:
-            timestamps = np.array([])
-            baselines = np.array([])
-            peakHeights = np.array([])
-
-        if expTailTimescale != None and len(timestamps) > 0:
-            #find the time between peaks
-            timeSpacing = np.diff(timestamps)
-            timeSpacing[timeSpacing < 0] = 1.
-            timeSpacing = np.append(1.,timeSpacing)#arbitrarily assume the first photon is 1 sec after the one before it
-            relPeakHeights = peakHeights-baselines
-            
-            #assume each peak is riding on the tail of an exponential starting at the peak before it with e-fold time of expTailTimescale
-            print 'dt',timeSpacing[0:10]
-            expTails = (1.*peakHeights-baselines)*np.exp(-1.*timeSpacing/expTailTimescale)
-            print 'expTail',expTails[0:10]
-            print 'peak',peakHeights[0:10]
-            print 'peak-baseline',1.*peakHeights[0:10]-baselines[0:10]
-            print 'expT',np.exp(-1.*timeSpacing[0:10]/expTailTimescale)
-            #subtract off this exponential tail
-            peakHeights = np.array(peakHeights-expTails,dtype=np.int)
-            print 'peak',peakHeights[0:10]
+            if self.cosmicMaskIsApplied:
+                inter = inter | self.cosmicMask
                 
-            
-        if timeSpacingCut != None and len(timestamps) > 0:
-            timeSpacing = np.diff(timestamps)
-            timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) #include first photon and photons after who are at least timeSpacingCut after the previous photon
-            timestamps = timestamps[timeSpacingMask]
-            peakHeights = peakHeights[timeSpacingMask]
-            baselines = baselines[timeSpacingMask]
+            if (type(firstSec) is not int) or (type(integrationTime) is not int):
+                #Also exclude times outside firstSec to lastSec. Allows for sub-second
+                #(floating point) values in firstSec and integrationTime in the call to parsePhotonPackets.
+                inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
 
+            #Inter now contains a single 'interval' instance, which contains a list of
+            #times to exclude, in seconds, including all times outside the requested
+            #integration if necessary.
+
+            #Calculate the total effective time for the integration after removing
+            #any 'intervals':
+            integrationInterval = interval([firstSec, lastSec])
+            maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel (for calculating eff. int. time)
+            effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
+
+            timestamps = []
+            baselines = []
+            peakHeights = []
+
+            # pixelData is an array of data for this iRow,iCol, at each good time
+            for t in range(len(pixelData)):
+                interTicks = (inter - (np.floor(firstSec) + t)) * self.ticksPerSec         
+                times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
+                times = np.floor(firstSec) + self.tickDuration * times + t
+                timestamps.append(times)
+                baselines.append(bases)
+                peakHeights.append(peaks)
+                
+            if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
+                timestamps = np.concatenate(timestamps)
+                baselines = np.concatenate(baselines)
+                peakHeights = np.concatenate(peakHeights)
+            else:
+                timestamps = np.array([])
+                baselines = np.array([])
+                peakHeights = np.array([])
+
+            if expTailTimescale != None and len(timestamps) > 0:
+                #find the time between peaks
+                timeSpacing = np.diff(timestamps)
+                timeSpacing[timeSpacing < 0] = 1.
+                timeSpacing = np.append(1.,timeSpacing)#arbitrarily assume the first photon is 1 sec after the one before it
+                relPeakHeights = peakHeights-baselines
+                
+                #assume each peak is riding on the tail of an exponential starting at the peak before it with e-fold time of expTailTimescale
+                print 'dt',timeSpacing[0:10]
+                expTails = (1.*peakHeights-baselines)*np.exp(-1.*timeSpacing/expTailTimescale)
+                print 'expTail',expTails[0:10]
+                print 'peak',peakHeights[0:10]
+                print 'peak-baseline',1.*peakHeights[0:10]-baselines[0:10]
+                print 'expT',np.exp(-1.*timeSpacing[0:10]/expTailTimescale)
+                #subtract off this exponential tail
+                peakHeights = np.array(peakHeights-expTails,dtype=np.int)
+                print 'peak',peakHeights[0:10]
+                    
+                
+            if timeSpacingCut != None and len(timestamps) > 0:
+                timeSpacing = np.diff(timestamps)
+                timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) #include first photon and photons after who are at least timeSpacingCut after the previous photon
+                timestamps = timestamps[timeSpacingMask]
+                peakHeights = peakHeights[timeSpacingMask]
+                baselines = baselines[timeSpacingMask]
+
+        except tables.exceptions.NoSuchNodeError: #h5 file is missing a pixel, treat as dead
+            timestamps = np.array([])
+            peakHeights = np.array([])
+            baselines = np.array([])
+            effectiveIntTime = 0.
+            
 
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
