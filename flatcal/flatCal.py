@@ -61,6 +61,7 @@ class FlatCal:
         wvlTimestamp = self.params['wvlTimestamp']
         obsSequence = self.params['obsSequence']
         self.deadtime = self.params['deadtime'] #from firmware pulse detection
+        self.timeSpacingCut = self.params['timeSpacingCut']
 
         obsFNs = [FileName(run=run,date=sunsetDate,tstamp=obsTstamp) for obsTstamp in obsSequence]
         self.obsFileNames = [fn.obs() for fn in obsFNs]
@@ -109,7 +110,7 @@ class FlatCal:
             print 'obs',iObs
             for firstSec in range(0,obs.getFromHeader('exptime'),self.intTime):
                 print 'sec',firstSec
-                cubeDict = obs.getSpectralCube(firstSec=firstSec,integrationTime=self.intTime,weighted=False,wvlBinEdges = self.wvlBinEdges)
+                cubeDict = obs.getSpectralCube(firstSec=firstSec,integrationTime=self.intTime,weighted=False,wvlBinEdges = self.wvlBinEdges,timeSpacingCut = self.timeSpacingCut)
                 cube = np.array(cubeDict['cube'],dtype=np.double)
                 effIntTime = cubeDict['effIntTime']
                 #add third dimension for broadcasting
@@ -141,7 +142,7 @@ class FlatCal:
         #mask out frames, or cubes from integration time chunks with count rates too high
         self.spectralCubes = np.array([cube for cube,boolIncludeFrame in zip(self.spectralCubes,boolIncludeFrames) if boolIncludeFrame==True])
         self.frames = [frame for frame,boolIncludeFrame in zip(self.frames,boolIncludeFrames) if boolIncludeFrame==True]
-        print 'few enough counts in the chunk',boolIncludeFrames,medianCountRates
+        print 'few enough counts in the chunk',zip(medianCountRates,boolIncludeFrames)
 
     def calculateWeights(self):
         """

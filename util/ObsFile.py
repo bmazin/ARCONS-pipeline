@@ -1223,6 +1223,15 @@ class ObsFile:
                 #for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
                     #print "   interval=",interval
 
+    def loadStandardCosmicMask(self, switchOnCosmicMask=True):
+        """
+        call this method to load the cosmic mask file from the standard location,
+        defined in Filename
+        """
+        fileName = FileName(obsFile=self)
+        cfn = fileName.cosmicMask()
+        self.loadCosmicMask(cosmicMaskFileName = cfn, switchOnCosmicMask=switchOnCosmicMask)
+
     def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
         self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
         if switchOnCosmicMask: self.switchOnCosmicTimeMask()
@@ -1412,7 +1421,6 @@ class ObsFile:
         if self.cosmicMask is None:
             raise RuntimeError, 'No cosmic mask file loaded'
         self.cosmicMaskIsApplied = True
-
     @staticmethod
     def writeCosmicIntervalToFile(intervals, ticksPerSec, fileName,
                                   beginTime, endTime, stride,
@@ -1437,8 +1445,10 @@ class ObsFile:
                               "Cosmic Mask")
         for interval in intervals:
             row = tbl.row
-            row['tBegin'] = max(0,int(np.round(interval[0]*ticksPerSec)))
-            row['tEnd'] = int(np.round(interval[1]*ticksPerSec))
+            tBegin = max(0,int(np.round(interval[0]*ticksPerSec)))
+            row['tBegin'] = tBegin
+            tEnd = int(np.round(interval[1]*ticksPerSec))
+            row['tEnd'] = tEnd
             row['reason'] = TimeMask.timeMaskReason["cosmic"]
             row.append()
             tbl.flush()
