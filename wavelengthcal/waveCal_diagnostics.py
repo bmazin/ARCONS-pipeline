@@ -46,7 +46,7 @@ def getCalFileNames(paramFile):
     return calFNs, params
 
 
-class diagnostic_plots:
+class waveCal_diagnostic():
     def __init__(self,calFN,params,save=True):
         self.calFN = calFN
         self.params=params
@@ -284,7 +284,7 @@ if __name__ == '__main__':
 
     for calFN in calFNs:
         try:
-            diag_obj=diagnostic_plots(calFN,params,save=False)
+            diag_obj=waveCal_diagnostic(calFN,params,save=False)
             #diag_obj.make_R_array()
             #diag_obj.plot_R_array()
             #diag_obj.plot_nlaser_array()

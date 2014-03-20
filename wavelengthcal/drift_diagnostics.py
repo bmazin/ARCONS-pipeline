@@ -67,7 +67,7 @@ def getDriftFileNames(paramFile):
     return calFNs, params
 
 
-class drift_ana_plots:
+class drift_ana:
     def __init__(self,driftFNs,params,save=True):
 
         self.driftFNs = driftFNs
@@ -104,9 +104,9 @@ class drift_ana_plots:
         self.IR_xOffset=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
         self.IR_sigma=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
 
-        for i in range(len(driftFNs)):
+        for i in range(len(self.driftFNs)):
             try:
-                driftFile=tables.openFile(driftFNs[i].calDriftInfo(),mode='r')
+                driftFile=tables.openFile(self.driftFNs[i].calDriftInfo(),mode='r')
                 drift_row = driftFile.root.params_drift.driftparams.cols.pixelrow[:]    
                 drift_col = driftFile.root.params_drift.driftparams.cols.pixelcol[:]    
                 drift_params = driftFile.root.params_drift.driftparams.cols.gaussparams[:]
@@ -120,7 +120,7 @@ class drift_ana_plots:
                     self.IR_sigma[drift_row[p],drift_col[p],i]=(drift_params[p])[6]*mask
                 driftFile.close()
             except:
-                print '\tUnable to open: '+driftFNs[i].calDriftInfo()
+                print '\tUnable to open: '+self.driftFNs[i].calDriftInfo()
                 #raise
         print "\tDone."
 
@@ -184,6 +184,11 @@ class drift_ana_plots:
     def hist_fluct(self,minSol=2):
         pass
 
+    def make_numSols_array(self):
+        self.numSols=np.zeros(self.beammap.shape)
+        for i in range(len(self.numSols)):
+            for k in range(len(self.numSols[i])):
+                self.numSols[i,k]=len(np.where(self.blue_sigma[i,k,:] > 0.0)[0])
 
     def plot_numSols_map(self):
         print "Mapping number of Solutions in pixel"
@@ -193,11 +198,10 @@ class drift_ana_plots:
         else:
             showMe=False
             pltfilename=self.outpath+'numSols_map.png'
-        numSols=np.zeros(self.beammap.shape)
-        for i in range(len(numSols)):
-            for k in range(len(numSols[i])):
-                numSols[i,k]=len(np.where(self.blue_sigma[i,k,:] > 0.0)[0])
-        plotArray( numSols, colormap=mpl.cm.hot, showMe=showMe, cbar=True,plotFileName=pltfilename, plotTitle='Number of solutions out of %i' %(len(self.driftFNs)))
+
+        if not hasattr(self, 'numSols'):
+            self.make_numSols_array()
+        plotArray( self.numSols, colormap=mpl.cm.hot, showMe=showMe, cbar=True,plotFileName=pltfilename, plotTitle='Number of solutions out of %i' %(len(self.driftFNs)))
         print "\tDone."
 
 
@@ -207,7 +211,7 @@ if __name__ == '__main__':
     driftFNs, params = getDriftFileNames(paramFile)
     
     try:
-        drift_ana = drift_ana_plots(driftFNs,params,save=True)
+        drift_ana = drift_ana(driftFNs,params,save=False)
         drift_ana.populate_data()
         drift_ana.plot_laser_xOffset()
         drift_ana.plot_fluct_map()

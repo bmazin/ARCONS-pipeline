@@ -152,17 +152,19 @@ def print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, p
         print '\t'+str(k)+': '+str(parameter_lowerlimit[k])+' < '+str(parameter_guess[k])+' < '+ str(parameter_upperlimit[k]) +' --> '+str(parameter_fit[k])
 
 class waveCal:
-    def __init__(self,calFN,params,verbose=False,debug=False):
+    def __init__(self,calFN,params,save_pdf=True,verbose=False,debug=False):
         """
         opens cal file, prepares hot pixel mask
 
         Inputs:
             calFN - FileName object to analyze
             params - dictionary of parameters
+            save_pdf - if True, save plots in PDF
             verbose - if False, suppresses comments
             debug - if False, catch errors
         """
         self.params=params
+        self.save_pdf=save_pdf
         self.verbose=verbose
         self.debug = debug
         self.calFN=calFN
@@ -203,7 +205,7 @@ class waveCal:
         self.drift_gaussParams=[]
         self.drift_perrors=[]
 
-        if not debug:
+        if (not debug) and (self.save_pdf):
             self.pp = PdfPages(self.outpath+params['figdir']+'calsol_'+calFN.tstamp+'_fits.pdf')
             mpl.rcParams['font.size'] = 4
             self.n_plots_x = 3
@@ -699,193 +701,9 @@ class waveCal:
 #            for j in range(self.n_cols):
 
 #        for i in [12]:
-#            for j in [15]:
+#            for j in [15,16]:
 #            for j in range(3,19):
-                if self.verbose:
-                    print '('+str(i)+', '+str(j)+') --> '+self.laserCalFile.beamImage[i][j]
-                if self.non_alloc_pix[i,j]==0:
-                    self.finish_pixel(i,j,failFlag=1)
-                    continue
-                #if self.dead_pix[i,j]==0:
-                #    self.failure(2)
-                #    continue
-                dataDict=self.laserCalFile.getTimedPacketList(i,j,timeSpacingCut=self.params['danicas_cut'])
-                peakHeights=np.asarray(dataDict['peakHeights'])*1.0
-                ## less than 'min_amp' per second average count rate
-                if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
-                    self.finish_pixel(i,j,failFlag=2)
-                    if self.verbose:
-                        print "Dead Pixel"
-                    continue
-                baselines=np.asarray(dataDict['baselines'])*1.0
-                peakHeights-=baselines
-                biggest_photon = int(min(peakHeights))
-                n_inbin,phase_bins=np.histogram(peakHeights,bins=np.abs(biggest_photon),range=(biggest_photon,0))
-                phase_bins=(phase_bins+(phase_bins[1]-phase_bins[0])/2.0)[:-1]
-                try:
-                    last_ind = np.where(n_inbin>self.params['min_amp'])[0][-1]
-                except IndexError:
-                    last_ind=len(n_inbin)-1
-                ## Cut out all the zeros on the right
-                n_inbin = n_inbin[:last_ind]
-                phase_bins = phase_bins[:last_ind]
-                
-                ## Try to fit Blue peak first. Catch fit error
-                try:
-                    parameter_guess,parameter_lowerlimit,parameter_upperlimit, cut_off_phase = self.guessBluePeak(n_inbin,phase_bins)
-                    bluePeak_Fit, redchi2blue, mpperr = fitData(phase_bins,n_inbin,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model='gaussian',cut_off_phase=cut_off_phase,make_plot=self.debug,verbose=self.verbose)
-                except:
-                    self.finish_pixel(i,j,failFlag=3)
-                    self.plot_pix_pdf(i,j,n_inbin,phase_bins,None,None,3)
-                    if self.verbose:
-                        print "System Info: "+str(sys.exc_info()[0])
-                    if self.debug:
-                        raise
-                    else:
-                        continue
-
-                ## If the fit didn't work then cut solution
-                if (mpperr == None):
-                    if self.verbose:
-                        print "Error fitting blue peak"
-                    self.finish_pixel(i,j,failFlag=4)
-                    self.plot_pix_pdf(i,j,n_inbin,phase_bins,bluePeak_Fit,redchi2blue,4)
-                    continue
-
-                ## Cut if the reduced chi^2 indicates a bad fit
-                if redchi2blue==None or redchi2blue>self.params['max_chi2_blue']:
-                    if self.verbose:
-                        print "Chi^2 too high: "+str(redchi2blue)
-                    self.finish_pixel(i,j,failFlag=5)
-                    self.plot_pix_pdf(i,j,n_inbin,phase_bins,bluePeak_Fit,redchi2blue,5)
-                    continue
-                
-                ## Try to fit blue, red, IR, noise peaks concurrently. Catch any errors during fit
-                try:
-                    parameter_guess,parameter_lowerlimit,parameter_upperlimit, cut_off_phase = self.guessBlueRedIrPeaks(n_inbin,phase_bins,dataDict['effIntTime'],bluePeak_Fit)
-                    parameter_fit, redchi2, mpperr = fitData(phase_bins,n_inbin,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model=self.params['model_type'],cut_off_phase=cut_off_phase,make_plot=self.debug,verbose=self.verbose)
-                except:
-                    self.finish_pixel(i,j,failFlag=6)
-                    self.plot_pix_pdf(i,j,n_inbin,phase_bins,bluePeak_Fit,None,6)
-                    if self.verbose:
-                        print "System Info: "+str(sys.exc_info()[0])
-                    if self.debug:
-                        raise
-                    else:
-                        continue
-
-                ## Cut if not a good fit and try again without IR peak
-                try_2_peak_fit = False
-                if mpperr == None:
-                    if self.verbose:
-                        print "mpperr == None. Now fitting without IR peak"
-                    try_2_peak_fit = True
-                elif self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
-                    if self.verbose:
-                        print "Blue, Red, IR, or Noise peak hit fit limits. Now fitting without IR peak"
-                    try_2_peak_fit = True
-                #elif np.sum((parameter_fit==parameter_lowerlimit)) + np.sum((parameter_fit==parameter_upperlimit)) != 0.0:
-                ##elif min(mpperr[6:])<=0.0:
-                #    if self.verbose:
-                #        print "Blue, Red, IR, or Noise peak hit fit limits. Now fitting without IR peak"
-                #    try_2_peak_fit = True
-                #elif np.sum((parameter_fit==parameter_guess)) != 0.0:
-                #    if self.verbose:
-                #        print "Some parameters weren't varied. Now fitting without IR peak"
-                #    try_2_peak_fit = True
-                elif redchi2==None:
-                    if self.verbose:
-                        print "reduced chi^2 == None. Now fitting without IR peak"
-                    try_2_peak_fit = True
-                elif redchi2>self.params['max_chi2_all']:
-                    if self.verbose:
-                        print "reduced chi^2 is too large: "+str(redchi2)+". Now fitting without IR peak"
-                    try_2_peak_fit = True
-                elif parameter_fit[7]>phase_bins[-5]:
-                    if self.verbose:
-                        print "IR peak location outside of phase range. Now fitting without IR peak"
-                    try_2_peak_fit = True
-                elif self.check_IR_in_Noise(parameter_fit)==True:
-                    if self.verbose:
-                        print "IR peak is smaller than noise tail. Now fitting without IR peak"
-                    try_2_peak_fit = True
-                if try_2_peak_fit:
-                    try:
-                        parameter_guess[8]=0        #set amplitude3=0
-                        parameter_lowerlimit[6:9]=parameter_guess[6:9]  #fix parameters
-                        parameter_upperlimit[6:9]=parameter_guess[6:9]
-                        parameter_fit, redchi2, mpperr = fitData(phase_bins,n_inbin,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model=self.params['model_type'],cut_off_phase=cut_off_phase,make_plot=self.debug,verbose=self.verbose)
-                    except:
-                        self.finish_pixel(i,j,failFlag=7)
-                        self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2gauss2,7)
-                        if self.verbose:
-                            print "System Info: "+str(sys.exc_info()[0])
-                        if self.debug:
-                            raise
-                        else:
-                            continue
-
-                    #Check if failed again
-                    if mpperr == None:
-                        if self.verbose:
-                            print "mpperr == None. Fit Failed"
-                        self.finish_pixel(i,j,failFlag=8)
-                        self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,8)
-                        continue
-                    elif self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
-                        if self.verbose:
-                            print "Blue, Red, or Noise peak hit fit limits. Fit Failed"
-                        self.finish_pixel(i,j,failFlag=9)
-                        self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,9)
-                        continue
-                    #elif np.sum(parameter_fit==parameter_lowerlimit) + np.sum(parameter_fit==parameter_upperlimit)-6 != 0.0:
-                    ##elif min(mpperr[9:])<=0.0 or min(mpperr[:6])<=0.0:
-                    #    if self.verbose:
-                    #        print "Blue, Red, or Noise peak hit fit limits. Fit Failed"
-                    #    self.finish_pixel(i,j,failFlag=9)
-                    #    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,9)
-                    #    continue
-                    #elif np.sum((parameter_fit==parameter_guess))-3 != 0.0:
-                    #    if self.verbose:
-                    #        print "Some parameters weren't varied. Fit Failed"
-                    #    self.finish_pixel(i,j,failFlag=10)
-                    #    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,10)
-                    elif redchi2==None:
-                        if self.verbose:
-                            print "reduced chi^2 == None. Fit Failed"
-                        self.finish_pixel(i,j,failFlag=11)
-                        self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,11)
-                        continue
-                    elif redchi2>self.params['max_chi2_all']:
-                        if self.verbose:
-                            print "reduced chi^2 is too large: "+str(redchi2)+". Fit Failed"
-                        self.finish_pixel(i,j,failFlag=12)
-                        self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,12)
-                        continue
-
-                if not try_2_peak_fit and cut_off_phase > parameter_fit[7]+parameter_fit[6]:
-                    self.sensitivity.append(bluePeak_Fit[1])
-                    self.noisecutoff.append(cut_off_phase)
-                    self.deltaNoise.append(phase_bins[-1]-cut_off_phase)
-
-                ## Now fit parabola to get wavelength <-> phase amplitude correspondance
-                try:
-                    polyfit, solnrange, sigma = self.fitparabola(n_inbin,phase_bins,parameter_fit,make_plot=self.debug)
-                except:
-                    if self.verbose:
-                        print "Failed while fitting wavelength cal to peaks!"
-                    self.finish_pixel(i,j,failFlag=13)
-                    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,13)
-                    if self.debug:
-                        raise
-                    else:
-                        continue
-
-                ## Fit Worked!
-                self.rescounter+=1
-                self.finish_pixel(i,j,polyfit, sigma, solnrange, parameter_fit, mpperr, failFlag=0)
-                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,0)     #Add pixel to PDF figure
-
+                self.findWaveLengthSoln_pix(i,j)
 
         self.plot_pix_pdf(None,None,None,None,None,None,None)       #Save any remaining PDF figures and close PDF file
         plt.close('all')                                            #Close any remaining matplotlib figures
@@ -893,6 +711,210 @@ class waveCal:
         #self.makeDiagnositcPlots()
         
         print '\nFound ', self.rescounter, ' pixels with wavelength calibration solutions. Time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+
+    def findWaveLengthSoln_pix(self,i,j,fit_guesses=None):
+        '''
+            Finds wavelength solution for pixel i,j. Uses fit_guesses as first guess of parameters. If None, it automatically finds these
+            
+            fit_guesses: [sigma_blue,x_offset_blue,amplitude_blue,sigma_red,x_offset_red,amplitude_red,sigma_IR,x_offset_IR,amplitude_IR,scale_factor_noise,x_offset_noise,amplitude_noise,phase_cutoff]
+        '''
+
+        if self.verbose:
+            print '('+str(i)+', '+str(j)+') --> '+self.laserCalFile.beamImage[i][j]
+        if self.non_alloc_pix[i,j]==0:
+            self.finish_pixel(i,j,failFlag=1)
+            return False
+        #if self.dead_pix[i,j]==0:
+        #    self.failure(2)
+        #    continue
+        dataDict=self.laserCalFile.getTimedPacketList(i,j,timeSpacingCut=self.params['danicas_cut'])
+        peakHeights=np.asarray(dataDict['peakHeights'])*1.0
+        ## less than 'min_amp' per second average count rate
+        if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
+            self.finish_pixel(i,j,failFlag=2)
+            if self.verbose:
+                print "Dead Pixel"
+            return False
+        baselines=np.asarray(dataDict['baselines'])*1.0
+        peakHeights-=baselines
+        biggest_photon = int(min(peakHeights))
+        n_inbin,phase_bins=np.histogram(peakHeights,bins=np.abs(biggest_photon),range=(biggest_photon,0))
+        phase_bins=(phase_bins+(phase_bins[1]-phase_bins[0])/2.0)[:-1]
+        try:
+            last_ind = np.where(n_inbin>self.params['min_amp'])[0][-1]
+        except IndexError:
+            last_ind=len(n_inbin)-1
+        ## Cut out all the zeros on the right
+        n_inbin = n_inbin[:last_ind]
+        phase_bins = phase_bins[:last_ind]
+        
+        ## Try to fit Blue peak first. Catch fit error
+        if fit_guesses==None:
+            try:
+                parameter_guess,parameter_lowerlimit,parameter_upperlimit, cut_off_phase = self.guessBluePeak(n_inbin,phase_bins)
+                bluePeak_Fit, redchi2blue, mpperr = fitData(phase_bins,n_inbin,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model='gaussian',cut_off_phase=cut_off_phase,make_plot=self.debug,verbose=self.verbose)
+            except:
+                self.finish_pixel(i,j,failFlag=3)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,None,None,3)
+                if self.verbose:
+                    print "System Info: "+str(sys.exc_info()[0])
+                if self.debug:
+                    raise
+                else:
+                    return False
+
+            ## If the fit didn't work then cut solution
+            if (mpperr == None):
+                if self.verbose:
+                    print "Error fitting blue peak"
+                self.finish_pixel(i,j,failFlag=4)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,bluePeak_Fit,redchi2blue,4)
+                return False
+
+            ## Cut if the reduced chi^2 indicates a bad fit
+            if redchi2blue==None or redchi2blue>self.params['max_chi2_blue']:
+                if self.verbose:
+                    print "Chi^2 too high: "+str(redchi2blue)
+                self.finish_pixel(i,j,failFlag=5)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,bluePeak_Fit,redchi2blue,5)
+                return False
+        
+        ## Try to fit blue, red, IR, noise peaks concurrently. Catch any errors during fit
+        try:
+            if fit_guesses==None:
+                parameter_guess,parameter_lowerlimit,parameter_upperlimit, cut_off_phase = self.guessBlueRedIrPeaks(n_inbin,phase_bins,dataDict['effIntTime'],bluePeak_Fit)
+            else:
+                parameter_guess = fit_guesses[:-1]
+                parameter_lowerlimit = [None]*(len(fit_guesses)-1)
+                parameter_upperlimit = [None]*(len(fit_guesses)-1)
+                cut_off_phase = fit_guesses[-1]
+            parameter_fit, redchi2, mpperr = fitData(phase_bins,n_inbin,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model=self.params['model_type'],cut_off_phase=cut_off_phase,make_plot=self.debug,verbose=self.verbose)
+        except:
+            self.finish_pixel(i,j,failFlag=6)
+            self.plot_pix_pdf(i,j,n_inbin,phase_bins,bluePeak_Fit,None,6)
+            if self.verbose:
+                print "System Info: "+str(sys.exc_info()[0])
+            if self.debug:
+                raise
+            else:
+                return False
+
+        ## Cut if not a good fit and try again without IR peak
+        try_2_peak_fit = False
+        if mpperr == None:
+            if self.verbose:
+                print "mpperr == None. Now fitting without IR peak"
+            try_2_peak_fit = True
+        elif self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
+            if self.verbose:
+                print "Blue, Red, IR, or Noise peak hit fit limits. Now fitting without IR peak"
+            try_2_peak_fit = True
+        #elif np.sum((parameter_fit==parameter_lowerlimit)) + np.sum((parameter_fit==parameter_upperlimit)) != 0.0:
+        ##elif min(mpperr[6:])<=0.0:
+        #    if self.verbose:
+        #        print "Blue, Red, IR, or Noise peak hit fit limits. Now fitting without IR peak"
+        #    try_2_peak_fit = True
+        #elif np.sum((parameter_fit==parameter_guess)) != 0.0:
+        #    if self.verbose:
+        #        print "Some parameters weren't varied. Now fitting without IR peak"
+        #    try_2_peak_fit = True
+        elif redchi2==None:
+            if self.verbose:
+                print "reduced chi^2 == None. Now fitting without IR peak"
+            try_2_peak_fit = True
+        elif redchi2>self.params['max_chi2_all']:
+            if self.verbose:
+                print "reduced chi^2 is too large: "+str(redchi2)+". Now fitting without IR peak"
+            try_2_peak_fit = True
+        elif parameter_fit[7]>phase_bins[-5]:
+            if self.verbose:
+                print "IR peak location outside of phase range. Now fitting without IR peak"
+            try_2_peak_fit = True
+        elif self.check_IR_in_Noise(parameter_fit)==True:
+            if self.verbose:
+                print "IR peak is smaller than noise tail. Now fitting without IR peak"
+            try_2_peak_fit = True
+        if try_2_peak_fit:
+            try:
+                parameter_guess[8]=0        #set amplitude3=0
+                parameter_lowerlimit[6:9]=parameter_guess[6:9]  #fix parameters
+                parameter_upperlimit[6:9]=parameter_guess[6:9]
+                parameter_fit, redchi2, mpperr = fitData(phase_bins,n_inbin,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model=self.params['model_type'],cut_off_phase=cut_off_phase,make_plot=self.debug,verbose=self.verbose)
+            except:
+                self.finish_pixel(i,j,failFlag=7)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2gauss2,7)
+                if self.verbose:
+                    print "System Info: "+str(sys.exc_info()[0])
+                if self.debug:
+                    raise
+                else:
+                    return False
+
+            #Check if failed again
+            if mpperr == None:
+                if self.verbose:
+                    print "mpperr == None. Fit Failed"
+                self.finish_pixel(i,j,failFlag=8)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,8)
+                return False
+            elif self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
+                if self.verbose:
+                    print "Blue, Red, or Noise peak hit fit limits. Fit Failed"
+                self.finish_pixel(i,j,failFlag=9)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,9)
+                return False
+            #elif np.sum(parameter_fit==parameter_lowerlimit) + np.sum(parameter_fit==parameter_upperlimit)-6 != 0.0:
+            ##elif min(mpperr[9:])<=0.0 or min(mpperr[:6])<=0.0:
+            #    if self.verbose:
+            #        print "Blue, Red, or Noise peak hit fit limits. Fit Failed"
+            #    self.finish_pixel(i,j,failFlag=9)
+            #    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,9)
+            #    continue
+            #elif np.sum((parameter_fit==parameter_guess))-3 != 0.0:
+            #    if self.verbose:
+            #        print "Some parameters weren't varied. Fit Failed"
+            #    self.finish_pixel(i,j,failFlag=10)
+            #    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,10)
+            elif redchi2==None:
+                if self.verbose:
+                    print "reduced chi^2 == None. Fit Failed"
+                self.finish_pixel(i,j,failFlag=11)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,11)
+                return False
+            elif redchi2>self.params['max_chi2_all']:
+                if self.verbose:
+                    print "reduced chi^2 is too large: "+str(redchi2)+". Fit Failed"
+                self.finish_pixel(i,j,failFlag=12)
+                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,12)
+                return False
+
+        if not try_2_peak_fit and cut_off_phase > parameter_fit[7]+parameter_fit[6]:
+            self.sensitivity.append(bluePeak_Fit[1])
+            self.noisecutoff.append(cut_off_phase)
+            self.deltaNoise.append(phase_bins[-1]-cut_off_phase)
+
+        ## Now fit parabola to get wavelength <-> phase amplitude correspondance
+        try:
+            polyfit, solnrange, sigma = self.fitparabola(n_inbin,phase_bins,parameter_fit,make_plot=self.debug)
+        except:
+            if self.verbose:
+                print "Failed while fitting wavelength cal to peaks!"
+            self.finish_pixel(i,j,failFlag=13)
+            self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,13)
+            if self.debug:
+                raise
+            else:
+                return False
+
+        ## Fit Worked!
+        self.rescounter+=1
+        self.finish_pixel(i,j,polyfit, sigma, solnrange, parameter_fit, mpperr, failFlag=0)
+        self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,0)     #Add pixel to PDF figure
+
+        return True
+
+
+
 
 
 
@@ -949,6 +971,9 @@ class waveCal:
 
         if self.debug:
             plt.show()
+            return
+
+        if not self.save_pdf:
             return
 
         if iRow==None or iCol==None:
@@ -1054,7 +1079,7 @@ if __name__ == '__main__':
             if waveCalObject.rescounter > 0:
                 waveCalObject.write_waveCal_drift()
                 try:
-                    diag_obj=diagnostic_plots(calFN,params,save=True)
+                    diag_obj=waveCal_diagnostic(calFN,params,save=True)
                     diag_obj.make_R_array()
                     diag_obj.plot_R_array()
                     diag_obj.plot_nlaser_array()
