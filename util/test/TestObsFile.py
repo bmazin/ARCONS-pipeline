@@ -430,6 +430,32 @@ iRow= 44  iCol= 43
             self.assertTrue(timestamp >= beginTime, msg)
             self.assertTrue(timestamp <= endTime, msg)
 
+    def testInvertInterval(self):
+        """
+        test the invertInterval method of ObsFile
+        Create in interval, and see that it returns the expected interval
+        """
+        i = interval()
+        i = i | interval[1,2]
+        i = i | interval[4,5]
+        # all intervals
+        inverted = ObsFile.ObsFile.invertInterval(i)
+        self.assertEquals(len(inverted),3)
+        self.assertEquals(inverted[0][0],float(-inf))
+        self.assertEquals(inverted[0][1],1)
+        self.assertEquals(inverted[1][0],2)
+        self.assertEquals(inverted[1][1],4)
+        self.assertEquals(inverted[2][0],5)
+        self.assertEquals(inverted[2][1],float(inf))
+
+        # limit min and max
+        inverted = ObsFile.ObsFile.invertInterval(i,iMin=0.0, iMax=4.5)
+        self.assertEquals(len(inverted),2)
+        self.assertEquals(inverted[0][0],0)
+        self.assertEquals(inverted[0][1],1)
+        self.assertEquals(inverted[1][0],2)
+        self.assertEquals(inverted[1][1],4)
+
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False

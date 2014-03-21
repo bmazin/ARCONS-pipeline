@@ -1471,6 +1471,35 @@ class ObsFile:
         fid.close()
         return retval
 
+    @staticmethod
+    def invertInterval(interval0, iMin=float("-inf"), iMax=float("inf")):
+        """
+        invert the interval
+
+        inputs:
+          interval0 -- the interval to invert
+          iMin=-inf -- beginning of the new interval
+          iMax-inv -- end of the new interval
+      
+        return:
+          the interval between iMin, iMax that is NOT masked by interval0
+    """
+        if len(interval0) == 0:
+            retval = interval[iMin,iMax]
+        else:
+            retval = interval()
+            previous = [iMin,iMin]
+            for segment in interval0:
+                if previous[1] < segment[0]:
+                    temp = interval[previous[1],segment[0]]
+                    if len(temp) > 0: 
+                        retval = retval | temp
+                    previous = segment
+            if previous[1] < iMax:
+                temp = interval[previous[1],iMax]
+                if len(temp) > 0:
+                    retval = retval | temp
+            return retval
 
     def writePhotonList(self,*nkwargs,**kwargs): #filename=None, firstSec=0, integrationTime=-1):                       
         """
