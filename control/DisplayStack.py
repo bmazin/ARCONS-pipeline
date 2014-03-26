@@ -370,7 +370,7 @@ class DisplayStack(QMainWindow):
                         self.frames.append(self.frame)
 
                     self.cube = np.dstack(self.frames)
-                    self.times = np.array(self.times)
+                    self.times = np.array(self.jd)
             
                     # 12) Create output file
                     self.createOutputName()
