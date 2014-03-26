@@ -362,7 +362,8 @@ class DisplayStack(QMainWindow):
                     for iSec in np.arange(0,self.exptime,self.integrationTime):
                         #add seconds offset to julian date, move jd to center of bin
                         self.jd = self.startJD + iSec/(24.*3600.) + self.integrationTime/2./(24.*3600.)
-                        'Creating frame for time ' + str(self.jd)
+                        self.times.append(self.jd)
+                        print 'Creating frame for time ' + str(self.jd)
                         self.frameData = self.ob.getPixelCountImage(firstSec=iSec,integrationTime=self.integrationTime,weighted=self.weighted,getRawCount=self.useRawCounts,scaleByEffInt=self.scaleByEffInt)
                         self.frame = self.frameData['image']         
                         if self.useDeadPixelMasking:
@@ -370,7 +371,7 @@ class DisplayStack(QMainWindow):
                         self.frames.append(self.frame)
 
                     self.cube = np.dstack(self.frames)
-                    self.times = np.array(self.jd)
+                    self.times = np.array(self.times)
             
                     # 12) Create output file
                     self.createOutputName()
