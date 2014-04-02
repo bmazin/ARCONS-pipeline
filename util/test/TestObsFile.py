@@ -78,19 +78,113 @@ class TestObsFile(unittest.TestCase):
         """
         timestamps = np.array([1.1, 2.2, 3.3, 4.4, 8.8])
         inter = interval([1.9,2.5],[4.3,5.3])
-        mask = ObsFile.ObsFile.makeMask(timestamps,inter)
+        mask = ObsFile.ObsFile.makeMaskV2(timestamps,inter)
+        print "mask=",mask
         for i in range(len(timestamps)):
-            self.assertTrue(mask[i] == inter.__contains__(timestamps[i]))
+            tsi = timestamps[i]
+            mi = mask[i]
+            self.assertTrue(mi == inter.__contains__(tsi))
+
+    def testGetPacketsTiming(self):
+        """
+        compare getPackets and getTimedPacketList
+
+
+        """
+
+        INTERM_DIR = '../../examples/mask-interval-performance/'
+        os.environ['INTERM_DIR'] = INTERM_DIR
+        run = 'PAL2012'
+        sunsetDate = '20121211'
+        obsSequence = '20121212-074700'
+        firstSec = 0
+        integrationTime = 10
+        fn = FileName.FileName(run=run,date=sunsetDate,tstamp=obsSequence)
+        obsFile = ObsFile.ObsFile(fn.obs())
+
+        print "integrationTime=",integrationTime
+        # no masking with getTimePacketList
+        nPhoton = 0
+        start = time.clock()
+        for iRow in xrange(obsFile.nRow):
+            for iCol in xrange(obsFile.nCol):
+                gtpl = obsFile.getTimedPacketList(iRow,iCol,firstSec,
+                                                  integrationTime)
+                nPhoton += len(gtpl['timestamps'])
+        elapsed = time.clock()-start
+        print "no mask gtpl nPhoton=",nPhoton, "elapsed=",elapsed
+
+        obsFile.loadStandardCosmicMask()
+
+        # masking with getPackets v1 of makeMask
+        pr = cProfile.Profile()
+        pr.enable()
+        fields = ('peakHeights','baselines')
+        start = time.clock()
+        nPhoton = 0
+        for iRow in xrange(obsFile.nRow):
+            for iCol in xrange(obsFile.nCol):
+                gtpl = obsFile.getPackets(iRow,iCol,firstSec,
+                                          integrationTime,
+                                          fields=fields)
+                nPhoton += len(gtpl['timestamps'])
+        elapsed = time.clock()-start
+        pr.disable()
+        print "   mask gt   nPhoton=",nPhoton, "elapsed=",elapsed
+        
+        s = StringIO.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats(10)
+        #print s.getvalue()
+
+        # masking with getPackets v2 of makeMask
+        obsFile.makeMaskVersion = 'v2'
+        pr = cProfile.Profile()
+        pr.enable()
+        fields = ('peakHeights','baselines')
+        start = time.clock()
+        nPhoton = 0
+        for iRow in xrange(obsFile.nRow):
+            for iCol in xrange(obsFile.nCol):
+                gtpl = obsFile.getPackets(iRow,iCol,firstSec,
+                                          integrationTime,
+                                          fields=fields)
+                nPhoton += len(gtpl['timestamps'])
+        elapsed = time.clock()-start
+        pr.disable()
+        print "   mask gt   nPhoton=",nPhoton, "elapsed=",elapsed
+        
+        s = StringIO.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats(10)
+        #print s.getvalue()
+        return
+
+        # masking with getTimedPacketList
+        start = time.clock()
+        nPhoton = 0
+        for iRow in xrange(obsFile.nRow):
+            for iCol in xrange(obsFile.nCol):
+                gtpl = obsFile.getTimedPacketList(iRow,iCol,firstSec,
+                                                  integrationTime)
+                nPhoton += len(gtpl['timestamps'])
+        elapsed = time.clock()-start
+        print "   mask gtpl nPhoton=",nPhoton, "elapsed=",elapsed
+
 
     def testGetPackets(self):
         """
         test the getPackets method, which could replace getTimedPacketList.
-        by masking more efficiently.  Report hthe number of packets
-        returned and the time for the two methods
+        by masking more efficiently.  Check that the returned
+        values for timestamps, baselines, peakheights, and effIntTime
+        are equal.
         """
 
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
         obsFile = ObsFile.ObsFile(fn.obs())
+
         exptime0 = obsFile.getFromHeader('exptime')
         self.assertEquals(exptime0, 300)
         timeAdjustments = fn.timeAdjustments()
@@ -98,39 +192,32 @@ class TestObsFile(unittest.TestCase):
         exptime1 = obsFile.getFromHeader('exptime')
         self.assertEquals(exptime1, 298)
 
-
-        exptime1 = 4
+        beginTime = 4.567
+        exptime1 = 100.654
         iRow = 30
         iCol = 32
 
-        fields = ['peakHeights']
+        fields = ['peakHeights','baselines']
 
         # mask out from 0.5 to 0.75 each second
         inter = interval()
-        for sec in range(exptime1):
+        for sec in range(int(beginTime), int(beginTime+exptime1)+1):
             inter = inter | interval([sec+0.5, sec+0.75])
         obsFile.cosmicMask = inter
         obsFile.switchOnCosmicTimeMask()
 
-        print "now call getPackets"
         start = time.clock()
         tpl = obsFile.getPackets(iRow, iCol, 0, exptime1, fields=fields)
         elapsed = (time.clock() - start)
-        print "getPackets elapsed=",elapsed
 
-        print "now call getTimedPacketList"
         start = time.clock()
         gtpl = obsFile.getTimedPacketList(iRow, iCol, 0, exptime1)
         elapsed = (time.clock() - start)
-        print "getTimedPackeList elapsed=",elapsed
 
-        print "compare"
-        print "len(tpl['timestamps'])=",len(tpl['timestamps'])
-        print "len(gtpl['timestamps'])=",len(gtpl['timestamps'])
-        print "now make plot"
-        plt.clf()
-        plt.plot(tpl['timestamps'], tpl['peakHeights'])
-        plt.savefig(inspect.stack()[0][3]+".png")
+        self.assertTrue((tpl['timestamps']==gtpl['timestamps']).all())
+        self.assertTrue((tpl['baselines']==gtpl['baselines']).all())
+        self.assertTrue((tpl['peakHeights']==gtpl['peakHeights']).all())
+        self.assertEquals(tpl['effIntTime'],gtpl['effIntTime'])
 
     def testGetPacketsProfile(self):
         fn = FileName.FileName('LICK2012','20120919',  '20120920-092626')
@@ -429,6 +516,32 @@ iRow= 44  iCol= 43
             msg = "beginTime=%f   timestamp=%f  endTime=%f"%(beginTime,timestamp,endTime)
             self.assertTrue(timestamp >= beginTime, msg)
             self.assertTrue(timestamp <= endTime, msg)
+
+    def testInvertInterval(self):
+        """
+        test the invertInterval method of ObsFile
+        Create in interval, and see that it returns the expected interval
+        """
+        i = interval()
+        i = i | interval[1,2]
+        i = i | interval[4,5]
+        # all intervals
+        inverted = ObsFile.ObsFile.invertInterval(i)
+        self.assertEquals(len(inverted),3)
+        self.assertEquals(inverted[0][0],float(-inf))
+        self.assertEquals(inverted[0][1],1)
+        self.assertEquals(inverted[1][0],2)
+        self.assertEquals(inverted[1][1],4)
+        self.assertEquals(inverted[2][0],5)
+        self.assertEquals(inverted[2][1],float(inf))
+
+        # limit min and max
+        inverted = ObsFile.ObsFile.invertInterval(i,iMin=0.0, iMax=4.5)
+        self.assertEquals(len(inverted),2)
+        self.assertEquals(inverted[0][0],0)
+        self.assertEquals(inverted[0][1],1)
+        self.assertEquals(inverted[1][0],2)
+        self.assertEquals(inverted[1][1],4)
 
 def npEquals(a,b):
     if (len(a) != len(b)):

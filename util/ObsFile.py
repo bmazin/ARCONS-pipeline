@@ -71,10 +71,11 @@ class ObsFile:
     c = 2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName, verbose=False):
+    def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
         """
         load the given file with fileName relative to $MKID_DATA_DIR
         """
+        self.makeMaskVersion = makeMaskVersion
         self.loadFile(fileName,verbose=verbose)
         self.wvlCalFile = None #initialize to None for an easy test of whether a cal file has been loaded
         self.flatCalFile = None
@@ -1024,10 +1025,12 @@ class ObsFile:
         """
         get and parse packets for pixel iRow,iCol starting at firstSec for integrationTime seconds.
 
-        files is a list of strings to indicate what to parse in addition to timestamps
-        (All it know how to do right now is peakHeights)
+        fields is a list of strings to indicate what to parse in addition to timestamps:  allowed values are 'peakHeights' and 'baselines'
 
-        return a dictionary containing errectiveIntTime (n seconds), the array of timestamps and other fields requested
+        return a dictionary containing:
+          effectiveIntTime (n seconds)
+          timestamps
+          other fields requested
         """
         parse = {'peakHeights': True, 'baselines': True}
         for key in parse.keys():
@@ -1096,7 +1099,11 @@ class ObsFile:
         # create a mask, "True" mean mask value
         start = time.clock()
         # the call the makeMask dominates the running time
-        mask = ObsFile.makeMask(timestamps, inter)
+        if self.makeMaskVersion == 'v1':
+            mask = ObsFile.makeMaskV1(timestamps, inter)
+        else:
+            mask = ObsFile.makeMaskV2(timestamps, inter)
+
         elapsed = (time.clock() - start)
         #print "In Obsfile:  elapsed due to makeMask=",elapsed
         # compress out all the masked values
@@ -1105,7 +1112,7 @@ class ObsFile:
         #timestamps = ma.compressed(ma.array(timestamps,mask))
         # build up the dictionary of values and return it
         retval =  {"effIntTime": effectiveIntTime,
-                "timestamps":timestamps}
+                   "timestamps":timestamps}
         if parse['peakHeights']: 
             retval['peakHeights'] = \
                 ma.compressed(ma.array(peakHeights,mask=mask))
@@ -1122,6 +1129,14 @@ class ObsFile:
 
     @staticmethod
     def makeMask(timestamps, inter):
+        """
+        return an array of booleans, the same length as timestamps,
+        with that value inter.__contains__(timestamps[i])
+        """
+        return ObsFile.makeMaskV2(timestamps, inter)
+
+    @staticmethod
+    def makeMaskV1(timestamps, inter):
         """
         return an array of booleans, the same length as timestamps,
         with that value inter.__contains__(timestamps[i])
@@ -1148,6 +1163,24 @@ class ObsFile:
                     retval[i] = True
                 else:
                     retval[i] = False
+        return retval
+
+    @staticmethod
+    def makeMaskV2(timestamps, inter):
+        """
+        return an array of booleans, the same length as timestamps,
+        with that value inter.__contains__(timestamps[i])
+        """
+        lt = len(timestamps)
+        retval = np.zeros(lt,dtype=np.bool)
+        for i in inter:
+            if len(i) == 2:
+                i0 = np.searchsorted(timestamps,i[0])
+                if i0 == lt: break # the intervals are later than timestamps
+                i1 = np.searchsorted(timestamps,i[1])
+                if i1 > 0:
+                    i0 = max(i0,0)
+                    retval[i0:i1] = True
         return retval
 
     def loadCentroidListFile(self, centroidListFileName):
@@ -1478,6 +1511,35 @@ class ObsFile:
         fid.close()
         return retval
 
+    @staticmethod
+    def invertInterval(interval0, iMin=float("-inf"), iMax=float("inf")):
+        """
+        invert the interval
+
+        inputs:
+          interval0 -- the interval to invert
+          iMin=-inf -- beginning of the new interval
+          iMax-inv -- end of the new interval
+      
+        return:
+          the interval between iMin, iMax that is NOT masked by interval0
+    """
+        if len(interval0) == 0:
+            retval = interval[iMin,iMax]
+        else:
+            retval = interval()
+            previous = [iMin,iMin]
+            for segment in interval0:
+                if previous[1] < segment[0]:
+                    temp = interval[previous[1],segment[0]]
+                    if len(temp) > 0: 
+                        retval = retval | temp
+                    previous = segment
+            if previous[1] < iMax:
+                temp = interval[previous[1],iMax]
+                if len(temp) > 0:
+                    retval = retval | temp
+            return retval
 
     def writePhotonList(self,*nkwargs,**kwargs): #filename=None, firstSec=0, integrationTime=-1):                       
         """
