@@ -89,6 +89,15 @@ class TestObsFile(unittest.TestCase):
         """
         compare getPackets and getTimedPacketList
 
+        This runs the packet finding code in four ways and prints the elapsed
+        time.   The mask has an interval for each second, plus intervals found
+        by cosmic.
+
+        For a 10 second exposure time, calling gettimePackeList with 
+        no mask takes 2.28 seconds.  With mask, 37.50 seconds.
+
+        The algorithm getPackets takes 12.29 seconds, and with an  update
+        to the expensive part (makeMask version 2) in takes 3.45 seconds.
 
         """
 
@@ -112,11 +121,25 @@ class TestObsFile(unittest.TestCase):
                                                   integrationTime)
                 nPhoton += len(gtpl['timestamps'])
         elapsed = time.clock()-start
-        print "no mask gtpl nPhoton=",nPhoton, "elapsed=",elapsed
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+            ('no',"getTimePacketList",nPhoton, elapsed)
 
         obsFile.loadStandardCosmicMask()
 
+        # yes masking with getTimePacketList
+        nPhoton = 0
+        start = time.clock()
+        for iRow in xrange(obsFile.nRow):
+            for iCol in xrange(obsFile.nCol):
+                gtpl = obsFile.getTimedPacketList(iRow,iCol,firstSec,
+                                                  integrationTime)
+                nPhoton += len(gtpl['timestamps'])
+        elapsed = time.clock()-start
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+              ('yes','getTimePacketList',nPhoton, elapsed)
+
         # masking with getPackets v1 of makeMask
+        obsFile.makeMaskVersion = 'v1'
         pr = cProfile.Profile()
         pr.enable()
         fields = ('peakHeights','baselines')
@@ -130,7 +153,8 @@ class TestObsFile(unittest.TestCase):
                 nPhoton += len(gtpl['timestamps'])
         elapsed = time.clock()-start
         pr.disable()
-        print "   mask gt   nPhoton=",nPhoton, "elapsed=",elapsed
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+              ('yes','getPackets v1',nPhoton, elapsed)
         
         s = StringIO.StringIO()
         sortby = 'cumulative'
@@ -153,7 +177,8 @@ class TestObsFile(unittest.TestCase):
                 nPhoton += len(gtpl['timestamps'])
         elapsed = time.clock()-start
         pr.disable()
-        print "   mask gt   nPhoton=",nPhoton, "elapsed=",elapsed
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+              ('yes','getPackets v2',nPhoton, elapsed)
         
         s = StringIO.StringIO()
         sortby = 'cumulative'
