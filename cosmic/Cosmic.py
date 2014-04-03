@@ -405,8 +405,11 @@ class Cosmic:
         for iRow in range(self.file.nRow):
             #print "Cosmic.findCosmics:  iRow=",iRow
             for iCol in range(self.file.nCol):
-                gtpl = self.file.getTimedPacketList(iRow,iCol,beginTime, 
-                                                    integrationTime)
+                # getTimedPacketList is slow.  Use getPackets instead.
+                #gtpl = self.file.getTimedPacketList(iRow,iCol,beginTime, 
+                #                                    integrationTime)
+                gtpl = self.file.getPackets(iRow,iCol,
+                                            beginTime,integrationTime)
                 timestamps = gtpl['timestamps']
                 if timestamps.size > 0:
                     timestamps = \
