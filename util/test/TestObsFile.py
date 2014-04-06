@@ -89,6 +89,15 @@ class TestObsFile(unittest.TestCase):
         """
         compare getPackets and getTimedPacketList
 
+        This runs the packet finding code in four ways and prints the elapsed
+        time.   The mask has an interval for each second, plus intervals found
+        by cosmic.
+
+        For a 10 second exposure time, calling gettimePackeList with 
+        no mask takes 2.28 seconds.  With mask, 37.50 seconds.
+
+        The algorithm getPackets takes 12.29 seconds, and with an  update
+        to the expensive part (makeMask version 2) in takes 3.45 seconds.
 
         """
 
@@ -112,11 +121,25 @@ class TestObsFile(unittest.TestCase):
                                                   integrationTime)
                 nPhoton += len(gtpl['timestamps'])
         elapsed = time.clock()-start
-        print "no mask gtpl nPhoton=",nPhoton, "elapsed=",elapsed
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+            ('no',"getTimePacketList",nPhoton, elapsed)
 
         obsFile.loadStandardCosmicMask()
 
+        # yes masking with getTimePacketList
+        nPhoton = 0
+        start = time.clock()
+        for iRow in xrange(obsFile.nRow):
+            for iCol in xrange(obsFile.nCol):
+                gtpl = obsFile.getTimedPacketList(iRow,iCol,firstSec,
+                                                  integrationTime)
+                nPhoton += len(gtpl['timestamps'])
+        elapsed = time.clock()-start
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+              ('yes','getTimePacketList',nPhoton, elapsed)
+
         # masking with getPackets v1 of makeMask
+        obsFile.makeMaskVersion = 'v1'
         pr = cProfile.Profile()
         pr.enable()
         fields = ('peakHeights','baselines')
@@ -130,7 +153,8 @@ class TestObsFile(unittest.TestCase):
                 nPhoton += len(gtpl['timestamps'])
         elapsed = time.clock()-start
         pr.disable()
-        print "   mask gt   nPhoton=",nPhoton, "elapsed=",elapsed
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+              ('yes','getPackets v1',nPhoton, elapsed)
         
         s = StringIO.StringIO()
         sortby = 'cumulative'
@@ -153,7 +177,8 @@ class TestObsFile(unittest.TestCase):
                 nPhoton += len(gtpl['timestamps'])
         elapsed = time.clock()-start
         pr.disable()
-        print "   mask gt   nPhoton=",nPhoton, "elapsed=",elapsed
+        print "mask=%3s  method=%19s nPhoton=%10d time=%6.2f"%\
+              ('yes','getPackets v2',nPhoton, elapsed)
         
         s = StringIO.StringIO()
         sortby = 'cumulative'
@@ -214,6 +239,61 @@ class TestObsFile(unittest.TestCase):
         gtpl = obsFile.getTimedPacketList(iRow, iCol, 0, exptime1)
         elapsed = (time.clock() - start)
 
+        self.assertTrue((tpl['timestamps']==gtpl['timestamps']).all())
+        self.assertTrue((tpl['baselines']==gtpl['baselines']).all())
+        self.assertTrue((tpl['peakHeights']==gtpl['peakHeights']).all())
+        self.assertEquals(tpl['effIntTime'],gtpl['effIntTime'])
+
+    def testGetPacketsAndHotPixelMasks(self):
+        """
+        test the getPackets method, which could replace getTimedPacketList.
+        by masking more efficiently.  Check that the returned
+        values for timestamps, baselines, peakheights, and effIntTime
+        are equal.
+
+        This is run on a file with detected hot pixels, and uses a pixel
+        and time where there are intervals masked.
+        """
+
+        fn = FileName.FileName('PAL2013', '20131209', '20131209-122152')
+        obsFile = ObsFile.ObsFile(fn.obs())
+
+        exptime0 = obsFile.getFromHeader('exptime')
+        self.assertEquals(exptime0, 300)
+        timeAdjustments = fn.timeAdjustments()
+
+        obsFile.loadTimeAdjustmentFile(timeAdjustments)
+
+        timeMaskFile = fn.timeMask()
+        obsFile.loadHotPixCalFile(timeMaskFile, switchOnMask=True)
+
+        exptime1 = obsFile.getFromHeader('exptime')
+        #self.assertEquals(exptime1, 298)
+
+        beginTime = 72.5
+        exptime1 = 110.654
+
+        # this row,col has a few intervals masked out due to hot pixels
+        iRow = 45
+        iCol = 39
+
+        fields = ['peakHeights','baselines']
+
+        # mask out from 0.5 to 0.75 each second
+        inter = interval()
+        for sec in range(int(beginTime), int(beginTime+exptime1)+1):
+            inter = inter | interval([sec+0.5, sec+0.75])
+        obsFile.cosmicMask = inter
+        obsFile.switchOnCosmicTimeMask()
+
+        start = time.clock()
+        tpl = obsFile.getPackets(iRow, iCol, 0, exptime1, fields=fields)
+        elapsed = (time.clock() - start)
+
+        start = time.clock()
+        gtpl = obsFile.getTimedPacketList(iRow, iCol, 0, exptime1)
+        elapsed = (time.clock() - start)
+        print "number of packets = ",len(tpl['timestamps'])
         self.assertTrue((tpl['timestamps']==gtpl['timestamps']).all())
         self.assertTrue((tpl['baselines']==gtpl['baselines']).all())
         self.assertTrue((tpl['peakHeights']==gtpl['peakHeights']).all())

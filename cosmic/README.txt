@@ -12,3 +12,19 @@ export export CPATH=/Users/stoughto/Library/Enthought/Canopy_64bit/User/lib/pyth
 
 where you need to replace the actual path with the actual path to the
 directory that containd numpy/arrayobject.h
+
+
+======
+
+To run from a dict file, make a directory and go there.  
+(For example, /Scratch/stoughto/geminga)
+
+Run the cosmic finding like this, in the background, saving to a log file:
+
+nohup  python -u $PYTHONPATH/cosmic/CosmicRunFromDictFile.py geminga-a.dict cosmic.dict > geminga-a.log 2>&1 &
+
+
+The file geminga-a.dict defines the data set to use.  
+The file cosmic.dict defins parameters to use in finding cosmic rays.
+
+add a third parameter to run the "summary" and make plots and such.
