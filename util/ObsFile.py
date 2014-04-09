@@ -590,11 +590,11 @@ class ObsFile:
             integration time after accounting for time-masking.)
         parses packets from firstSec to firstSec+integrationTime.
         if integrationTime is -1, all time after firstSec is used.  
-        if timeSpacingCut is not None, photons sooner than timeSpacingCut seconds after the last photon are cut.
+        if timeSpacingCut is not None [**units=seconds, presumably?**], photons sooner than timeSpacingCut seconds after the last photon are cut.
             Typically we will set timeSpacingCut=1.e-3 (1 ms) to remove effects of photon pile-up
         if expTailTimescale is not None, photons are assumed to exhibit an exponential decay back to baseline with e-fold time
             expTailTimescale, this is used to subtract the exponential tail of one photon from the peakHeight of the next photon
-            This also attempts to counter effects of photon pile-up for short (<100 us) dead times.
+            This also attempts to counter effects of photon pile-up for short (<100 us) dead times. [**units?**]
         
         Now updated to take advantage of masking capabilities in parsePhotonPackets
         to allow for correct application of non-integer values in firstSec and
@@ -1014,11 +1014,18 @@ class ObsFile:
         return frame
     
     # a different way to get, with the functionality of getTimedPacketList
-    def getPackets(self, iRow, iCol, firstSec, integrationTime, fields=()):
+    def getPackets(self, iRow, iCol, firstSec, integrationTime, 
+                   fields=(),
+                   timeSpacingCut=None):
         """
         get and parse packets for pixel iRow,iCol starting at firstSec for integrationTime seconds.
 
-        fields is a list of strings to indicate what to parse in addition to timestamps:  allowed values are 'peakHeights' and 'baselines'
+        fields is a list of strings to indicate what to parse in
+        addition to timestamps: allowed values are 'peakHeights' and
+        'baselines'
+
+        timeSpacingCut (if not None) rejects photons sooner than
+        timeSpacingCut seconds after the last photon.
 
         return a dictionary containing:
           effectiveIntTime (n seconds)
@@ -1062,8 +1069,8 @@ class ObsFile:
                                   integrationTime=integrationTimeInt)
         # calculate how long a np array needs to be to hold everything
         nPackets = 0
-        for pixels in pixelData:
-            nPackets += len(pixels)
+        for packets in pixelData:
+            nPackets += len(packets)
 
         # create empty arrays
         timestamps = np.empty(nPackets, dtype=np.float)
@@ -1073,18 +1080,18 @@ class ObsFile:
         # fill in the arrays one second at a time
         ipt = 0
         t = firstSecInt
-        for pixels in pixelData:
-            iptNext = ipt+len(pixels)
+        for packets in pixelData:
+            iptNext = ipt+len(packets)
             timestamps[ipt:iptNext] = \
-                t + np.bitwise_and(pixels,self.timestampMask)*self.tickDuration
+                t + np.bitwise_and(packets,self.timestampMask)*self.tickDuration
             if parse['peakHeights']:
                 peakHeights[ipt:iptNext] = np.bitwise_and(
-                    np.right_shift(pixels, self.nBitsAfterParabolaPeak), 
+                    np.right_shift(packets, self.nBitsAfterParabolaPeak), 
                     self.pulseMask)
 
             if parse['baselines']:
                 baselines[ipt:iptNext] = np.bitwise_and(
-                    np.right_shift(pixels, self.nBitsAfterBaseline), 
+                    np.right_shift(packets, self.nBitsAfterBaseline), 
                     self.pulseMask)
 
             ipt = iptNext
@@ -1098,20 +1105,34 @@ class ObsFile:
             mask = ObsFile.makeMaskV2(timestamps, inter)
 
         elapsed = (time.clock() - start)
-        #print "In Obsfile:  elapsed due to makeMask=",elapsed
-        # compress out all the masked values
         tsMaskedArray = ma.array(timestamps,mask=mask)
         timestamps = ma.compressed(tsMaskedArray)
-        #timestamps = ma.compressed(ma.array(timestamps,mask))
+
+        if parse['peakHeights']: 
+            peakHeights = \
+                ma.compressed(ma.array(peakHeights,mask=mask))
+        if parse['baselines']: 
+            baselines = \
+                ma.compressed(ma.array(baselines,mask=mask))
+        
+        if timeSpacingCut != None and len(timestamps) > 0:
+            timeSpacing = np.diff(timestamps)
+            #include first photon and photons after who are at least
+            #timeSpacingCut after the previous photon
+            timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) 
+            timestamps = timestamps[timeSpacingMask]
+            if parse['peakHeights']:
+                peakHeights = peakHeights[timeSpacingMask]
+            if parse['baselines']:
+                baselines = baselines[timeSpacingMask]
+
         # build up the dictionary of values and return it
         retval =  {"effIntTime": effectiveIntTime,
                    "timestamps":timestamps}
         if parse['peakHeights']: 
-            retval['peakHeights'] = \
-                ma.compressed(ma.array(peakHeights,mask=mask))
+            retval['peakHeights'] = peakHeights
         if parse['baselines']: 
-            retval['baselines'] = \
-                ma.compressed(ma.array(baselines,mask=mask))
+            retval['baselines'] = baselines
         return retval
 
     @staticmethod
