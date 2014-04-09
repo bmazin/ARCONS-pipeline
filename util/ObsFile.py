@@ -1062,8 +1062,8 @@ class ObsFile:
                                   integrationTime=integrationTimeInt)
         # calculate how long a np array needs to be to hold everything
         nPackets = 0
-        for pixels in pixelData:
-            nPackets += len(pixels)
+        for packets in pixelData:
+            nPackets += len(packets)
 
         # create empty arrays
         timestamps = np.empty(nPackets, dtype=np.float)
@@ -1073,18 +1073,18 @@ class ObsFile:
         # fill in the arrays one second at a time
         ipt = 0
         t = firstSecInt
-        for pixels in pixelData:
-            iptNext = ipt+len(pixels)
+        for packets in pixelData:
+            iptNext = ipt+len(packets)
             timestamps[ipt:iptNext] = \
-                t + np.bitwise_and(pixels,self.timestampMask)*self.tickDuration
+                t + np.bitwise_and(packets,self.timestampMask)*self.tickDuration
             if parse['peakHeights']:
                 peakHeights[ipt:iptNext] = np.bitwise_and(
-                    np.right_shift(pixels, self.nBitsAfterParabolaPeak), 
+                    np.right_shift(packets, self.nBitsAfterParabolaPeak), 
                     self.pulseMask)
 
             if parse['baselines']:
                 baselines[ipt:iptNext] = np.bitwise_and(
-                    np.right_shift(pixels, self.nBitsAfterBaseline), 
+                    np.right_shift(packets, self.nBitsAfterBaseline), 
                     self.pulseMask)
 
             ipt = iptNext
