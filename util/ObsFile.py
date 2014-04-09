@@ -590,11 +590,11 @@ class ObsFile:
             integration time after accounting for time-masking.)
         parses packets from firstSec to firstSec+integrationTime.
         if integrationTime is -1, all time after firstSec is used.  
-        if timeSpacingCut is not None, photons sooner than timeSpacingCut seconds after the last photon are cut.
+        if timeSpacingCut is not None [**units=seconds, presumably?**], photons sooner than timeSpacingCut seconds after the last photon are cut.
             Typically we will set timeSpacingCut=1.e-3 (1 ms) to remove effects of photon pile-up
         if expTailTimescale is not None, photons are assumed to exhibit an exponential decay back to baseline with e-fold time
             expTailTimescale, this is used to subtract the exponential tail of one photon from the peakHeight of the next photon
-            This also attempts to counter effects of photon pile-up for short (<100 us) dead times.
+            This also attempts to counter effects of photon pile-up for short (<100 us) dead times. [**units?**]
         
         Now updated to take advantage of masking capabilities in parsePhotonPackets
         to allow for correct application of non-integer values in firstSec and
