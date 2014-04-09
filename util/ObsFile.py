@@ -1071,6 +1071,7 @@ class ObsFile:
         integrationTimeInt = lastSecInt-firstSecInt
         if (lastSec < lastSecInt):
             inter = inter | interval([lastSec, lastSecInt])
+
         #Calculate the total effective time for the integration after removing
         #any 'intervals':
         integrationInterval = interval([firstSec, lastSec])
