@@ -1014,11 +1014,18 @@ class ObsFile:
         return frame
     
     # a different way to get, with the functionality of getTimedPacketList
-    def getPackets(self, iRow, iCol, firstSec, integrationTime, fields=()):
+    def getPackets(self, iRow, iCol, firstSec, integrationTime, 
+                   fields=(),
+                   timeSpacingCut=None):
         """
         get and parse packets for pixel iRow,iCol starting at firstSec for integrationTime seconds.
 
-        fields is a list of strings to indicate what to parse in addition to timestamps:  allowed values are 'peakHeights' and 'baselines'
+        fields is a list of strings to indicate what to parse in
+        addition to timestamps: allowed values are 'peakHeights' and
+        'baselines'
+
+        timeSpacingCut (if not None) rejects photons sooner than
+        timeSpacingCut seconds after the last photon.
 
         return a dictionary containing:
           effectiveIntTime (n seconds)
@@ -1098,20 +1105,34 @@ class ObsFile:
             mask = ObsFile.makeMaskV2(timestamps, inter)
 
         elapsed = (time.clock() - start)
-        #print "In Obsfile:  elapsed due to makeMask=",elapsed
-        # compress out all the masked values
         tsMaskedArray = ma.array(timestamps,mask=mask)
         timestamps = ma.compressed(tsMaskedArray)
-        #timestamps = ma.compressed(ma.array(timestamps,mask))
+
+        if parse['peakHeights']: 
+            peakHeights = \
+                ma.compressed(ma.array(peakHeights,mask=mask))
+        if parse['baselines']: 
+            baselines = \
+                ma.compressed(ma.array(baselines,mask=mask))
+        
+        if timeSpacingCut != None and len(timestamps) > 0:
+            timeSpacing = np.diff(timestamps)
+            #include first photon and photons after who are at least
+            #timeSpacingCut after the previous photon
+            timeSpacingMask = np.concatenate([[True],timeSpacing >= timeSpacingCut]) 
+            timestamps = timestamps[timeSpacingMask]
+            if parse['peakHeights']:
+                peakHeights = peakHeights[timeSpacingMask]
+            if parse['baselines']:
+                baselines = baselines[timeSpacingMask]
+
         # build up the dictionary of values and return it
         retval =  {"effIntTime": effectiveIntTime,
                    "timestamps":timestamps}
         if parse['peakHeights']: 
-            retval['peakHeights'] = \
-                ma.compressed(ma.array(peakHeights,mask=mask))
+            retval['peakHeights'] = peakHeights
         if parse['baselines']: 
-            retval['baselines'] = \
-                ma.compressed(ma.array(baselines,mask=mask))
+            retval['baselines'] = baselines
         return retval
 
     @staticmethod
