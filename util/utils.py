@@ -14,6 +14,7 @@ import math
 from scipy.signal import convolve
 import scipy.ndimage
 import scipy.stats
+import astropy.stats
 import ds9
 
 #from interval import interval
@@ -42,7 +43,9 @@ rebin2D(a, ysize, xsize)
 replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True)
 stdDev_filterNaN(inputarray, size=5, *nkwarg, **kwarg)
 getGitStatus()
-findNearestFinite()
+findNearestFinite(im,i,j,n=10)
+nearestNstdDevFilter(inputArray,n=24)
+nearestNmedFilter(inputArray,n=24)
 """
 
 def aperture(startpx,startpy,radius=3):
@@ -780,15 +783,26 @@ def findNearestFinite(im,i,j,n=10):
         n finite values are, and False everywhere else.
     """
     
-    assert len(numpy.shape(im)) == 2
-    ii,jj = numpy.indices(numpy.shape(im),dtype=float)
+    imShape = numpy.shape(im)
+    assert len(imShape) == 2
+    ii,jj = numpy.indices(imShape,dtype=float)
     distsq = (i-ii)**2 + (j-jj)**2 #Calculate distance squared from i,j (no need to bother taking square root)
     good = numpy.isfinite(im)
     good[i,j] = False #Get rid of element i,j itself.
     ngood = numpy.sum(good)
     distsq[~good] = numpy.nan   #Get rid of non-finite valued elements
     #Find indices of the nearest finite values, and unravel the flattened results back into 2D arrays
-    nearest = (numpy.unravel_index((numpy.argsort(distsq,axis=None))[0:min(n,ngood)],numpy.shape(im))) #Should ignore NaN values automatically
+    nearest = (numpy.unravel_index(
+                                   (numpy.argsort(distsq,axis=None))[0:min(n,ngood)],numpy.shape(im)
+                                   )) #Should ignore NaN values automatically
+    
+    #Below version is maybe slightly quicker, but at this stage doesn't give quite the same results -- not worth the trouble
+    #to figure out right now.
+    #nearest = (numpy.unravel_index(
+    #                               (numpy.argpartition(distsq,min(n,ngood)-1,axis=None))[0:min(n,ngood)],
+    #                               imShape
+    #                              )) #Should ignore NaN values automatically
+    
     return nearest
 
 
@@ -814,6 +828,37 @@ def nearestNstdDevFilter(inputArray,n=24):
         for iCol in numpy.arange(nCol):
             outputArray[iRow,iCol] = numpy.std(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)])
     return outputArray
+
+
+def nearestNrobustSigmaFilter(inputArray,n=24):
+    '''
+    JvE 4/8/2014
+    Similar to nearestNstdDevFilter, but estimate the standard deviation using the 
+    median absolute deviation instead, scaled to match 1-sigma (for a normal
+    distribution - see http://en.wikipedia.org/wiki/Robust_measures_of_scale).
+    Should be more robust to outliers than regular standard deviation.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating std. dev. around each pixel.
+        
+    OUTPUTS:
+        A 2D array of standard deviations with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            vals = inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)]
+            #MAD seems to give best compromise between speed and reasonable results.
+            #Biweight midvariance is good, somewhat slower.            
+            #outputArray[iRow,iCol] = numpy.diff(numpy.percentile(vals,[15.87,84.13]))/2.
+            outputArray[iRow,iCol] = astropy.stats.median_absolute_deviation(vals)*1.4826
+            #outputArray[iRow,iCol] = astropy.stats.biweight_midvariance(vals)
+    return outputArray
+
 
 
 def nearestNmedFilter(inputArray,n=24):
