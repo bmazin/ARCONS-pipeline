@@ -76,6 +76,7 @@ import sys
 from math import *
 from interval import interval
 import tables
+import ds9
 import numpy as np
 import numpy.ma as ma
 import matplotlib.pylab as mpl
@@ -115,8 +116,8 @@ class headerDescription(tables.IsDescription):
  
 def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.0,
                   nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
-                  display=False, weighted=False, maxIter=5, dispMinPerc=0.0,
-                  dispMaxPerc=98.0):
+                  display=False, ds9display=False, weighted=False, maxIter=5,
+                  dispMinPerc=0.0, dispMaxPerc=98.0):
     '''
     To find the hot (and cold) pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
@@ -154,6 +155,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                     below the median in the surrounding box, then flag it as cold.
         display: Boolean. If true, then display the input image and mark those 
                     flagged as hot with a dot.
+        ds9display: Boolean, as for 'display', but displays the output in ds9 instead.
         maxIter: Scalar integer. Maximum number of iterations allowed.
         dispMinPerc: Lower percentile for image stretch if display=True
         dispMaxPerc: Upper percentile "     "     "      "       "
@@ -232,7 +234,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         footprint = np.ones((boxSize,boxSize))
         footprint[boxSize/2,boxSize/2] = 0      #Can move this definition outside the loop if needed, but prob. okay at the moment. 
         #stdFiltImage = utils.stdDev_filterNaN(im, boxSize, mode='mirror', footprint=footprint)
-        stdFiltImage = utils.nearestNstdDevFilter(im, n=boxSize**2-1)       #TRYING OUT USING A NEAREST-NEIGHBOUR STD. DEV FILTER....
+        #stdFiltImage = utils.nearestNstdDevFilter(im, n=boxSize**2-1)       #TRYING OUT USING A NEAREST-NEIGHBOUR STD. DEV FILTER....
+        stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
+        #******* Next step is to replace with a robust std. dev. estimate to eliminate outliers (using percentiles).
     
         #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
         #Also calculate the error in the same quantity.
@@ -269,37 +273,57 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     mask[coldMask] = pflags.badPixCal['cold']
     mask[deadMask] = pflags.badPixCal['dead']
         
-    if display:
+    if display or ds9display:
         imForDisplay = np.copy(imOriginal)
         cleanImForDisplay = np.copy(imForDisplay)
         imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
         cleanImForDisplay[mask!=pflags.badPixCal['good']] = 0   #An image with only good pixels
     
         #utils.plotArray(im, cbar=True)
-        fig = mpl.figure(figsize=(5,5))
-        mpl.matshow(imForDisplay,
-                    vmin=np.percentile(imForDisplay,dispMinPerc),
-                    vmax=np.percentile(imForDisplay,dispMaxPerc),
-                    fignum=False,
-                    origin='lower', cmap=mpl.cm.hot)     #, norm=LogNorm())  #, cmap=mpl.cm.hot)
-        mpl.colorbar()
+        vmin=np.percentile(imForDisplay,dispMinPerc)
+        vmax=np.percentile(imForDisplay,dispMaxPerc)
+        if display:
+            fig = mpl.figure(figsize=(5,5))
+            mpl.matshow(imForDisplay,
+                        vmin=vmin,vmax=vmax,
+                        fignum=False,
+                        origin='lower', cmap=mpl.cm.hot)     #, norm=LogNorm())  #, cmap=mpl.cm.hot)
+            mpl.colorbar()
+
+        if ds9display:
+            utils.ds9Array(imForDisplay, normMin=vmin, normMax=vmax, colormap='bb')
 
         x = np.arange(np.shape(imForDisplay)[1])
         y = np.arange(np.shape(imForDisplay)[0])
         xx, yy = np.meshgrid(x, y)
-        if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y', label='Hot')
-        if np.sum(coldMask) > 0: mpl.scatter(xx[coldMask], yy[coldMask], c='w', label='Cold')
-        if np.sum(deadMask) > 0: mpl.scatter(xx[deadMask], yy[deadMask], c='b', label='Dead')
-        mpl.legend()
-        #if obsFile is None:
-        #    plotTitle = ('im' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
-        mpl.title('Image + mask')
-        if obsFile is not None:
-            plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
-            mpl.suptitle(plotTitle)
+        
+        if display:
+            if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y', label='Hot')
+            if np.sum(coldMask) > 0: mpl.scatter(xx[coldMask], yy[coldMask], c='w', label='Cold')
+            if np.sum(deadMask) > 0: mpl.scatter(xx[deadMask], yy[deadMask], c='b', label='Dead')
+            mpl.legend()
+            #if obsFile is None:
+            #    plotTitle = ('im' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
+            mpl.title('Image + mask')
+            if obsFile is not None:
+                plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
+                mpl.suptitle(plotTitle)
 
-        #Show diagnostic images...
-        if 1==1:
+        if ds9display:
+            d=ds9.ds9()     #Get reference to the now (hopefully) open ds9 instance.
+            for i in range(np.sum(hotMask)):
+                d.set("regions command {circle "+str(xx[hotMask][i]+1)+" "+str(yy[hotMask][i]+1)
+                      +" 0.3 #color=red}")
+            for i in range(np.sum(coldMask)):
+                d.set("regions command {circle "+str(xx[coldMask][i]+1)+" "+str(yy[coldMask][i]+1)
+                      +" 0.3 #color=white}")
+            for i in range(np.sum(deadMask)):
+                d.set("regions command {circle "+str(xx[deadMask][i]+1)+" "+str(yy[deadMask][i]+1)
+                      +" 0.3 #color=blue}")
+
+
+        #Show diagnostic images (not in ds9).
+        if display and 1==1:
             #fig = mpl.figure(figsize=(5,5))
             #mpl.matshow(cleanImForDisplay, vmax=np.percentile(imForDisplay, 98.0),
             #            cmap=mpl.cm.hot, fignum=False, origin='lower')
@@ -362,8 +386,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 
 def findHotPixels(inputFileName=None, outputFileName=None,
                   paramFile=None, timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
-                  boxSize=5, nSigmaHot=3.0, nSigmaCold=3.0, display=False,
-                  weighted=False, maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0):
+                  boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
+                  ds9display=False, weighted=False, maxIter=5,
+                  dispMinPerc=0.0, dispMaxPerc=98.0):
     '''
     To find hot (and cold) pixels .
     This routine is the main code entry point.
@@ -402,6 +427,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         display: Boolean. If true, then display the input image and mark those 
                     flagged as hot/cold/dead with a coloured dot. NB - UPDATED
                     TO ONLY SHOW FIRST AND LAST TIME SLICES FOR NOW.
+        ds9display: Boolean, as for 'display', but displays the output in ds9 instead.
         weighted: boolean, set to True to use flat cal weights (see flatcal/ 
                     and util.obsFile.getPixelCountImage() )
         maxIter: Max. number of iterations to do on the bad pixel detection before
@@ -498,11 +524,14 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     for i, eachTime in enumerate(stepStarts):
         print str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
         displayThisOne = display and (i==0 or i==len(stepStarts)-1)
+        ds9ThisOne = ds9display and (i==0 or i==len(stepStarts)-1)
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
-                                     nSigmaCold=nSigmaCold, display=displayThisOne, weighted=weighted,
+                                     nSigmaCold=nSigmaCold, display=displayThisOne, ds9display=ds9ThisOne, 
+                                     weighted=weighted,
                                      maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc)['mask']
-                                     #Note checkInterval call should automatically clip at end of obsFile, so don't need to worry about endTime.
+                                     #Note checkInterval call should automatically clip at end of obsFile,
+                                     #so don't need to worry about endTime.
     
     timeMaskData = []  
 
