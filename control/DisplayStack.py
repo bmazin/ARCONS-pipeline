@@ -31,9 +31,18 @@ class DisplayStack(QMainWindow):
 
         # Initialize Variables
         self.initializeVariables()
-     
-        # Initialize run and target, load param file
-        self.chooseRun()
+
+        # Click item in runList to select a run. Run number corresponds to array index.  Load up corresponding target list.
+        self.ui.runList.itemClicked.connect(self.selectRun)
+
+        # Click item in targetList to select a target.
+        self.ui.targetList.itemClicked.connect(self.selectTarget)
+
+        # Click button in 
+        self.ui.targetButton.clicked.connect(self.loadTarget)
+
+
+        self.ui.sunsetList.itemClicked.connect(self.createObsList)
 
         '''
         # Browse wavecal button
@@ -59,15 +68,21 @@ class DisplayStack(QMainWindow):
         # Load image stack button
         #self.ui.loadStackButton.clicked.connect(self.chooseStack)
 
-    # 1) Initialize Variables
+    # Initialize Variables
     def initializeVariables(self):
         # Define path names
         self.displayStackPath = '/Scratch/DisplayStack/'
         self.defaultWavelengthPath = '/Scratch/waveCalSolnFiles/'
         self.defaultFlatPath = '/Scratch/flatCalSolnFiles/'
+       
+        # Load and display list of run names from /Scratch/DisplayStack/runList.dict
+        self.loadRunData()
+        
+        # Load list of target names from /Scratch/DisplayStack/runName/runName.dict, for all runs
+        self.loadTargetData()
 
+        '''
         # Arrays with run names and buttons
-        self.runNames = ['LICK2012','PAL2012','PAL2013']
         self.runButtons = [self.ui.lick2012Button, self.ui.pal2012Button, self.ui.pal2013Button]
 
         # Arrays with target names and buttons
@@ -85,12 +100,69 @@ class DisplayStack(QMainWindow):
             self.runButtons[iRun].clicked.connect(self.chooseRun)
             for iTarget in range(len(self.targetButtons[iRun])):
                 self.targetButtons[iRun][iTarget].clicked.connect(self.chooseTarget)
+        '''
 
-        self.ui.sunsetList.itemClicked.connect(self.createObsList)
+    # Function to load list of run names. Runs on initialization.
+    def loadRunData(self):
+        # Load run data from /Scratch/DisplayStack/runList.dict
+        self.runData = readDict()
+        self.runData.read_from_file(self.displayStackPath + '/runList.dict')
+        self.runNames = np.array(self.runData['runs'])
+        # Populate runList table with run names.
+        for iRun in range(len(self.runNames)):
+            self.ui.runList.addItem(self.runNames[iRun])
 
-    def testFunction(self):
-        print 'test'
+    # Function to load a table of target names.
+    def loadTargetData(self):
+        self.targetNames = []
+        # Cycle through runs and extract target name information from various dictionaries.
+        for iRun in range(len(self.runNames)):
+            self.targetData = readDict()
+            self.targetData.read_from_file(self.displayStackPath + self.runNames[iRun] + '/' + self.runNames[iRun] + '.dict')
+            self.iTargets = np.array(self.targetData['targets'])
+            self.targetNames.append(self.iTargets)
 
+    # Function to select a run and populate the target list for that particular run.
+    def selectRun(self):
+        # Clear list of target information for previously selected run.
+        self.ui.targetList.clear()
+        # Define a run number by the index of the selected run.
+        self.runNumber = self.ui.runList.row(self.ui.runList.currentItem())
+        # Populate targetList table with target names for selected run.
+        for iTarget in range(len(self.targetNames[self.runNumber])):
+            self.ui.targetList.addItem(self.targetNames[self.runNumber][iTarget])
+
+    def selectTarget(self):
+        self.targetNumber = self.ui.targetList.row(self.ui.targetList.currentItem())
+
+    def loadTarget(self):
+        self.run = self.runNames[self.runNumber]
+        self.target = self.targetNames[self.runNumber][self.targetNumber]
+        try:
+            self.paramData = readDict()
+            self.paramData.read_from_file(self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict')
+            self.obsTimes = np.array(self.paramData['obsTimes'])
+            self.utcDates = self.paramData['utcDates']
+            self.sunsetDates = self.paramData['sunsetDates']
+            self.calTimestamps = self.paramData['calTimestamps']
+            self.flatCalDates = self.paramData['flatCalDates']  
+
+            print 'Loading parameter file at ' + self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
+            self.createSunsetList()
+            #self.createObsList()
+            self.createWavelengthList()
+            self.createFlatList()
+            self.paramFileExists = True
+        except IOError:           
+            print 'No existing parameter file at ' + self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
+            self.ui.sunsetList.clear()
+            self.ui.obsList.clear()
+            self.ui.inputList.clear()
+            self.ui.wavelengthList.clear()
+            self.ui.flatList.clear()
+            self.paramFileExists = False
+        
+    '''
     # 2) Choose Run
     def chooseRun(self):
         for iRun in range(len(self.runButtons)):
@@ -105,6 +177,7 @@ class DisplayStack(QMainWindow):
         self.targetButtons[self.runNumber][self.targetNumber].setChecked(True)
         self.target = self.targetNames[self.runNumber][self.targetNumber]
         self.loadParamFile()
+    '''
            
     # 3) Choose Target
     def chooseTarget(self):
@@ -113,7 +186,7 @@ class DisplayStack(QMainWindow):
                 self.targetNumber = iTarget
         self.target = self.targetNames[self.runNumber][self.targetNumber]
         self.loadParamFile()
-
+    '''
     # 4) Load Param File
     def loadParamFile(self):
         try:
@@ -139,6 +212,7 @@ class DisplayStack(QMainWindow):
             self.ui.wavelengthList.clear()
             self.ui.flatList.clear()
             self.paramFileExists = False
+    '''
 
     # 5) Choose Obs File
     # Create list of available sunset dates
