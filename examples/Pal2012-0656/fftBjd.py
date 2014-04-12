@@ -1,8 +1,8 @@
 #!/bin/python
 '''
-Author: Matt Strader        Date: March 6,2013
+Author: Matt Strader        Date: March 20,2014
 
-This program opens a series of observations of the crab pulsar.  It calculates the period, and calcluates the phase for every photon in the series of observations, It then plots a light curve, and a histogram of counts per period
+This program takes a series of pulsar photon lists and takes the fourier transform of the photon timestamps in an attempt to see the pulsar rotation frequency
 '''
 from flatcal.flatCal import FlatCal
 from util.ObsFile import ObsFile

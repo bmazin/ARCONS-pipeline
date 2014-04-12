@@ -2,7 +2,7 @@
 '''
 Author: Matt Strader        Date: March 6,2013
 
-This program opens a series of observations of the crab pulsar.  It calculates the period, and calcluates the phase for every photon in the series of observations, It then plots a light curve, and a histogram of counts per period
+This program opens pulsar photon lists that have been pushed through tempo2, so that the pulsar period used can be found.
 '''
 from flatcal.flatCal import FlatCal
 from util.ObsFile import ObsFile

@@ -2,7 +2,8 @@
 '''
 Author: Matt Strader        Date: March 6,2013
 
-This program opens a series of observations of a pulsar and makes them into photon lists 
+This program opens a series of observations of a pulsar and makes them into photon lists.
+Only photons in a circular aperture around the expected position of the pulsar are put into the photon lists
 '''
 from util.ObsFile import ObsFile
 from util.FileName import FileName
