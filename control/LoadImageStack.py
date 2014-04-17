@@ -40,10 +40,13 @@ class LoadImageStack(QDialog):
     def displayPlot(self):
         self.ui.frameNumberLine.setText(str(self.currentFrame))
         self.ui.jdLabel.setText('JD = ' + str(self.jdData[self.currentFrame]))
+        self.selectedFrame = self.stackData[:,:,self.currentFrame]
+        self.nanMask = np.isnan(self.selectedFrame)
+        self.selectedFrame[self.nanMask] = 0.0
         self.ui.plotDock.canvas.ax.clear()
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        self.ui.plotDock.canvas.ax.matshow(self.stackData[:,:,self.currentFrame], cmap='gray', origin='lower')
+        self.ui.plotDock.canvas.ax.matshow(self.selectedFrame, cmap='gray', origin='lower')
         self.ui.plotDock.canvas.ax.xaxis.tick_bottom()
         self.ui.plotDock.canvas.draw()
         
