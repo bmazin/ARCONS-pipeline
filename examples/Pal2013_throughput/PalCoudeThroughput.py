@@ -58,15 +58,24 @@ def loadFilter(fname):
 if len(sys.argv)<3:
     print "Provide measured Amps from optometer as argument, and desired filter"
     print "Example: >python PalCoudeThroughput.py 1E-4 v"
-    print "Available filters: B, V, R
+    print "Available filters: B, V, R"
     sys.exit()
 AmpsMeas = float(sys.argv[1])
 filt = str(sys.argv[2])
 
+if len(sys.argv)>3:
+    objectName = sys.argv[3]
+else:
+    print "No standard star selected, using Vega by default"
+    objectName = "vega"
+
 #load standard spectrum in counts/s/cm^2/A and convert to watts/cm^2/A
-objectName = "vega"
 std = MKIDStd.MKIDStd()
-a = std.load(objectName)
+try:
+    a = std.load(objectName)
+except:
+    print "Invalid standard given. Exiting."
+    sys.exit()
 stdWvls = np.array(a[:,0],dtype=float) # wavelengths in angstroms
 stdFlux = np.array(a[:,1],dtype=float) # flux in counts/s/cm^2/Angs
 stdFlux *= (h*c*1E10/stdWvls) #flux in J/s/cm^2/Angs or W/cm^2/Angs
@@ -92,6 +101,11 @@ Diam = 508 #cm
 Ds = 0.33 * Diam
 radp = Diam/2.0
 rads = Ds/2.0
+
+#for 11" telescope on Broida roof
+#radp = 13.97 #11" diam
+#rads = 5.08 #guess 2"
+
 area = pi*(radp**2 - rads**2)
 print "Primary diameter = ", Diam, " cm"
 print "Secondary diameter = ", Ds, " cm"
@@ -100,11 +114,11 @@ stdFlux*=area #flux in W/Angs
 
 #multiply standard spectrum by V-filter transmission
 if filt == ("b" or "B"):
-    fname = 'AstrodonB.txt'
+    fname = os.environ['ARCONS_PIPELINE_PATH']+'/util/data/AstrodonB.txt'
 if filt == ("v" or "V"):
-    fname = 'AstrodonV.txt'
+    fname = os.environ['ARCONS_PIPELINE_PATH']+'/util/data/AstrodonV.txt'
 if filt == ("r" or "R"):
-    fname = 'AstrodonR.txt'
+    fname = os.environ['ARCONS_PIPELINE_PATH']+'/util/data/AstrodonR.txt'
 
 filtWvls, filtTrans, filtWidth, filtCorrection = loadFilter(fname) #load filter file
 filtTransInterp = interpolate.griddata(filtWvls,filtTrans,stdWvls,"linear",fill_value=0)#interpolate filter curve to spectrum wvl spacing
@@ -115,13 +129,13 @@ checkFlux = filteredFlux/area #W/Angs/cm^2
 checkFlux *= 1.0E7 #ergs/s/Angs/cm^2
 totalCheckFlux = integrate.simps(checkFlux,x=stdWvls)/filtWidth #ergs/s/cm^2/Angs Vband flux estimated from Vega spectrum
 mag = -2.5*np.log10(totalCheckFlux/filtCorrection)-21.1
-print "magnitude of V-filtered spectrum = ", mag
+print "magnitude of %s-filtered spectrum = "%filt, mag
 
 
 #--------test plots-------------#
 ax2 = plt.subplot(1,1,1)
 ax2.set_xlabel("Wavelength in $\AA$")
-ax2.set_ylabel("Filter Transmission")
+ax2.set_ylabel("%s Filter Transmission"%filt)
 plt.plot(filtWvls,filtTrans)
 plt.plot(stdWvls,filtTransInterp)
 ax2.set_xlim(3000,13000)
@@ -168,7 +182,7 @@ plt.show()
 
 #integrate final A/Angs curve to get total Amps expected when viewing Vega through our V filter
 totalAmps = integrate.simps(ampsCurve,x=stdWvls)
-print "Total Amps expected from Vega V-band = ", totalAmps
+print "Total Amps expected from Vega %s-band = "%filt, totalAmps
 print "Measured Amps from optometer given as ", AmpsMeas
 
 #print measured optometer Amps / expected Amps for Vega

@@ -107,6 +107,7 @@ class FileName:
     def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
             self.date + os.sep + \
             "calsol_" + self.tstamp + '.h5'
 
@@ -133,11 +134,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.tstamp + '.h5'
 
@@ -146,11 +149,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.h5'
 

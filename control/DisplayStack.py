@@ -15,7 +15,7 @@ import hotpix.hotPixels as hp
 import os
 from time import time
 import sys
-import LoadImageStack
+#import LoadImageStack
 
 from PyQt4.QtGui import *
 from PyQt4.QtGui import *
@@ -73,8 +73,8 @@ class DisplayStack(QMainWindow):
         # Arrays with target names and buttons
         self.lick2012TargetNames = ['LICK2012_Object']
         self.lick2012TargetButtons = [self.ui.lick2012ObjectButton]
-        self.pal2012TargetNames = ['SDSS_J0651', 'SDSS_J0926']
-        self.pal2012TargetButtons = [self.ui.sdss0651Button,self.ui.sdss0926Button]
+        self.pal2012TargetNames = ['SDSS_J0651',  'Corot18b', 'SDSS_J0926']
+        self.pal2012TargetButtons = [self.ui.sdss0651Button,self.ui.corot18bButton,self.ui.sdss0926Button]
         self.pal2013TargetNames = ['PAL2013_Object']
         self.pal2013TargetButtons = [self.ui.pal2013ObjectButton]
         self.targetNames = [self.lick2012TargetNames, self.pal2012TargetNames, self.pal2013TargetNames]
@@ -362,12 +362,13 @@ class DisplayStack(QMainWindow):
                     for iSec in np.arange(0,self.exptime,self.integrationTime):
                         #add seconds offset to julian date, move jd to center of bin
                         self.jd = self.startJD + iSec/(24.*3600.) + self.integrationTime/2./(24.*3600.)
-                        'Creating frame for time ' + str(self.jd)
+                        print 'Creating frame for time ' + str(self.jd)
                         self.frameData = self.ob.getPixelCountImage(firstSec=iSec,integrationTime=self.integrationTime,weighted=self.weighted,getRawCount=self.useRawCounts,scaleByEffInt=self.scaleByEffInt)
                         self.frame = self.frameData['image']         
                         if self.useDeadPixelMasking:
                             self.frame[self.deadMask == 0] = np.nan
                         self.frames.append(self.frame)
+                        self.times.append(self.jd)
 
                     self.cube = np.dstack(self.frames)
                     self.times = np.array(self.times)

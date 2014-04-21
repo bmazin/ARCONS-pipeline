@@ -5,15 +5,15 @@ from matplotlib import cm
 from sdssgaussfitter import twodgaussian
 
 
-rawfile = '/home/srmeeker/scratch/standards/Landolt9542_raw_0.npz'
+#rawfile = '/home/srmeeker/scratch/standards/Landolt9542_raw_0.npz'
 
 #rawfile = '/home/srmeeker/scratch/standards/pg0220a_raw_0.npz'
-#rawfile = '/home/srmeeker/scratch/standards/G158-100_raw_0.npz'
+rawfile = '/home/srmeeker/scratch/standards/G158-100_raw_0.npz'
 #rawfile = '/home/srmeeker/ARCONS-pipeline/examples/Pal2012_landoltPhot/Landolt9542_V_all_0.npz'
 
-fitfile = '/home/srmeeker/scratch/standards/Landolt9542_fit_0.npz'
+#fitfile = '/home/srmeeker/scratch/standards/Landolt9542_fit_0.npz'
 #fitfile = '/home/srmeeker/scratch/standards/pg0220a_fit_0.npz'
-#fitfile = '/home/srmeeker/scratch/standards/G158-100_fit_0.npz'
+fitfile = '/home/srmeeker/scratch/standards/G158-100_fit_0.npz'
 #fitfile = '/home/srmeeker/ARCONS-pipeline/examples/Pal2012_landoltPhot/Landolt9542_V_fit.npz'
 
 
