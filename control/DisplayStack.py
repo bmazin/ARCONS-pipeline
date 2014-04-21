@@ -364,7 +364,6 @@ class DisplayStack(QMainWindow):
                         if self.useDeadPixelMasking:
                             self.frame[self.deadMask == 0] = np.nan
                         self.frames.append(self.frame)
-                        self.times.append(self.jd)
 
                     self.cube = np.dstack(self.frames)
                     self.times = np.array(self.times)
