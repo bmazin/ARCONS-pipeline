@@ -22,6 +22,18 @@ class RADecImage(object):
     '''
     Class to hold derotated, integrated and possibly stacked images, in the sky coordinate
     frame.
+    
+    NOTE - to be able to import boxer for this routine,  
+    boxer.so (exact name may vary by platform) needs to be created
+    from fortran boxer.f (in the same directory) using command:
+
+    f2py -c -m boxer boxer.f
+
+    This command should work on any platform, I think, though the
+    output file may have a different file extension. In any case,
+    should all then be importable in python using 'import boxer', 
+    and this module should all then run fine (see also readme.txt
+    in this directory).
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,

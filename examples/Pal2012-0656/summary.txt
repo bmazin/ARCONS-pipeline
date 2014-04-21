@@ -1,0 +1,1000 @@
+20121207
+
+Object: PSR 0656+14
+
+Seeing is less than 1” so we are going to try a pulsar.
+guide star is on array at UTC 10:22:00
+Guiding on target started at UTC 10:25:00
+
+Moved center of array 5 arcseconds to the right and 5 arcseconds down on the guider.
+Laser cal at UTC 11:25
+
+Moved guide star to good part of array, then move back to pulsar at UTC 11:27
+
+Center should actually be on r0/p30. Pixel is given wrong name in description.
+
+UTC 12:22, still integrating. Seeing about 0.8”
+
+UTC 12:30:00 Moving 10.5E, 8.5N to move object out momentarily
+Put object back to the top right of array, started guiding again.
+
+Moved at UTC 12:39 to fix guiding, brought new star into array on bottom right corner.
+Moving back to a finder star to make sure we get back on target.
+
+UTC 12:44:00, back to the target and taking observations.
+
+UTC 13:00, needed to manually fix guide star location.
+Guide star seems to be moving around a lot.
+Moved to a guide star on the right
+Stopping observation, guider made some big moves, UTC 13:25
+
+-----------------------------
+20121208
+
+Object: PSR 0656
+
+Moving to Matt’s Pulsar at UTC 06:10
+REROTATING AND RETHRESHOLDING
+
+Guide star on the array at UTC 6:27
+Object on array at UTC 6:32
+
+Popping out to guide star and repositioning object at UTC 7:19
+Guide star on array at UTC 7:20
+
+Back to target at UTC 7:22
+Guiding back on
+
+Setting timer to pop out and relocate object every 30 minutes.
+
+Reverse move 10.5E and 8.5N, at UTC 8:38
+
+Popping out again at UTC 9:16
+
+Clouds have rolled in, so we can’t find our guide star at the moment.  Waiting for them to roll through before trying again.  Stopped taking data for now....
+
+UTC 9:30 Clouds have moved out.  Getting guide star back on array, then offsetting to target.
+Different than usual, 20.6 W and 18.0 N. Should now be on our pulsar.  Moving to other guider by offsetting 10.5 E, 8.5 N. Still cloudy...
+
+UTC 9:38, moved back to target location.  Clouds coming and going. Taking data and guiding again.
+
+UTC 9:56, clouds have mostly cleared. Popping out again, now that sky has cleared a bit.
+UTC 10:30, still on it.  Seeing is good and clouds have left.
+UTC 10:38, moving to finder star and adjusting slightly.  
+UTC 10:40, back to target. Should be on pixel r0/p82
+
+UTC 11:17 Laser Cal
+UTC 11:21:15, taking data again after popping off and back.
+UTC 11:50:00, finishing on this target.
+
+UTC 11:52 Laser Cal
+Moving at UTC 11:53 to new target
+
+--------------------------
+
+Filename:  cal_20121208-101613.h5
+Target:  corot 18b
+Local time:  Sat, 08 Dec 2012 02:16:13
+UTC:  Sat, 08 Dec 2012 10:16:13
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121208-112506.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:25:06
+UTC:  Sat, 08 Dec 2012 11:25:06
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121208-132558.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 05:25:58
+UTC:  Sat, 08 Dec 2012 13:25:58
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121208-133818.h5
+Target:  twilight
+Local time:  Sat, 08 Dec 2012 05:38:18
+UTC:  Sat, 08 Dec 2012 13:38:18
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+----------------------------
+
+Filename:  cal_20121209-060704.h5
+Target:  arp147 raster
+Local time:  Sat, 08 Dec 2012 22:07:04
+UTC:  Sun, 09 Dec 2012 06:07:04
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121209-062404.h5
+Target:  PSR0656+finder
+Local time:  Sat, 08 Dec 2012 22:24:04
+UTC:  Sun, 09 Dec 2012 06:24:04
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121209-111730.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:17:30
+UTC:  Sun, 09 Dec 2012 11:17:30
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121209-115205.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:52:05
+UTC:  Sun, 09 Dec 2012 11:52:05
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+Filename:  cal_20121209-131132.h5
+Target:  SDSS J0926
+Local time:  Sun, 09 Dec 2012 05:11:32
+UTC:  Sun, 09 Dec 2012 13:11:32
+Description:  
+Filter:  Open
+Exposure Time:  60
+
+----------------------------
+Filename:  obs_20121208-102112.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:21:12
+UTC:  Sat, 08 Dec 2012 10:21:12
+Description:  Getting on target.  Offset star on /r4/p134.
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121208-102325.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:23:25
+UTC:  Sat, 08 Dec 2012 10:23:25
+Description:  Getting on target.  Offset star started  on /r4/p134. Offset 10.5 W and 8.5 S to target.  Target should be on /r4/p134, within a half arcsec. Guiding on.
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121208-102539.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:25:39
+UTC:  Sat, 08 Dec 2012 10:25:39
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-103042.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:30:42
+UTC:  Sat, 08 Dec 2012 10:30:42
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-103545.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:35:45
+UTC:  Sat, 08 Dec 2012 10:35:45
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-104047.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:40:47
+UTC:  Sat, 08 Dec 2012 10:40:47
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-104550.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:45:50
+UTC:  Sat, 08 Dec 2012 10:45:50
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-105052.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:50:52
+UTC:  Sat, 08 Dec 2012 10:50:52
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-105555.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 02:55:55
+UTC:  Sat, 08 Dec 2012 10:55:55
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-110058.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:00:58
+UTC:  Sat, 08 Dec 2012 11:00:58
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-110601.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:06:01
+UTC:  Sat, 08 Dec 2012 11:06:01
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-111104.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:11:04
+UTC:  Sat, 08 Dec 2012 11:11:04
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-111607.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:16:07
+UTC:  Sat, 08 Dec 2012 11:16:07
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-112152.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:21:52
+UTC:  Sat, 08 Dec 2012 11:21:52
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121208-112357.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:23:57
+UTC:  Sat, 08 Dec 2012 11:23:57
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121208-112633.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:26:33
+UTC:  Sat, 08 Dec 2012 11:26:33
+Description:  Place on /r0/p40
+Filter:  Open
+Exposure Time:  30
+
+Filename:  obs_20121208-112731.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:27:31
+UTC:  Sat, 08 Dec 2012 11:27:31
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-113234.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:32:34
+UTC:  Sat, 08 Dec 2012 11:32:34
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-113737.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:37:37
+UTC:  Sat, 08 Dec 2012 11:37:37
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-114240.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:42:40
+UTC:  Sat, 08 Dec 2012 11:42:40
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-114743.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:47:43
+UTC:  Sat, 08 Dec 2012 11:47:43
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-115246.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:52:46
+UTC:  Sat, 08 Dec 2012 11:52:46
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-115749.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 03:57:49
+UTC:  Sat, 08 Dec 2012 11:57:49
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-120252.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:02:52
+UTC:  Sat, 08 Dec 2012 12:02:52
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-120755.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:07:55
+UTC:  Sat, 08 Dec 2012 12:07:55
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-121258.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:12:58
+UTC:  Sat, 08 Dec 2012 12:12:58
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-121801.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:18:01
+UTC:  Sat, 08 Dec 2012 12:18:01
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-122304.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:23:04
+UTC:  Sat, 08 Dec 2012 12:23:04
+Description:  Place on /r0/p30.
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-122838.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:28:38
+UTC:  Sat, 08 Dec 2012 12:28:38
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121208-123104.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:31:04
+UTC:  Sat, 08 Dec 2012 12:31:04
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-123606.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:36:06
+UTC:  Sat, 08 Dec 2012 12:36:06
+Description:  Centered on /r0/p149
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-124120.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:41:20
+UTC:  Sat, 08 Dec 2012 12:41:20
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121208-124406.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:44:06
+UTC:  Sat, 08 Dec 2012 12:44:06
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-124909.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:49:09
+UTC:  Sat, 08 Dec 2012 12:49:09
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-125412.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:54:12
+UTC:  Sat, 08 Dec 2012 12:54:12
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-125915.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 04:59:15
+UTC:  Sat, 08 Dec 2012 12:59:15
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-130418.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 05:04:18
+UTC:  Sat, 08 Dec 2012 13:04:18
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-130921.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 05:09:21
+UTC:  Sat, 08 Dec 2012 13:09:21
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-131424.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 05:14:24
+UTC:  Sat, 08 Dec 2012 13:14:24
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121208-131927.h5
+Target:  PSR 0656
+Local time:  Sat, 08 Dec 2012 05:19:27
+UTC:  Sat, 08 Dec 2012 13:19:27
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+===================================================================================================
+
+Filename:  obs_20121209-062313.h5
+Target:  dark
+Local time:  Sat, 08 Dec 2012 22:23:13
+UTC:  Sun, 09 Dec 2012 06:23:13
+Description:  
+Filter:  Closed
+Exposure Time:  30
+
+Filename:  obs_20121209-062533.h5
+Target:  PSR0656+finder
+Local time:  Sat, 08 Dec 2012 22:25:33
+UTC:  Sun, 09 Dec 2012 06:25:33
+Description:  finder on /r0/p98 at 115 s.  Arrive at object at 230 s.
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-063038.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 22:30:38
+UTC:  Sun, 09 Dec 2012 06:30:38
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-063540.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 22:35:40
+UTC:  Sun, 09 Dec 2012 06:35:40
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-064042.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 22:40:42
+UTC:  Sun, 09 Dec 2012 06:40:42
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-064544.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 22:45:44
+UTC:  Sun, 09 Dec 2012 06:45:44
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-065046.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 22:50:46
+UTC:  Sun, 09 Dec 2012 06:50:46
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-065549.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 22:55:49
+UTC:  Sun, 09 Dec 2012 06:55:49
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-070051.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:00:51
+UTC:  Sun, 09 Dec 2012 07:00:51
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-070553.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:05:53
+UTC:  Sun, 09 Dec 2012 07:05:53
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-071055.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:10:55
+UTC:  Sun, 09 Dec 2012 07:10:55
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-071557.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:15:57
+UTC:  Sun, 09 Dec 2012 07:15:57
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-072121.h5
+Target:  PSR0656+finder
+Local time:  Sat, 08 Dec 2012 23:21:21
+UTC:  Sun, 09 Dec 2012 07:21:21
+Description:  Check guide star, /r0/p68/
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-072329.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:23:29
+UTC:  Sun, 09 Dec 2012 07:23:29
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-072832.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:28:32
+UTC:  Sun, 09 Dec 2012 07:28:32
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-073334.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:33:34
+UTC:  Sun, 09 Dec 2012 07:33:34
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-073837.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:38:37
+UTC:  Sun, 09 Dec 2012 07:38:37
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-074340.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:43:40
+UTC:  Sun, 09 Dec 2012 07:43:40
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-074843.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:48:43
+UTC:  Sun, 09 Dec 2012 07:48:43
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-075445.h5
+Target:  PSR0656+finder
+Local time:  Sat, 08 Dec 2012 23:54:45
+UTC:  Sun, 09 Dec 2012 07:54:45
+Description:  Check guide star. dropped to /r4/p158/
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-075656.h5
+Target:  PSR0656
+Local time:  Sat, 08 Dec 2012 23:56:56
+UTC:  Sun, 09 Dec 2012 07:56:56
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-080800.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:08:00
+UTC:  Sun, 09 Dec 2012 08:08:00
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-081303.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:13:03
+UTC:  Sun, 09 Dec 2012 08:13:03
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-081805.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:18:05
+UTC:  Sun, 09 Dec 2012 08:18:05
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-082307.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:23:07
+UTC:  Sun, 09 Dec 2012 08:23:07
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-082809.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:28:09
+UTC:  Sun, 09 Dec 2012 08:28:09
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-083748.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:37:48
+UTC:  Sun, 09 Dec 2012 08:37:48
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-084046.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:40:46
+UTC:  Sun, 09 Dec 2012 08:40:46
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-084548.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:45:48
+UTC:  Sun, 09 Dec 2012 08:45:48
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-085050.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:50:50
+UTC:  Sun, 09 Dec 2012 08:50:50
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-085552.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 00:55:52
+UTC:  Sun, 09 Dec 2012 08:55:52
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-090054.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 01:00:54
+UTC:  Sun, 09 Dec 2012 09:00:54
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-090556.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 01:05:56
+UTC:  Sun, 09 Dec 2012 09:05:56
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-091058.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 01:10:58
+UTC:  Sun, 09 Dec 2012 09:10:58
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-091628.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 01:16:28
+UTC:  Sun, 09 Dec 2012 09:16:28
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-091835.h5
+Target:  PSR0656+finder
+Local time:  Sun, 09 Dec 2012 01:18:35
+UTC:  Sun, 09 Dec 2012 09:18:35
+Description:  
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-092335.h5
+Target:  PSR0656+finder
+Local time:  Sun, 09 Dec 2012 01:23:35
+UTC:  Sun, 09 Dec 2012 09:23:35
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-092837.h5
+Target:  PSR0656+finder
+Local time:  Sun, 09 Dec 2012 01:28:37
+UTC:  Sun, 09 Dec 2012 09:28:37
+Description:  cloudy, looking at bright finder at /r4/p12/.  Object is on at 275 s.  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-093346.h5
+Target:  PSR0656+finder
+Local time:  Sun, 09 Dec 2012 01:33:46
+UTC:  Sun, 09 Dec 2012 09:33:46
+Description:  still cloudy. guiding on pulsar position any way. guiding problems at 200 s.  Guiding again at 250 s.
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-093854.h5
+Target:  PSR0656 cloudy
+Local time:  Sun, 09 Dec 2012 01:38:54
+UTC:  Sun, 09 Dec 2012 09:38:54
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-094356.h5
+Target:  PSR0656 cloudy
+Local time:  Sun, 09 Dec 2012 01:43:56
+UTC:  Sun, 09 Dec 2012 09:43:56
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-094858.h5
+Target:  PSR0656 cloudy
+Local time:  Sun, 09 Dec 2012 01:48:58
+UTC:  Sun, 09 Dec 2012 09:48:58
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-095400.h5
+Target:  PSR0656 cloudy
+Local time:  Sun, 09 Dec 2012 01:54:00
+UTC:  Sun, 09 Dec 2012 09:54:00
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-095947.h5
+Target:  PSR0656 check
+Local time:  Sun, 09 Dec 2012 01:59:47
+UTC:  Sun, 09 Dec 2012 09:59:47
+Description:  Popped out and found it, returned.
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-100204.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:02:04
+UTC:  Sun, 09 Dec 2012 10:02:04
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-100706.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:07:06
+UTC:  Sun, 09 Dec 2012 10:07:06
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-101208.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:12:08
+UTC:  Sun, 09 Dec 2012 10:12:08
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-101710.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:17:10
+UTC:  Sun, 09 Dec 2012 10:17:10
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-102213.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:22:13
+UTC:  Sun, 09 Dec 2012 10:22:13
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-102715.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:27:15
+UTC:  Sun, 09 Dec 2012 10:27:15
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-103218.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:32:18
+UTC:  Sun, 09 Dec 2012 10:32:18
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-103749.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:37:49
+UTC:  Sun, 09 Dec 2012 10:37:49
+Description:  Moved finder star to r0/p82
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-104023.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:40:23
+UTC:  Sun, 09 Dec 2012 10:40:23
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-104526.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:45:26
+UTC:  Sun, 09 Dec 2012 10:45:26
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-105029.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:50:29
+UTC:  Sun, 09 Dec 2012 10:50:29
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-105531.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 02:55:31
+UTC:  Sun, 09 Dec 2012 10:55:31
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-110034.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:00:34
+UTC:  Sun, 09 Dec 2012 11:00:34
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-110537.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:05:37
+UTC:  Sun, 09 Dec 2012 11:05:37
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-111040.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:10:40
+UTC:  Sun, 09 Dec 2012 11:10:40
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-111849.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:18:49
+UTC:  Sun, 09 Dec 2012 11:18:49
+Description:  Centered finder on r0/p82, then offset back to object at 55s.
+Filter:  Open
+Exposure Time:  120
+
+Filename:  obs_20121209-112102.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:21:02
+UTC:  Sun, 09 Dec 2012 11:21:02
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-112605.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:26:05
+UTC:  Sun, 09 Dec 2012 11:26:05
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-113108.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:31:08
+UTC:  Sun, 09 Dec 2012 11:31:08
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-113610.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:36:10
+UTC:  Sun, 09 Dec 2012 11:36:10
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-114113.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:41:13
+UTC:  Sun, 09 Dec 2012 11:41:13
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+Filename:  obs_20121209-114616.h5
+Target:  PSR0656
+Local time:  Sun, 09 Dec 2012 03:46:16
+UTC:  Sun, 09 Dec 2012 11:46:16
+Description:  
+Filter:  Open
+Exposure Time:  300
+
+

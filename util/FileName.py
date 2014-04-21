@@ -114,6 +114,7 @@ class FileName:
     def calDriftInfo(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
             self.date + os.sep + \
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
@@ -163,11 +164,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.npz'
         else:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
