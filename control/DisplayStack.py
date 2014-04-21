@@ -15,7 +15,7 @@ import hotpix.hotPixels as hp
 import os
 from time import time
 import sys
-#import LoadImageStack
+import LoadImageStack
 
 from PyQt4.QtGui import *
 from PyQt4.QtGui import *
