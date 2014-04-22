@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'LoadImageStack_gui.ui'
 #
-# Created: Mon Apr 14 13:27:48 2014
+# Created: Mon Apr 21 17:03:37 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -17,12 +17,13 @@ except AttributeError:
 class Ui_LoadImageStack_gui(object):
     def setupUi(self, LoadImageStack_gui):
         LoadImageStack_gui.setObjectName(_fromUtf8("LoadImageStack_gui"))
-        LoadImageStack_gui.resize(515, 636)
+        LoadImageStack_gui.resize(702, 802)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(LoadImageStack_gui.sizePolicy().hasHeightForWidth())
         LoadImageStack_gui.setSizePolicy(sizePolicy)
+        LoadImageStack_gui.setAutoFillBackground(False)
         self.plotDock = MPL_Widget(LoadImageStack_gui)
         self.plotDock.setGeometry(QtCore.QRect(10, 40, 491, 521))
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
@@ -82,6 +83,81 @@ class Ui_LoadImageStack_gui(object):
         self.jdLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.jdLabel.setIndent(0)
         self.jdLabel.setObjectName(_fromUtf8("jdLabel"))
+        self.aperturePhotometryButton = QtGui.QPushButton(LoadImageStack_gui)
+        self.aperturePhotometryButton.setGeometry(QtCore.QRect(560, 610, 91, 51))
+        self.aperturePhotometryButton.setObjectName(_fromUtf8("aperturePhotometryButton"))
+        self.psfPhotometryButton = QtGui.QPushButton(LoadImageStack_gui)
+        self.psfPhotometryButton.setGeometry(QtCore.QRect(560, 700, 91, 51))
+        self.psfPhotometryButton.setObjectName(_fromUtf8("psfPhotometryButton"))
+        self.apertureLine = QtGui.QLineEdit(LoadImageStack_gui)
+        self.apertureLine.setGeometry(QtCore.QRect(200, 700, 51, 27))
+        self.apertureLine.setObjectName(_fromUtf8("apertureLine"))
+        self.innerAnnulusLine = QtGui.QLineEdit(LoadImageStack_gui)
+        self.innerAnnulusLine.setGeometry(QtCore.QRect(300, 700, 51, 27))
+        self.innerAnnulusLine.setObjectName(_fromUtf8("innerAnnulusLine"))
+        self.apertureLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.apertureLabel.setGeometry(QtCore.QRect(190, 660, 62, 41))
+        self.apertureLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.apertureLabel.setObjectName(_fromUtf8("apertureLabel"))
+        self.innerAnnulusLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.innerAnnulusLabel.setGeometry(QtCore.QRect(290, 650, 62, 51))
+        self.innerAnnulusLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.innerAnnulusLabel.setObjectName(_fromUtf8("innerAnnulusLabel"))
+        self.annulusNoteLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.annulusNoteLabel.setGeometry(QtCore.QRect(290, 730, 141, 41))
+        font = QtGui.QFont()
+        font.setPointSize(8)
+        self.annulusNoteLabel.setFont(font)
+        self.annulusNoteLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.annulusNoteLabel.setObjectName(_fromUtf8("annulusNoteLabel"))
+        self.outerAnnulusLine = QtGui.QLineEdit(LoadImageStack_gui)
+        self.outerAnnulusLine.setGeometry(QtCore.QRect(380, 700, 51, 27))
+        self.outerAnnulusLine.setObjectName(_fromUtf8("outerAnnulusLine"))
+        self.outerAnnulusLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.outerAnnulusLabel.setGeometry(QtCore.QRect(370, 650, 62, 51))
+        self.outerAnnulusLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.outerAnnulusLabel.setObjectName(_fromUtf8("outerAnnulusLabel"))
+        self.centerLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.centerLabel.setGeometry(QtCore.QRect(80, 650, 62, 41))
+        self.centerLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.centerLabel.setObjectName(_fromUtf8("centerLabel"))
+        self.xLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.xLabel.setGeometry(QtCore.QRect(70, 700, 21, 17))
+        self.xLabel.setObjectName(_fromUtf8("xLabel"))
+        self.yLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.yLabel.setGeometry(QtCore.QRect(70, 740, 21, 17))
+        self.yLabel.setObjectName(_fromUtf8("yLabel"))
+        self.xLine = QtGui.QLineEdit(LoadImageStack_gui)
+        self.xLine.setGeometry(QtCore.QRect(100, 700, 51, 27))
+        self.xLine.setObjectName(_fromUtf8("xLine"))
+        self.yLine = QtGui.QLineEdit(LoadImageStack_gui)
+        self.yLine.setGeometry(QtCore.QRect(100, 740, 51, 27))
+        self.yLine.setObjectName(_fromUtf8("yLine"))
+        self.apertureCheckbox = QtGui.QCheckBox(LoadImageStack_gui)
+        self.apertureCheckbox.setGeometry(QtCore.QRect(530, 60, 121, 22))
+        self.apertureCheckbox.setChecked(True)
+        self.apertureCheckbox.setObjectName(_fromUtf8("apertureCheckbox"))
+        self.annulusCheckbox = QtGui.QCheckBox(LoadImageStack_gui)
+        self.annulusCheckbox.setGeometry(QtCore.QRect(530, 100, 121, 22))
+        self.annulusCheckbox.setChecked(True)
+        self.annulusCheckbox.setObjectName(_fromUtf8("annulusCheckbox"))
+        self.allButton = QtGui.QPushButton(LoadImageStack_gui)
+        self.allButton.setGeometry(QtCore.QRect(540, 340, 141, 41))
+        self.allButton.setObjectName(_fromUtf8("allButton"))
+        self.subsequentButton = QtGui.QPushButton(LoadImageStack_gui)
+        self.subsequentButton.setGeometry(QtCore.QRect(540, 400, 141, 41))
+        self.subsequentButton.setObjectName(_fromUtf8("subsequentButton"))
+        self.previousButton = QtGui.QPushButton(LoadImageStack_gui)
+        self.previousButton.setGeometry(QtCore.QRect(540, 460, 141, 41))
+        self.previousButton.setObjectName(_fromUtf8("previousButton"))
+        self.shortcutLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.shortcutLabel.setGeometry(QtCore.QRect(540, 286, 141, 41))
+        self.shortcutLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.shortcutLabel.setObjectName(_fromUtf8("shortcutLabel"))
+        self.skySubtractionCheckbox = QtGui.QCheckBox(LoadImageStack_gui)
+        self.skySubtractionCheckbox.setGeometry(QtCore.QRect(540, 580, 131, 22))
+        self.skySubtractionCheckbox.setChecked(True)
+        self.skySubtractionCheckbox.setObjectName(_fromUtf8("skySubtractionCheckbox"))
 
         self.retranslateUi(LoadImageStack_gui)
         QtCore.QMetaObject.connectSlotsByName(LoadImageStack_gui)
@@ -93,5 +169,41 @@ class Ui_LoadImageStack_gui(object):
         self.maxLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "/ MAX", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Frame Number", None, QtGui.QApplication.UnicodeUTF8))
         self.jdLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "JD", None, QtGui.QApplication.UnicodeUTF8))
+        self.aperturePhotometryButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Perform\n"
+"Aperture\n"
+"Photometry", None, QtGui.QApplication.UnicodeUTF8))
+        self.psfPhotometryButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Perform\n"
+"PSF Fitting\n"
+"Photometry", None, QtGui.QApplication.UnicodeUTF8))
+        self.apertureLine.setText(QtGui.QApplication.translate("LoadImageStack_gui", "5", None, QtGui.QApplication.UnicodeUTF8))
+        self.innerAnnulusLine.setText(QtGui.QApplication.translate("LoadImageStack_gui", "5", None, QtGui.QApplication.UnicodeUTF8))
+        self.apertureLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Aperture\n"
+"Radius", None, QtGui.QApplication.UnicodeUTF8))
+        self.innerAnnulusLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Annulus\n"
+"Inner\n"
+"Radius", None, QtGui.QApplication.UnicodeUTF8))
+        self.annulusNoteLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "(Only used for\n"
+"aperture photometry)", None, QtGui.QApplication.UnicodeUTF8))
+        self.outerAnnulusLine.setText(QtGui.QApplication.translate("LoadImageStack_gui", "15", None, QtGui.QApplication.UnicodeUTF8))
+        self.outerAnnulusLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Annulus\n"
+"Outer\n"
+"Radius", None, QtGui.QApplication.UnicodeUTF8))
+        self.centerLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Center\n"
+"Position", None, QtGui.QApplication.UnicodeUTF8))
+        self.xLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "x =", None, QtGui.QApplication.UnicodeUTF8))
+        self.yLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "y =", None, QtGui.QApplication.UnicodeUTF8))
+        self.xLine.setText(QtGui.QApplication.translate("LoadImageStack_gui", "21", None, QtGui.QApplication.UnicodeUTF8))
+        self.yLine.setText(QtGui.QApplication.translate("LoadImageStack_gui", "22", None, QtGui.QApplication.UnicodeUTF8))
+        self.apertureCheckbox.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Show Aperture", None, QtGui.QApplication.UnicodeUTF8))
+        self.annulusCheckbox.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Show Annulus", None, QtGui.QApplication.UnicodeUTF8))
+        self.allButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Apply to\n"
+"all frames", None, QtGui.QApplication.UnicodeUTF8))
+        self.subsequentButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Apply to\n"
+"subsequent frames", None, QtGui.QApplication.UnicodeUTF8))
+        self.previousButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Apply to\n"
+"previous frames", None, QtGui.QApplication.UnicodeUTF8))
+        self.shortcutLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Aperture and\n"
+"annulus shortcuts", None, QtGui.QApplication.UnicodeUTF8))
+        self.skySubtractionCheckbox.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Sky Subtraction", None, QtGui.QApplication.UnicodeUTF8))
 
 from mpl_pyqt4_widget import MPL_Widget
