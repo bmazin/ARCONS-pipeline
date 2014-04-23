@@ -1,0 +1,52 @@
+
+######################## For display_stack_aperture.py only ########################
+
+apertureRadius1 = 5
+
+#ObjPosFile=[[what file number this position started at, x position, y position],[what file number it changed, new x, new y]]
+ObjPosFile=[[1,14,8]] #Dec8
+#ObjPosFile=[[1,31,30],[15,14,8]] #Dec10
+#ObjPosFile=[[1,16,15]] #Dec11
+#ObjPosFile=[[1,14,8],[18,31,30],[32,14,8],[49,16,15]] #All
+
+######################## For display_stack.py ########################
+
+#do stacking with ARCONS-pipeline/controls/DisplayStack.py
+
+######################## For fitpsf.py ########################
+
+npzLoadFile = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/AllImageStack_20121208_30s_3000-6000_hp.npz'
+npzfitpsf = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/Fits_20121208-all_30s_3000-6000_hp.npz'
+giffitpsf = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/Fits_20121208-all_30s_3000-6000_hp.gif'
+
+#Dec8 
+#seq0:13
+#seq1:4
+#Dec10
+#seq2:9
+#seq3:5
+#seq4:17
+#Dec11
+#seq5:14
+#seq6:12
+
+expTime=300
+integrationTime=30
+
+#FramesPerFile = expTime/integrationTime
+FramesPerFile = expTime/integrationTime * 37
+
+#seqCorr = [-1,seq0seq1,seq0seq1+seq2seq3,seq0seq1+seq2seq3+seq4,seq0seq1+seq2seq3+seq4+seq5seq6]
+
+#NumFiles = [-1,17,17,17,17]
+#NumFiles = [-1,-1,14,31,31]
+NumFiles = [-1]
+#NumFiles = [-1,17,31,48,74]
+guessX = [16]
+guessY = [16]
+
+######################## For lightcurve.py ########################
+
+npzLoadFitFile = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/Fits_20121208-all_30s_3000-6000_hp.npz'
+TotalNumFiles = 1
+

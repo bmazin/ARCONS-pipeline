@@ -14,144 +14,6 @@
    <string>Display Stack Options</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QGroupBox" name="runGroup">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>161</width>
-      <height>111</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>Run</string>
-    </property>
-    <widget class="QRadioButton" name="lick2012Button">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>20</y>
-       <width>108</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>LICK2012</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-    <widget class="QRadioButton" name="pal2012Button">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>50</y>
-       <width>108</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>PAL2012</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QRadioButton" name="pal2013Button">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>80</y>
-       <width>108</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>PAL2013</string>
-     </property>
-    </widget>
-   </widget>
-   <widget class="QGroupBox" name="targetGroup">
-    <property name="enabled">
-     <bool>true</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>140</y>
-      <width>161</width>
-      <height>351</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>Target</string>
-    </property>
-    <widget class="QRadioButton" name="sdss0651Button">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>20</y>
-       <width>151</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>SDSS J0651+2844</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QRadioButton" name="sdss0926Button">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>50</y>
-       <width>151</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>SDSS J0926+3624</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QRadioButton" name="pal2013ObjectButton">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>20</y>
-       <width>151</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>PAL2013 Object</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QRadioButton" name="lick2012ObjectButton">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>20</y>
-       <width>151</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>LICK2012 Object</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </widget>
    <widget class="QLineEdit" name="integrationTimeLine">
     <property name="geometry">
      <rect>
@@ -560,6 +422,83 @@
     </property>
     <property name="text">
      <string>Load Stack</string>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="runList">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>40</y>
+      <width>141</width>
+      <height>192</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="runLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>20</y>
+      <width>91</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Runs</string>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="targetList">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>330</y>
+      <width>141</width>
+      <height>281</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="targetLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>310</y>
+      <width>91</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Targets</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="targetButton">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>650</y>
+      <width>111</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Load Target</string>
     </property>
    </widget>
   </widget>

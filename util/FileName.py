@@ -135,11 +135,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.tstamp + '.h5'
 

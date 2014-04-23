@@ -209,8 +209,8 @@ for k in xrange(nFiles):
     curve = 2*np.pi*amps*(widths**2) #spectrum of oberved object in counts/s
     curve /= binWidths #spectrum is now in counts/s/Angs
 
-    diam = 500 #5 meter telescope
-    area = np.pi * ((diam/2.0)**2 -(diam/4.0)**2)
+    diam = 510.55 #5 meter telescope
+    area = np.pi * ((diam/2.0)**2 -(183/2.0)**2) #secondary obstruction diameter 1.83m
     curve/= area #spectrum is now in counts/s/Angs/cm^2
     print k
     print curve
@@ -253,8 +253,8 @@ ypos = params[:,3]
 curve = 2*np.pi*amps*(widths**2) #spectrum of oberved object in counts/s
 curve /= binWidths #spectrum is now in counts/s/Angs
 
-diam = 500 #5 meter telescope
-area = np.pi * ((diam/2.0)**2 -(100)**2) #Palomar secondary is ~1m radius from Serabyn 2007
+diam = 510.55 #5 meter telescope
+area = np.pi * ((diam/2.0)**2 -(183/2.0)**2) #secondary obstruction diameter 1.83m
 curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 

@@ -23,28 +23,18 @@ class CosmicRunFromDictFile:
                                    date=self.param['sunsetDate'],
                                    tstamp = obs)
 
-            if True:
-                cosmic = Cosmic(fn,
-                                loggingLevel=logging.INFO,
-                                beginTime=self.s['beginTime'],
-                                endTime=self.s['endTime'])
+
+            cosmic = Cosmic(fn,
+                            loggingLevel=logging.INFO,
+                            beginTime=self.s['beginTime'],
+                            endTime=self.s['endTime'])
 
 
-                fc = cosmic.findCosmics(stride=int(self.s['stride']), 
-                                        threshold=int(self.s['threshold']), 
-                                        populationMax=int(self.s['populationMax']),
-                                        nSigma=float(self.s['nSigma']),
-                                        writeCosmicMask=True)
-
-                outfileName = "cosmic-all"+obs+".pkl"
-                outfile = open(outfileName, "wb")
-                pickle.dump(fc['populationHg'],outfile)
-                pickle.dump(cosmic.beginTime,outfile)
-                pickle.dump(cosmic.endTime,outfile)
-                pickle.dump(fc['ppmMasked'],outfile)
-                pickle.dump(fc['ppsTime'],outfile)
-                pickle.dump(fc['pps'],outfile)
-                outfile.close()
+            fc = cosmic.findCosmics(stride=int(self.s['stride']), 
+                                    threshold=int(self.s['threshold']), 
+                                    populationMax=int(self.s['populationMax']),
+                                    nSigma=float(self.s['nSigma']),
+                                    writeCosmicMask=True)
 
             cosmic = Cosmic(fn,
                             loggingLevel=logging.INFO,
@@ -52,66 +42,70 @@ class CosmicRunFromDictFile:
                             endTime=self.s['endTime'],
                             applyCosmicMask=True)
 
-            fc = cosmic.findCosmics(stride=int(self.s['stride']), 
-                                    threshold=int(self.s['threshold']), 
-                                    populationMax=int(self.s['populationMax']),
-                                    nSigma=float(self.s['nSigma']),
-                                    writeCosmicMask=False)
+            fcm = cosmic.findCosmics(stride=int(self.s['stride']), 
+                                     threshold=int(self.s['threshold']), 
+                                     populationMax=int(self.s['populationMax']),
+                                     nSigma=float(self.s['nSigma']),
+                                     writeCosmicMask=False)
             
-            outfileName = "cosmic-masked"+obs+".pkl"
+            p = {
+                'populationHg':fc['populationHg'][0],
+                'populationHgM':fcm['populationHg'][0],
+                'pps':fc['pps'],
+                'ppsM':fcm['pps'],
+                'ppmMasked':fc['ppmMasked'],
+                'ppsTime':fc['ppsTime'],
+                'beginTime':cosmic.beginTime,
+                'endTime':cosmic.endTime
+                }
+
+            outfileName = "cosmic-summary-"+obs+".pkl"
             outfile = open(outfileName, "wb")
-            pickle.dump(fc['populationHg'],outfile)
-            pickle.dump(cosmic.beginTime,outfile)
-            pickle.dump(cosmic.endTime,outfile)
-            pickle.dump(fc['ppmMasked'],outfile)
-            pickle.dump(fc['ppsTime'],outfile)
-            pickle.dump(fc['pps'],outfile)
+            pickle.dump(p,outfile)
             outfile.close()
 
             
     def summarize(self):
         print "summarize"
-        popAllSum  = None
-        popMaskedSum = None
-        ppsTimeMasked = {}
-        ppsMasked = {}
-        ppsTimeAll = {}
-        ppsAll = {}
+        nSum = 0
         for obs in self.param['obsSequence']:
-            fn = FileName.FileName(run=self.param['run'],
-                                   date=self.param['sunsetDate'],
-                                   tstamp = obs)
-
-            pFileName = "cosmic-all"+obs+".pkl"
+            pFileName = "cosmic-summary-"+obs+".pkl"
             pFile = open(pFileName, "rb")
-            popAll = pickle.load(pFile)
-            beginTimeAll = pickle.load(pFile)
-            endTimeAll = pickle.load(pFile)
-            ppmMaskedAll = pickle.load(pFile)
-            ppsTimeAll[obs] = pickle.load(pFile)
-            ppsAll[obs] = pickle.load(pFile)
+            p = pickle.load(pFile)
+            pFile.close()
+            stride = int(1/p['ppsTime'])
 
-            pFileName = "cosmic-masked"+obs+".pkl"
-            pFile = open(pFileName, "rb")
-            popMasked = pickle.load(pFile)
-            beginTimeMasked = pickle.load(pFile)
-            endTimeMasked = pickle.load(pFile)
-            ppmMaskedMasked = pickle.load(pFile)
-            ppsTimeMasked[obs] = pickle.load(pFile)
-            ppsMasked[obs] = pickle.load(pFile)
-
-            cfn = fn.cosmicMask()
-            table = ObsFile.readCosmicIntervalFromFile(cfn)
-
-            if popAllSum:
-                popAllSum += popAll[0]
-                popMaskedSum += popMasked[0]
-                ppmMaskedSum += ppmMaskedMasked
+            if nSum > 0:
+                popAllSum += p['populationHg']
+                popMaskedSum += p['populationHgM']
+                ppmMaskedSum += p['ppmMasked']
+                pps = p['pps']
+                ppsSum += np.sum(pps.reshape(-1,stride),axis=0)
+                ppsMasked = p['ppsM']
+                ppsMaskedSum += np.sum(ppsMasked.reshape(-1,stride),axis=0)
             else:
-                popAllSum = popAll[0]
-                popMaskedSum = popMasked[0]
-                ppmMaskedSum = ppmMaskedMasked
+                popAllSum = p['populationHg']
+                popMaskedSum = p['populationHgM']
+                ppmMaskedSum = p['ppmMasked']
+                pps = p['pps']
+                ppsSum = np.sum(pps.reshape(-1,stride),axis=0)
+                ppsMasked = p['ppsM']
+                ppsMaskedSum = np.sum(ppsMasked.reshape(-1,stride),axis=0)
+            nSum += 1
 
+        ppmMasked = ppmMaskedSum/float(nSum)
+        plt.figure()
+        n = len(ppsSum)
+        print "in plot pps.png n = ",n
+        xTime = np.arange(n)/float(n)
+        plt.plot(xTime, ppsSum,label="all data")
+        plt.plot(xTime, ppsMaskedSum, label="cosmic masked")
+        plt.legend(loc="best").get_frame().set_alpha(0.5)
+        plt.title("%s ppmMasked=%d"%(self.dictFile,ppmMasked))
+        plt.xlabel("time inside each second")
+        plt.ylabel("count rate")
+        plt.savefig("pps.png")
+    
         plt.figure()
         plt.plot(popAllSum, "b-", drawstyle="steps-mid", label="all")
         plt.plot(popMaskedSum, "r+", drawstyle="steps-mid", label="cosmics masked")
@@ -121,17 +115,11 @@ class CosmicRunFromDictFile:
         plt.xlim(-0.1, self.s['populationMax'])
         plt.ylim(ymin=-0.1)
         plt.legend(loc="center right").get_frame().set_alpha(0.5)
-        plt.title("%s ppmMasked=%d"%(self.dictFile,ppmMaskedSum))
-        plt.xlabel("Population -- number of photons in a time bin")
+        plt.title("%s ppmMasked=%d"%(self.dictFile,ppmMasked))
+        plt.xlabel("Population -- number of photons in a time tick")
         plt.ylabel("dN/dPopulation")
+        plt.savefig("populationHg.png")
 
-        plt.savefig("summary.png")
-
-        plt.figure()
-        for obs in self.param['obsSequence']:
-            time = np.arange(len(ppsAll[obs]))*ppsTimeAll[obs]
-            plt.plot(time,ppsAll[obs]-ppsMasked[obs])
-        plt.savefig("pps.png")    
                
 
 if __name__ == '__main__':

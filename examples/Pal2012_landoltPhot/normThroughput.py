@@ -84,7 +84,8 @@ wvlStart = 3000
 wvlStop = 13000
 wvlBinEdges = ObsFile.makeWvlBins(energyBinWidth,wvlStart,wvlStop)
 
-fluxFactors = 1.0/curveThru
+fluxFactors = np.ones(np.shape(curveThru),dtype=float)
+#fluxFactors = 1.0/curveThru
 print "flux Factors = "
 print fluxFactors
 
@@ -99,7 +100,8 @@ fluxFlags[np.isnan(fluxFactors)] = pipelineFlags.fluxCal['nanWeight']   #Modifie
 fluxFlags[fluxFactors <= 0]=pipelineFlags.fluxCal['LEzeroWeight']   #Modified to use flag dictionary - JvE 5/1/2013
 fluxFactors[fluxFactors <= 0]=1.0
 
-fluxCalFileName = "fluxsol_absolute.h5"
+fluxCalFileName = "fluxsol_ones.h5"
+#fluxCalFileName = "fluxsol_absolute_102713.h5"
 if os.path.isabs(fluxCalFileName) == True:
     fullFluxCalFileName = fluxCalFileName
 else:
