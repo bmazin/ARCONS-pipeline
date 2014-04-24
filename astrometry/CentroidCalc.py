@@ -117,7 +117,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     # centerY = '30.5'
 
     # Create an array of array and target specific parameters to include in the output file header.
-    paramsList = [centroid_RA,centroid_DEC]
+    paramsList = [gridHeight,gridWidth,centroid_RA,centroid_DEC]
     
     # Create output filename to save centroid data
     if outputFileName is None:

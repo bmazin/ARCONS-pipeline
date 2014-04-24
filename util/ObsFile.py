@@ -248,12 +248,17 @@ class ObsFile:
         if excludeBad is True, wavelengths calculated as np.inf are excised from the array returned, as are wavelengths outside the fit limits of the wavecal
         """
 
-        xOffset = self.wvlCalTable[iRow, iCol, 0]
-        yOffset = self.wvlCalTable[iRow, iCol, 1]
-        amplitude = self.wvlCalTable[iRow, iCol, 2]
+        #xOffset = self.wvlCalTable[iRow, iCol, 0]
+        #yOffset = self.wvlCalTable[iRow, iCol, 1]
+        #amplitude = self.wvlCalTable[iRow, iCol, 2]
+        #energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
+        const = self.wvlCalTable[iRow, iCol, 0]
+        lin_term = self.wvlCalTable[iRow, iCol, 1]
+        quad_term = self.wvlCalTable[iRow, iCol, 2]
+        energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
+
         wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
         wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
-        energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
         
         if excludeBad == True:
             energies = energies[energies != 0]
@@ -434,15 +439,20 @@ class ObsFile:
         baselines = np.array(baselines,dtype=np.double)
         if dither==True:
             parabolaPeaks += np.random.random_sample(len(parabolaPeaks))
-            baselines += np.random.random_sample(len(baselines))
-                    
+            baselines += np.random.random_sample(len(baselines))                    
         pulseHeights = parabolaPeaks - baselines
-        xOffset = self.wvlCalTable[iRow,iCol,0]
-        yOffset = self.wvlCalTable[iRow,iCol,1]
-        amplitude = self.wvlCalTable[iRow,iCol,2]
-        wvlCalLowerLimit = self.wvlRangeTable[iRow,iCol,0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow,iCol,1]
-        energies = amplitude*(pulseHeights-xOffset)**2+yOffset
+
+        #xOffset = self.wvlCalTable[iRow, iCol, 0]
+        #yOffset = self.wvlCalTable[iRow, iCol, 1]
+        #amplitude = self.wvlCalTable[iRow, iCol, 2]
+        #energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
+        const = self.wvlCalTable[iRow, iCol, 0]
+        lin_term = self.wvlCalTable[iRow, iCol, 1]
+        quad_term = self.wvlCalTable[iRow, iCol, 2]
+        energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
+
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
         
         wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
         if excludeBad == True:

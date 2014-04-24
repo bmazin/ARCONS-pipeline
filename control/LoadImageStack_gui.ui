@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>515</width>
-    <height>636</height>
+    <width>702</width>
+    <height>802</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -18,6 +18,9 @@
   </property>
   <property name="windowTitle">
    <string>Image Stack Viewer</string>
+  </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
   </property>
   <widget class="MPL_Widget" name="plotDock" native="true">
    <property name="geometry">
@@ -197,6 +200,341 @@
    </property>
    <property name="indent">
     <number>0</number>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="aperturePhotometryButton">
+   <property name="geometry">
+    <rect>
+     <x>560</x>
+     <y>610</y>
+     <width>91</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Perform
+Aperture
+Photometry</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="psfPhotometryButton">
+   <property name="geometry">
+    <rect>
+     <x>560</x>
+     <y>700</y>
+     <width>91</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Perform
+PSF Fitting
+Photometry</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="apertureLine">
+   <property name="geometry">
+    <rect>
+     <x>200</x>
+     <y>700</y>
+     <width>51</width>
+     <height>27</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>5</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="innerAnnulusLine">
+   <property name="geometry">
+    <rect>
+     <x>300</x>
+     <y>700</y>
+     <width>51</width>
+     <height>27</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>5</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="apertureLabel">
+   <property name="geometry">
+    <rect>
+     <x>190</x>
+     <y>660</y>
+     <width>62</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Aperture
+Radius</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QLabel" name="innerAnnulusLabel">
+   <property name="geometry">
+    <rect>
+     <x>290</x>
+     <y>650</y>
+     <width>62</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Annulus
+Inner
+Radius</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QLabel" name="annulusNoteLabel">
+   <property name="geometry">
+    <rect>
+     <x>290</x>
+     <y>730</y>
+     <width>141</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>8</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>(Only used for
+aperture photometry)</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="outerAnnulusLine">
+   <property name="geometry">
+    <rect>
+     <x>380</x>
+     <y>700</y>
+     <width>51</width>
+     <height>27</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>15</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="outerAnnulusLabel">
+   <property name="geometry">
+    <rect>
+     <x>370</x>
+     <y>650</y>
+     <width>62</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Annulus
+Outer
+Radius</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QLabel" name="centerLabel">
+   <property name="geometry">
+    <rect>
+     <x>80</x>
+     <y>650</y>
+     <width>62</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Center
+Position</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QLabel" name="xLabel">
+   <property name="geometry">
+    <rect>
+     <x>70</x>
+     <y>700</y>
+     <width>21</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>x =</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="yLabel">
+   <property name="geometry">
+    <rect>
+     <x>70</x>
+     <y>740</y>
+     <width>21</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>y =</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="xLine">
+   <property name="geometry">
+    <rect>
+     <x>100</x>
+     <y>700</y>
+     <width>51</width>
+     <height>27</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>21</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="yLine">
+   <property name="geometry">
+    <rect>
+     <x>100</x>
+     <y>740</y>
+     <width>51</width>
+     <height>27</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>22</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="apertureCheckbox">
+   <property name="geometry">
+    <rect>
+     <x>530</x>
+     <y>60</y>
+     <width>121</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Show Aperture</string>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="annulusCheckbox">
+   <property name="geometry">
+    <rect>
+     <x>530</x>
+     <y>100</y>
+     <width>121</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Show Annulus</string>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="allButton">
+   <property name="geometry">
+    <rect>
+     <x>540</x>
+     <y>340</y>
+     <width>141</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Apply to
+all frames</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="subsequentButton">
+   <property name="geometry">
+    <rect>
+     <x>540</x>
+     <y>400</y>
+     <width>141</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Apply to
+subsequent frames</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="previousButton">
+   <property name="geometry">
+    <rect>
+     <x>540</x>
+     <y>460</y>
+     <width>141</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Apply to
+previous frames</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QLabel" name="shortcutLabel">
+   <property name="geometry">
+    <rect>
+     <x>540</x>
+     <y>286</y>
+     <width>141</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Aperture and
+annulus shortcuts</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="skySubtractionCheckbox">
+   <property name="geometry">
+    <rect>
+     <x>540</x>
+     <y>580</y>
+     <width>131</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Sky Subtraction</string>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
    </property>
   </widget>
  </widget>

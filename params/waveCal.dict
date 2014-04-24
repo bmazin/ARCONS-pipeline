@@ -1,10 +1,10 @@
 ## Files and Dirs
 
 run = 'PAL2012'
-#sunsetDate = '20121210'
 sunsetDate = None                       # if None then do all dates and all files for run
 calTimeStamps = None                    # if None then do all files in directory
-#calTimeStamps = ['20121211-090613-5']
+#sunsetDate = '20121211'
+#calTimeStamps = ['20121211-020441']
 
 
 
