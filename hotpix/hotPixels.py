@@ -73,6 +73,7 @@ See individual routines for more detail.
 
 import os.path
 import sys
+import pickle
 from math import *
 from interval import interval
 import tables
@@ -116,10 +117,10 @@ class headerDescription(tables.IsDescription):
  
 def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.0,
                   nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
-                  display=False, ds9display=False, weighted=False, maxIter=5,
-                  dispMinPerc=0.0, dispMaxPerc=98.0):
+                  display=False, ds9display=False, dispToPickle=None, weighted=False,
+                  maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False):
     '''
-    To find the hot (and cold) pixels in a given time interval for an observation file.
+    To find the hot, cold, or dead pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
     interval. Compares the ratio of flux in each pixel to the median of the flux in an
     enclosing box. If the ratio is too high -- i.e. the flux is too tightly 
@@ -159,7 +160,16 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         maxIter: Scalar integer. Maximum number of iterations allowed.
         dispMinPerc: Lower percentile for image stretch if display=True
         dispMaxPerc: Upper percentile "     "     "      "       "
-
+        dispToPickle: If not None (default), then save a pickle file of the data fo
+                    the main plot shown with display=True and ds9display=True. If a string
+                    value, then this value is used as the name for the output pickle file.
+                    Otherwise uses default output name 'badPixels.pickle'.
+                    Saves a dictionary with four entries:
+                        "image" - the integrated image for the interval requested
+                        "hotMask" - mask of hot pixels detected (False=good, True=hot)
+                        "coldMask" - similar mask for the cold pixels (False=good)
+                        "deadMask" - similar mask for the dead pixels (False=good)
+        diagnosticPlots: if True, shows a bunch of diagnostic plots for debug purposes.
 
     OUTPUTS:
         A dictionary containing the result and various diagnostics. Keys are:
@@ -187,6 +197,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                   Added output dictionary key 'niter'.
 
     '''
+    
+    defaultPklFileName = 'badPixels.pickle'
     
     if image is not None:
         im = np.copy(image)      #So that we pass by value instead of by reference (since we will change 'im').
@@ -242,6 +254,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #Also calculate the error in the same quantity.
         diff = im - maxRatio * medFiltImage
         diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)
+        if iIter == 0:
+            diffOriginal = np.copy(diff)
+            diffErrOriginal = np.copy(diff)
         #************
         #diffErr = np.sqrt(medFiltImage)         #Just an experiment....
         #************    
@@ -272,8 +287,12 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     mask[hotMask] = pflags.badPixCal['hot']
     mask[coldMask] = pflags.badPixCal['cold']
     mask[deadMask] = pflags.badPixCal['dead']
-        
-    if display or ds9display:
+    
+    
+    assert(1==0)
+    
+    
+    if display or ds9display or (dispToPickle is not False):
         imForDisplay = np.copy(imOriginal)
         cleanImForDisplay = np.copy(imForDisplay)
         imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
@@ -282,23 +301,17 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #utils.plotArray(im, cbar=True)
         vmin=np.percentile(imForDisplay,dispMinPerc)
         vmax=np.percentile(imForDisplay,dispMaxPerc)
-        if display:
-            fig = mpl.figure(figsize=(5,5))
-            mpl.matshow(imForDisplay,
-                        vmin=vmin,vmax=vmax,
-                        fignum=False,
-                        origin='lower', cmap=mpl.cm.hot)     #, norm=LogNorm())  #, cmap=mpl.cm.hot)
-            mpl.colorbar()
-
-        if ds9display:
-            utils.ds9Array(imForDisplay, normMin=vmin, normMax=vmax, colormap='bb')
 
         x = np.arange(np.shape(imForDisplay)[1])
         y = np.arange(np.shape(imForDisplay)[0])
         xx, yy = np.meshgrid(x, y)
         
         if display:
-            if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y', label='Hot')
+            fig = mpl.figure(figsize=(5,5))
+            mpl.matshow(imForDisplay,vmin=vmin,vmax=vmax,
+                        fignum=False,origin='lower',cmap=mpl.cm.hot)     #, norm=LogNorm())  #, cmap=mpl.cm.hot)
+            mpl.colorbar()
+            if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y', label='Hot',linewidths=0)
             if np.sum(coldMask) > 0: mpl.scatter(xx[coldMask], yy[coldMask], c='w', label='Cold')
             if np.sum(deadMask) > 0: mpl.scatter(xx[deadMask], yy[deadMask], c='b', label='Dead')
             mpl.legend()
@@ -310,6 +323,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                 mpl.suptitle(plotTitle)
 
         if ds9display:
+            utils.ds9Array(imForDisplay, normMin=vmin, normMax=vmax, colormap='bb')
             d=ds9.ds9()     #Get reference to the now (hopefully) open ds9 instance.
             for i in range(np.sum(hotMask)):
                 d.set("regions command {circle "+str(xx[hotMask][i]+1)+" "+str(yy[hotMask][i]+1)
@@ -321,9 +335,22 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                 d.set("regions command {circle "+str(xx[deadMask][i]+1)+" "+str(yy[deadMask][i]+1)
                       +" 0.3 #color=blue}")
 
+        if dispToPickle is not False:
+            #Save to pickle file to feed into a separate plotting script, primarily for 
+            #the pipeline paper.
+            if type(dispToPickle) is str:
+                pklFileName = dispToPickle
+            else:
+                pklFileName = defaultPklFileName
+            pDict = {"image":imForDisplay,"hotMask":hotMask,"coldMask":coldMask,
+                     "deadMask":deadMask}
+            print 'Saving to file: ',pklFileName
+            output = open(pklFileName, 'wb')
+            pickle.dump(pDict,output)
+            output.close()
 
         #Show diagnostic images (not in ds9).
-        if display and 1==1:
+        if diagnosticPlots is True:
             #fig = mpl.figure(figsize=(5,5))
             #mpl.matshow(cleanImForDisplay, vmax=np.percentile(imForDisplay, 98.0),
             #            cmap=mpl.cm.hot, fignum=False, origin='lower')
@@ -347,7 +374,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.title('Nearest neighbour median filtered')
             
             fig = mpl.figure(figsize=(5,5))
-            im = np.copy(diff)
+            im = np.copy(diffOriginal)
             im[np.isnan(im)] = np.nanmin(im)
             mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 98.5),
                         fignum=False, origin='lower')
@@ -355,7 +382,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.title('Difference image')
             
             fig = mpl.figure(figsize=(5,5))            
-            im = np.copy(diffErr)
+            im = np.copy(diffErrOriginal)
             im[np.isnan(im)] = 0
             mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 100.0),
                         fignum=False, origin='lower')  #, cmap=mpl.cm.hot)
@@ -370,6 +397,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.colorbar()
             mpl.title('Std. Dev. Image')
         
+                
         if obsFile is not None:
             plotTitle = (obsFile.fileName + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
             mpl.suptitle(plotTitle)
@@ -387,8 +415,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 def findHotPixels(inputFileName=None, outputFileName=None,
                   paramFile=None, timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
-                  ds9display=False, weighted=False, maxIter=5,
-                  dispMinPerc=0.0, dispMaxPerc=98.0):
+                  ds9display=False, dispToPickle=False, weighted=False, maxIter=5,
+                  dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False):
     '''
     To find hot (and cold) pixels .
     This routine is the main code entry point.
@@ -428,13 +456,19 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                     flagged as hot/cold/dead with a coloured dot. NB - UPDATED
                     TO ONLY SHOW FIRST AND LAST TIME SLICES FOR NOW.
         ds9display: Boolean, as for 'display', but displays the output in ds9 instead.
+        dispToPickle: If not False, save whatever would/will be the data for the main plot
+                    output by by display=True or ds9display=True to a dictionary in a 
+                    pickle file. If dispToPickle is a string, use this as the output
+                    file name. Otherwise use a default. See checkInterval for more info.
         weighted: boolean, set to True to use flat cal weights (see flatcal/ 
                     and util.obsFile.getPixelCountImage() )
         maxIter: Max. number of iterations to do on the bad pixel detection before
                     stopping trying to improve it.
         dispMinPerc: Lower percentile for image stretch if display=True
         dispMaxPerc: Upper percentile "     "     "      "       "
-        
+        diagnosticPlots: if True, and display is also True, then show a bunch of
+                         diagnostic plots for debug purposes.
+
         
     OUTPUTS:
         Writes an hdf (.h5) file to outputFile containing tables of start/end
@@ -525,11 +559,13 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         print str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
         displayThisOne = display and (i==0 or i==len(stepStarts)-1)
         ds9ThisOne = ds9display and (i==0 or i==len(stepStarts)-1)
+        dispToPickleThisOne = dispToPickle and (i==0 or i==len(stepStarts)-1)
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
                                      nSigmaCold=nSigmaCold, display=displayThisOne, ds9display=ds9ThisOne, 
-                                     weighted=weighted,
-                                     maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc)['mask']
+                                     dispToPickle=dispToPickleThisOne, weighted=weighted,
+                                     maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc,
+                                     diagnosticPlots=diagnosticPlots and displayThisOne)['mask']
                                      #Note checkInterval call should automatically clip at end of obsFile,
                                      #so don't need to worry about endTime.
     

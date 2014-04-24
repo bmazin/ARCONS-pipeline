@@ -1,20 +1,25 @@
 import os.path
 import sys
+import pickle
 import tables
 import numpy as np
+import matplotlib.pyplot as mpl
 from util import utils
 from hotpix import hotPixels as hp
 
 
-def quantifyHotTime(inputFileName, startTime=0, endTime=-1, 
+def quantifyBadTime(inputFileName, startTime=0, endTime=-1, 
                     defaultTimeMaskFileName='./testTimeMask.hd5',
-                    timeStep=1, fwhm=3.0, boxSize=5,
-                    nSigmaHot=2.5, nSigmaCold=2.5,
-                    maxIter=5):
+                    timeStep=1, fwhm=3.0, boxSize=5, nSigmaHot=2.5,
+                    nSigmaCold=2.5,maxIter=5,binWidth=3,
+                    dispToPickle=False):
     '''
-    Function to calculate a metric for the degree of hot pixel behaviour in a raw 
-    raw obs file. Calculates the mean total 'hot time' per good pixel (i.e., per 
+    Function to calculate a various metrics for the degree of bad pixel behaviour in a raw 
+    raw obs file. Calculates the mean total hot/cold/dead time per good pixel (i.e., per 
     pixel which is not permanently dead, hot, or cold).
+    
+    Makes a couple of heat maps showing time spent bad in each way for each pixel,
+    as well as a histogram of times spent bad for the *temporarily* bad pixels.
     JvE Nov 20 2013.
     
     The parameters for the finding algorithm may need to be tuned a little,
@@ -39,7 +44,17 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
         defaultTimeMaskFileName - use this filename to output new time mask to
                                 (if inputFileName is an obs file)
     
-        Parameters passed on to findHotPixels routine (see also documentation
+        binWidth - width of time bins for plotting the bad-time histogram (seconds)
+
+        dispToPickle - if not False, saves the data for the histogram plot to a pickle file.
+                       If a string, then uses that as the name for the pickle file. Otherwise
+                       saves to a default name. Saves a dictionary with four entries, the first
+                       three of which are each a flat array of total times spent bad for every
+                       pixel (in sec) ('hotTime','coldTime','deadTime'). The fourth, 'duration',
+                       is the duration of the input time-mask in seconds.
+    
+    
+        Parameters passed on to findHotPixels routine if called (see also documentation
         for that function):
     
         timeStep        #Check for hot pixels every timeStep seconds
@@ -60,6 +75,7 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
                         #deviation is estimated as the square root of the median flux).
     
         maxIter=5       #Max num. of iterations for the bad pixel detection algorithm.
+        
 
 
     OUTPUTS:
@@ -70,6 +86,8 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
     
 
     '''
+    
+    defaultPklFileName = 'badPixTimeHist.pickle'
     
     #Check whether the input file is a time mask or a regular obs file.
     absInputFileName = os.path.abspath(inputFileName)   #To avoid weird issues with the way findHotPixels expands paths....
@@ -126,28 +144,31 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
                 else:
                     otherTime[iRow,iCol] += utils.intervalSize(eachInterval)
     
+    totBadTime = hotTime+coldTime+deadTime+otherTime
+    
     maskDuration = timeMask['endTime']-timeMask['startTime']
     
     #Figure out which pixels are hot, cold, permanently hot, temporarily cold, etc. etc.
     nPix = timeMask['nRow'] * timeMask['nCol']
-    hotPix = hotTime > 0
-    coldPix = coldTime > 0
-    deadPix = deadTime > 0
-    otherPix = otherTime > 0
-    multiBehaviourPix = (hotPix+coldPix+deadPix+otherPix > 1)
+    hotPix = hotTime > 0.1
+    coldPix = coldTime > 0.1
+    deadPix = deadTime > 0.1
+    otherPix = otherTime > 0.1
+    multiBehaviourPix = ( (np.array(hotPix,dtype=int)+np.array(coldPix,dtype=int)
+                         +np.array(deadPix,dtype=int)+np.array(otherPix,dtype=int)) > 1)
     #assert np.all(deadTime[deadPix] == maskDuration)      #All dead pixels should be permanently dead....
     
-    permHotPix = hotTime >= maskDuration
-    permColdPix = coldTime >= maskDuration
-    permDeadPix = deadTime >= maskDuration
-    permOtherPix = otherTime >= maskDuration
-    permGoodPix = (hotTime+coldTime+deadTime+otherTime == 0)
+    permHotPix = hotTime >= maskDuration-0.1
+    permColdPix = coldTime >= maskDuration-0.1
+    permDeadPix = deadTime >= maskDuration-0.1
+    permOtherPix = otherTime >= maskDuration-0.1
+    permGoodPix = (hotTime+coldTime+deadTime+otherTime < 0.1)
     permBadPix = permHotPix | permColdPix | permDeadPix | permOtherPix
     
-    tempHotPix = (hotTime < maskDuration) & (hotTime > 0)
-    tempColdPix = (coldTime < maskDuration) & (coldTime > 0)
-    tempDeadPix = (deadTime < maskDuration) & (deadTime > 0)
-    tempOtherPix = (otherTime < maskDuration) & (otherTime > 0)
+    tempHotPix = (hotTime < maskDuration) & (hotTime > 0.1)
+    tempColdPix = (coldTime < maskDuration) & (coldTime > 0.1)
+    tempDeadPix = (deadTime < maskDuration) & (deadTime > 0.1)
+    tempOtherPix = (otherTime < maskDuration) & (otherTime > 0.1)
     tempGoodPix = tempHotPix | tempColdPix | tempDeadPix | tempOtherPix     #Bitwise or should work okay with boolean arrays
     tempBadPix = tempGoodPix        #Just to be explicit about it....
     
@@ -194,7 +215,11 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
     print
     print 'Done.'
     print
-    
+    if np.sum(tempOtherPix) > 0 or np.sum(permOtherPix) > 0:
+        print '--------------------------------------------------------'
+        print 'WARNING: Pixels flagged for "other" reasons detected - '
+        print 'Histogram plot will not account for these!!'
+        print '--------------------------------------------------------'
 
     #Display contour plots of the array of total bad times for each pixel for each type of behaviour
     utils.plotArray(hotTime, plotTitle='Hot time per pixel (sec)', fignum=None, cbar=True)
@@ -202,9 +227,80 @@ def quantifyHotTime(inputFileName, startTime=0, endTime=-1,
     utils.plotArray(otherTime, plotTitle='Other bad time per pixel (sec)', fignum=None, cbar=True)
     utils.plotArray(deadTime, plotTitle='Dead time per pixel (sec)', fignum=None, cbar=True)
     
+    #Make histogram of time spent 'bad' for the temporarily bad pixels.
+    #Ignore pixels flagged as bad for 'other' reasons (other than hot/cold/dead),
+    #of which there should be none at the moment.
+    assert np.all(otherPix == False)
+    #Find total bad time for pixels which go only one of hot, cold, or dead
+    onlyHotBadTime = totBadTime[hotPix & ~coldPix & ~deadPix]
+    onlyColdBadTime = totBadTime[~hotPix & coldPix & ~deadPix]
+    onlyDeadBadTime = totBadTime[~hotPix & ~coldPix & deadPix]
+    #Find total bad time for pixels which alternate between more than one bad state
+    hotAndColdBadTime = totBadTime[hotPix & coldPix & ~deadPix]
+    hotAndDeadBadTime = totBadTime[hotPix & ~coldPix & deadPix]
+    coldAndDeadBadTime = totBadTime[~hotPix & coldPix & deadPix]
+    hotAndColdAndDeadBadTime = totBadTime[hotPix & coldPix & deadPix]
+    allGoodBadTime = totBadTime[~hotPix & ~coldPix & ~deadPix]
+    assert np.sum(allGoodBadTime) == 0
+
+    if dispToPickle is not False:
+        #Save to pickle file to feed into a separate plotting script, primarily for 
+        #the pipeline paper.
+        if type(dispToPickle) is str:
+            pklFileName = dispToPickle
+        else:
+            pklFileName = defaultPklFileName
+        pDict = {'hotTime':hotTime,
+                 'coldTime':coldTime,
+                 'deadTime':deadTime,
+                 'onlyHotBadTime':onlyHotBadTime,
+                 'onlyColdBadTime':onlyColdBadTime, 
+                 'onlyDeadBadTime':onlyDeadBadTime,
+                 'hotAndColdBadTime':hotAndColdBadTime,
+                 'hotAndDeadBadTime':hotAndDeadBadTime,
+                 'coldAndDeadBadTime':coldAndDeadBadTime,
+                 'hotAndColdAndDeadBadTime':hotAndColdAndDeadBadTime,
+                 'maskDuration':maskDuration}
+        #pDict = {"hotTime":hotTime.ravel(),"coldTime":coldTime.ravel(),"deadTime":deadTime.ravel(),
+        #         "duration":maskDuration}
+        print 'Saving to file: ',pklFileName
+        output = open(pklFileName, 'wb')
+        pickle.dump(pDict,output)
+        output.close()
+
+    mpl.figure()
+    assert np.size(hotTime)==nPix and np.size(coldTime)==nPix and np.size(deadTime)==nPix
+    assert (len(onlyHotBadTime)+len(onlyColdBadTime)+len(onlyDeadBadTime)+len(hotAndColdBadTime)
+            +len(coldAndDeadBadTime)+len(hotAndDeadBadTime)+len(hotAndColdAndDeadBadTime)
+            +len(allGoodBadTime))==nPix
     
+    #Be sure it's okay to leave hot+dead pixels out, and hot+cold+dead pixels.
+    assert len(hotAndDeadBadTime)==0 and len(hotAndColdAndDeadBadTime)==0 
+    
+    norm = 1./np.size(hotTime)*100.
+    mpl.hist([onlyHotBadTime,hotAndColdBadTime,onlyColdBadTime,coldAndDeadBadTime,onlyDeadBadTime],
+              #hotAndDeadBadTime,hotAndColdAndDeadBadTime],
+             range=None, #[-0.1,maskDuration+0.001],         #Eliminate data at 0sec and maskDuration sec. (always good or permanently bad)
+             weights=[np.ones_like(onlyHotBadTime)*norm, np.ones_like(hotAndColdBadTime)*norm,
+                      np.ones_like(onlyColdBadTime)*norm, np.ones_like(coldAndDeadBadTime)*norm,
+                      np.ones_like(onlyDeadBadTime)*norm], #np.ones_like(hotAndDeadBadTime)*norm,
+                      #np.ones_like(hotAndColdAndDeadBadTime)*norm],
+             label=['Hot only','Hot/cold','Cold only','Cold/dead','Dead only'], #,'Hot/dead','Hot/cold/dead'],
+             color=['red','pink','lightgray','lightblue','blue'], #,'green','black'],
+             bins=maskDuration/binWidth,histtype='stepfilled',stacked=True,log=False)         
+    mpl.title('Duration of Bad Pixel Behaviour - '+os.path.basename(inputFileName))
+    mpl.xlabel('Total time "bad" (sec)')
+    mpl.ylabel('Percantage of pixels')
+    mpl.legend()
  
- 
+    print 'Mask duration (s): ',maskDuration
+    print 'Number of pixels: ',nPix
+    print 'Fraction at 0s (hot,cold,dead): ', np.array([np.sum(hotTime<0.1),np.sum(coldTime<0.1),
+                                                        np.sum(deadTime<0.1)]) / float(nPix)                            
+    print 'Fraction at '+str(maskDuration)+'s (hot,cold,dead): ', np.array([np.sum(hotTime>maskDuration-0.1),
+                                                                        np.sum(coldTime>maskDuration-0.1),
+                                                                        np.sum(deadTime>maskDuration-0.1)])/float(nPix)
+    #assert 1==0
  
  
 if __name__ == "__main__":

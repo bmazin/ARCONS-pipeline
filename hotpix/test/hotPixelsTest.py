@@ -50,7 +50,7 @@ def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20
     
     hpOutput = hp.readHotPixels(outputFile)
 
-    intMask = intermediateOutput['mask']
+    intMask = intermediateOutput['mask'] > 0    #Make a Boolean mask - any code > 0 is bad for some reason.
     intervals = hpOutput['intervals']
     reasons = hpOutput['reasons']
 
@@ -64,7 +64,7 @@ def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20
                                      dtype='object'), np.shape(intervals))
 
 
-    #Create a boolean mask that should be True for all hot pixels within the test time range
+    #Create a boolean mask that should be True for all bad (hot/cold/dead/other) pixels within the test time range
     finalMask = np.reshape([(interval(testStartTime, testEndTime) in x) 
                             for x in uIntervals.flat], np.shape(uIntervals))   
 

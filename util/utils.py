@@ -785,15 +785,22 @@ def findNearestFinite(im,i,j,n=10):
     
     imShape = numpy.shape(im)
     assert len(imShape) == 2
-    ii,jj = numpy.indices(imShape,dtype=float)
-    distsq = (i-ii)**2 + (j-jj)**2 #Calculate distance squared from i,j (no need to bother taking square root)
+    nRows,nCols = imShape
+    #ii,jj = numpy.indices(imShape,dtype=float)
+    #distsq = (i-ii)**2 + (j-jj)**2 #Calculate distance squared from i,j (no need to bother taking square root)
+    ii2,jj2 = numpy.atleast_2d(numpy.arange(-i,nRows-i,dtype=float), numpy.arange(-j,nCols-j,dtype=float))
+    distsq = ii2.T**2 + jj2**2
+    #if numpy.all(distsq == distsq2):
+    #    print 'Hooray!'
+    #else:
+    #    print 'Uh oh.'
     good = numpy.isfinite(im)
     good[i,j] = False #Get rid of element i,j itself.
     ngood = numpy.sum(good)
     distsq[~good] = numpy.nan   #Get rid of non-finite valued elements
     #Find indices of the nearest finite values, and unravel the flattened results back into 2D arrays
     nearest = (numpy.unravel_index(
-                                   (numpy.argsort(distsq,axis=None))[0:min(n,ngood)],numpy.shape(im)
+                                   (numpy.argsort(distsq,axis=None))[0:min(n,ngood)],imShape
                                    )) #Should ignore NaN values automatically
     
     #Below version is maybe slightly quicker, but at this stage doesn't give quite the same results -- not worth the trouble
