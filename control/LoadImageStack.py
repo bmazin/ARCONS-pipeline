@@ -6,6 +6,7 @@ from LoadImageStack_gui import Ui_LoadImageStack_gui
 import DisplayStack
 import numpy as np
 import matplotlib.pyplot as plt
+from GaussFitter import gaussfit
 
 '''
 Author: Paul Szypryt		Date: November 4, 2013
@@ -27,8 +28,6 @@ class LoadImageStack(QDialog):
         self.totalAngles = 100
         self.an = np.linspace(0,2*np.pi,self.totalAngles)
         
-        
-
         self.loadStackData()
        
         self.displayPlot()
@@ -203,8 +202,11 @@ class LoadImageStack(QDialog):
 
                 frameCounts.append((apertureCountsPerPixel - annulusCountsPerPixel) * aperturePix)
 
-            plt.clf()
-            plt.plot(self.jdData, frameCounts)
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            ax.plot(self.jdData, frameCounts)
+            ax.set_xlabel('JD')
+            ax.set_ylabel('Counts')
             plt.show()
                              
 
@@ -227,8 +229,12 @@ class LoadImageStack(QDialog):
                 frameCounts.append(np.sum(currentImage[aperturePixels]))
             np.savez(self.outputFileName, counts=frameCounts, jd=self.jdData)
 
-            plt.clf()
-            plt.plot(self.jdData, frameCounts)
+            
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            ax.plot(self.jdData, frameCounts)
+            ax.set_xlabel('JD')
+            ax.set_ylabel('Counts')
             plt.show()
         
         print 'Done performing aperture photometry...'
@@ -244,7 +250,80 @@ class LoadImageStack(QDialog):
         self.centerPositions[self.currentFrame] = [float(self.ui.xLine.text()),float(self.ui.yLine.text())]
         self.apertureRadii[self.currentFrame] = float(self.ui.apertureLine.text())
         self.annulusRadii[self.currentFrame] = [float(self.ui.innerAnnulusLine.text()),float(self.ui.outerAnnulusLine.text())]
-        print 'Done performing PSF fitting photometry...'
         
+
+        paramsList = []
+        errorsList = []
+        fitImgList = []
+        chisqList = []
+
+        for iFrame in range(self.totalFrames):
+            guessX = int(np.round(self.centerPositions[iFrame][0],0))
+            guessY = int(np.round(self.centerPositions[iFrame][1],0))
+            apertureRadius = self.apertureRadii[iFrame]
+
+            apertureMask = self.aperture(guessX, guessY, apertureRadius)
+
+            currentImage = np.array(self.stackData[:,:,iFrame])
+    
+            nanMask = np.isnan(currentImage)
+
+            err = np.sqrt(currentImage)
+            #err = np.ones(np.shape(currentImage))
+            err[apertureMask==0] = np.inf#weight points closer to the expected psf higher
+            currentImage[nanMask]=0#set to finite value that will be ignored
+            err[nanMask] = np.inf#ignore these data points
+            nearDeadCutoff=1#100/15 cps for 4000-6000 angstroms
+            err[currentImage<nearDeadCutoff] = np.inf
+            entireMask = (err==np.inf)
+            maFrame = np.ma.masked_array(currentImage,entireMask)
+            guessAmp = 600.
+            guessHeight = 675.
+            guessWidth=3.
+            guessParams = [guessHeight,guessAmp,guessX,guessY,guessWidth]
+            limitedmin = 5*[True] 
+            limitedmax = 5*[True]
+            minpars = [0,0,0,0,.1]
+            maxpars = [5000,10000,43,45,10]
+            usemoments=[True,True,True,True,True] #doesn't use our guess values
+
+            out = gaussfit(data=maFrame,err=err,params=guessParams,returnfitimage=True,quiet=True,limitedmin=limitedmin,limitedmax=limitedmax,minpars=minpars,maxpars=maxpars,circle=1,usemoments=usemoments,returnmp=True)
+            mp = out[0]
+
+            outparams = mp.params
+            paramErrors = mp.perror
+            chisq = mp.fnorm
+            dof = mp.dof
+            reducedChisq = chisq/dof
+            print reducedChisq
+            fitimg = out[1]
+            chisqList.append([chisq,dof])
+
+            paramsList.append(outparams)
+            errorsList.append(paramErrors)
+            print outparams,paramErrors
+
+            fitimg[nanMask]=0           
+            fitImgList.append(fitimg)
+            currentImage[nanMask]=np.nan
+
+        cube = np.array(fitImgList)
+        chisqs = np.array(chisqList)
+        params = np.array(paramsList)
+        errors = np.array(errorsList)
+
+        np.savez(self.outputFileName,fitImg=cube,params=params,errors=errors,chisqs=chisqs,jd=self.jdData)
+
+        amps = params[:,1]
+        widths = params[:,4]
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(self.jdData, amps*widths**2)
+        ax.set_xlabel('JD')
+        ax.set_ylabel('Power')
+        plt.show()    
+
+        print 'Done performing PSF fitting photometry...'
 
 
