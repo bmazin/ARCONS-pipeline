@@ -216,6 +216,9 @@
 Aperture
 Photometry</string>
    </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
   </widget>
   <widget class="QPushButton" name="psfPhotometryButton">
    <property name="geometry">
@@ -230,6 +233,9 @@ Photometry</string>
     <string>Perform
 PSF Fitting
 Photometry</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
    </property>
   </widget>
   <widget class="QLineEdit" name="apertureLine">
@@ -460,6 +466,9 @@ Position</string>
     <string>Apply to
 all frames</string>
    </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
   </widget>
   <widget class="QPushButton" name="subsequentButton">
    <property name="geometry">
@@ -474,6 +483,9 @@ all frames</string>
     <string>Apply to
 subsequent frames</string>
    </property>
+   <property name="autoDefault">
+    <bool>false</bool>
+   </property>
   </widget>
   <widget class="QPushButton" name="previousButton">
    <property name="geometry">
@@ -487,6 +499,9 @@ subsequent frames</string>
    <property name="text">
     <string>Apply to
 previous frames</string>
+   </property>
+   <property name="autoDefault">
+    <bool>false</bool>
    </property>
   </widget>
   <widget class="QLabel" name="shortcutLabel">

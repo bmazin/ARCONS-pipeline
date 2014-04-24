@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'LoadImageStack_gui.ui'
 #
-# Created: Mon Apr 21 17:03:37 2014
+# Created: Tue Apr 22 12:24:54 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -85,9 +85,11 @@ class Ui_LoadImageStack_gui(object):
         self.jdLabel.setObjectName(_fromUtf8("jdLabel"))
         self.aperturePhotometryButton = QtGui.QPushButton(LoadImageStack_gui)
         self.aperturePhotometryButton.setGeometry(QtCore.QRect(560, 610, 91, 51))
+        self.aperturePhotometryButton.setAutoDefault(False)
         self.aperturePhotometryButton.setObjectName(_fromUtf8("aperturePhotometryButton"))
         self.psfPhotometryButton = QtGui.QPushButton(LoadImageStack_gui)
         self.psfPhotometryButton.setGeometry(QtCore.QRect(560, 700, 91, 51))
+        self.psfPhotometryButton.setAutoDefault(False)
         self.psfPhotometryButton.setObjectName(_fromUtf8("psfPhotometryButton"))
         self.apertureLine = QtGui.QLineEdit(LoadImageStack_gui)
         self.apertureLine.setGeometry(QtCore.QRect(200, 700, 51, 27))
@@ -143,12 +145,15 @@ class Ui_LoadImageStack_gui(object):
         self.annulusCheckbox.setObjectName(_fromUtf8("annulusCheckbox"))
         self.allButton = QtGui.QPushButton(LoadImageStack_gui)
         self.allButton.setGeometry(QtCore.QRect(540, 340, 141, 41))
+        self.allButton.setAutoDefault(False)
         self.allButton.setObjectName(_fromUtf8("allButton"))
         self.subsequentButton = QtGui.QPushButton(LoadImageStack_gui)
         self.subsequentButton.setGeometry(QtCore.QRect(540, 400, 141, 41))
+        self.subsequentButton.setAutoDefault(False)
         self.subsequentButton.setObjectName(_fromUtf8("subsequentButton"))
         self.previousButton = QtGui.QPushButton(LoadImageStack_gui)
         self.previousButton.setGeometry(QtCore.QRect(540, 460, 141, 41))
+        self.previousButton.setAutoDefault(False)
         self.previousButton.setObjectName(_fromUtf8("previousButton"))
         self.shortcutLabel = QtGui.QLabel(LoadImageStack_gui)
         self.shortcutLabel.setGeometry(QtCore.QRect(540, 286, 141, 41))

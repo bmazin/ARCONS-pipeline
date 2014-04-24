@@ -19,13 +19,18 @@ class LoadImageStack(QDialog):
         self.ui.setupUi(self)
         
         self.loadStackName = str(stackName)
+        print 'Loading ' + self.loadStackName
         self.currentFrame = 0
 
         # Initialize angle array for drawing circles.
-        self.an = np.linspace(0,2*np.pi,100)
-        
-        self.loadStackData()
 
+        self.totalAngles = 100
+        self.an = np.linspace(0,2*np.pi,self.totalAngles)
+        
+        
+
+        self.loadStackData()
+       
         self.displayPlot()
 
         self.ui.leftButton.clicked.connect(self.leftButtonClicked)
@@ -64,18 +69,16 @@ class LoadImageStack(QDialog):
         for iFrame in range(self.totalFrames):
             self.centerPositions[iFrame] = [float(self.nCol)/2.0 - 0.5, float(self.nRow)/2.0 - 0.5]
             self.apertureRadii[iFrame] = 5.0
-            self.annulusRadii[iFrame] = [5.0,15.0]
+            self.annulusRadii[iFrame] = [10.0, 20.0]
         self.updateFrameInfo()
 
     def displayPlot(self):
         self.ui.frameNumberLine.setText(str(self.currentFrame))
         self.ui.jdLabel.setText('JD = ' + str(self.jdData[self.currentFrame]))
-        self.selectedFrame = self.stackData[:,:,self.currentFrame]
+        self.selectedFrame = np.array(self.stackData[:,:,self.currentFrame])
         self.nanMask = np.isnan(self.selectedFrame)
         self.selectedFrame[self.nanMask] = 0.0
         self.ui.plotDock.canvas.ax.clear()
-        self.fig = plt.figure()
-        ax = self.fig.add_subplot(111)
         self.ui.plotDock.canvas.ax.matshow(self.selectedFrame, cmap='gray', origin='lower')
         self.ui.plotDock.canvas.ax.xaxis.tick_bottom()
         self.ui.plotDock.canvas.ax.set_xlim([-0.5,self.nCol-0.5])
@@ -104,13 +107,13 @@ class LoadImageStack(QDialog):
         self.centerPositions[self.currentFrame] = [float(self.ui.xLine.text()),float(self.ui.yLine.text())]
         self.apertureRadii[self.currentFrame] = float(self.ui.apertureLine.text())
         self.annulusRadii[self.currentFrame] = [float(self.ui.innerAnnulusLine.text()),float(self.ui.outerAnnulusLine.text())]
-        if self.ui.apertureCheckbox.isChecked():
-        # Plot aperture circle
-            self.ui.plotDock.canvas.ax.plot( self.centerPositions[self.currentFrame][0]+self.apertureRadii[self.currentFrame]*np.cos(self.an), self.centerPositions[self.currentFrame][1]+self.apertureRadii[self.currentFrame]*np.sin(self.an), 'b')
         if self.ui.annulusCheckbox.isChecked():
         # Plot annulus circles
             self.ui.plotDock.canvas.ax.plot( self.centerPositions[self.currentFrame][0]+self.annulusRadii[self.currentFrame][0]*np.cos(self.an), self.centerPositions[self.currentFrame][1]+self.annulusRadii[self.currentFrame][0]*np.sin(self.an), 'r')
             self.ui.plotDock.canvas.ax.plot( self.centerPositions[self.currentFrame][0]+self.annulusRadii[self.currentFrame][1]*np.cos(self.an), self.centerPositions[self.currentFrame][1]+self.annulusRadii[self.currentFrame][1]*np.sin(self.an), 'r')
+        if self.ui.apertureCheckbox.isChecked():
+        # Plot aperture circle
+            self.ui.plotDock.canvas.ax.plot( self.centerPositions[self.currentFrame][0]+self.apertureRadii[self.currentFrame]*np.cos(self.an), self.centerPositions[self.currentFrame][1]+self.apertureRadii[self.currentFrame]*np.sin(self.an), 'b')
 
     def updateFrameInfo(self):
         self.ui.apertureLine.setText(str(self.apertureRadii[self.currentFrame]))
@@ -137,19 +140,107 @@ class LoadImageStack(QDialog):
             self.apertureRadii[iFrame] = self.apertureRadii[self.currentFrame]
             self.annulusRadii[iFrame] = self.annulusRadii[self.currentFrame]
 
+    def aperture(self,startpx,startpy,radius):
+        r = radius
+        length = 2*r 
+        height = length
+        allx = xrange(startpx-int(np.ceil(length/2.0)),startpx+int(np.floor(length/2.0))+1)
+        ally = xrange(startpy-int(np.ceil(height/2.0)),startpy+int(np.floor(height/2.0))+1)
+        mask=np.zeros((46,44))
+        
+        for x in allx:
+            for y in ally:
+                if (np.abs(x-startpx))**2+(np.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
+                    mask[y,x]=1.
+        return mask
+
     def performAperturePhotometry(self):
+        
         self.doSkySubtraction = self.ui.skySubtractionCheckbox.isChecked()
         if self.doSkySubtraction:
             print 'Performing aperture photometry with sky subtraction...'
         else:
             print 'Performing aperture photometry without sky subtraction...'
+        # Create file name
+        self.objectIdentifier = self.loadStackName[0:self.loadStackName.index('ImageStacks/ImageStack_')]
+        self.obsIdentifier = self.loadStackName[self.loadStackName.rindex('ImageStacks/ImageStack_') + len('ImageStacks/ImageStack_'):-4]
+        self.outputFileName = self.objectIdentifier + 'ApertureStacks/ApertureStack_' + self.obsIdentifier + '.npz'
+        print 'Saving to ' + self.outputFileName
+
         self.centerPositions[self.currentFrame] = [float(self.ui.xLine.text()),float(self.ui.yLine.text())]
         self.apertureRadii[self.currentFrame] = float(self.ui.apertureLine.text())
         self.annulusRadii[self.currentFrame] = [float(self.ui.innerAnnulusLine.text()),float(self.ui.outerAnnulusLine.text())]
+
+        if self.doSkySubtraction:
+            # Cycle through all frames, performing aperture photometry on each individually.
+            frameCounts=[]
+            for iFrame in range(self.totalFrames):
+                
+                startpx = int(np.round(self.centerPositions[iFrame][0],0))
+                startpy = int(np.round(self.centerPositions[iFrame][1],0))
+
+                apertureRadius = self.apertureRadii[iFrame]
+                innerRadius = self.annulusRadii[iFrame][0]
+                outerRadius = self.annulusRadii[iFrame][1]
+                
+                apertureMask = self.aperture(startpx, startpy, apertureRadius)
+
+                innerMask = self.aperture(startpx, startpy, innerRadius)
+                outerMask = self.aperture(startpx, startpy, outerRadius)
+                annulusMask = outerMask-innerMask
+
+                currentImage = np.array(self.stackData[:,:,iFrame])
+                
+                nanMask = np.isnan(currentImage)
+
+                aperturePixels = np.array(np.where(np.logical_and(apertureMask==1, nanMask==False)))
+                aperturePix = aperturePixels.shape[1]
+                apertureCountsPerPixel = np.sum(currentImage[aperturePixels[0],aperturePixels[1]])/aperturePix
+
+                annulusPixels = np.array(np.where(np.logical_and(annulusMask==1, nanMask==False)))
+                annulusPix = annulusPixels.shape[1]
+                annulusCountsPerPixel = np.sum(currentImage[annulusPixels[0],annulusPixels[1]])/annulusPix
+
+                frameCounts.append((apertureCountsPerPixel - annulusCountsPerPixel) * aperturePix)
+
+            plt.clf()
+            plt.plot(self.jdData, frameCounts)
+            plt.show()
+                             
+
+        else:
+            # Cycle through all frames, performing aperture photometry on each individually.
+            frameCounts=[]
+            for iFrame in range(self.totalFrames):
+                apertureRadius = self.apertureRadii[iFrame]
+                startpx = int(np.round(self.centerPositions[iFrame][0],0))
+                startpy = int(np.round(self.centerPositions[iFrame][1],0))
+                
+                apertureMask = self.aperture(startpx, startpy, apertureRadius)
+                
+                aperturePixels = np.where(apertureMask==1)
+                
+                currentImage = np.array(self.stackData[:,:,iFrame])
+                nanMask = np.isnan(currentImage)
+
+                currentImage[nanMask] = 0.0
+                frameCounts.append(np.sum(currentImage[aperturePixels]))
+            np.savez(self.outputFileName, counts=frameCounts, jd=self.jdData)
+
+            plt.clf()
+            plt.plot(self.jdData, frameCounts)
+            plt.show()
+        
         print 'Done performing aperture photometry...'
 
     def performPSFPhotometry(self):
         print 'Performing PSF fitting photometry...'
+        # Create file name
+        self.objectIdentifier = self.loadStackName[0:self.loadStackName.index('ImageStacks/ImageStack_')]
+        self.obsIdentifier = self.loadStackName[self.loadStackName.rindex('ImageStacks/ImageStack_') + len('ImageStacks/ImageStack_'):-4]
+        self.outputFileName = self.objectIdentifier + 'FittedStacks/FittedStack_' + self.obsIdentifier + '.npz'
+        print 'Saving to ' + self.outputFileName
+
         self.centerPositions[self.currentFrame] = [float(self.ui.xLine.text()),float(self.ui.yLine.text())]
         self.apertureRadii[self.currentFrame] = float(self.ui.apertureLine.text())
         self.annulusRadii[self.currentFrame] = [float(self.ui.innerAnnulusLine.text()),float(self.ui.outerAnnulusLine.text())]
