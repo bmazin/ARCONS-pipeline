@@ -24,12 +24,17 @@ from util.readDict import readDict
 from util.FileName import FileName
 #from fitFunctions import *
 from utils import *
+from waveCal import fitData,print_guesses
 
 
 
-def getDriftFileNames(paramFile):
-    params = readDict(paramFile)
-    params.readFromFile(paramFile)
+def getDriftFileNames(paramFile,nameStart='calsol_',nameEnd='_drift.h5'):
+    try:
+        params = readDict(paramFile)
+        params.readFromFile(paramFile)
+    except:
+        params = paramFile
+
 
     #Load in cal files from param file
     run = params['run']
@@ -58,7 +63,7 @@ def getDriftFileNames(paramFile):
         calFNs = []
         for root,dirs,files in os.walk(walkPath):
             for f in files:
-                if f.endswith('_drift.h5'):
+                if f.startswith(nameStart) and f.endswith(nameEnd):
                     d=(root.split(run)[-1]).split('/')[1]
                     t=f.split('_')[1]
                     calFNs.append(FileName(run=run, date=d,tstamp=t))
@@ -91,11 +96,37 @@ class drift_ana:
         self.beammap = temp.root.beammap.beamimage.read()
         temp.close()
 
-
-    def populate_data(self):
-        print "Collecting Data..."
-
         self.timeArray=[strpdate2num("%Y%m%d-%H%M%S")(driftFN.tstamp) for driftFN in self.driftFNs]
+
+    def populate_sig_range_data(self):
+        print "Collecting Sigma and Range Data for "+str(self.driftFNs[0].run)+'...'
+
+        self.sigma=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
+        self.range_min=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
+        self.range_max=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
+
+        for i in range(len(self.driftFNs)):
+            try:
+                calFile=tables.openFile(self.driftFNs[i].calSoln(),mode='r')
+                cal_row = calFile.root.wavecal.calsoln.cols.pixelrow[:]    
+                cal_col = calFile.root.wavecal.calsoln.cols.pixelcol[:]    
+                cal_range = calFile.root.wavecal.calsoln.cols.solnrange[:]
+                cal_sigma = calFile.root.wavecal.calsoln.cols.sigma[:]
+                for p in range(len(cal_row)):
+                    self.range_min[cal_row[p],cal_col[p],i]=(cal_range[p])[0]
+                    self.range_max[cal_row[p],cal_col[p],i]=(cal_range[p])[1]
+                    self.sigma[cal_row[p],cal_col[p],i]=cal_sigma[p]
+                calFile.close()
+            except:
+                print '\tUnable to open: '+self.driftFNs[i].calSoln()
+                #raise
+        print "\tDone."
+
+
+    def populate_peak_data(self):
+        print "Collecting Drift Data for "+str(self.driftFNs[0].run)+'...'
+
+
 
         self.blue_xOffset=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
         self.blue_sigma=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
@@ -123,6 +154,123 @@ class drift_ana:
                 print '\tUnable to open: '+self.driftFNs[i].calDriftInfo()
                 #raise
         print "\tDone."
+
+    def populate_cal_data(self):
+        print "Collecting Cal Data for "+str(self.driftFNs[0].run)+'...'
+
+
+        self.parab_const=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
+        self.parab_lin=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
+        self.parab_quad=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.driftFNs)))
+
+        for i in range(len(self.driftFNs)):
+            try:
+                calFile=tables.openFile(self.driftFNs[i].calSoln(),mode='r')
+                cal_row = calFile.root.wavecal.calsoln.cols.pixelrow[:]    
+                cal_col = calFile.root.wavecal.calsoln.cols.pixelcol[:]    
+                cal_params = calFile.root.wavecal.calsoln.cols.polyfit[:]
+                for p in range(len(cal_row)):
+                    self.parab_const[cal_row[p],cal_col[p],i]=(cal_params[p])[0]
+                    self.parab_lin[cal_row[p],cal_col[p],i]=(cal_params[p])[1]
+                    self.parab_quad[cal_row[p],cal_col[p],i]=(cal_params[p])[2]
+                calFile.close()
+            except:
+                print '\tUnable to open: '+self.driftFNs[i].calSoln()
+                #raise
+        print "\tDone."
+
+    def populate_master_sig_range_data(self):
+        if hasattr(self, 'master_sigma'):
+            return
+        if not hasattr(self, 'masterFNs'):
+            self.masterFNs,p = getDriftFileNames(self.params,nameStart='mastercal_',nameEnd='_drift.h5')
+        if len(self.masterFNs)==0:
+            print "No master cal files found!"
+            return
+
+        print "Collecting Master Sigma and Range Data for "+str(self.driftFNs[0].run)+'...'
+        self.master_sigma=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        self.master_range_min=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        self.master_range_max=np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+
+        for i in range(len(self.masterFNs)):
+            try:
+                calFile=tables.openFile(self.masterFNs[i].mastercalSoln(),mode='r')
+                cal_row = calFile.root.wavecal.calsoln.cols.pixelrow[:]    
+                cal_col = calFile.root.wavecal.calsoln.cols.pixelcol[:]    
+                cal_range = calFile.root.wavecal.calsoln.cols.solnrange[:]
+                cal_sigma = calFile.root.wavecal.calsoln.cols.sigma[:]
+                for p in range(len(cal_row)):
+                    self.master_range_min[cal_row[p],cal_col[p],i]=(cal_range[p])[0]
+                    self.master_range_max[cal_row[p],cal_col[p],i]=(cal_range[p])[1]
+                    self.master_sigma[cal_row[p],cal_col[p],i]=cal_sigma[p]
+                calFile.close()
+            except:
+                print '\tUnable to open: '+self.masterFNs[i].mastercalSoln()
+                #raise
+        print "\tDone."
+
+    def populate_master_cal_data(self):
+        if hasattr(self, 'master_parab_const'):
+            return
+        if not hasattr(self, 'masterFNs'):
+            self.masterFNs,p = getDriftFileNames(self.params,nameStart='mastercal_',nameEnd='_drift.h5')
+        if len(self.masterFNs)==0:
+            print "No master cal files found!"
+            return
+
+        print "Collecting Master Cal Data for "+str(self.driftFNs[0].run)+'...'
+        self.master_parab_const=-1.0*np.ones((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        self.master_parab_lin=-1.0*np.ones((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        self.master_parab_quad=-1.0*np.ones((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+
+        for i in range(len(self.masterFNs)):
+            try:
+                calFile=tables.openFile(self.masterFNs[i].mastercalSoln(),mode='r')
+                cal_row = calFile.root.wavecal.calsoln.cols.pixelrow[:]    
+                cal_col = calFile.root.wavecal.calsoln.cols.pixelcol[:]    
+                cal_params = calFile.root.wavecal.calsoln.cols.polyfit[:]
+                for p in range(len(cal_row)):
+                    self.master_parab_const[cal_row[p],cal_col[p],i]=(cal_params[p])[0]
+                    self.master_parab_lin[cal_row[p],cal_col[p],i]=(cal_params[p])[1]
+                    self.master_parab_quad[cal_row[p],cal_col[p],i]=(cal_params[p])[2]
+                calFile.close()
+            except:
+                print '\tUnable to open: '+self.masterFNs[i].mastercalSoln()
+                #raise
+        print "\tDone."
+
+    def populate_master_peak_data(self):
+        if hasattr(self, 'master_blue'):
+            return
+        if not hasattr(self, 'masterFNs'):
+            self.masterFNs,p = getDriftFileNames(self.params,nameStart='mastercal_',nameEnd='_drift.h5')
+        if len(self.masterFNs)==0:
+            print "No master cal files found!"
+            return
+
+        print "Collecting master peak data for "+str(self.driftFNs[0].run)+'...'
+        self.master_blue = np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        self.master_red = np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        self.master_IR = np.zeros((self.beammap.shape[0],self.beammap.shape[1],len(self.masterFNs)))
+        for i in range(len(self.masterFNs)):
+            try:
+                driftFile=tables.openFile(self.masterFNs[i].mastercalDriftInfo(),mode='r')
+                drift_row = driftFile.root.params_drift.driftparams.cols.pixelrow[:]    
+                drift_col = driftFile.root.params_drift.driftparams.cols.pixelcol[:]    
+                drift_params = driftFile.root.params_drift.driftparams.cols.avglaserphase[:]
+                for p in range(len(drift_row)):
+                    self.master_blue[drift_row[p],drift_col[p],i]=(drift_params[p])[0]
+                    self.master_red[drift_row[p],drift_col[p],i]=(drift_params[p])[1]
+                    self.master_IR[drift_row[p],drift_col[p],i]=(drift_params[p])[2]
+                driftFile.close()
+            except:
+                print '\tUnable to open: '+self.masterFNs[i].mastercalDriftInfo()
+                #raise
+        print "\tDone."
+
+        
+
 
     def plot_laser_xOffset(self,minSol=2):
         print "Making xOffset Plots..."
@@ -211,10 +359,10 @@ if __name__ == '__main__':
     driftFNs, params = getDriftFileNames(paramFile)
     
     try:
-        drift_ana = drift_ana(driftFNs,params,save=False)
-        drift_ana.populate_data()
+        drift_ana = drift_ana(driftFNs,params,save=True)
+        drift_ana.populate_peak_data()
         drift_ana.plot_laser_xOffset()
-        drift_ana.plot_fluct_map()
+        #drift_ana.plot_fluct_map()
         drift_ana.plot_numSols_map()
     except:
         print "ERROR!"

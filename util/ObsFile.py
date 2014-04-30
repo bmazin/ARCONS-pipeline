@@ -58,6 +58,7 @@ import numpy as np
 from numpy import vectorize
 from numpy import ma
 import matplotlib.pyplot as plt
+from matplotlib.dates import strpdate2num
 from util import utils
 from interval import interval, inf, imath
 from util.FileName import FileName
@@ -1405,29 +1406,64 @@ class ObsFile:
             if verbose:
                 print 'Unable to load time adjustment for '+self.fileName
             raise
+
+    def loadBestWvlCalFile(self,master=True):
+        """
+        Searchs the waveCalSolnFiles directory tree for the best wavecal to apply to this obsfile.
+        if master==True then it first looks for a master wavecal solution
+        """
+        scratchDir = '/Scratch'
+        run = FileName(obsFile=self).run
+        wvlDir = scratchDir+"/waveCalSolnFiles/"+run+'/'
+        obs_t_num = strpdate2num("%Y%m%d-%H%M%S")(FileName(obsFile=self).tstamp)
+
+        wvlCalFileName = None
+        wvl_t_num = None
+        for root,dirs,files in os.walk(wvlDir):
+            for f in files:
+                if f.endswith('.h5') and ((master and f.startswith('mastercal_')) or (not master and f.startswith('calsol_'))):
+                    tstamp=(f.split('_')[1]).split('.')[0]
+                    t_num=strpdate2num("%Y%m%d-%H%M%S")(tstamp)
+                    if t_num < obs_t_num and (wvl_t_num == None or t_num > wvl_t_num):
+                        wvl_t_num = t_num
+                        wvlCalFileName = root+os.sep+f
+
+        if wvlCalFileName==None or not os.path.exists(str(wvlCalFileName)):
+            if master:
+                print "Could not find master wavecal solutions"
+                self.loadBestWvlCalFile(master=False)
+            else:
+                print "Searched "+wvlDir+" but no appropriate wavecal solution found"
+        else:
+            print "Loading wavelength calibration from: "+wvlCalFileName
+            self.loadWvlCalFile(wvlCalFileName)
                 
     def loadWvlCalFile(self, wvlCalFileName):
         """
         loads the wavelength cal coefficients from a given file
         """
-        scratchDir = '/Scratch'
-        wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
-        fullWvlCalFileName = os.path.join(wvlDir, wvlCalFileName)
-        if (not os.path.exists(fullWvlCalFileName)):
+        if os.path.exists(str(wvlCalFileName)):
+            fullWvlCalFileName = str(wvlCalFileName)
+        else:
+            scratchDir = '/Scratch'
+            wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
+            fullWvlCalFileName = os.path.join(wvlDir, str(wvlCalFileName))
+        try:
+            self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
+            wvlCalData = self.wvlCalFile.root.wavecal.calsoln
+            self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
+            self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
+            self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
+            self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
+            for calPixel in wvlCalData:
+                self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
+                self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
+                if calPixel['wave_flag'] == 0:
+                    self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
+                    self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
+        except IOError:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
-            return
-        self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
-        wvlCalData = self.wvlCalFile.root.wavecal.calsoln
-        self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
-        self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
-        self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
-        self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
-        for calPixel in wvlCalData:
-            self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
-            self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
-            if calPixel['wave_flag'] == 0:
-                self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
-                self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
+            
 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):

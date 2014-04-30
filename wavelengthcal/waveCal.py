@@ -58,12 +58,30 @@ def getCalFileNames(paramFile):
     run = params['run']
     sunsetDate = params['sunsetDate']
     tStampList = params['calTimeStamps']
-    if tStampList == None:
-        #search for all cal files in date
-        mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
-        path = mkidDataDir + os.sep + run + os.sep + sunsetDate + os.sep
-        tStampList = [f.split('.')[-2].split('_')[1] for f in os.listdir(path) if f.endswith('.h5') and f.startswith('cal_')]
-    calFNs = [FileName(run=run, date=sunsetDate,tstamp=tStamp) for tStamp in tStampList]
+    walkPath = None
+
+    #if tStampList == None:
+    #    #search for all cal files in date
+    #    mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
+    #    path = mkidDataDir + os.sep + run + os.sep + sunsetDate + os.sep
+    #    tStampList = [f.split('.')[-2].split('_')[1] for f in os.listdir(path) if f.endswith('.h5') and f.startswith('cal_')]
+
+    if sunsetDate == None:
+        walkPath=os.getenv('MKID_DATA_DIR', default="/ScienceData")+os.sep+run+os.sep
+    elif tStampList == None:
+        walkPath=os.getenv('MKID_DATA_DIR', default="/ScienceData")+os.sep+run+os.sep+sunsetDate+os.sep
+    if walkPath != None:
+        print 'Using all files from: '+walkPath
+        calFNs = []
+        for root,dirs,files in os.walk(walkPath):
+            for f in files:
+                if f.startswith('cal_') and f.endswith('.h5'):
+                    d=(root.split(run)[-1]).split('/')[1]
+                    t=f.split('.')[-2].split('_')[1]
+                    calFNs.append(FileName(run=run, date=d,tstamp=t))
+    else:
+        calFNs = [FileName(run=run, date=sunsetDate,tstamp=tStamp) for tStamp in tStampList]
+
     return calFNs, params
 
 def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,cut_off_phase=None,make_plot=False,verbose=False):
@@ -172,7 +190,7 @@ class waveCal:
         self.laserCalFile=ObsFile(calFN.cal())
         timeAdjustFileName=FileName(run=self.run).timeAdjustments()
         try:
-            self.laserCalFile.loadTimeAdjustmentFile(timeAdjustFileName,verbose=True)
+            self.laserCalFile.loadTimeAdjustmentFile(timeAdjustFileName,verbose=verbose)
         except:
             pass
         if not os.path.exists(self.calFN.timeMask()):
@@ -613,28 +631,31 @@ class waveCal:
 
         wavelengths = [self.params['bluelambda'],self.params['redlambda'], self.params['irlambda']]     #Angstroms
         energies = [self.params['h'] * self.params['c'] / (x * self.params['ang2m']) for x in wavelengths]             #eV
-        energies.append(0.)
-        laser_amps = np.concatenate((fit_params[[1,4,7]],[0.0]))
-        if fit_params[8]==0.0:
-            energies=np.delete(energies,2)
-            laser_amps = np.delete(laser_amps,2)
-        
-        #parameter_guess = [energies[0] / (pow(laser_amps[0],2)),0,0]
-        #parameter_guess = [20000.1,-70.1,1.1*10.**-7.]
-        parameter_guess = [-800.,5.,-1.*10.**-6.]
-        
-        x_offset2_guess=fit_params[1]*self.params['bluelambda']/(1.0*self.params['redlambda'])
-        x_offset3_guess=fit_params[1]*self.params['bluelambda']/(1.0*self.params['irlambda'])
-        if x_offset2_guess>fit_params[4] and x_offset3_guess>fit_params[7]:
-            #Curve bends upwards
-            parameter_guess = [800.,-5.,1.*10.**-6.]
+        laser_amps=np.asarray(fit_params[[1,4,7]])
+        #energies.append(0.)
+        #laser_amps = np.concatenate((fit_params[[1,4,7]],[0.0]))
 
-
+        # parameter_guess [constant, linear term (slope), quadratic term (perturbation to straight line)]
+        parameter_guess = [0.0,(energies[0]-energies[1])*1.0/(laser_amps[0]-laser_amps[1]), -10.**-5.]
         parameter_lowerlimit=[None]*3
         parameter_upperlimit=[None]*3
+        if fit_params[8]==0.0:      #No IR solution
+            energies=np.delete(energies,2)
+            laser_amps = np.delete(laser_amps,2)
+            # fix quadratic term to zero so we only fit a straight line
+            parameter_guess[-1] = 0.
+            parameter_lowerlimit[-1] = 0.0
+            parameter_upperlimit[-1] = 0.0        
+        else:
+            guess_blue_E_from_red_IR = (energies[1]-energies[2])*1.0/(laser_amps[1]-laser_amps[2])*(laser_amps[0]-laser_amps[1])+energies[1]
+            if guess_blue_E_from_red_IR < energies[0]:      #check if curving up instead of down
+                parameter_guess[-1]*=-1.0
+        
         parameter_fit, redchi2gauss2, mpperr = fitData(laser_amps,energies,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model='parabola',make_plot=make_plot,verbose=self.verbose)
         #mpperr gives 0 if parameter is at limit or fixed or not varied
         num_param_fails = np.sum(parameter_fit==parameter_guess)+np.sum(parameter_fit==parameter_lowerlimit) + np.sum(parameter_fit==parameter_upperlimit)
+        if parameter_fit[2]==0.0:       # no quadratic term, just fitting line
+            num_param_fails = 0
         if mpperr==None or num_param_fails>0.0:
             if self.verbose:
                 print "Unable to fit parabola"
@@ -1062,6 +1083,8 @@ if __name__ == '__main__':
     
     paramFile = sys.argv[1]
     calFNs, params = getCalFileNames(paramFile)
+    for calFN in calFNs:
+        print calFN.cal()
     debug=False
     verbose=False
     for calFN in calFNs:
@@ -1075,8 +1098,8 @@ if __name__ == '__main__':
                 print "last completed resonator: ("+str(waveCalObject.pixRowArr[-1])+', '+str(waveCalObject.pixColArr[-1])+')'
             raise
         if not debug:
-            waveCalObject.write_waveCal()
             if waveCalObject.rescounter > 0:
+                waveCalObject.write_waveCal()
                 waveCalObject.write_waveCal_drift()
                 try:
                     diag_obj=waveCal_diagnostic(calFN,params,save=True)
@@ -1093,6 +1116,9 @@ if __name__ == '__main__':
                     del diag_obj
                 except:
                     pass
+            else:
+                print "No solutions found!"
+        del waveCalObject
 
 
 

@@ -119,6 +119,21 @@ class FileName:
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
 
+    def mastercalSoln(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
+            'master_cals' + os.sep + \
+            "mastercal_" + self.tstamp + '.h5'
+
+    def mastercalDriftInfo(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
+            'master_cals' + os.sep + \
+            'drift_study'+ os.sep+\
+            "mastercal_" + self.tstamp + '_drift.h5'
+
     def centroidList(self):
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
