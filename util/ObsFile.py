@@ -53,23 +53,26 @@ repackArray(array, slices)
 
 import sys, os
 import warnings
-import tables
+import time
+
 import numpy as np
 from numpy import vectorize
 from numpy import ma
+from scipy import pi
 import matplotlib.pyplot as plt
 from matplotlib.dates import strpdate2num
-from util import utils
 from interval import interval, inf, imath
-from util.FileName import FileName
-from scipy import pi
+import tables
 from tables.nodes import filenode
+import astropy.constants
+
+from util import utils
+from util.FileName import FileName
 from headers import TimeMask
-import time
 
 class ObsFile:
-    h = 4.135668e-15 #eV s
-    c = 2.998e8 #m/s
+    h = astropy.constants.h.to('eV s').value  #4.135668e-15 #eV s
+    c = astropy.constants.c.to('m/s').value   #'2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
     def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
