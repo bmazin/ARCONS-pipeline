@@ -19,6 +19,7 @@ getFromHeader(self, name)
 getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True)
 getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, getRawCount=False)
+getPixelLightCurve(self, iRow, iCol, firstSec=0, lastSec=-1, cadence=1, **kwargs)
 getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
@@ -514,6 +515,34 @@ class ObsFile:
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 
+
+    def getPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,
+                           **kwargs):
+        """
+        Get a simple light curve for a pixel (basically a wrapper for getPixelCount)
+        
+        INPUTS:
+            iRow,iCol - Row and column of pixel
+            firstSec - start time (sec) within obsFile to begin the light curve
+            lastSec - end time (sec) within obsFile for the light curve. If -1, returns light curve to end of file.
+            cadence - cadence (sec) of light curve. i.e., return values integrated every 'cadence' seconds.
+            **kwargs - any other keywords are passed on to getPixelCount (see above), including:
+                weighted
+                fluxWeighted  (Note if True, then this should correct the light curve for effective exposure time due to bad pixels)
+                getRawCount
+                
+        OUTPUTS:
+            A single one-dimensional array of flux counts integrated every 'cadence' seconds 
+            between firstSec and lastSec. Note if step is non-integer may return inconsistent
+            number of values depending on rounding of last value in time step sequence (see
+            documentation for numpy.arange() ).
+        """
+        if lastSec==-1:lSec = self.getFromHeader('exptime')
+        else: lSec = lastSec
+        return np.array([self.getPixelCount(iRow,iCol,firstSec=x,integrationTime=cadence,**kwargs)['counts']
+                       for x in np.arange(firstSec,lSec,cadence)])
+        
+    
     def getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         returns a numpy array of 64-bit photon packets for a given pixel, integrated from firstSec to firstSec+integrationTime.
