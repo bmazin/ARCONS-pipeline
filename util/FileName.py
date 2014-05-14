@@ -135,11 +135,13 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.tstamp + '.h5'
 
@@ -190,6 +192,12 @@ class FileName:
             'photonLists' + os.sep + \
             self.date + os.sep + \
             "photons_" + self.tstamp + '.h5'
+
+    def timedPhotonList(self):
+        return self.intermDir + os.sep + \
+            'photonLists' + os.sep + \
+            self.date + os.sep + \
+            "timedPhotons_" + self.tstamp + '.h5'
                            
     def packetMasterLog(self):
         return self.mkidDataDir + os.sep + \
