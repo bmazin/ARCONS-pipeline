@@ -19,6 +19,7 @@ getFromHeader(self, name)
 getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True)
 getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False, getRawCount=False)
+getPixelLightCurve(self, iRow, iCol, firstSec=0, lastSec=-1, cadence=1, **kwargs)
 getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1)
 getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1)
@@ -53,22 +54,26 @@ repackArray(array, slices)
 
 import sys, os
 import warnings
-import tables
+import time
+
 import numpy as np
 from numpy import vectorize
 from numpy import ma
-import matplotlib.pyplot as plt
-from util import utils
-from interval import interval, inf, imath
-from util.FileName import FileName
 from scipy import pi
+import matplotlib.pyplot as plt
+from matplotlib.dates import strpdate2num
+from interval import interval, inf, imath
+import tables
 from tables.nodes import filenode
+import astropy.constants
+
+from util import utils
+from util.FileName import FileName
 from headers import TimeMask
-import time
 
 class ObsFile:
-    h = 4.135668e-15 #eV s
-    c = 2.998e8 #m/s
+    h = astropy.constants.h.to('eV s').value  #4.135668e-15 #eV s
+    c = astropy.constants.c.to('m/s').value   #'2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
     def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
@@ -248,12 +253,17 @@ class ObsFile:
         if excludeBad is True, wavelengths calculated as np.inf are excised from the array returned, as are wavelengths outside the fit limits of the wavecal
         """
 
-        xOffset = self.wvlCalTable[iRow, iCol, 0]
-        yOffset = self.wvlCalTable[iRow, iCol, 1]
-        amplitude = self.wvlCalTable[iRow, iCol, 2]
+        #xOffset = self.wvlCalTable[iRow, iCol, 0]
+        #yOffset = self.wvlCalTable[iRow, iCol, 1]
+        #amplitude = self.wvlCalTable[iRow, iCol, 2]
+        #energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
+        const = self.wvlCalTable[iRow, iCol, 0]
+        lin_term = self.wvlCalTable[iRow, iCol, 1]
+        quad_term = self.wvlCalTable[iRow, iCol, 2]
+        energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
+
         wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
         wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
-        energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
         
         if excludeBad == True:
             energies = energies[energies != 0]
@@ -434,15 +444,20 @@ class ObsFile:
         baselines = np.array(baselines,dtype=np.double)
         if dither==True:
             parabolaPeaks += np.random.random_sample(len(parabolaPeaks))
-            baselines += np.random.random_sample(len(baselines))
-                    
+            baselines += np.random.random_sample(len(baselines))                    
         pulseHeights = parabolaPeaks - baselines
-        xOffset = self.wvlCalTable[iRow,iCol,0]
-        yOffset = self.wvlCalTable[iRow,iCol,1]
-        amplitude = self.wvlCalTable[iRow,iCol,2]
-        wvlCalLowerLimit = self.wvlRangeTable[iRow,iCol,0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow,iCol,1]
-        energies = amplitude*(pulseHeights-xOffset)**2+yOffset
+
+        #xOffset = self.wvlCalTable[iRow, iCol, 0]
+        #yOffset = self.wvlCalTable[iRow, iCol, 1]
+        #amplitude = self.wvlCalTable[iRow, iCol, 2]
+        #energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
+        const = self.wvlCalTable[iRow, iCol, 0]
+        lin_term = self.wvlCalTable[iRow, iCol, 1]
+        quad_term = self.wvlCalTable[iRow, iCol, 2]
+        energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
+
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
         
         wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
         if excludeBad == True:
@@ -500,6 +515,34 @@ class ObsFile:
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 
+
+    def getPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,
+                           **kwargs):
+        """
+        Get a simple light curve for a pixel (basically a wrapper for getPixelCount)
+        
+        INPUTS:
+            iRow,iCol - Row and column of pixel
+            firstSec - start time (sec) within obsFile to begin the light curve
+            lastSec - end time (sec) within obsFile for the light curve. If -1, returns light curve to end of file.
+            cadence - cadence (sec) of light curve. i.e., return values integrated every 'cadence' seconds.
+            **kwargs - any other keywords are passed on to getPixelCount (see above), including:
+                weighted
+                fluxWeighted  (Note if True, then this should correct the light curve for effective exposure time due to bad pixels)
+                getRawCount
+                
+        OUTPUTS:
+            A single one-dimensional array of flux counts integrated every 'cadence' seconds 
+            between firstSec and lastSec. Note if step is non-integer may return inconsistent
+            number of values depending on rounding of last value in time step sequence (see
+            documentation for numpy.arange() ).
+        """
+        if lastSec==-1:lSec = self.getFromHeader('exptime')
+        else: lSec = lastSec
+        return np.array([self.getPixelCount(iRow,iCol,firstSec=x,integrationTime=cadence,**kwargs)['counts']
+                       for x in np.arange(firstSec,lSec,cadence)])
+        
+    
     def getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         returns a numpy array of 64-bit photon packets for a given pixel, integrated from firstSec to firstSec+integrationTime.
@@ -1395,29 +1438,64 @@ class ObsFile:
             if verbose:
                 print 'Unable to load time adjustment for '+self.fileName
             raise
+
+    def loadBestWvlCalFile(self,master=True):
+        """
+        Searchs the waveCalSolnFiles directory tree for the best wavecal to apply to this obsfile.
+        if master==True then it first looks for a master wavecal solution
+        """
+        scratchDir = '/Scratch'
+        run = FileName(obsFile=self).run
+        wvlDir = scratchDir+"/waveCalSolnFiles/"+run+'/'
+        obs_t_num = strpdate2num("%Y%m%d-%H%M%S")(FileName(obsFile=self).tstamp)
+
+        wvlCalFileName = None
+        wvl_t_num = None
+        for root,dirs,files in os.walk(wvlDir):
+            for f in files:
+                if f.endswith('.h5') and ((master and f.startswith('mastercal_')) or (not master and f.startswith('calsol_'))):
+                    tstamp=(f.split('_')[1]).split('.')[0]
+                    t_num=strpdate2num("%Y%m%d-%H%M%S")(tstamp)
+                    if t_num < obs_t_num and (wvl_t_num == None or t_num > wvl_t_num):
+                        wvl_t_num = t_num
+                        wvlCalFileName = root+os.sep+f
+
+        if wvlCalFileName==None or not os.path.exists(str(wvlCalFileName)):
+            if master:
+                print "Could not find master wavecal solutions"
+                self.loadBestWvlCalFile(master=False)
+            else:
+                print "Searched "+wvlDir+" but no appropriate wavecal solution found"
+        else:
+            print "Loading wavelength calibration from: "+wvlCalFileName
+            self.loadWvlCalFile(wvlCalFileName)
                 
     def loadWvlCalFile(self, wvlCalFileName):
         """
         loads the wavelength cal coefficients from a given file
         """
-        scratchDir = '/Scratch'
-        wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
-        fullWvlCalFileName = os.path.join(wvlDir, wvlCalFileName)
-        if (not os.path.exists(fullWvlCalFileName)):
+        if os.path.exists(str(wvlCalFileName)):
+            fullWvlCalFileName = str(wvlCalFileName)
+        else:
+            scratchDir = '/Scratch'
+            wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
+            fullWvlCalFileName = os.path.join(wvlDir, str(wvlCalFileName))
+        try:
+            self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
+            wvlCalData = self.wvlCalFile.root.wavecal.calsoln
+            self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
+            self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
+            self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
+            self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
+            for calPixel in wvlCalData:
+                self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
+                self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
+                if calPixel['wave_flag'] == 0:
+                    self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
+                    self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
+        except IOError:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
-            return
-        self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
-        wvlCalData = self.wvlCalFile.root.wavecal.calsoln
-        self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
-        self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
-        self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
-        self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
-        for calPixel in wvlCalData:
-            self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
-            self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
-            if calPixel['wave_flag'] == 0:
-                self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
-                self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
+            
 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):

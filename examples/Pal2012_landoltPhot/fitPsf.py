@@ -138,6 +138,7 @@ for iFrame in range(0,np.shape(stack)[0]):
     #minpars = [0,0,27,27,1] #tighter constraint on PSF width to avoid fitting wrong peak if PSF is divided by dead pixels
     maxpars = [40,200,43,43,10]
     #maxpars = [40,200,33,33,10]
+    ''' #forced parameters for Landolt standard
     if iFrame == 27:
         minpars = [8,5,0,0,0.5]
         maxpars = [30,25,43,45,1.1]
@@ -150,7 +151,7 @@ for iFrame in range(0,np.shape(stack)[0]):
     if iFrame == 30:
         minpars = [8,5,0,0,0.5]
         maxpars = [30,25,43,45,1.10]
-    
+    '''
     usemoments=[True,True,True,True,True] #doesn't use our guess values, default
     #usemoments=[False,False,False,False,False]
 

@@ -58,10 +58,8 @@ class CalculateRaDec:
         
         
         self.params = np.array(centroidListNode.params.read())
-        '''
-        self.xCenterOfRotation = float(self.params[0])
-        self.yCenterOfRotation = float(self.params[1])
-        '''
+        self.nRow = self.params[0]
+        self.nCol = self.params[1]
         self.centroidRightAscension = self.params[2]
         self.centroidDeclination = self.params[3]
         self.times = np.array(centroidListNode.times.read())
@@ -86,11 +84,11 @@ class CalculateRaDec:
         self.rotationMatrix = np.array([[np.cos(self.hourAngles),-np.sin(self.hourAngles)],[np.sin(self.hourAngles),np.cos(self.hourAngles)]]).T  
         self.centroidRotated = np.dot(self.rotationMatrix,np.array([self.xCentroids,self.yCentroids])).diagonal(axis1=0,axis2=2)
       
-        self.pixelCount = 44*46
+        self.pixelCount = self.nCol*self.nRow
         self.values = np.zeros((2,self.pixelCount))
         for i in range(self.pixelCount):
-            self.values[0,i] = i/46
-            self.values[1,i] = i%46
+            self.values[0,i] = i/self.nRow
+            self.values[1,i] = i%self.nRow
         self.rotatedValues = np.dot(self.rotationMatrix,self.values)
       
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
@@ -106,7 +104,7 @@ class CalculateRaDec:
 
         self.photonHourAngle = self.hourAngles[self.binNumber]
 
-        self.indexArray = np.array(self.xPhotonPixel*46+self.yPhotonPixel)
+        self.indexArray = np.array(self.xPhotonPixel*self.nRow+self.yPhotonPixel)
 
         self.xPhotonRotated=np.zeros(len(self.timestamp))
         self.yPhotonRotated=np.zeros(len(self.timestamp))

@@ -179,8 +179,6 @@ def main():
     print "Dead time correction factors = "
     print CorrFactors
 
-
-
     print "Making Weighted cube"
     #REMAKE CUBE WITH FLAT WEIGHTS AND APPLY DEAD TIME CORRECTION AS WELL
 

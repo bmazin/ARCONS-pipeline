@@ -59,7 +59,7 @@ class DisplayStack(QMainWindow):
 
 
         # Load image stack button
-        #self.ui.loadStackButton.clicked.connect(self.chooseStack)
+        self.ui.loadStackButton.clicked.connect(self.chooseStack)
 
     # Initialize Variables
     def initializeVariables(self):
@@ -378,18 +378,20 @@ class DisplayStack(QMainWindow):
             print 'Invalid parameter file...'
 
     # Choose an image stack
-    '''
+    
     def chooseStack(self):
-        self.defaultLoadStackDirectory = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks')
+        self.defaultLoadStackDirectory = str(self.displayStackPath)
+        #self.defaultLoadStackDirectory = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks')
+        self.stackName = ''
         self.stackName = QFileDialog.getOpenFileName(parent=None, directory=self.defaultLoadStackDirectory, caption=str("Choose Image Stack"), filter=str("NPZ (*.npz)")) 
         if self.stackName == '':
             print 'No file chosen'
         else:          
-            loadStackApp = LoadImageStack.LoadImageStack()
+            loadStackApp = LoadImageStack.LoadImageStack(stackName = self.stackName)
             loadStackApp.show()
             loadStackApp.exec_()
             # Change to a QDialog...
-    '''
+    
 
 # Start up main gui
 if __name__ == "__main__":

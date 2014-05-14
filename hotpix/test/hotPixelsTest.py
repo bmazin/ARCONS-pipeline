@@ -1,9 +1,11 @@
 import sys
+import os.path
 import numpy as np
 import matplotlib.pylab as mpl
 from interval import interval
 import hotpix.hotPixels as hp
 from util.FileName import FileName 
+from util import ObsFile as of
 
 '''Internal consistency checks for hotPixels.py'''
 
@@ -27,7 +29,7 @@ def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20
     
     workingDir = '/Users/vaneyken/Data/UCSB/ARCONS/Palomar2012/hotPixTest2/'
     outputFile = workingDir + 'testoutput.h5'
-    paramFile = '/Users/vaneyken/UCSB/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
+    paramFile = os.path.join(os.path.dirname(__file__),'../../params/hotPixels.dict')  #/Users/vaneyken/UCSB/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
     testStartTime = 2   #In seconds
     testEndTime = 4     #In seconds
     timeStep = 2        #In seconds (deliberately equal to start time - end time)
@@ -50,7 +52,7 @@ def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20
     
     hpOutput = hp.readHotPixels(outputFile)
 
-    intMask = intermediateOutput['mask']
+    intMask = intermediateOutput['mask'] > 0    #Make a Boolean mask - any code > 0 is bad for some reason.
     intervals = hpOutput['intervals']
     reasons = hpOutput['reasons']
 
@@ -64,7 +66,7 @@ def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20
                                      dtype='object'), np.shape(intervals))
 
 
-    #Create a boolean mask that should be True for all hot pixels within the test time range
+    #Create a boolean mask that should be True for all bad (hot/cold/dead/other) pixels within the test time range
     finalMask = np.reshape([(interval(testStartTime, testEndTime) in x) 
                             for x in uIntervals.flat], np.shape(uIntervals))   
 
@@ -76,7 +78,7 @@ def hotPixelsTest(testFileName=FileName(run='PAL2012',date='20121208',tstamp='20
 
 
 
-def hotPixelsTest2(startTime=12.3, endTime=23.1, getRawCount=False):
+def hotPixelsTest2(startTime=12.3, endTime=23.1, getRawCount=True):
     '''
     Runs a check of the bad pixel time masking. Checks:
         - Number of photons removed from returned image is consistent
@@ -96,9 +98,20 @@ def hotPixelsTest2(startTime=12.3, endTime=23.1, getRawCount=False):
     wvlCalFileName = 'calsol_20121209-060704.h5'
     flatCalFileName = 'flatsol_20121210.h5'
     hotPixFileName = 'hotPix_20121209-044636.h5'
+    paramFile = os.path.join(os.path.dirname(__file__),'../../params/hotPixels.dict')
     startTime = float(startTime)    #Force these values to floats to make sure
     endTime = float(endTime)        #that getPixelCountImage calls getPixelSpectrum
                                     #and applies wavelength cutoffs consistently.
+    
+    if not os.path.exists(dir+hotPixFileName):
+        print 'Creating hot pixel file....'
+        hp.findHotPixels(paramFile=paramFile, inputFileName=dir+obsFileName,
+                         outputFileName=dir+hotPixFileName, timeStep=1,
+                         startTime=0, endTime=-1,
+                         fwhm=3.0, boxSize=5, nSigmaHot=2.5,
+                         nSigmaCold=2.5, display=True)
+        print 'Done creating hot pixel file.'
+        print
     
     intTime = endTime - startTime
     

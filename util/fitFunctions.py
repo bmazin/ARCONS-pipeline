@@ -6,11 +6,21 @@ def benitez2(p, fjac=None, x=None, y=None, err=None):
     status = 0
     return([status, (y-model)/err])    
 
-def parabola(p, fjac=None, x=None, y=None, err=None,return_models=False):
+def parabola_old(p, fjac=None, x=None, y=None, err=None,return_models=False):
     #p[0] = x_offset
     #p[1] = y_offset
     #p[2] = amplitude
     model = p[2] * (pow( (x - p[0]), 2 )) + p[1]
+    if return_models:
+        return [model]
+    status = 0
+    return([status, (y-model)/err])
+
+def parabola(p, fjac=None, x=None, y=None, err=None,return_models=False):
+    #p[0] = constant term
+    #p[1] = linear term
+    #p[2] = quadratic term
+    model = p[0]+p[1]*x+p[2]*x**2
     if return_models:
         return [model]
     status = 0

@@ -4,7 +4,17 @@ import ephem
 import math
 
 class Overview:
-    'A simple class to generate summary information for ACORNS data and calibration files'
+    '''
+    A simple class to generate summary information for ARCONS data 
+    and calibration files. E.g. useage:
+    
+        from util import overview as ov
+        ov.Overview('./').all()
+        
+        - lists info on all the ARCONS data files in the 
+          current working directory.
+    '''
+    
     def __init__(self,directory):
         if os.path.exists(directory):
             self.dataDir = directory

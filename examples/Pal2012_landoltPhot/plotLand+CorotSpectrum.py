@@ -7,7 +7,7 @@ from util.ObsFile import ObsFile
 from util import MKIDStd
 from util.rebin import rebin
 from matplotlib import rcParams
-from matplotlib.backends.backend_pdf import PdfPages
+#from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib
 from scipy import interpolate
 from scipy import integrate
@@ -208,9 +208,8 @@ for k in xrange(nFiles):
     curve = 2*np.pi*amps*(widths**2) #spectrum of oberved object in counts/s
     curve /= binWidths #spectrum is now in counts/s/Angs
 
-    diam = 500 #5 meter telescope
-    area = np.pi * ((diam/2.0)**2 -(diam/4.0)**2)
-    curve/= area #spectrum is now in counts/s/Angs/cm^2
+    diam = 510.55 #5 meter telescope
+    area = np.pi * ((diam/2.0)**2 -(183/2.0)**2) #secondary obstruction diameter 1.83m
     print k
     print curve
     curves[k] = curve
@@ -252,8 +251,8 @@ ypos = params[:,3]
 curve = 2*np.pi*amps*(widths**2) #spectrum of oberved object in counts/s
 curve /= binWidths #spectrum is now in counts/s/Angs
 
-diam = 500 #5 meter telescope
-area = np.pi * ((diam/2.0)**2 -(100)**2) #Palomar secondary is ~1m radius from Serabyn 2007
+diam = 510.55 #5 meter telescope
+area = np.pi * ((diam/2.0)**2 -(183/2.0)**2) #secondary obstruction diameter 1.83m
 curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 
@@ -262,6 +261,11 @@ curve/= area #spectrum is now in counts/s/Angs/cm^2
 #ax = fig.add_subplot(111)
 #plt.xlim(3500,13000)
 #plt.ylim(0,0.001)
+
+#SETUP EPS PLOTTING
+#matplotlib.rcParams.update({'font.size':12, 'font.family': 'sans-serif','sans-serif':['Helvetica']})
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+plt.rc('text',usetex=True)
 
 fname = 'throughput_high.txt'
 fdata = np.loadtxt(fname,dtype=float)
@@ -300,10 +304,11 @@ print "percents (errors/counts * 100) = ", percents
 
 #plt.show()
 plotDir = "/home/srmeeker/scratch/standards"
-plotFileName = "Land+CorotSpec.pdf"
+#plotFileName = "Land+CorotSpec.pdf"
+plotFileName = "Land+CorotSpec.eps"
 fullFluxPlotFileName = os.path.join(plotDir,plotFileName)
 
-pp = PdfPages(fullFluxPlotFileName)
+#pp = PdfPages(fullFluxPlotFileName)
 
 fig = plt.figure()
 ax = plt.subplot(211)
@@ -410,8 +415,10 @@ ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%d'))
 
 #plt.show()
 
-pp.savefig()
-pp.close()
+plt.savefig(fullFluxPlotFileName,format='eps')
+
+#pp.savefig()
+#pp.close()
 
 '''
 #output spectrum

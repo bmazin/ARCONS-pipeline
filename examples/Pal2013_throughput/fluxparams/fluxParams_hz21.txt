@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2013/20131209
+flatdir=/Scratch/flatCalSolnFiles/PAL2013/20131209
+wvldir=/Scratch/waveCalSolnFiles/PAL2013/20131209
+fluxfile=obs_20131209-115553.h5
+skyfile=None
+flatfile=flatsol_20131209.h5
+wvlfile=calsol_20131209-132225.h5
+fluxdir=/Scratch/fluxCalSolnFiles/PAL2013/20131209
+fluxoutfile=fluxsol_20131209-121634.h5
+objectName=hz21
+xpix = 21
+ypix = 27
+rad = 10
+starttime = 50
+endtime = -1
