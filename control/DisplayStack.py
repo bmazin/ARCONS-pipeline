@@ -112,8 +112,9 @@ class DisplayStack(QMainWindow):
         self.run = self.runNames[self.runNumber]
         self.target = self.targetNames[self.runNumber][self.targetNumber]
         try:
+            self.paramName = self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
             self.paramData = readDict()
-            self.paramData.read_from_file(self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict')
+            self.paramData.read_from_file(self.paramName)
             self.obsTimes = np.array(self.paramData['obsTimes'])
             self.utcDates = self.paramData['utcDates']
             self.sunsetDates = self.paramData['sunsetDates']
