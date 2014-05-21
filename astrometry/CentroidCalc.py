@@ -116,6 +116,11 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     # centerX = '30.5'        #Dummy values - actually doesn't matter what's entered here.
     # centerY = '30.5'
 
+    # Get array size information from obs file
+    gridHeight = ob.nCol
+    gridWidth = ob.nRow
+
+
     # Create an array of array and target specific parameters to include in the output file header.
     paramsList = [gridHeight,gridWidth,centroid_RA,centroid_DEC]
     
@@ -146,10 +151,6 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     
     original_lst_radians = ephem.hours(original_lst).real
     original_lst_seconds = radians_to_arcsec(original_lst_radians)/15.0
-    
-    # Get array size information from obs file
-    gridHeight = ob.nCol
-    gridWidth = ob.nRow
     
     # Create saturated pixel mask to apply to PyGuide algorithm.
     print 'Creating saturation mask...'
