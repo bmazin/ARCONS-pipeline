@@ -3,6 +3,7 @@ from catalog import queryVizier,queryFitsImage
 import os
 import warnings
 from radec import radec
+from functions import *
 
 
 #ignore the warning caused by astropy
@@ -32,11 +33,24 @@ caldir = './cal/'
 #directory of fits images to be calibrated, put all the files here
 fdir = './origin/'
 sedir = './config/'
+
 #if manual = False, the program will use sextractor to find source and match the correponding stars in the images
 #also make sure the ./origin/ folder has appropriate sextractor parameters files and parameters
 manual = False
+
+#next, if automatic calibration is chosen, it is best to first manually correct the reference pixel coordinate on the header. This greatly increases the chances of calibrating.
+refFix = False
+if refFix:
+    #specify the correct reference pixels. This can be found by manually open the fits file and changing the header keywords CRVAL1 AND CRVAL2 until the stars matched the one found in the catalog. This only has be done once per calibration since we assume the offset is constant.
+    refX = 500
+    refY = 600
+
+
 #perform linear and polynomial calibration to each file in dir specified
 for fitsImage in os.listdir(fdir):
+    #fix reference value if refFix is True
+    if refFix:
+        pass
 	cal = StarCalibration(fitsImage,tfitsTable,tfitsImage,manual,paramFile=None,caldir=caldir,fdir=fdir,sedir=sedir)
 	cal.linCal()
 	#cal.distCal()

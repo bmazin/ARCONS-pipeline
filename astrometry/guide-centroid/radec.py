@@ -1,33 +1,35 @@
+'''
+To Do: 
+1.write down function for converting guide pixel to arcons pixel and use the same function for calculating its inverse to convert arcons back to guide pixel
+2.Implement a better way to find reference guide pixel and reference arcons pixel
+'''
+
+from functions import *
 import pyfits
 import numpy as np
 from astropy import wcs
 from scipy.optimize import fsolve
 
-inputFile = 'runRecord.txt'
-
-
-def _poly2(p,x1,x2):
-    """
-    Polynomial distortion model following SIP convention
-        
-    Keywords argument:
-    p --- ordered coeffient list
-    x1 --- x coordinate
-    x2 --- y coordinate
-    """
-    a10,a01,a20,a02,a11,a21,a12,a30,a03 = p
-    y = a10*x1 + a01*x2 + a20*x1**2 + a02*x2**2 + a11*x1*x2 + a21*(x1**2)*x2 + a12*x1*x2**2 + a30*x1**3 + a03*x2**3
-    return y
-    
-
+inputFile = 'runRecord.txt'  
 
 class radec(object):
 
-    def __init__(self,recordFile='runRecord.txt',tolError=400,caldir='./cal/'):
+    def __init__(self,recordFile='runRecord.txt',tolError=400,caldir='./cal/',refPixGuide=[548,370],refPixARCONS=[11.8688,12.9538]):
     
         self.sortList = []
+        #notice that self.timeStamp contains timeStamp in seconds(integers)
+        self.timeStampList = []
         self.caldir = caldir
-    
+        
+        #initialize ARCONS parameters      
+        self.guidePlate=3.5833*10**(-5)
+        self.arconsPlate=1.208*10**(-4)
+        self.dimX=44
+        self.dimY=46
+        self.refPixGuide = refPixGuide
+        self.refPixARCONS = refPixARCONS
+        self.sufix = ''
+        
         #sorting the list of files in time-ascending order and discard any images that have error greater than 400 pixels
         fileList = []
         recordFile = open(recordFile,'r')
@@ -45,90 +47,33 @@ class radec(object):
 
         tempList1 = []
         tempList2 = []
+        self.suffix = fileList[6:]
+        
         for nfile in fileList:
             timeStamp = nfile[0:6]
-            hr = int(timeStamp[0:2])
-            min = int(timeStamp[2:4])
-            sec = int(timeStamp[4:6])
-            sec = hr*3600 + min*60 + sec
+            sec = timeConvert(timeStamp)
             tempList1.append(sec)
-            
+        
+        #time-ascending order
         tempList1.sort() 
-            
 
         for ntime in tempList1:
-            hr = ntime/3600
-            min = (ntime-(hr*3600))/60
-            sec = ntime-(hr*3600)-(min*60)
-            
-            hr = str(hr)
-            min = str(min)
-            sec = str(sec)
-            
-            if len(hr) == 1:
-                hr = '0' + hr
-            if len(min) == 1:   
-                min = '0' + min
-            if len(sec) == 1:
-                sec = '0' + sec
-            outputFileName = '%s%s%sfix_offCal_rotCal.fits' %(hr,min,sec)
+            timeStr = timeConvert(ntime)
+            outputFileName = timeStr + suffix
             tempList2.append(outputFileName)        
         
+        #output sorted file and timeStamp lists
         self.sortList = tempList2
+        self.timeStampList = tempList1
 
-    def centroid(self,worldCoor,refPixGuide=[548,370],refPixARCONS=[11.8688,12.9538],guidePlate=3.5833*10**(-5),arconsPlate=1.208*10**(-4),dimX=44,dimY=46):
+    def centroid(self,worldCoor,refPixGuide=[548,370],refPixARCONS=[11.8688,12.9538]):
         '''
         Convert world coordinate into arcons coordinate.
         '''
-        
-        #this function is used in FitsAnalysis also, combine them into one place
-        def _world2pix(fitsImageName,world,paramFile=None):  
-            #load file
-            imageList = pyfits.open(fitsImageName)
-            header = imageList[0].header
-            #fix error
-            if header['CTYPE1'] == 'RA--TAN':
-                header['CTYPE1'] = 'RA---TAN'
-            #coordinates conversion
-            w = wcs.WCS(header)
-            pix = w.wcs_world2pix(world,1)
-            pix = pix.tolist()
-            
-            #Then if distortion params provided, find the inverse of that and apply it to find the final pixel coordinates      
-            if paramFile != None:
-                
-                paramFile = np.load(paramFile)
-                dt1 = paramFile['dt1']
-                dt2 = paramFile['dt2']
-                x1ref = paramFile['xref'][0]
-                x2ref = paramFile['xref'][1]
-                #Prevent python errors of too many files opened
-                paramFile.close()
-                                          
-                def _equations(p,dt1,dt2,x,y,x1ref,x2ref):
-                    """ 
-                    Return a system of equations roots will give the reverse transformation of distortion. Remember everything is in relative coordinates.
-                    """
-                    x1,x2 = p
-                    eqn1 = x - _poly2(dt1,x1,x2) - x1 
-                    eqn2 = y - _poly2(dt2,x1,x2) - x2 
-                    return (eqn1,eqn2)
-                
-                
-                for index in range(len(pix)):
-                    x = pix[index][0] - x1ref
-                    y = pix[index][1] - x2ref
-                
-                    x1,x2 = fsolve(_equations,(x,y),args=(dt1,dt2,x,y,x1ref,x2ref))
-                    
-                    pix[index][0] = x1 + x1ref
-                    pix[index][1] = x2 + x2ref
-                    
-            return pix
-
         guidePixel = [] 
 
         for nfile in self.sortList:
+            #include the prefix for file directory
             nfiledir = self.caldir + nfile
             try:
                 pix = _world2pix(nfiledir,[worldCoor],'params.npz')
@@ -138,27 +83,62 @@ class radec(object):
 
        
         x = np.array([coorX for coorX in (guidePixel[index][1][0] for index in range(len(guidePixel)))])
-
         y = np.array([coorY for coorY in (guidePixel[index][1][1] for index in range(len(guidePixel)))])
-
-        deltaX = (x-refPixGuide[0])*guidePlate/arconsPlate
-        deltaY = (y-refPixGuide[1])*guidePlate/arconsPlate
-
-        arconsX = refPixARCONS[0] + deltaX
-        arconsY = refPixARCONS[1] - deltaY
+        
+        #difference in X,Y ARCONS coordinate relative to the reference pixel
+        deltaX = (x-self.refPixGuide[0])*self.guidePlate/self.arconsPlate
+        deltaY = (y-self.refPixGuide[1])*self.guidePlate/self.arconsPlate
+        
+        #the reason for the minux sign in deltaY is because the axis is inverted
+        arconsX = self.refPixARCONS[0] + deltaX
+        arconsY = self.refPixARCONS[1] - deltaY
 
         index = 0
         arconsCoor = []
         print arconsX
+        #eliminate any coordinate that is out of the range of the plate (0<x<44,0<y<46)
         for coor1 in arconsX:
             if coor1 > 0 and coor1 < 44 and arconsY[index] > 0 and arconsY[index] < 46:
                 arconsCoor.append([coor1,arconsY[index],self.sortList[index][0:6]])
             index += 1
         return arconsCoor
 
-    def photonMapping(self):
-        pass
-
+    def photonMapping(self,timeStamp,xPhotonPixel,yPhotonPixel):
+        #the timestamp variable has to be a string input of format eg: 041527
+        
+        
+        #first convert timeStamp to seconds in interger and compare with the list to find the closest neighbor
+        timeStamp = timeConvert(timeStamp)
+        
+        #convert to np array for faster processing
+        timeStampListNp = np.array[self.timeStampList]
+        
+        def _find_nearest(array,value):
+        #find closest neighbor from a given array for a given value
+            idx = (np.abs(array-value)).argmin()
+            return array[idx]
+        
+        matchedTime = _find_nearest(timeStampListNp,timeStamp)
+        #file name of the closest matching time stamp
+        matchedFile = timeConvert(matchedTime) + self.suffix
+        
+        deltaX = xPhotonPixel - self.refPixARCONS[0]
+        deltaY = yPhotonPixel + self.refPixARCONS[1]
+        
+        #find (x,y) in guide pixel coordinate
+        x = deltaX*(self.arconsPlate/self.guidePlate) + self.refPixGuide[0]
+        y = deltaY*(self.arconsPlate/self.guidePlate) + self.refPixGuide[1]
+        
+        filePath = self.caldir + matchedFile    
+        
+        #return RA,DEC world coordinate
+        world = _pix2world(filePath,[[x,y]])
+        
+        #RA,DEC in degreess
+        RA = world[0][0]
+        DEC = world[0][1]
+        
+        return RA,DEC
 
 if __name__ == '__main__':
  
