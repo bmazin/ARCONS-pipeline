@@ -41,16 +41,26 @@ manual = False
 #next, if automatic calibration is chosen, it is best to first manually correct the reference pixel coordinate on the header. This greatly increases the chances of calibrating.
 refFix = False
 if refFix:
-    #specify the correct reference pixels. This can be found by manually open the fits file and changing the header keywords CRVAL1 AND CRVAL2 until the stars matched the one found in the catalog. This only has be done once per calibration since we assume the offset is constant.
-    refX = 500
-    refY = 600
+    #specify the correct reference pixels. This can be found by manually open the fits file and changing the header keywords CRPIX1 AND CRPIX2 until the stars matched the one found in the catalog. This only has be done once per calibration since we assume the offset is constant.
+    CRPIX1 = 560
+    CRPIX2 = 360
 
 
 #perform linear and polynomial calibration to each file in dir specified
 for fitsImage in os.listdir(fdir):
     #fix reference value if refFix is True
     if refFix:
-        pass
+        #open the fits image and change CRPIX value. Save the file to *fixed.fits in the fdir(origin in defualt)
+        imageList = pyfits.open(fitsImageName)
+        header = imageList[0].header
+        header.update('CRPIX1',CRPIX1)
+        header.update('CRPIX2',CRPIX2)
+        fitsImage = '%sfixed.fits' %(fitsImageName[0:6])
+        try:
+            os.remove(fitsImage)
+        except:
+            pass
+        imageList.writeto(fitsImage,output_verify='ignore')        
 	cal = StarCalibration(fitsImage,tfitsTable,tfitsImage,manual,paramFile=None,caldir=caldir,fdir=fdir,sedir=sedir)
 	cal.linCal()
 	#cal.distCal()
