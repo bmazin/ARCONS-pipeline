@@ -1322,6 +1322,28 @@ class ObsFile:
                     retval[i0:i1] = True
         return retval
 
+    def loadBeammapFile(self,beammapFileName):
+        """
+        Load an external beammap file in place of the obsfile's attached beammap.
+        Can be used to correct pixel location mistackes
+        """
+        #get the beam image.
+        scratchDir = os.getenv('INTERM_PATH', '/')
+        beammapPath = os.path.join(scratchDir, 'pixRemap')
+        fullBeammapFileName = os.path.join(beammapPath, beammapFileName)
+        if (not os.path.exists(fullBeammapFileName)):
+            print 'Beammap file does not exist: ', fullBeammapFileName
+            return
+        beammapFile = tables.openFile(beammapFileName,'r')
+        try:
+            self.beamImage = beammapFile.getNode('/beammap/beamimage').read()
+        except Exception as inst:
+            print 'Can\'t access beamimage for ',self.fullFileName
+
+        beamShape = self.beamImage.shape
+        self.nRow = beamShape[0]
+        self.nCol = beamShape[1]
+        
     def loadCentroidListFile(self, centroidListFileName):
         """
         Load an astrometry (centroid list) file into the 

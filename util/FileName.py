@@ -229,6 +229,10 @@ class FileName:
             'pixRemap' + os.sep + \
             'pixRemap_' + self.run + '.h5'
             
+    def beammap(self):
+        return self.intermDir + os.sep + \
+            'pixRemap' + os.sep + \
+            'beamimage_' + self.run + '.h5'
     ##################################
     
     def getComponents(self):
