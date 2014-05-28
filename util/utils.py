@@ -46,6 +46,7 @@ getGitStatus()
 findNearestFinite(im,i,j,n=10)
 nearestNstdDevFilter(inputArray,n=24)
 nearestNmedFilter(inputArray,n=24)
+showzcoord()
 """
 
 def aperture(startpx,startpy,radius=3):
@@ -650,13 +651,20 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     
     INPUTS:
         inputarray - input array
-        mode - 'mean' or 'median' to replace with the mean or median of the neighbouring pixels.
+        mode - 'mean', 'median', or 'nearestNmedian', to replace with the mean or median of
+                the neighbouring pixels. In the first two cases, calculates on the basis of
+                a surrounding box of side 'boxsize'. In the latter, calculates median on the 
+                basis of the nearest N='boxsize' non-NaN pixels (this is probably a lot slower
+                than the first two methods). 
         boxsize - scalar integer, length of edge of box surrounding bad pixels from which to
-                  calculate the mean or median.
+                  calculate the mean or median; or in the case that mode='nearestNmedian', the 
+                  number of nearest non-NaN pixels from which to calculate the median.
         iterate - If iterate is set to True then iterate until there are no NaN values left.
                   (To deal with cases where there are many adjacent NaN's, where some NaN
                   elements may not have any valid neighbours to calculate a mean/median. 
-                  Such elements will remain NaN if only a single pass is done.)
+                  Such elements will remain NaN if only a single pass is done.) In principle,
+                  should be redundant if mode='nearestNmedian', as far as I can think right now
+    
     OUTPUTS:
         Returns 'inputarray' with NaN values replaced.
         
@@ -672,9 +680,11 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
         
         #Calculate interpolates at *all* locations (because it's easier...)
         if mode=='mean':
-            interpolates=mean_filterNaN(outputarray,size=boxsize,mode='mirror')
+            interpolates = mean_filterNaN(outputarray,size=boxsize,mode='mirror')
         elif mode=='median':
-            interpolates=median_filterNaN(outputarray,size=boxsize,mode='mirror')
+            interpolates = median_filterNaN(outputarray,size=boxsize,mode='mirror')
+        elif mode=='nearestNmedian':
+            interpolates = nearestNmedFilter(outputarray,n=boxsize)
         else:
             raise ValueError('Invalid mode selection - should be one of "mean" or "median"')
         
@@ -888,4 +898,37 @@ def nearestNmedFilter(inputArray,n=24):
         for iCol in numpy.arange(nCol):
             outputArray[iRow,iCol] = numpy.median(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)])
     return outputArray
+
+
+
+
+def showzcoord():
+    '''
+    For arrays displayed using 'matshow', hack to set the cursor location
+    display to include the value under the cursor, for the currently
+    selected axes.
+    
+    NB - watch out if you have several windows open - sometimes it
+    will show values in one window from another window. Avoid this by
+    making sure you've clicked *within* the plot itself to make it
+    the current active axis set (or hold down mouse button while scanning
+    values). That should reset the values to the current window.
+    
+    JvE 5/28/2014
+    
+    '''
+    
+    def format_coord(x,y):
+        try:
+            im = plt.gca().get_images()[0].get_array().data
+            nrow,ncol = numpy.shape(im)
+            row,col = int(y+0.5),int(x+0.5)
+            z = im[row,col]
+            return 'x=%1.4f, y=%1.4f, z=%1.4f'%(x, y, z)
+        except:
+            return 'x=%1.4f, y=%1.4f, --'%(x, y)
+    
+    ax = plt.gca()
+    ax.format_coord = format_coord
+
 
