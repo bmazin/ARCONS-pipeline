@@ -85,6 +85,7 @@ import tables
 import ds9
 import numpy as np
 import numpy.ma as ma
+import scipy.ndimage.filters as spfilters
 import matplotlib.pylab as mpl
 from matplotlib.colors import LogNorm
 import astropy.stats
@@ -254,11 +255,16 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #(Not sure what edge effects there may be...)
         #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection';
         #'mirror' does not, and makes more sense for this application.
-        medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')
-        #nrstNbrMedFiltImage = utils.nearestNmedFilter(im, n=boxSize**2-1)
+        
+        #Do the median filter on a NaN-fixed version of im:
+        nanFixedImage = utils.replaceNaN(im, mode='nearestNmedian', boxsize=boxSize**2-1)
+        assert np.all(np.isfinite(nanFixedImage))  #Just make sure there's nothing weird still in there.
+        medFiltImage = spfilters.median_filter(nanFixedImage, boxSize, mode='mirror')
+        #medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')  #Original version without interpolating the NaNs
         
         #-------------- Cold flagging switched off for now, May 6 2014-----------------    
         if doColdFlagging is True:
+            nrstNbrMedFiltImage = utils.nearestNmedFilter(im, n=boxSize**2-1)  #Possibly useful with cold pixel flagging.
             overallMedian = np.median(im[~np.isnan(im)])
             stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
             overallStdDev = astropy.stats.median_absolute_deviation(im[~np.isnan(im)])*1.4826
@@ -273,10 +279,15 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
         #Also calculate the error in the same quantity.
         diff = im - maxRatio * medFiltImage
-        diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)
+        diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+        #... More explicitly: sqrt(    ((sqrt(im))**2)  +  ((maxRatio * sqrt(medFiltImage)/sqrt(boxSize*boxSize) )**2) ) 
+        #diffErr = np.sqrt(im + (maxRatio ** 2) * stdFiltImage**2 / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+
+
+        
         if iIter == 0:
             diffOriginal = np.copy(diff)
-            diffErrOriginal = np.copy(diff)
+            diffErrOriginal = np.copy(diffErr)
             
         #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged as hot:
         #(True=>bad pixel; False=> good pixel).
@@ -286,14 +297,16 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         if doColdFlagging is True:
             #And any pixel that is more than nSigma *below* the std. dev. of the surrounding box (not including itself)
             #should be flagged as cold:
-            #coldMask = ((nrstNbrMedFiltImage - im) > nSigmaCold * stdFiltImage) | oldColdMask 
-            coldMask = ((overallMedian - im) > nSigmaCold * overallStdDev) | oldColdMask 
+            coldMask = ((nrstNbrMedFiltImage - im) > nSigmaCold * stdFiltImage) | oldColdMask 
+            #coldMask = ((overallMedian - im) > nSigmaCold * overallStdDev) | oldColdMask 
         #------------------------------------------------------------------------------------------
         
         if diagnosticPlots is True and iIter==0:
             #Display a histogram of fluxes by pixel
             mpl.figure()
-            mpl.hist(im[~np.isnan(im)],bins=600) #np.sqrt(np.nansum(im)))
+            mpl.hist(im[~np.isnan(im)],bins=400)
+                                            #(np.nanmax(im)-np.nanmin(im)/np.median(im[~np.isnan(im)]))*10.)
+                                             #np.sqrt(np.sum(~np.isnan(im))))
             mpl.xlabel('Photon counts')
             mpl.ylabel('Number of pixels')
             mpl.title('Flux by Pixel, Before Flagging')
@@ -326,7 +339,6 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
         cleanImForDisplay[mask!=pflags.badPixCal['good']] = 0   #An image with only good pixels
     
-        #utils.plotArray(im, cbar=True)
         vmin=np.percentile(imForDisplay,dispMinPerc)
         vmax=np.percentile(imForDisplay,dispMaxPerc)
 
@@ -339,14 +351,15 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.matshow(imForDisplay,vmin=vmin,vmax=vmax,
                         fignum=False,origin='lower',cmap=mpl.cm.hot)     #, norm=LogNorm())  #, cmap=mpl.cm.hot)
             mpl.colorbar()
-            if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], c='y', label='Hot',linewidths=0)
-            if np.sum(coldMask) > 0: mpl.scatter(xx[coldMask], yy[coldMask], c='w', label='Cold')
-            if np.sum(deadMask) > 0: mpl.scatter(xx[deadMask], yy[deadMask], c='b', label='Dead')
+            if np.sum(hotMask) > 0: mpl.scatter(xx[hotMask], yy[hotMask], marker='x', c='b', label='Hot', linewidths=2)
+            if np.sum(coldMask) > 0: mpl.scatter(xx[coldMask], yy[coldMask], marker='o', c='w', label='Cold')
+            if np.sum(deadMask) > 0: mpl.scatter(xx[deadMask], yy[deadMask], marker='o', c='b', label='Dead')
             mpl.legend()
             #if obsFile is None:
             #    plotTitle = ('im' + ' ' + str(firstSec) + '-' + str(firstSec + intTime) + 's')
             mpl.title('Image + mask')
             mpl.suptitle(plotTitle)
+            utils.showzcoord()
 
         if ds9display:
             utils.ds9Array(imForDisplay, normMin=vmin, normMax=vmax, colormap='bb')
@@ -383,50 +396,55 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             #mpl.colorbar()
             #mpl.title('Cleaned image')
 
-            print 'Overall median: ',overallMedian
-            print 'Overall std. dev.: ',overallStdDev
+            print 'Max ratio: ', maxRatio
+
+            if doColdFlagging is True:
+                print 'Overall median: ',overallMedian
+                print 'Overall std. dev.: ',overallStdDev
 
             fig = mpl.figure(figsize=(5,5))
-            im = np.copy(medFiltImage)
-            im[np.isnan(im)] = 0
-            mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 100.0),
-                        fignum=False, origin='lower')
+            imToPlot = np.copy(medFiltImage)
+            imToPlot[np.isnan(imToPlot)] = 0
+            mpl.matshow(imToPlot, vmax=np.percentile(imToPlot[np.isfinite(imToPlot)], 100.0),
+                        fignum=False, origin='lower', cmap=mpl.cm.hot)
             mpl.colorbar()
             mpl.title('Median filtered image')
             mpl.suptitle(plotTitle)
             
-#             fig = mpl.figure(figsize=(5,5))
-#             im = np.copy(nrstNbrMedFiltImage)
-#             im[np.isnan(im)] = 0
-#             mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 100.0),
-#                         fignum=False, origin='lower')
-#             mpl.colorbar()
-#             mpl.title('Nearest neighbour median filtered')
-#             mpl.suptitle(plotTitle)
-            
             fig = mpl.figure(figsize=(5,5))
-            im = np.copy(diffOriginal)
-            im[np.isnan(im)] = np.nanmin(im)
-            mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 98.5),
-                        fignum=False, origin='lower')
+            imToPlot = np.copy(diffOriginal)
+            imToPlot[np.isnan(imToPlot)] = np.nanmin(imToPlot)
+            mpl.matshow(imToPlot, vmax=np.percentile(imToPlot[np.isfinite(imToPlot)], 98.5),
+                        fignum=False, origin='lower', cmap=mpl.cm.hot)
             mpl.colorbar()
             mpl.title('Difference image')
             mpl.suptitle(plotTitle)
             
             fig = mpl.figure(figsize=(5,5))            
-            im = np.copy(diffErrOriginal)
-            im[np.isnan(im)] = 0
-            mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 100.0),
-                        fignum=False, origin='lower')  #, cmap=mpl.cm.hot)
+            imToPlot = np.copy(diffErrOriginal)
+            imToPlot[np.isnan(imToPlot)] = 0
+            mpl.matshow(imToPlot, vmax=np.percentile(imToPlot[np.isfinite(imToPlot)], 100.0),
+                        fignum=False, origin='lower', cmap=mpl.cm.hot)
             mpl.colorbar()
             mpl.title('Difference Error')
             mpl.suptitle(plotTitle)
+            
+            fig = mpl.figure(figsize=(5,5))            
+            imToPlot = utils.replaceNaN(np.copy(im),mode='nearestNmedian',boxsize=24)
+            imToPlot[np.isnan(imToPlot)] = 0
+            mpl.matshow(imToPlot, vmax=np.percentile(imToPlot[np.isfinite(imToPlot)], 100.0),
+                        fignum=False, origin='lower', cmap=mpl.cm.hot)
+            mpl.colorbar()
+            mpl.title('Cleaned+interpolated image')
+            mpl.suptitle(plotTitle)
+            
+            #--------------------------------------------------------------------
 
             if doColdFlagging is True:
                 fig = mpl.figure(figsize=(5,5))            
-                im = np.copy(stdFiltImage)
-                im[np.isnan(im)] = 0
-                mpl.matshow(im, vmax=np.percentile(im[np.isfinite(im)], 100.0),
+                imToPlot = np.copy(stdFiltImage)
+                imToPlot[np.isnan(imToPlot)] = 0
+                mpl.matshow(imToPlot, vmax=np.percentile(imToPlot[np.isfinite(imToPlot)], 100.0),
                             fignum=False, origin='lower')  #, cmap=mpl.cm.hot)
                 mpl.colorbar()
                 mpl.title('Std. Dev. Image')
@@ -455,11 +473,13 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     To find hot (and cold) pixels .
     This routine is the main code entry point.
     
+    NB - AT THE MOMENT, I THINK THIS WILL OVERWRITE PRE-EXISTING HOT PIXEL FILES
+    WITHOUT WARNING (should update this behaviour....)
     
     INPUTS:
         paramFile - string, name of input parameter file. Other parameters 
                     provided as arguments will override values in the parameter
-                    file. See example parameter file hotPixels.dict in pipeline
+                    file. See example parameter file .dict in pipeline
                     'params' directory.
         inputFileName - string, pathname of input observation file.
         outputFileName - string, pathname of output .h5 file.
@@ -648,6 +668,9 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     '''
     Write the output hot-pixel time masks table to an .h5 file. Called by
     findHotPixels().
+    
+    ** AT THE MOMENT, I THINK THIS WILL OVERWRITE PRE-EXISTING HOT PIXEL FILES
+    WITHOUT WARNING - SHOULD UPDATE THIS BEHAVIOUR **
     
     INPUTS:
         timeMaskData - list structure as constructed by findHotPixels()
