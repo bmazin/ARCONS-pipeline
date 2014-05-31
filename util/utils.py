@@ -686,7 +686,7 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
         elif mode=='nearestNmedian':
             interpolates = nearestNmedFilter(outputarray,n=boxsize)
         else:
-            raise ValueError('Invalid mode selection - should be one of "mean" or "median"')
+            raise ValueError('Invalid mode selection - should be one of "mean", "median", or "nearestNmedian"')
         
         #Then substitute those values in wherever there are NaN values.
         outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
