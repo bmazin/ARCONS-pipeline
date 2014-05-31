@@ -217,7 +217,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     
     #Approximate peak/median ratio for an ideal (Gaussian) PSF sampled at 
     #pixel locations corresponding to the median kernal used with the real data.  
-    gauss_array = utils.gaussian_psf(fwhm, boxSize)
+    gauss_array = utils.gaussian_psf(fwhm, boxSize)     #***MAYBE BETTER IF WE OVERSAMPLE THIS?****
     maxRatio = np.max(gauss_array) / np.median(gauss_array)
 
     if obsFile is None and im is None:
@@ -277,13 +277,12 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #----------------------------------------------------------------------------------
 
         #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
-        #Also calculate the error in the same quantity.
+        #Also calculate the error that would exist in a measurment of a pixel that *was* at the peak of a real PSF
         diff = im - maxRatio * medFiltImage
-        diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+        #diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+        diffErr = np.sqrt(maxRatio * medFiltImage)       # Or maybe this is right...? Actually I think this makes more sense. Neglect errors in the median calculation here.
         #... More explicitly: sqrt(    ((sqrt(im))**2)  +  ((maxRatio * sqrt(medFiltImage)/sqrt(boxSize*boxSize) )**2) ) 
         #diffErr = np.sqrt(im + (maxRatio ** 2) * stdFiltImage**2 / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
-
-
         
         if iIter == 0:
             diffOriginal = np.copy(diff)
