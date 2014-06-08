@@ -675,7 +675,6 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     '''
     
     outputarray = numpy.copy(inputarray)
-    print numpy.sum(numpy.isnan(outputarray))
     while numpy.sum(numpy.isnan(outputarray)) > 0:
         
         #Calculate interpolates at *all* locations (because it's easier...)

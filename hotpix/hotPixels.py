@@ -23,9 +23,7 @@ Main routines of interest are:
 findHotPixels: currently the main routine. Takes an obs. file as input and 
                 outputs an .h5 file containing lists of bad time intervals for
                 all the pixels, along with reason indicators for each of those
-                intervals (*Note currently only one reason - i.e. hot pixel - 
-                is covered; but this should be easily extendible to cover e.g.
-                cold pixels*).
+                intervals.
                 
 readHotPixels: reads in a hot-pixel .h5 file into somewhat sensible structures
                 for use by external routines.
@@ -62,11 +60,9 @@ To do:
     - Time intervals are currently stored in units of seconds - need to convert
         to clock ticks for consistency with TimeInterval class. FIXED - 02/12/2013.
     - If necessary, apply algorithm only at the red end, where hot-pixel
-        contrast should be higher.
+        contrast should be higher. MAYBE WORTH REVISITING, BUT LOOKS LIKE NOT *ALL* HOT PIXELS ARE RED....
     - Output files seem unnecessarily large. May be some way of making this more
         efficient.
-    - Current image display in checkInterval is wrong way up - need to update
-      to use Danica's image display routine.
     
     - NOTE - HAVE NOT PROPERLY CODED TO MAKE SURE THAT TIME STEPS ARE PROPERLY
       CONSECUTIVE IN INTEGER 'TICKS' FOR THE RECORDED INTERVALS - SHOULD PROBABLY
@@ -125,7 +121,8 @@ class headerDescription(tables.IsDescription):
 def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.0,
                   nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
                   display=False, ds9display=False, dispToPickle=None, weighted=False,
-                  maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False):
+                  maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
+                  useLocalStdDev=False):
     '''
     To find the hot, cold, or dead pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
@@ -177,6 +174,11 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                         "coldMask" - similar mask for the cold pixels (False=good)
                         "deadMask" - similar mask for the dead pixels (False=good)
         diagnosticPlots: if True, shows a bunch of diagnostic plots for debug purposes.
+        useLocalStdDev - if True, use the local (robust) standard deviation within the 
+                    moving box for the sigma value in the hot pixel thresholding
+                    instead of Poisson statistics. Mainly intended for situations where
+                    you know there is no astrophysical source in the image (e.g. flatfields,
+                    laser calibrations), where you can also set fwhm=np.inf
 
     OUTPUTS:
         A dictionary containing the result and various diagnostics. Keys are:
@@ -202,6 +204,11 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                   pixels are missed because of other nearby hot pixels. Added
                   input parameter 'maxIter' (also present in parameter file).
                   Added output dictionary key 'niter'.
+        5/6/2014: Switched off cold pixel flagging for now - cutoff between
+                  genuinely bad cold pixels and those with low QE is not
+                  unambiguous enough.
+        6/7/2014: Added option to use local box robust estimate of sigma instead
+                  of sigma from photon noise estimate.
 
     '''
     
@@ -249,24 +256,26 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     coldMask = np.zeros(shape=np.shape(im), dtype=bool)     
      
     for iIter in range(maxIter):
-        print 'iIter: ',iIter
+        print 'Iteration: ',iIter
         #Calculate median filtered image
         #Each pixel takes the median of itself and the surrounding boxSize x boxSize box.
-        #(Not sure what edge effects there may be...)
+        #(Not sure what edge effects there may be, ignore for now...)
         #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection';
         #'mirror' does not, and makes more sense for this application.
-        
-        #Do the median filter on a NaN-fixed version of im:
+        #Do the median filter on a NaN-fixed version of im.
         nanFixedImage = utils.replaceNaN(im, mode='nearestNmedian', boxsize=boxSize**2-1)
         assert np.all(np.isfinite(nanFixedImage))  #Just make sure there's nothing weird still in there.
         medFiltImage = spfilters.median_filter(nanFixedImage, boxSize, mode='mirror')
         #medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')  #Original version without interpolating the NaNs
         
+        if doColdFlagging is True or useLocalStdDev is True:
+            stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
+
+        
         #-------------- Cold flagging switched off for now, May 6 2014-----------------    
         if doColdFlagging is True:
             nrstNbrMedFiltImage = utils.nearestNmedFilter(im, n=boxSize**2-1)  #Possibly useful with cold pixel flagging.
             overallMedian = np.median(im[~np.isnan(im)])
-            stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
             overallStdDev = astropy.stats.median_absolute_deviation(im[~np.isnan(im)])*1.4826
             #Calculate the standard-deviation filtered image,
             #using a kernel footprint that will miss out the central pixel:
@@ -279,10 +288,19 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
         #Also calculate the error that would exist in a measurment of a pixel that *was* at the peak of a real PSF
         diff = im - maxRatio * medFiltImage
-        #diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
-        diffErr = np.sqrt(maxRatio * medFiltImage)       # Or maybe this is right...? Actually I think this makes more sense. Neglect errors in the median calculation here.
-        #... More explicitly: sqrt(    ((sqrt(im))**2)  +  ((maxRatio * sqrt(medFiltImage)/sqrt(boxSize*boxSize) )**2) ) 
-        #diffErr = np.sqrt(im + (maxRatio ** 2) * stdFiltImage**2 / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+
+        #Simple estimate, probably makes the most sense: photon error in the max value allowed. Neglect errors in the median itself here.
+        if useLocalStdDev is False:
+            diffErr = np.sqrt(maxRatio * medFiltImage)       
+            #Alternatively, the corrected version of what I was trying to do before - i.e., the error in diff, which
+            #seems bogus because if you have a very high value in im, then you'll have a large error, which is
+            #not what you're looking for.
+            #diffErr = np.sqrt(im + (maxRatio ** 2) * stdFiltImage**2 / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+            #
+            #Originally was something like:
+            #diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)      #which is really not very sensible.
+        else:
+            diffErr = stdFiltImage
         
         if iIter == 0:
             diffOriginal = np.copy(diff)
@@ -467,10 +485,19 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                   paramFile=None, timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
                   ds9display=False, dispToPickle=False, weighted=False, maxIter=5,
-                  dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False):
+                  dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
+                  useLocalStdDev=None):
     '''
-    To find hot (and cold) pixels .
-    This routine is the main code entry point.
+    To find hot (and cold/dead) pixels. This routine is the main code entry point.
+    Takes an obs. file as input and outputs an .h5 file containing lists of bad time
+    intervals for all the pixels, along with reason indicators for each of those
+    intervals. Defaults should be somewhat reasonable for a typical on-sky image.
+    
+    Note that for calibrations frames where there should be no point sources (e.g.
+    laser calibrations, flatfields), can set fwhm=np.inf, and useLocalStdDev=True
+    (and/or set nSigma appropriately) in order to just do sigma-clipping without
+    bothering to try to account for real astrophysical PSFs. Should be a bit more
+    aggressive. Can also set useLocalStdDev=True in this case, which may also help.
     
     NB - AT THE MOMENT, I THINK THIS WILL OVERWRITE PRE-EXISTING HOT PIXEL FILES
     WITHOUT WARNING (should update this behaviour....)
@@ -506,7 +533,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                     than nSigma times the std. dev. in a surrounding box, flag it 
                     as cold.
         display: Boolean. If true, then display the input image and mark those 
-                    flagged as hot/cold/dead with a coloured dot. NB - UPDATED
+                    pixels flagged as hot/cold/dead with a coloured dot. NB - UPDATED
                     TO ONLY SHOW FIRST AND LAST TIME SLICES FOR NOW.
         ds9display: Boolean, as for 'display', but displays the output in ds9 instead.
         dispToPickle: If not False, save whatever would/will be the data for the main plot
@@ -521,6 +548,11 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         dispMaxPerc: Upper percentile "     "     "      "       "
         diagnosticPlots: if True, and display is also True, then show a bunch of
                          diagnostic plots for debug purposes.
+        useLocalStdDev - if True, use the local (robust) standard deviation within the 
+                    moving box for the sigma value in the hot pixel thresholding
+                    instead of Poisson statistics. Mainly intended for situations where
+                    you know there is no astrophysical source in the image (e.g. flatfields,
+                    laser calibrations), where you can also set fwhm=np.inf
 
         
     OUTPUTS:
@@ -556,12 +588,23 @@ def findHotPixels(inputFileName=None, outputFileName=None,
             using parameter file 'hotPixels.dict', and considering only 
             the first 5 seconds of the input file (here the start/end time 
             values override those in the parameter file).
+            
+        To get a quick view of how the chosen parameters perform, can
+        just run on a one-second time-slice and display the results:
+    
+        findHotPixels(...., startTime=0, endTime=1, display=True)
         
         
     HISTORY:
         2/8/2013: Added iteration to the algorithm, now takes parameter 
-                    'maxIter' (also added to parameter file). See
-                    checkInterval() for more info.
+                  'maxIter' (also added to parameter file). See
+                  checkInterval() for more info.
+        5/6/2014: Switched off cold pixel flagging for now - cutoff between
+                  genuinely bad cold pixels and those with low QE is not
+                  unambiguous enough.
+        6/7/2014: Added option to use local box robust estimate of sigma instead
+                  of sigma from photon noise estimate.
+
     '''
 
     if paramFile is not None:
@@ -579,6 +622,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         if nSigmaCold is None: nSigmaCold = params['nSigmaCold']
         if display is None: display = params['display']
         if maxIter is None: maxIter = params['maxIter']
+        if useLocalStdDev is None: useLocalStdDev = params['useLocalStdDev']
     else:
         print 'No parameter file provided - using defaults/input params'
     
@@ -589,6 +633,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     if endTime is None: pass
     if maxIter is None: maxIter = 5
     if outputFileName is None: outputFileName = 'badPixTimeMask.h5'
+    if useLocalStdDev is None: useLocalStdDev = False
     
     obsFile = ObsFile.ObsFile(inputFileName)
     expTime = obsFile.getFromHeader('exptime')
@@ -609,7 +654,7 @@ def findHotPixels(inputFileName=None, outputFileName=None,
 
     #Get the mask for each time step
     for i, eachTime in enumerate(stepStarts):
-        print str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
+        print 'Processing time slice: ', str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
         displayThisOne = display and (i==0 or i==len(stepStarts)-1)
         ds9ThisOne = ds9display and (i==0 or i==len(stepStarts)-1)
         dispToPickleThisOne = dispToPickle and (i==0 or i==len(stepStarts)-1)
@@ -618,7 +663,8 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                                      nSigmaCold=nSigmaCold, display=displayThisOne, ds9display=ds9ThisOne, 
                                      dispToPickle=dispToPickleThisOne, weighted=weighted,
                                      maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc,
-                                     diagnosticPlots=diagnosticPlots and displayThisOne)['mask']
+                                     useLocalStdDev=useLocalStdDev, diagnosticPlots=diagnosticPlots 
+                                     and displayThisOne)['mask']
                                      #Note checkInterval call should automatically clip at end of obsFile,
                                      #so don't need to worry about endTime.
     
@@ -1054,7 +1100,7 @@ def getHotPixels(hotPixDict,integrationTime=-1,firstSec=0):
 
 if __name__ == "__main__":
     
-    paramFile = '/Users/vaneyken/UCSB/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
+    paramFile = '/Users/vaneyken/ARCONS/pipeline/github/ARCONS-pipeline/params/hotPixels.dict'
     inputFile = '/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/ScienceData/PAL2012/20121208/obs_20121209-120530.h5'
     outputFile = None
     

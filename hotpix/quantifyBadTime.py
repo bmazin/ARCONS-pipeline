@@ -9,8 +9,8 @@ from hotpix import hotPixels as hp
 
 
 def quantifyBadTime(inputFileName, startTime=0, endTime=-1, 
-                    defaultTimeMaskFileName='./testTimeMask.hd5',
-                    timeStep=1, fwhm=3.0, boxSize=5, nSigmaHot=2.5,
+                    defaultTimeMaskFileName='./testTimeMask.h5',
+                    timeStep=1, fwhm=3.0, boxSize=5, nSigmaHot=3.0,
                     nSigmaCold=2.5,maxIter=5,binWidth=3,
                     dispToPickle=False, showHist=False):
     '''
@@ -78,7 +78,7 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
                         #in a surrounding box in order to be flagged as cold (where std.
                         #deviation is estimated as the square root of the median flux).
     
-        maxIter=5       #Max num. of iterations for the bad pixel detection algorithm.
+        maxIter         #Max num. of iterations for the bad pixel detection algorithm.
         
 
 
@@ -210,10 +210,16 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
     print '# pixels total: ', nPix
     print 'Mask duration (sec): ', maskDuration
     print
+    print '% hot pixels: ', float(np.sum(permHotPix+tempHotPix))/nPix * 100.
+    print '% cold pixels: ', float(np.sum(permColdPix+tempColdPix))/nPix * 100.
+    print '% dead pixels: ', float(np.sum(permDeadPix+tempDeadPix))/nPix * 100.
+    print '% other pixels: ', float(np.sum(permOtherPix+tempOtherPix))/nPix * 100.
+    print
     print '% permanently hot pixels: ', float(np.sum(permHotPix))/nPix * 100.
     print '% permanently cold pixels: ', float(np.sum(permColdPix))/nPix * 100.
     print '% permanently dead pixels: ', float(np.sum(permDeadPix))/nPix * 100.
     print '% permanently "other" bad pixels: ', float(np.sum(permOtherPix))/nPix * 100.
+    print
     print '% temporarily hot pixels: ', float(np.sum(tempHotPix))/nPix * 100.
     print '% temporarily cold pixels: ', float(np.sum(tempColdPix))/nPix * 100.
     print '% temporarily dead pixels: ', float(np.sum(tempDeadPix))/nPix * 100.
@@ -316,21 +322,25 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
         
         mpl.figure()
         mpl.hist(hotIntervals, bins=maskDuration/binWidth)
+        print 'Median hot interval: ', np.median(hotIntervals)
         mpl.xlabel('Duration of hot intervals')
         mpl.ylabel('Number of intervals')
  
         mpl.figure()
         mpl.hist(coldIntervals, bins=maskDuration/binWidth)
+        print 'Median cold interval: ', np.median(coldIntervals)
         mpl.xlabel('Duration of cold intervals')
         mpl.ylabel('Number of intervals')
  
         mpl.figure()
         mpl.hist(deadIntervals, bins=maskDuration/binWidth)
+        print 'Median dead interval: ', np.median(deadIntervals)
         mpl.xlabel('Duration of dead intervals')
         mpl.ylabel('Number of intervals')
  
         mpl.figure()
         mpl.hist(otherIntervals, bins=maskDuration/binWidth)
+        print 'Median "other" interval: ', np.median(otherIntervals)
         mpl.xlabel('Duration of "other" intervals')
         mpl.ylabel('Number of intervals')
         
@@ -338,12 +348,11 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
  
     print 'Mask duration (s): ',maskDuration
     print 'Number of pixels: ',nPix
-    print 'Fraction at 0s (hot,cold,dead): ', np.array([np.sum(hotTime<0.1),np.sum(coldTime<0.1),
-                                                        np.sum(deadTime<0.1)]) / float(nPix)                            
-    print 'Fraction at '+str(maskDuration)+'s (hot,cold,dead): ', np.array([np.sum(hotTime>maskDuration-0.1),
-                                                                        np.sum(coldTime>maskDuration-0.1),
-                                                                        np.sum(deadTime>maskDuration-0.1)])/float(nPix)
-    #assert 1==0
+    print 'Fraction at 0s (hot,cold,dead): ', np.array([np.sum(hotTime<tol),np.sum(coldTime<tol),
+                                                        np.sum(deadTime<tol)]) / float(nPix)                            
+    print 'Fraction at '+str(maskDuration)+'s (hot,cold,dead): ', np.array([np.sum(hotTime>maskDuration-tol),
+                                                                        np.sum(coldTime>maskDuration-tol),
+                                                                        np.sum(deadTime>maskDuration-tol)])/float(nPix)
  
  
 if __name__ == "__main__":
