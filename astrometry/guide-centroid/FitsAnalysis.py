@@ -48,11 +48,24 @@ class StarClass(object):
         self.fdir = fdir
         self.caldir = caldir
         self.fitsdir = self.fdir + self.fitsImageName
-		
-        imageList = pyfits.open(self.fitsdir)
-        image = imageList[0].data
+        self.manual = manual
+        self.minError = 2000
+        self.calibrate = True
         
-        if manual == True:
+        
+        #test to see if calibration is necessary
+        imageList = pyfits.open(self.fitsdir)
+        header = imageList[0].header
+        try:
+            CALERR = header['CALERR']
+            print 'CALERR:' + str(CALERR)  
+            if CALERR > self.minError:
+                raise
+            self.calibrate = False
+        except:
+            pass
+        
+        if self.manual and self.calibrate :
             #defining basic parameters for PyGuide.findStars. More info can be found on help(pyGuide.findStars)
             ccd = pg.CCDInfo(0,0.00001,1,2500)
 
@@ -70,32 +83,20 @@ class StarClass(object):
                     starList.append(centroidData[_count].xyCtr)
                 _count += 1    
             
-        if manual == False:
+        if not self.manual and self.calibrate:
+            
             #use source extractor to extractor sources, visit man page for more info
             catName = self.caldir + self.fitsImageName[:-5] + '.cat'
             paramdir = self.sedir + 'default.sex'
             checkimg = self.caldir + self.fitsImageName[:-5] + '.check'
             proc = subprocess.Popen(['sex',self.fdir+fitsImageName,'-c',paramdir,'-CATALOG_NAME',catName,'-CHECKIMAGE_NAME',checkimg])
             proc.communicate()
-            
-            nfile = open(catName)
-            starList = []
-
-            while True:
-                line = nfile.readline()
-                if line == '':
-                    break
+            #read cat file to extract stars
+            starList = readCat(catName)
         
-                if int(line.split()[3]) == 0 or int(line.split()[3])==1:
-                        x = float(line.split()[1])
-                        y = float(line.split()[2])
-                        starList.append([x,y])
-                        #print starList
-                else:    
-                    pass
-            
         #coordinates in pixels
-        self.starList = np.array(starList)
+        if self.calibrate:
+            self.starList = np.array(starList)
     
         #if fits table is provided, loading fits table and convert the list of star into standard numpy array
         if self.fitsTableName != None:
@@ -148,7 +149,7 @@ class StarClass(object):
 class StarCalibration(StarClass):
     #Calibration utility for fits image. Catalog data needs to be provided
 
-    def __init__(self,fitsImageName,fitsTableName,fitsCatalogName=None,manual=False,paramFile=None,caldir='./cal/',fdir='./origin/',sedir='./config/'):
+    def __init__(self,fitsImageName,fitsTableName,fitsCatalogName=None,manual=False,paramFile=None,caldir='./cal/',fdir='./origin/',sedir='./config/',height=3):
         
         #Initialize class attributes
         self.paramFile = paramFile 
@@ -163,6 +164,8 @@ class StarCalibration(StarClass):
         self.caldir = caldir
         self.fdir = fdir
         self.fitsdir = self.fdir + self.fitsImageName
+        self.height = height
+        self.manual = manual
         
 		#create folder for calibrated files if doesnt exit
         if not os.path.exists(self.caldir):
@@ -170,9 +173,12 @@ class StarCalibration(StarClass):
 		
 		#ignore the warning caused by astropy
         warnings.filterwarnings("ignore")
-
+        
         #Initialize the super class, StarClass
-        super(StarCalibration,self).__init__(self.fitsImageName,self.fitsTableName,manual,self.fitsCatalogName,self.caldir,self.fdir,self.sedir)
+        super(StarCalibration,self).__init__(self.fitsImageName,self.fitsTableName,self.manual,self.fitsCatalogName,self.caldir,self.fdir,self.sedir)
+
+        if len(self.starList) < 2 and self.calibrate:        
+            raise ValueError, '2 of more stars required to calibrate. Only %s star/s detected!' %len(self.starList)
         
         #Initialize reference pixels from the header
         imageList = pyfits.open(self.fitsdir)
@@ -180,8 +186,24 @@ class StarCalibration(StarClass):
         x1ref = header['CRPIX1']
         x2ref = header['CRPIX2']
         
+        #load the star from header if it is well calibrated already
+        if not self.calibrate:
+            pix = []
+            calWorld = []
+            calX = map(float,header['CALX'].split(','))
+            calY = map(float,header['CALY'].split(','))
+            pixX = map(float,header['STARX'].split(','))
+            pixY = map(float,header['STARY'].split(','))         
+            for count in range(len(calX)):
+                pix.append([pixX[count],pixY[count]])
+                calWorld.append([calX[count],calY[count]])
+            self.pix = np.array(pix)
+            self.calibratedStar = np.array(calWorld)
+            
+        imageList.close()
+        
         #Manual cross match
-        if manual == True:
+        if self.calibrate and self.manual == True:
                    
             #try to see any calibrated file so no need to repeat calibration    
             try:    
@@ -193,7 +215,7 @@ class StarCalibration(StarClass):
                 
             except:          
                 #convert starList into world coordinate              
-                self.starList = _pix2world(self.fitsdir,self.starList)
+                self.starList = pix2world(self.fitsdir,self.starList)
                 openCatalog = '-fits' + ' ' + self.fitsCatalogName
 
                 #initialize the centroid of set of stars in catalog table and put an 'X' mark in that position
@@ -206,7 +228,8 @@ class StarCalibration(StarClass):
                 self.catalog = convert(self.catalog)
                 self.centroid = convert(self.centroid)
                 
-                catalog = ds9(target='catalog',start=openCatalogue)
+                #open ds9 instance for catalog image
+                catalog = ds9(target='catalog',start=openCatalog)
                 catalog.set('scale mode 99')
         
                 def _turnOnLabel():
@@ -229,8 +252,9 @@ class StarCalibration(StarClass):
         
                 text = 'image; text %s %s #text="%s" font="times 15 bold"' %(self.centroid[0][0],self.centroid[0][1],'X')
                 catalog.set('regions',text )
-
-                openGuide = '-fits' + ' ' + fitsImageName
+                
+                #open ds9 instance for fits image
+                openGuide = '-fits' + ' ' + self.fitsdir
                 guideImage = ds9(target='guidImage',start=openGuide)
                 guideImage.set('scale mode 99')
                 guideImage.set('cmap value 0.9 0.7')
@@ -360,25 +384,28 @@ class StarCalibration(StarClass):
                 #convert from standard to degree in order to pass on to world2pix later on
                 self.calibratedStar = np.array(convert(self.calibratedStar))
                 self.starList = np.array(convert(self.starList))
-            
-                self.pix = _world2pix(self.fitsdir,self.starList)
-            
+                self.pix = world2pix(self.fitsdir,self.starList)
+                
+                minError = linCal()
+                
+                '''
                 #save the calibrated list for class method reference
                 saveName = self.caldir + self.fitsImageName[:-5] + 'calList'        
                 np.savez(saveName,calibratedStar=self.calibratedStar,starListPix=self.pix)
-        
+                '''
+                
         #automatic cross match
-        if manual == False:
+        if self.calibrate and self.manual == False:
             
             #convert cataglogue world coorodinates into pixel coordinates
-            self.catalog = _world2pix(self.fitsdir,self.catalog,self.paramFile,x1ref,x2ref)
+            self.catalog = world2pix(self.fitsdir,self.catalog,self.paramFile,x1ref,x2ref)
             
-            '''       
+            '''
             #Test to see if paramFile is provided, whether the reverse distortion transformation will give back itself as distortion is zero at reference point
             print 'test ref1:',x1ref,x2ref           
-            testList = _pix2world(fitsImageName,np.array([[x1ref,x2ref]]),self.paramFile,x1ref,x2ref)                  
-            print 'test ref2:', _world2pix(self.fitsImageName,testList,self.paramFile,x1ref,x2ref)
-            raise ValueError
+            testList = pix2world(self.fitsdir,np.array([[x1ref,x2ref]]),self.paramFile,x1ref,x2ref)                  
+            print 'test ref2:', world2pix(self.fitsdir,testList,self.paramFile,x1ref,x2ref)
+            raise ValueError, 'test terminated'
             '''
         
             def _patternGeneration(index,length,height): 
@@ -412,7 +439,7 @@ class StarCalibration(StarClass):
                 
 
             #now we have both self.catalog and self.starList both in pixel coordinate, we want to cross match two lists by looking for least squares
-            height = 6         
+            height = self.height        
             minList = []
             print 'total number of stars = %s' %(len(self.starList))
             
@@ -479,7 +506,7 @@ class StarCalibration(StarClass):
                 if con:
                     continue
             
-                self.calibratedStar = _pix2world(self.fitsdir,np.array(sortCatalog),self.paramFile,x1ref,x2ref)            
+                self.calibratedStar = pix2world(self.fitsdir,np.array(sortCatalog),self.paramFile,x1ref,x2ref)            
                 self.pix = self.starList
                 
                 self._offCal()
@@ -493,44 +520,86 @@ class StarCalibration(StarClass):
                     minIndex = index
      
             minPattern = _patternGeneration(minIndex,len(self.starList),height)
-            print 'minPattern is %s' %minPattern
+            print 'minimum Error is %s' %minError
+            print 'with pattern %s' %minPattern
             sortCatalog = _matchPattern(minPattern)[0]
             
-            #give the ordered pair of catalog stars in world coordinates(degrees) and image star in pixel coordinate which then can be passed to offCal and rotCal methods
-            self.calibratedStar = _pix2world(self.fitsdir,np.array(sortCatalog),self.paramFile,x1ref,x2ref)            
-            self.pix = np.array(self.starList)   
+            #give the ordered pair of catalog stars in world coordinates(degrees) and image star in pixel coordinate which then can be passed to offCal and rotCal methods. The position of one list matches the other.
+            self.calibratedStar = pix2world(self.fitsdir,np.array(sortCatalog),self.paramFile,x1ref,x2ref)            
+            self.pix = np.array(self.starList)  
+                        
         
-    def linCal(self,iteration=5):
+        
+        
+        
+       
+       
+        #create header entries to record calibrated star and error. Only perform this when the calibration is done on the first time
+        if self.calibrate:
+            appendCALX = []
+            appendCALY = []
+            appendX = []
+            appendY = []
+            for pixCoor in self.pix:
+                appendX.append(str(pixCoor[0]))
+                appendY.append(str(pixCoor[1]))
+            updateHeader(self.fitsdir,'STARX',",".join(appendX))
+            updateHeader(self.fitsdir,'STARY',",".join(appendY))       
+            for calDeg in self.calibratedStar:
+                appendCALX.append(str(calDeg[0]))
+                appendCALY.append(str(calDeg[1]))
+            updateHeader(self.fitsdir,'CALX',",".join(appendCALX))
+            updateHeader(self.fitsdir,'CALY',",".join(appendCALY))
+            updateHeader(self.fitsdir,'CALERR',minError)
+            
+             
+        
+    def linCal(self,iteration=15):
         """
-        A wrapper around offCal and rotCal methods. It performs translational and rotational calibration in appropriate order.
+        A wrapper around offCal and rotCal methods. It performs translational and rotational calibration in appropriate order. The calibration will be performed until either tolerance error or iteration upper bound is met. Iteration argument is obsolete. 
         
         Keyword arguments:
-        iteration --- the number of iterations of calibration to minimize error. Has to be greater or equal to one (default:3). 
+        NONE, iteration argument is obsolete.
         """
         
-        self._offCal()
-        self._rotCal()
+        if not self.calibrate:
+            imageList = pyfits.open(self.fitsdir)
+            header = imageList[0].header
+            CALERR = header['CALERR']
+            return CALERR
         
-        for i in range(iteration-1):
+        self._offCal()
+        error = self._rotCal()
+        upperBound = 30
+        tolerance = 1
+        errorTemp = 1000000000
+        i = 0
+        
+        while i < 30:
             self._offCal(CD=False,openName=self.caldir + self.fitsImageName[:-5] + '_offCal_rotCal.fits')
             error = self._rotCal(openName=self.caldir + self.fitsImageName[:-5] + '_offCal.fits')
+            if abs(errorTemp - error) < tolerance:
+                break
+            errorTemp = error
+            i += 1
+        print 'calibration finished in %s iterations!' %i
+            
         print 'error = %s' %error
-        
-        #update distortion coefficients in the header if paramFile is provided
-        if self.paramFile != None:
-            pass
-        
+        return error
+        '''
         #record the name and error in runRecord.txt
-        recordFile = 'runRecord.txt'
+        recordFile = 'runRecord.txt'      
+
         try:
             os.remove(recordFile)
         except: 
             pass
+
         openFile = open(recordFile,'a')
         outputList = ''.join([self.fitsImageName.ljust(30),str(error/len(self.starList)).ljust(30),'\n'])
         openFile.write(outputList)
         openFile.close()  
-            
+        '''  
                 
     def _offCal(self,CD=True,openName=None):
         """
@@ -562,7 +631,7 @@ class StarCalibration(StarClass):
             header['CD2_1'] = 0
             
         #each time when we call different calibration class methods, we have to convert the wcs of catalog star into pix using DIFFERENT image headers which causes shift in pixel coordinates!!
-        self.calpix = _world2pix(openName,self.calibratedStar,self.paramFile,x1ref,x2ref)
+        self.calpix = world2pix(openName,self.calibratedStar,self.paramFile,x1ref,x2ref)
         
         #just to make sure they are in numpy array so we can pass it to functions below
         pix = np.array(self.pix)
@@ -604,7 +673,7 @@ class StarCalibration(StarClass):
         elif polydeg == 1:
             p0 = [0.001]*6
         elif polydeg == 'dist':
-            p0 = [10]*2
+            p0 = [100]*2
         
         '''
         starDist = []
@@ -623,8 +692,8 @@ class StarCalibration(StarClass):
         x2ref = header['CRPIX2']
         '''
         
-        x1 = np.array([(no-x1ref) for no in (pix[cr][0] for cr in range(len(pix)))])
-        x2 = np.array([(no-x2ref) for no in (pix[cr][1] for cr in range(len(pix)))])
+        x1 = np.array([(no) for no in (pix[cr][0] for cr in range(len(pix)))])
+        x2 = np.array([(no) for no in (pix[cr][1] for cr in range(len(pix)))])
         '''
         if not polydeg == 'dist':
             dtor = calpix - pix
@@ -640,21 +709,22 @@ class StarCalibration(StarClass):
         '''
         
         #least squares fits to minimize distance difference between catalog and our image
-        y1 = np.array([(no-x1ref) for no in (calpix[cr][0] for cr in range(len(calpix)))])
-        y2 = np.array([(no-x2ref) for no in (calpix[cr][1] for cr in range(len(calpix)))])
+        y1 = np.array([(no) for no in (calpix[cr][0] for cr in range(len(calpix)))])
+        y2 = np.array([(no) for no in (calpix[cr][1] for cr in range(len(calpix)))])
         
         #With fulloutput=True, we can obtain the residual/error of the least squares fit
         dt = leastsq(residuals,p0,args=(y1,y2,x1,x2))
         
         #update the header
-        x1ref = x1ref + dt[0][0]
-        x2ref = x2ref + dt[0][1] 
-        refPix = [[x1ref,x2ref]]
-        w = wcs.WCS(header)
-        world = w.wcs_pix2world(refPix,1)             
-        header.update('CRVAL1',world[0][0])
-        header.update('CRVAL2',world[0][1])
+        x1refNew = x1ref + dt[0][0]
+        x2refNew = x2ref + dt[0][1] 
+        refPix = [[x1refNew,x2refNew]]
         
+        #calculate appropriate CRVALS and update header
+        world = pix2world(openName,refPix,paramFile=self.paramFile,crval1=x1ref,crval2=x2ref)                  
+        header['CRVAL1'] = world[0][0]
+        header['CRVAL2'] = world[0][1] 
+               
         #remove existing file and save the calibrated file 
         saveName = self.caldir + self.fitsImageName[:-5] + '_offCal.fits'
         try:
@@ -681,8 +751,8 @@ class StarCalibration(StarClass):
             
         x1ref = header['CRPIX1']
         x2ref = header['CRPIX2']
-
-        self.calpix = _world2pix(openName,self.calibratedStar,self.paramFile,x1ref,x2ref)
+        
+        self.calpix = world2pix(openName,self.calibratedStar,self.paramFile,x1ref,x2ref)
         
         pix = np.array(self.pix)
         calpix = np.array(self.calpix)
@@ -719,11 +789,13 @@ class StarCalibration(StarClass):
         #initialize guessing parameters, doesn't matter
         p0 = [0.1]
         
+        '''
+        #I think this line is acutally false, let me try
         #if paramFile is provided, we need to first apply distortion prior to rotCal()
-      
         if self.paramFile != None:
-            pix = _distApp(pix,self.paramFile,x1ref,x2ref)
-                      
+            pix = distApp(pix,self.paramFile,x1ref,x2ref)
+        '''
+        
         x1 = np.array([(no-x1ref) for no in (pix[cr][0] for cr in range(len(pix)))])
         x2 = np.array([(no-x2ref) for no in (pix[cr][1] for cr in range(len(pix)))])
         y1meas = np.array([(cal-x1ref) for cal in (calpix[cr][0] for cr in range(len(calpix)))])
@@ -753,7 +825,7 @@ class StarCalibration(StarClass):
         for p in range(2):
             for q in range(2):
                 keyword = 'CD%s_%s' %(p+1,q+1)
-                header.update(keyword,CD[p][q])
+                header[keyword] = CD[p][q]
             
         #remove existing file and save the calibrated image
         saveName = self.caldir + self.fitsImageName[:-5] + '_offCal_rotCal.fits'       
@@ -786,40 +858,39 @@ class StarCalibration(StarClass):
         x1ref = header['CRPIX1']
         x2ref = header['CRPIX2']
             
-        def _headerUpdate(saveName,fitsImageName,coeffx,coeffy,coeffList):           
-            #Open the image
-            imageList = pyfits.open(fitsImageName)
-            header = imageList[0].header    
-            header = imageList[0].header
-            #Updating header
-            header.update('A_ORDER',3)
-            header.update('B_ORDER',3)
-            header.update('CTYPE1','RA---TAN-SIP')
-            header.update('CTYPE2','DEC--TAN-SIP')
-            count = 0
-            for string in coeffList:
-                p = int(string[0])
-                q = int(string[1])
-                keyword1 = 'A_%s_%s' %(p,q)
-                keyword2 = 'B_%s_%s' %(p,q)
-                header.update(keyword1,coeffx[count])
-                header.update(keyword2,coeffy[count])
-                count += 1
-            #Try to remove any existing fits files  
-            try:
-                os.remove(saveName)
-            except:
-                pass           
-            imageList.writeto(saveName,output_verify='ignore')
-        
         #Calculate distortion parametes if paramFile is missing
         if self.paramFile == None:       
-            self.calpix = _world2pix(openName,self.calibratedStar)
+            self.calpix = world2pix(openName,self.calibratedStar)
             if addFiles != None:
+                #add the directory of add files
                 for tfile in addFiles:
-                    nlist = np.load(tfile[:-5]+'calList.npz')
-                    appendPix = nlist['starListPix']
-                    appendCal = _world2pix(tfile[:-5]+'_offCal_rotCal.fits',nlist['calibratedStar'])
+                    #loading calibrated star from header
+                    addImageList = pyfits.open(self.fdir+tfile)
+                    addheader = addImageList[0].header
+                    pix = []
+                    calWorld = []
+                    
+                    #append the pix and corresponding stars into a single list. Then, the calibration parameters will base on these stars.
+                    calX = map(float,addheader['CALX'].split(','))
+                    calY = map(float,addheader['CALY'].split(','))
+                    pixX = map(float,addheader['STARX'].split(','))
+                    pixY = map(float,addheader['STARY'].split(','))         
+                    for count in range(len(calX)):
+                        pix.append([pixX[count],pixY[count]])
+                        calWorld.append([calX[count],calY[count]])
+                    appendPix = np.array(pix)
+                    appendCal = world2pix(self.caldir+tfile[:-5]+'_offCal_rotCal.fits',np.array(calWorld))
+                    '''
+                    if self.manual:
+                        nlist = np.load(tfile[:-5]+'calList.npz')
+                        appendPix = nlist['starListPix']
+                    elif not self.manual:
+                        catName = tfile[:-5] + '.cat'
+                        appendPix = readCat(catName)
+                        #problems
+                    
+                    appendCal = world2pix(tfile[:-5]+'_offCal_rotCal.fits',nlist['calibratedStar']) 
+                    '''  
                     try:
                         self.pix = self.pix.tolist()
                         self.calpix = self.calpix.tolist()
@@ -840,7 +911,7 @@ class StarCalibration(StarClass):
             
             #residual of least squares for using leastsq function
             def residuals(p,y,x1,x2):
-                err = y - _poly2(p,x1,x2)
+                err = y - poly2(p,x1,x2)
                 return err
             '''
             def polyTPV(p,x1,x2):
@@ -920,10 +991,9 @@ class StarCalibration(StarClass):
                        
             #update the header of every fits images provided
             saveName = self.caldir + self.fitsImageName[:-5]+'_allCal.fits'
-            _headerUpdate(saveName,openName,dt1,dt2,coeffList)
+            coeffUpdate(saveName,openName,dt1,dt2,coeffList)
             for tfile in addFiles:
-                fileName = tfile[:-5]
-                _headerUpdate(tfile[:-5]+'_allCal.fits',tfile[:-5]+'_offCal_rotCal.fits',dt1,dt2,coeffList)
+                coeffUpdate(self.caldir+tfile[:-5]+'_allCal.fits',self.caldir+tfile[:-5]+'_offCal_rotCal.fits',dt1,dt2,coeffList)
                    
                 
             '''
@@ -940,13 +1010,8 @@ class StarCalibration(StarClass):
             ''' 
             
         #apply coefficients to header if paramFile is provided
-        if self.paramFile != None:
-            paramFile = np.load(self.paramFile)
-            dt1 = paramFile['dt1']
-            dt2 = paramFile['dt2']
-            coeffList = paramFile['coeffList']
-            _headerUpdate(self.fitsImageName[:-5]+'_allCal.fits',openName,dt1,dt2,coeffList)          
-        
+        if self.paramFile != None:          
+            distHeaderUpdate(openName,self.fitsImageName[:-5]+'_allCal.fits',self.paramFile)
          
 if __name__ == '__main__':
      
