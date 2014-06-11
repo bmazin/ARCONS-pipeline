@@ -209,7 +209,9 @@ def updateHeader(fitsImage,keyword,arg):
     warnings.filterwarnings("ignore")
     imageList = pyfits.open(fitsImage,mode='update')
     header = imageList[0].header
-    header[keyword] = arg
+    header.update(keyword,arg)
+    #notice for pyfits in turk, header[keyword]=arg will raise error if keyword is not already present. However, it won't be a problem in a newer version of pyfits. But header.update(..) always works.
+    #header[keyword] = arg
     imageList.flush()
 
 def distHeaderUpdate(fitsImage,saveName,paramFile):
@@ -252,14 +254,25 @@ def readCat(catFile,flagList=[0,1,4]):
 
     while True:
         line = nfile.readline()
+        #end the reading of the file at the last line
         if line == '':
             break
         
+        #ignore the comment sentence
+        if str(line.split()[0])[0] == '#':
+            pass
+        else:
         #flag 0 1 and 4 usually indicate good source whereas other flags represent bad or possibily misidentified source
-        if int(line.split()[3]) in flagList:
-            x = float(line.split()[1])
-            y = float(line.split()[2])
-            starList.append([x,y])
+            try:
+                if int(line.split()[3]) in flagList:
+                    x = float(line.split()[1])
+                    y = float(line.split()[2])
+                    starList.append([x,y])
+        #this argument is intended for manual catalog where flag and index are not requied to present. They are splitted by blacnk spaces
+            except:
+                x = float(line.split()[0])
+                y = float(line.split()[1])
+                starList.append([x,y])
     return starList
       
 

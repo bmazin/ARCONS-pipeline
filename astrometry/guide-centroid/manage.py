@@ -28,15 +28,22 @@ source = 'USNO-B1.0'
 tfitsTable = 'test.fits'
 tfitsImage = 'test_image.fits'
 
-#it will overwrite any existing files with the same names, the file 'test_vo.xml' is not important and can be ignored
-#queryVizier(tfitsTable,source=source,pos=pos)
-#queryFitsImage(tfitsImage,'test_vo.xml',pos=pos)
+#if manCat=True, manual catalog will be used instead of vizier
+#if semiManCat=True, stars will be added on top of the vizier catalog stars
+#stars appended in both cases are specified in manCatFile
+#notice that manCat and semiManCat can't both be true at the same time
+manCat = False
+semiManCat = True
+manCatFile = 'manCat.cat'
+
+calHeight = 3
 
 #saving directory of all the calibrated files in relative path
 caldir = './cal/'
 #directory of fits images to be calibrated, put all the files here
 fdir = './origin/'
 sedir = './config/'
+#the distoriton parameter file
 paramFile = None
 
 #if manual = False, the program will use sextractor to find source and match the correponding stars in the images
@@ -46,17 +53,35 @@ manual = False
 #if calibrate is True, all the files that are calibrated will be used as data points to calculate distortion parameters
 calibrate = False
 
+
 #next, if automatic calibration is chosen, it is best to first manually correct the reference pixel coordinate on the header. This greatly increases the chances of calibrating.
 refFix = True
 CRVAL1 = 104.94975
 CRVAL2 = 14.2423833333333
-#specify the correct reference pixels. This can be found by manually open the fits file and changing the header keywords CRVAL1 AND CRVAL2 until the stars matched the one found in the catalog. This only has be done once per calibration since we assume the offset is constant.
+
+
+'''
+-----------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+
+Input Ends Here
+
+-----------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+'''
+
+#it will overwrite any existing files with the same names, the file 'test_vo.xml' is not important and can be ignored
+#queryVizier(tfitsTable,source=source,pos=pos)
+#queryFitsImage(tfitsImage,'test_vo.xml',pos=pos)
+if manCat and semiManCat:
+    raise ValueError, 'Manual catalog and semi-manual catalog cannot be True all at once!'
+elif manCat:
+    catOption = 'full'
+elif semiManCat:
+    catOption = 'semi'
+else:
+    catOption = None
     
-recordFile = 'runRecord.txt'
-try:
-    os.remove(recordFile)
-except: 
-    pass
 
 #perform linear and polynomial calibration to each file in dir specified
 for fitsImage in os.listdir(fdir):
@@ -71,7 +96,7 @@ for fitsImage in os.listdir(fdir):
         updateHeader(fdir+fitsImage,'CRVAL1',CRVAL1)
         updateHeader(fdir+fitsImage,'CRVAL2',CRVAL2) 
     try:
-        cal = StarCalibration(fitsImage,tfitsTable,tfitsImage,manual,paramFile=paramFile,caldir=caldir,fdir=fdir,sedir=sedir,height=2)
+        cal = StarCalibration(fitsImage,tfitsTable,tfitsImage,manual,paramFile=paramFile,caldir=caldir,fdir=fdir,sedir=sedir,height=3,manCat=catOption,manCatFile=manCatFile)
         cal.linCal()
     
         if paramFile != None:
@@ -84,10 +109,11 @@ if calibrate:
     dummyList = os.listdir(fdir)
     print dummyList
     firstDummy = dummyList[0]
-    cal= StarCalibration(firstDummy,tfitsTable,tfitsImage,manual,paramFile=None,caldir=caldir,fdir=fdir,sedir=sedir)
+    cal= StarCalibration(firstDummy,tfitsTable,tfitsImage,manual,paramFile=None,caldir=caldir,fdir=fdir,sedir=sedir,manCat=catOption,manCatFile=manCatFile)
     cal.distCal(addFiles=dummyList[1:])
 
 '''
+#testing scripts
 #convert world coordinate(in degrees) to ARCONS coordinate
 worldCoor = [98.172398,-0.0315900]
 #worldCoor = [98.169492,-0.03306112]

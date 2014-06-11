@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 class StarClass(object):
     """Load a list of star in the fits image and initilize stars from catalog if specified"""
 
-    def __init__(self,fitsImageName,fitsTableName=None,manual=False,fitsCatalogName=None,caldir='./cal/',fdir='./origin/',sedir='./config/'):
+    def __init__(self,fitsImageName,fitsTableName=None,manual=False,fitsCatalogName=None,caldir='./cal/',fdir='./origin/',sedir='./config/',manCat=None,manCatFile=None):
         """
         Keyword arguments:
         fitsImageName -- the input fits image file
@@ -51,7 +51,8 @@ class StarClass(object):
         self.manual = manual
         self.minError = 2000
         self.calibrate = True
-        
+        self.manCat = manCat
+        self.manCatFile = manCatFile
         
         #test to see if calibration is necessary
         imageList = pyfits.open(self.fitsdir)
@@ -99,7 +100,13 @@ class StarClass(object):
             self.starList = np.array(starList)
     
         #if fits table is provided, loading fits table and convert the list of star into standard numpy array
-        if self.fitsTableName != None:
+        if self.manCat == 'full':
+            catalog = []
+            catalogAppend = readCat(self.manCatFile)
+            for star in catalogeAppend:
+                catalog.append([star[0],star[1]])
+        
+        elif self.fitsTableName != None:
             tableList = pyfits.open(self.fitsTableName)
             
             h1 = tableList[1]
@@ -109,11 +116,18 @@ class StarClass(object):
             for i in range(len(catalog)):
                 catalog_x.append(catalog[i][0])
                 catalog_y.append(catalog[i][1])
-            catalog = zip(catalog_x,catalog_y)
             
-            #coordinates in degrees
-            self.catalog = np.array(catalog)
-        #todo: add manual catalog 
+            #if semi manual catalog is used, add stars in manCatFile into the existing catalog
+            if self.manCat == 'semi':
+                for star in readCat(self.manCatFile):
+                    catalog_x.append(star[0])
+                    catalog_y.append(star[1])
+            catalog = zip(catalog_x,catalog_y)
+        
+        self.catalog = np.array(catalog)
+        print len(self.catalog)
+                
+            
         
     '''
     def showCatalogPlot(self):
@@ -149,7 +163,7 @@ class StarClass(object):
 class StarCalibration(StarClass):
     #Calibration utility for fits image. Catalog data needs to be provided
 
-    def __init__(self,fitsImageName,fitsTableName,fitsCatalogName=None,manual=False,paramFile=None,caldir='./cal/',fdir='./origin/',sedir='./config/',height=3):
+    def __init__(self,fitsImageName,fitsTableName,fitsCatalogName=None,manual=False,paramFile=None,caldir='./cal/',fdir='./origin/',sedir='./config/',height=3,manCat=None,manCatFile=None):
         
         #Initialize class attributes
         self.paramFile = paramFile 
@@ -175,10 +189,10 @@ class StarCalibration(StarClass):
         warnings.filterwarnings("ignore")
         
         #Initialize the super class, StarClass
-        super(StarCalibration,self).__init__(self.fitsImageName,self.fitsTableName,self.manual,self.fitsCatalogName,self.caldir,self.fdir,self.sedir)
+        super(StarCalibration,self).__init__(self.fitsImageName,self.fitsTableName,self.manual,self.fitsCatalogName,self.caldir,self.fdir,self.sedir,manCat=manCat,manCatFile=manCatFile)
 
         if len(self.starList) < 2 and self.calibrate:        
-            raise ValueError, '2 of more stars required to calibrate. Only %s star/s detected!' %len(self.starList)
+            raise ValueError, '2 of more stars required to calculate calibration parameters. Only %s star/s detected!' %len(self.starList)
         
         #Initialize reference pixels from the header
         imageList = pyfits.open(self.fitsdir)
@@ -459,20 +473,29 @@ class StarCalibration(StarClass):
                 while len(sortMinSubList) < height:
                     minDist = 1000000000000
                     minIndex = 0
+                    delIndex = 0
+                    counter = 0
                     for param in minSubList:
                         if param[1] < minDist:
                             minIndex = param[0]
                             minDist = param[1]
+                            delIndex = counter
+                        counter += 1
                     sortMinSubList.append([minIndex,minDist])
-                    del minSubList[minIndex]
-                         
+                    
+                    del minSubList[delIndex]
+                    
+                    
+                    #this was meant to eliminate the identification with unreasonably far stars     
                     tolerancePixel = 150
                     count = 0
+                    
                     for item in sortMinSubList:
                         #set any entries that have distance differences greater than the tolerance to None and ignore them. and not count==0 statement prevent the situation where all the entries are None.
                         if item[1] > tolerancePixel and not count == 0:
                             item[1] = None
-                        count = count + 1          
+                        count = count + 1     
+                        
                 minList.append(sortMinSubList)
                     
             def _matchPattern(pattern):
@@ -500,6 +523,7 @@ class StarCalibration(StarClass):
                 index = index + 1
                 tempCatalog = self.catalog
                 pattern = _patternGeneration(index,len(self.starList),height)
+                print pattern
                 sortCatalog,con = _matchPattern(pattern)
                 
                 #if None entry exists, skip straight to the next iteration in for loop
@@ -511,7 +535,7 @@ class StarCalibration(StarClass):
                 
                 self._offCal()
                 self._rotCal()
-                for i in range(5):
+                for i in range(1):
                     self._offCal(CD=False,openName=self.caldir + self.fitsImageName[:-5] + '_offCal_rotCal.fits')
                     error = self._rotCal(openName=self.caldir + self.fitsImageName[:-5] + '_offCal.fits')
                 

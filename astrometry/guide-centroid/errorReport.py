@@ -20,5 +20,7 @@ for nfile in fileList:
         error.append(fileList[count][0:6])
     imageList.close()
     count += 1
+    
+    
 print 'total files = %s and %s of them are bad!' %(len(fileList),len(error))
 print error
