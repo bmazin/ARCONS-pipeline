@@ -1,0 +1,9 @@
+easy install sextractor for mac:
+
+1)Install homebrew
+2)brew tap homebrew/science
+3)brew install sextractor
+
+bug list:
+
+1) When using manual calibration for more than one files, ds9 doesnt work for the second file

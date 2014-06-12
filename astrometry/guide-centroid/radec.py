@@ -1,5 +1,5 @@
 '''
-To Do: 
+To Do
 1.write down function for converting guide pixel to arcons pixel and use the same function for calculating its inverse to convert arcons back to guide pixel
 2.Implement a better way to find reference guide pixel and reference arcons pixel
 '''
@@ -14,7 +14,7 @@ inputFile = 'runRecord.txt'
 
 class radec(object):
 
-    def __init__(self,recordFile='runRecord.txt',tolError=400,caldir='./cal/',refPixGuide=[548,370],refPixARCONS=[11.8688,12.9538]):
+    def __init__(self,recordFile='runRecord.txt',tolError=400,caldir='./cal/',refPixGuide=[565,366],refPixARCONS=[11.18,13.5]):
     
         self.sortList = []
         #notice that self.timeStamp contains timeStamp in seconds(integers)
@@ -22,10 +22,10 @@ class radec(object):
         self.caldir = caldir
         
         #initialize ARCONS parameters      
-        self.guidePlate=3.5833*10**(-5)
-        self.arconsPlate=1.208*10**(-4)
-        self.dimX=44
-        self.dimY=46
+        self.guidePlate = 3.5833*10**(-5)
+        self.arconsPlate = 1.208*10**(-4)
+        self.dimX = 44
+        self.dimY = 46
         self.refPixGuide = refPixGuide
         self.refPixARCONS = refPixARCONS
         self.sufix = ''
@@ -47,26 +47,27 @@ class radec(object):
 
         tempList1 = []
         tempList2 = []
-        self.suffix = fileList[6:]
+        tempList3 = []
         
         for nfile in fileList:
             timeStamp = nfile[0:6]
             sec = timeConvert(timeStamp)
             tempList1.append(sec)
+            self.suffix = nfile[6:]
         
         #time-ascending order
         tempList1.sort() 
 
         for ntime in tempList1:
             timeStr = timeConvert(ntime)
-            outputFileName = timeStr + suffix
-            tempList2.append(outputFileName)        
+            outputFileName = '%s%s' %(timeStr,self.suffix)
+            tempList2.append(outputFileName)       
         
         #output sorted file and timeStamp lists
         self.sortList = tempList2
         self.timeStampList = tempList1
 
-    def centroid(self,worldCoor,refPixGuide=[548,370],refPixARCONS=[11.8688,12.9538]):
+    def centroid(self,worldCoor,refPixGuide=[629.67,318.49],refPixARCONS=[32.024,28.849]):
         '''
         Convert world coordinate into arcons coordinate.
         '''
@@ -76,9 +77,9 @@ class radec(object):
             #include the prefix for file directory
             nfiledir = self.caldir + nfile
             try:
-                pix = _world2pix(nfiledir,[worldCoor],'params.npz')
+                pix = world2pix(nfiledir[:-5]+'_allCals.fits',[worldCoor],'params.npz')
             except:
-                pix = _world2pix(nfiledir,[worldCoor], None)
+                pix = world2pix(nfiledir[:-5]+'_offCal_rotCal.fits',[worldCoor], None)
             guidePixel.append([nfile[0:6],pix[0]]) 
 
        
@@ -95,12 +96,13 @@ class radec(object):
 
         index = 0
         arconsCoor = []
-        print arconsX
         #eliminate any coordinate that is out of the range of the plate (0<x<44,0<y<46)
         for coor1 in arconsX:
             if coor1 > 0 and coor1 < 44 and arconsY[index] > 0 and arconsY[index] < 46:
                 arconsCoor.append([coor1,arconsY[index],self.sortList[index][0:6]])
             index += 1
+        
+        print arconsCoor
         return arconsCoor
 
     def photonMapping(self,timeStamp,xPhotonPixel,yPhotonPixel):
@@ -111,19 +113,20 @@ class radec(object):
         timeStamp = timeConvert(timeStamp)
         
         #convert to np array for faster processing
-        timeStampListNp = np.array[self.timeStampList]
+        timeStampListNp = np.array([self.timeStampList])
         
         def _find_nearest(array,value):
         #find closest neighbor from a given array for a given value
             idx = (np.abs(array-value)).argmin()
-            return array[idx]
-        
-        matchedTime = _find_nearest(timeStampListNp,timeStamp)
+            print array[idx]
+            return array[idx][0]
+
+        matchedTime = timeConvert(_find_nearest(timeStampListNp,timeStamp))      
         #file name of the closest matching time stamp
-        matchedFile = timeConvert(matchedTime) + self.suffix
+        matchedFile = '%s%s' %(matchedTime,self.suffix)
         
         deltaX = xPhotonPixel - self.refPixARCONS[0]
-        deltaY = yPhotonPixel + self.refPixARCONS[1]
+        deltaY = -yPhotonPixel + self.refPixARCONS[1]
         
         #find (x,y) in guide pixel coordinate
         x = deltaX*(self.arconsPlate/self.guidePlate) + self.refPixGuide[0]
@@ -132,13 +135,19 @@ class radec(object):
         filePath = self.caldir + matchedFile    
         
         #return RA,DEC world coordinate
-        world = _pix2world(filePath,[[x,y]])
+        try:
+            world = pix2world(filePath[:-5]+'_allCal.fits',[[x,y]])
+        except:
+            world = pix2world(filePath[:-5]+'_offCal_rotCal.fits',[[x,y]])
         
         #RA,DEC in degreess
         RA = world[0][0]
         DEC = world[0][1]
         
+        print RA,DEC
         return RA,DEC
+
+
 
 if __name__ == '__main__':
  

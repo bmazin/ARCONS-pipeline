@@ -3,6 +3,7 @@ import numpy as np
 from astropy import wcs
 from scipy.optimize import leastsq,fsolve
 import warnings
+import os
 
 def convert(coordinates,returnFormat=False):
     """
@@ -90,7 +91,7 @@ def convert(coordinates,returnFormat=False):
     else:
         return coordinates
 
-def _poly2(p,x1,x2):
+def poly2(p,x1,x2):
     """
     Polynomial distortion model following SIP convention
         
@@ -103,7 +104,7 @@ def _poly2(p,x1,x2):
     y = a10*x1 + a01*x2 + a20*x1**2 + a02*x2**2 + a11*x1*x2 + a21*(x1**2)*x2 + a12*x1*x2**2 + a30*x1**3 + a03*x2**3
     return y
     
-def _pix2world(fitsImageName,pix,paramFile=None,crval1=None,crval2=None):
+def pix2world(fitsImageName,pix,paramFile=None,crval1=None,crval2=None):
     """
     Input a LIST of pixel coordinates and output a list of world coordinates in degrees (example, pix=[[55,23],[34,43],[142,888]]). 
     If param file is provided, apply distortion to the coordinate conversion.
@@ -112,7 +113,7 @@ def _pix2world(fitsImageName,pix,paramFile=None,crval1=None,crval2=None):
     
     #apply distortion params if it exist prior to conversion
     if paramFile != None:
-        pix = _distApp(pix,paramFile,crval1,crval2)
+        pix = distApp(pix,paramFile,crval1,crval2)
     
     imageList = pyfits.open(fitsImageName)
     header = imageList[0].header    
@@ -127,7 +128,7 @@ def _pix2world(fitsImageName,pix,paramFile=None,crval1=None,crval2=None):
     world = world.tolist()
     return world
 
-def _world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
+def world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
     """
     Input a LIST of world coordinates in degrees and output a list of pixel coordinates (example, world=[[103.2,67],[28,33],[69,11]])
     If param file and crvals are provided, apply distortion to the coordinate conversion. Crvals are needed because SIP is based on the coordinates
@@ -146,7 +147,6 @@ def _world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
     
     #Then if distortion params provided, find the inverse of that and apply it to find the final pixel coordinates      
     if paramFile != None:
-        
         paramFile = np.load(paramFile)
         dt1 = paramFile['dt1']
         dt2 = paramFile['dt2']
@@ -165,8 +165,8 @@ def _world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
             Return a system of equations roots will give the reverse transformation of distortion. Remember everything is in relative coordinates.
             """
             x1,x2 = p
-            eqn1 = x - _poly2(dt1,x1,x2) - x1 
-            eqn2 = y - _poly2(dt2,x1,x2) - x2 
+            eqn1 = x - poly2(dt1,x1,x2) - x1 
+            eqn2 = y - poly2(dt2,x1,x2) - x2 
             return (eqn1,eqn2)
         
         
@@ -181,7 +181,7 @@ def _world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
             
     return pix
  
-def _distApp(pix,paramFile,crval1,crval2):
+def distApp(pix,paramFile,crval1,crval2):
     """
     Apply distortion polynomial to the coordinates in objectList. (crval1,crval2) represents the reference coordinate in which the paraFile is calculated from.
     """
@@ -201,10 +201,81 @@ def _distApp(pix,paramFile,crval1,crval2):
         #Change to relative coordinates then apply distortion parameters
         x = pix[index][0] - x1ref
         y = pix[index][1] - x2ref
-        pix[index][0] += _poly2(dt1,x,y)
-        pix[index][1] += _poly2(dt2,x,y)
+        pix[index][0] += poly2(dt1,x,y)
+        pix[index][1] += poly2(dt2,x,y)
     return pix
+
+def updateHeader(fitsImage,keyword,arg):
+    warnings.filterwarnings("ignore")
+    imageList = pyfits.open(fitsImage,mode='update')
+    header = imageList[0].header
+    header.update(keyword,arg)
+    #notice for pyfits in turk, header[keyword]=arg will raise error if keyword is not already present. However, it won't be a problem in a newer version of pyfits. But header.update(..) always works.
+    #header[keyword] = arg
+    imageList.flush()
+
+def distHeaderUpdate(fitsImage,saveName,paramFile):
+    paramFile = np.load(paramFile)
+    dt1 = paramFile['dt1']
+    dt2 = paramFile['dt2']
+    coeffList = paramFile['coeffList']
+    coeffheaderUpdate(saveName,fitsImage,dt1,dt2,coeffList)
+ 
+def coeffUpdate(saveName,fitsImageName,coeffx,coeffy,coeffList):           
+    #Open the image
+    imageList = pyfits.open(fitsImageName)
+    header = imageList[0].header    
+    #Updating header
+    header['A_ORDER'] = 3
+    header['B_ORDER'] = 3
+    header['CTYPE1'] = 'RA---TAN-SIP'
+    header['CTYPE2'] = 'DEC--TAN-SIP'
+    count = 0
+    for string in coeffList:
+        p = int(string[0])
+        q = int(string[1])
+        keyword1 = 'A_%s_%s' %(p,q)
+        keyword2 = 'B_%s_%s' %(p,q)
+        header[keyword1] = coeffx[count]
+        header[keyword2] = coeffy[count]
+
+        count += 1
+    #Try to remove any existing fits files  
+    try:
+        os.remove(saveName)
+    except:
+        pass           
+    imageList.writeto(saveName,output_verify='ignore')    
     
+def readCat(catFile,flagList=[0,1,4]):
+    #read the cat file generated by sextractor. Only return stars that have flags 0, 1, or 4
+    nfile = open(catFile)
+    starList = []
+
+    while True:
+        line = nfile.readline()
+        #end the reading of the file at the last line
+        if line == '':
+            break
+        
+        #ignore the comment sentence
+        if str(line.split()[0])[0] == '#':
+            pass
+        else:
+        #flag 0 1 and 4 usually indicate good source whereas other flags represent bad or possibily misidentified source
+            try:
+                if int(line.split()[3]) in flagList:
+                    x = float(line.split()[1])
+                    y = float(line.split()[2])
+                    starList.append([x,y])
+        #this argument is intended for manual catalog where flag and index are not requied to present. They are splitted by blacnk spaces
+            except:
+                x = float(line.split()[0])
+                y = float(line.split()[1])
+                starList.append([x,y])
+    return starList
+      
+
 def timeConvert(timeStamp):
     #eg convert '021456' expression to seconds in integer or convert seconds in integer into string expression
     if isinstance(timeStamp,str):
@@ -216,7 +287,7 @@ def timeConvert(timeStamp):
     elif isinstance(timeStamp,int):
         hr = timeStamp/3600
         minu = (timeStamp-(hr*3600))/60
-        sec = timeStamp-(hr*3600)-(min*60)       
+        sec = timeStamp-(hr*3600)-(minu*60)       
         hr = str(hr)
         minu = str(minu)
         sec = str(sec)        
