@@ -110,6 +110,15 @@ for fitsImage in os.listdir(fdir):
             #cal.distCal()
     except ValueError as err:
        print '> WARNING: %s is NOT calibrated: %s ' %(fitsImage,err)
+    
+    #try to remove the intermediate files after calibration
+    try:
+        os.remove(caldir + fitsImageName[:-5] + '_offCal.fits')
+        os.remove(caldir + fitsImageName[:-5] + '.check')
+        print 'clean up completed'
+    except:
+        pass
+    
 if calibrate:
     #just choose a random file in the original folder in order to call the function
     dummyList = os.listdir(fdir)

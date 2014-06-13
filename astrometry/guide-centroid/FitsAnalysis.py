@@ -127,7 +127,8 @@ class StarClass(object):
         self.catalog = np.array(catalog)
         print len(self.catalog)
                 
-            
+        #always remember to close the file to avoid memory leakage
+        imageList.close()
         
     '''
     def showCatalogPlot(self):
@@ -199,22 +200,25 @@ class StarCalibration(StarClass):
         header = imageList[0].header
         x1ref = header['CRPIX1']
         x2ref = header['CRPIX2']
+        imageList.close()
         
         #load the star from header if it is well calibrated already
         if not self.calibrate:
+            imageListCal = pyfits.open(self.caldir+self.fitsImageName[:-5]+'_offCal_rotCal.fits')
+            headerCal = imageListCal[0].header
             pix = []
             calWorld = []
-            calX = map(float,header['CALX'].split(','))
-            calY = map(float,header['CALY'].split(','))
-            pixX = map(float,header['STARX'].split(','))
-            pixY = map(float,header['STARY'].split(','))         
+            calX = map(float,headerCal['CALX'].split(','))
+            calY = map(float,headerCal['CALY'].split(','))
+            pixX = map(float,headerCal['STARX'].split(','))
+            pixY = map(float,headerCal['STARY'].split(','))         
             for count in range(len(calX)):
                 pix.append([pixX[count],pixY[count]])
                 calWorld.append([calX[count],calY[count]])
             self.pix = np.array(pix)
             self.calibratedStar = np.array(calWorld)
+            imageListCal.close()
             
-        imageList.close()
         
         #Manual cross match
         if self.calibrate and self.manual == True:
