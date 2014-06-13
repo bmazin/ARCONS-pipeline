@@ -56,8 +56,12 @@ calibrate = False
 
 #next, if automatic calibration is chosen, it is best to first manually correct the reference pixel coordinate on the header. This greatly increases the chances of calibrating.
 refFix = True
-CRVAL1 = 104.94975
-CRVAL2 = 14.2423833333333
+
+#specificy the RA,DEC of the obect in CRVAL1 AND CRAVAL2 and the approximate pixel coordinate in the guider pixel coordinate.
+CRVAL1 = 104.950558
+CRVAL2 = 14.239306
+CRPIX1 = 629
+CRPIX2 = 318
 
 
 '''
@@ -71,8 +75,8 @@ Input Ends Here
 '''
 
 #it will overwrite any existing files with the same names, the file 'test_vo.xml' is not important and can be ignored
-#queryVizier(tfitsTable,source=source,pos=pos)
-#queryFitsImage(tfitsImage,'test_vo.xml',pos=pos)
+queryVizier(tfitsTable,source=source,pos=pos)
+queryFitsImage(tfitsImage,'test_vo.xml',pos=pos)
 if manCat and semiManCat:
     raise ValueError, 'Manual catalog and semi-manual catalog cannot be True all at once!'
 elif manCat:
