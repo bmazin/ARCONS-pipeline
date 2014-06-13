@@ -99,6 +99,8 @@ for fitsImage in os.listdir(fdir):
     if refFix:
         updateHeader(fdir+fitsImage,'CRVAL1',CRVAL1)
         updateHeader(fdir+fitsImage,'CRVAL2',CRVAL2) 
+        updateHeader(fdir+fitsImage,'CRPIX1',CRPIX1)
+        updateHeader(fdir+fitsImage,'CRPIX2',CRPIX2)
     try:
         cal = StarCalibration(fitsImage,tfitsTable,tfitsImage,manual,paramFile=paramFile,caldir=caldir,fdir=fdir,sedir=sedir,height=3,manCat=catOption,manCatFile=manCatFile)
         cal.linCal()

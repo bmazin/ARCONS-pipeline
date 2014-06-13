@@ -523,7 +523,6 @@ class StarCalibration(StarClass):
                 index = index + 1
                 tempCatalog = self.catalog
                 pattern = _patternGeneration(index,len(self.starList),height)
-                print pattern
                 sortCatalog,con = _matchPattern(pattern)
                 
                 #if None entry exists, skip straight to the next iteration in for loop
