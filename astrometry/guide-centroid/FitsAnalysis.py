@@ -57,8 +57,12 @@ class StarClass(object):
         #test to see if calibration is necessary
         imageList = pyfits.open(self.fitsdir)
         header = imageList[0].header
+        
         try:
-            CALERR = header['CALERR']
+            #if calibrated file with suffix _offCal_rotCal already exists, skip the calibration 
+            imageListCal = pyfits.open(self.caldir+self.fitsImageName[:-5]+'_offCal_rotCal.fits')
+            headerCal = imageListCal[0].header
+            CALERR = headerCal['CALERR']
             print 'CALERR:' + str(CALERR)  
             if CALERR > self.minError:
                 raise
