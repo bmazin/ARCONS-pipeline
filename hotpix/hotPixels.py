@@ -254,92 +254,102 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     oldColdMask = np.zeros(shape=np.shape(im), dtype=bool)  #Same for cold pixels
     hotMask = np.zeros(shape=np.shape(im), dtype=bool)      
     coldMask = np.zeros(shape=np.shape(im), dtype=bool)     
-     
-    for iIter in range(maxIter):
-        print 'Iteration: ',iIter
-        #Calculate median filtered image
-        #Each pixel takes the median of itself and the surrounding boxSize x boxSize box.
-        #(Not sure what edge effects there may be, ignore for now...)
-        #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection';
-        #'mirror' does not, and makes more sense for this application.
-        #Do the median filter on a NaN-fixed version of im.
-        nanFixedImage = utils.replaceNaN(im, mode='nearestNmedian', boxsize=boxSize**2-1)
-        assert np.all(np.isfinite(nanFixedImage))  #Just make sure there's nothing weird still in there.
-        medFiltImage = spfilters.median_filter(nanFixedImage, boxSize, mode='mirror')
-        #medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')  #Original version without interpolating the NaNs
-        
-        if doColdFlagging is True or useLocalStdDev is True:
-            stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
-
-        
-        #-------------- Cold flagging switched off for now, May 6 2014-----------------    
-        if doColdFlagging is True:
-            nrstNbrMedFiltImage = utils.nearestNmedFilter(im, n=boxSize**2-1)  #Possibly useful with cold pixel flagging.
-            overallMedian = np.median(im[~np.isnan(im)])
-            overallStdDev = astropy.stats.median_absolute_deviation(im[~np.isnan(im)])*1.4826
-            #Calculate the standard-deviation filtered image,
-            #using a kernel footprint that will miss out the central pixel:
-            #footprint = np.ones((boxSize,boxSize))
-            #footprint[boxSize/2,boxSize/2] = 0      #Can move this definition outside the loop if needed, but prob. okay at the moment. 
-            #stdFiltImage = utils.stdDev_filterNaN(im, boxSize, mode='mirror', footprint=footprint)
-            #stdFiltImage = utils.nearestNstdDevFilter(im, n=boxSize**2-1)       #TRYING OUT USING A NEAREST-NEIGHBOUR STD. DEV FILTER....
-        #----------------------------------------------------------------------------------
-
-        #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
-        #Also calculate the error that would exist in a measurment of a pixel that *was* at the peak of a real PSF
-        diff = im - maxRatio * medFiltImage
-
-        #Simple estimate, probably makes the most sense: photon error in the max value allowed. Neglect errors in the median itself here.
-        if useLocalStdDev is False:
-            diffErr = np.sqrt(maxRatio * medFiltImage)       
-            #Alternatively, the corrected version of what I was trying to do before - i.e., the error in diff, which
-            #seems bogus because if you have a very high value in im, then you'll have a large error, which is
-            #not what you're looking for.
-            #diffErr = np.sqrt(im + (maxRatio ** 2) * stdFiltImage**2 / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
-            #
-            #Originally was something like:
-            #diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)      #which is really not very sensible.
-        else:
-            diffErr = stdFiltImage
-        
-        if iIter == 0:
-            diffOriginal = np.copy(diff)
-            diffErrOriginal = np.copy(diffErr)
+    
+    #Initialise some arrays with nan's in case we don't get to fill them out for real,
+    #just so that things don't go awry when we try to return the arrays at the end.
+    medFiltImage = np.zeros_like(im)
+    medFiltImage.fill(np.nan)
+    diff = np.zeros_like(im)
+    diff.fill(np.nan)
+    diffErr = np.zeros_like(im)
+    diffErr.fill(np.nan)
+    #Ditto for number of iterations
+    iIter=-1 
+    
+    if not np.all(deadMask):  #Check to make sure not *all* the pixels are dead before doing further masking.
+        for iIter in range(maxIter):
+            print 'Iteration: ',iIter
+            #Calculate median filtered image
+            #Each pixel takes the median of itself and the surrounding boxSize x boxSize box.
+            #(Not sure what edge effects there may be, ignore for now...)
+            #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection';
+            #'mirror' does not, and makes more sense for this application.
+            #Do the median filter on a NaN-fixed version of im.
+            nanFixedImage = utils.replaceNaN(im, mode='nearestNmedian', boxsize=boxSize**2-1)
+            assert np.all(np.isfinite(nanFixedImage))  #Just make sure there's nothing weird still in there.
+            medFiltImage = spfilters.median_filter(nanFixedImage, boxSize, mode='mirror')
+            #medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')  #Original version without interpolating the NaNs
             
-        #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged as hot:
-        #(True=>bad pixel; False=> good pixel).
-        hotMask = (diff > (nSigmaHot * diffErr)) | oldHotMask
-        
-        #-------------- Cold flagging switched off for now, May 6 2014-----------------        
-        if doColdFlagging is True:
-            #And any pixel that is more than nSigma *below* the std. dev. of the surrounding box (not including itself)
-            #should be flagged as cold:
-            coldMask = ((nrstNbrMedFiltImage - im) > nSigmaCold * stdFiltImage) | oldColdMask 
-            #coldMask = ((overallMedian - im) > nSigmaCold * overallStdDev) | oldColdMask 
-        #------------------------------------------------------------------------------------------
-        
-        if diagnosticPlots is True and iIter==0:
-            #Display a histogram of fluxes by pixel
-            mpl.figure()
-            mpl.hist(im[~np.isnan(im)],bins=400)
-                                            #(np.nanmax(im)-np.nanmin(im)/np.median(im[~np.isnan(im)]))*10.)
-                                             #np.sqrt(np.sum(~np.isnan(im))))
-            mpl.xlabel('Photon counts')
-            mpl.ylabel('Number of pixels')
-            mpl.title('Flux by Pixel, Before Flagging')
-            mpl.suptitle(plotTitle)
+            if doColdFlagging is True or useLocalStdDev is True:
+                stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
+    
+            
+            #-------------- Cold flagging switched off for now, May 6 2014-----------------    
+            if doColdFlagging is True:
+                nrstNbrMedFiltImage = utils.nearestNmedFilter(im, n=boxSize**2-1)  #Possibly useful with cold pixel flagging.
+                overallMedian = np.median(im[~np.isnan(im)])
+                overallStdDev = astropy.stats.median_absolute_deviation(im[~np.isnan(im)])*1.4826
+                #Calculate the standard-deviation filtered image,
+                #using a kernel footprint that will miss out the central pixel:
+                #footprint = np.ones((boxSize,boxSize))
+                #footprint[boxSize/2,boxSize/2] = 0      #Can move this definition outside the loop if needed, but prob. okay at the moment. 
+                #stdFiltImage = utils.stdDev_filterNaN(im, boxSize, mode='mirror', footprint=footprint)
+                #stdFiltImage = utils.nearestNstdDevFilter(im, n=boxSize**2-1)       #TRYING OUT USING A NEAREST-NEIGHBOUR STD. DEV FILTER....
+            #----------------------------------------------------------------------------------
+    
+            #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
+            #Also calculate the error that would exist in a measurment of a pixel that *was* at the peak of a real PSF
+            diff = im - maxRatio * medFiltImage
+    
+            #Simple estimate, probably makes the most sense: photon error in the max value allowed. Neglect errors in the median itself here.
+            if useLocalStdDev is False:
+                diffErr = np.sqrt(maxRatio * medFiltImage)       
+                #Alternatively, the corrected version of what I was trying to do before - i.e., the error in diff, which
+                #seems bogus because if you have a very high value in im, then you'll have a large error, which is
+                #not what you're looking for.
+                #diffErr = np.sqrt(im + (maxRatio ** 2) * stdFiltImage**2 / (boxSize**2))        #/boxSize**2 because it's like error in the mean, i.e., divide by sqrt(n). Def. not rigorous to apply that to a median, but, better than nothing....
+                #
+                #Originally was something like:
+                #diffErr = np.sqrt(im + (maxRatio ** 2) * medFiltImage)      #which is really not very sensible.
+            else:
+                diffErr = stdFiltImage
+            
+            if iIter == 0:
+                diffOriginal = np.copy(diff)
+                diffErrOriginal = np.copy(diffErr)
                 
-        #If no change between between this and the last iteration then stop iterating
-        if np.all(hotMask == oldHotMask) and np.all(coldMask == oldColdMask): break
-
-        #Otherwise update 'oldHotMask' and set all detected bad pixels to NaN for the next iteration
-        oldHotMask = np.copy(hotMask)
-        im[hotMask] = np.nan
-        oldColdMask = np.copy(coldMask)
-        im[coldMask] = np.nan
+            #Any pixel that has a peak/median ratio more than nSigma above the maximum ratio should be flagged as hot:
+            #(True=>bad pixel; False=> good pixel).
+            hotMask = (diff > (nSigmaHot * diffErr)) | oldHotMask
+            
+            #-------------- Cold flagging switched off for now, May 6 2014-----------------        
+            if doColdFlagging is True:
+                #And any pixel that is more than nSigma *below* the std. dev. of the surrounding box (not including itself)
+                #should be flagged as cold:
+                coldMask = ((nrstNbrMedFiltImage - im) > nSigmaCold * stdFiltImage) | oldColdMask 
+                #coldMask = ((overallMedian - im) > nSigmaCold * overallStdDev) | oldColdMask 
+            #------------------------------------------------------------------------------------------
+            
+            if diagnosticPlots is True and iIter==0:
+                #Display a histogram of fluxes by pixel
+                mpl.figure()
+                mpl.hist(im[~np.isnan(im)],bins=400)
+                                                #(np.nanmax(im)-np.nanmin(im)/np.median(im[~np.isnan(im)]))*10.)
+                                                 #np.sqrt(np.sum(~np.isnan(im))))
+                mpl.xlabel('Photon counts')
+                mpl.ylabel('Number of pixels')
+                mpl.title('Flux by Pixel, Before Flagging')
+                mpl.suptitle(plotTitle)
+                    
+            #If no change between between this and the last iteration then stop iterating
+            if np.all(hotMask == oldHotMask) and np.all(coldMask == oldColdMask): break
     
+            #Otherwise update 'oldHotMask' and set all detected bad pixels to NaN for the next iteration
+            oldHotMask = np.copy(hotMask)
+            im[hotMask] = np.nan
+            oldColdMask = np.copy(coldMask)
+            im[coldMask] = np.nan
     
-
     #Finished with loop, now combine the hot and cold masks:
     assert np.all(coldMask & hotMask == False)  #Presumably a pixel can't be both hot AND cold....
     assert np.all(hotMask & deadMask == False)  #Ditto hot and dead. (But *cold* and dead maybe okay at this point).
@@ -1109,9 +1119,10 @@ if __name__ == "__main__":
     if nArg > 1: paramFile = sys.argv[1]
     if nArg > 2: inputFile = sys.argv[2]
     if nArg > 3: outputFile = sys.argv[3]
-    findHotPixels(paramFile=paramFile, inputFileName=inputFile,
-                  outputFileName=outputFile, endTime=4.5)
-    
+    #findHotPixels(paramFile=paramFile, inputFileName=inputFile,
+                  #outputFileName=outputFile, endTime=4.5)
+    fn = '/Users/vaneyken/Data/UCSB/ARCONS/turkDataCopy/ScienceData/PAL2013/20131209/cal_20131209-120649.h5'
+    findHotPixels(fn,outputFileName='hptest.h5',startTime=61, endTime=62,display=True,fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
     
 
 

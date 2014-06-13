@@ -675,8 +675,9 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     '''
     
     outputarray = numpy.copy(inputarray)
-    while numpy.sum(numpy.isnan(outputarray)) > 0:
+    while numpy.sum(numpy.isnan(outputarray)) > 0 and numpy.all(numpy.isnan(outputarray)) == False:
         
+        print numpy.sum(numpy.isnan(outputarray))
         #Calculate interpolates at *all* locations (because it's easier...)
         if mode=='mean':
             interpolates = mean_filterNaN(outputarray,size=boxsize,mode='mirror')
@@ -775,7 +776,9 @@ def findNearestFinite(im,i,j,n=10):
     The element i,j itself is *not* returned.
     
     If n is greater than the number of finite valued elements available,
-    it will return non
+    it will return the indices of only the valued elements that exist.
+    If there are no finite valued elements, it will return a tuple of
+    empty arrays. 
     
     No guarantees about the order
     in which elements are returned that are equidistant from i,j.
@@ -788,21 +791,19 @@ def findNearestFinite(im,i,j,n=10):
         n - find the nearest n finite-valued elements
 
     OUTPUTS:
-        Returns an boolean array matching the shape of im, with 'True' where the nearest
-        n finite values are, and False everywhere else.
+        (#Returns an boolean array matching the shape of im, with 'True' where the nearest
+        #n finite values are, and False everywhere else. Seems to be outdated - see below. 06/11/2014,
+        JvE. Should probably check to be sure there wasn't some mistake. ).
+        
+        Returns a tuple of index arrays (row_array, col_array), similar to results
+        returned by the numpy 'where' function.
     """
     
     imShape = numpy.shape(im)
     assert len(imShape) == 2
     nRows,nCols = imShape
-    #ii,jj = numpy.indices(imShape,dtype=float)
-    #distsq = (i-ii)**2 + (j-jj)**2 #Calculate distance squared from i,j (no need to bother taking square root)
     ii2,jj2 = numpy.atleast_2d(numpy.arange(-i,nRows-i,dtype=float), numpy.arange(-j,nCols-j,dtype=float))
     distsq = ii2.T**2 + jj2**2
-    #if numpy.all(distsq == distsq2):
-    #    print 'Hooray!'
-    #else:
-    #    print 'Uh oh.'
     good = numpy.isfinite(im)
     good[i,j] = False #Get rid of element i,j itself.
     ngood = numpy.sum(good)
