@@ -9,6 +9,8 @@ import pyfits
 import numpy as np
 from astropy import wcs
 from scipy.optimize import fsolve
+import itertools
+import h5py
   
 
 class radec(object):
@@ -30,7 +32,7 @@ class radec(object):
         self.dimY = 46
         self.refPixGuide = refPixGuide
         self.refPixARCONS = refPixARCONS
-        self.sufix = suffix
+        self.suffix = suffix
         
         #sorting the list of files in time-ascending order and discard any images that have error greater than 2500 pixel distance in default
         
@@ -42,14 +44,14 @@ class radec(object):
         #then sort the files in each directory separately. Create a dictionary and have the directory name to be keyword and sorted list be the argument
         for directory in directories:
             calList = []
-            for calFile in os.listdir():
-                imageList = pyfits.open(calFile)
+            for calFile in os.listdir(directory):
+                imageList = pyfits.open(directory+calFile)
                 header = imageList[0].header
                 if header['CALERR'] < self.tolErr:
                     calList.append(calFile[0:6])
                 imageList.close()
             #append dictionary entry. Here, the calList contains only the time stamp of each file(in seconds NOT in eg 063014 format). Suffix is removed
-            self.dictionary[directory] = timeConvert(sortList(calList))
+            self.dictionary[directory] = sortList(calList)
     
         
         #output sorted file and timeStamp lists
@@ -100,36 +102,101 @@ class radec(object):
         print arconsCoor
         return arconsCoor
 
-    def photonMapping(self,directory,timeStamp,xPhotonPixel,yPhotonPixel):
-        #the timestamp variable has to be a string input of format eg: 041527
+    def photonMapping(self,date,timeStamp,xPhotonPixel,yPhotonPixel):
+        #notice here that timeStamp has to be in STRING format (eg. '065413')
         
-        timeStampListNp = np.arry([self.dictionary[directory]])   
+        #directory of the files
+        directory = self.caldir + date + '/'
         
         def _find_nearest(array,value):
         #find closest neighbor from a given array for a given value
             idx = (np.abs(array-value)).argmin()
-            print array[idx]
-            return array[idx][0]
+            return array[idx]
+            
+        #Constructing lookup table if not presented
+        try:
+            print '> Loading lookup table in %s...' %directory
+            saveName = date + 'lookup.hdf5'
+            h5f = h5py.File(saveName,'r')
+            #loading index
+            index = h5f['index'][:]
+            print '> Table found in %s! Proceed to photon mapping!' %saveName
+            
+        except:
+            print '> Lookup table not presented in %s. Constructing a new table NOW!' %directory
+            
+            '''
+            #+0.1 is to include the very last number
+            tempList = [np.arange(0,self.dimX+0.1,0.1),np.arange(0,self.dimY+0.1,0.1)]
+            #pixel is the list that contains every pixels in 0.1 steps (eg, (14.3,5.3))
+            pixelList = list(itertools.product(*a))
+            '''
+            
+            #Initializing data structure. Here I use step is 0.1
+            print '> Initializing structure array...'
+            meshx,meshy = np.meshgrid(np.arange(0,self.dimX+0.1,0.1),np.arange(0,self.dimY+0.1,0.1))
+            
+            #first apply inverse transformation to each grid point. These operations are independent of the calibration file.
+            deltaX = meshx - self.refPixARCONS[0]
+            deltaY = -meshy + self.refPixARCONS[1]
+            x = deltaX*(self.arconsPlate/self.guidePlate) + self.refPixGuide[0]
+            y = deltaY*(self.arconsPlate/self.guidePlate) + self.refPixGuide[1]
+            
+            #here is stack in (y,x) order
+            arrayMatrix = np.dstack((y,x))
+                        
+            #reshape the array to pass to pix2world
+            arrayYLen = arrayMatrix.shape[0]
+            arrayXLen = arrayMatrix.shape[1]     
+            length = arrayYLen * arrayXLen
+            flatList = arrayMatrix.reshape(length,2)
+            
+            #initialize h5 table
+            saveName = date + 'lookup.hdf5'
+            h5f = h5py.File(directory+saveName,'w')
+            fileList = timeConvert(self.dictionary[directory])
+            count = 1
+            for calFile in fileList:
+                print '> Calculating %s with 0.1 step (%s/%s)...' %(calFile,count,len(fileList))
+                worldCoor = np.array(pix2world(directory + calFile,flatList))
+                worldCoor = worldCoor.reshape(arrayYLen,arrayXLen,2)
+                #create a dataset in h5 table with its name specified by the calFile name
+                h5f.create_dataset(calFile,data=worldCoor)
+                count += 1
+            
+            #save the file list to h5 table for indexing purposes. Here, the file list is stored in seconds.
+            h5f.creat_dataset('index',data=timeConvert(fileList))
+            
+            print '> saving h5 file to %s!' %directory+saveNmae
+            h5f.close()
+            print '> all done!'
+            print '> restart the program to map the photons!'
+            exit(-1)
+            
 
-        matchedTime = timeConvert(_find_nearest(timeStampListNp,timeStamp))      
-        #file name of the closest matching time stamp
-        matchedFile = '%s%s' %(matchedTime,self.suffix)
         
+
+        
+       
+        
+        matchedTime = timeConvert(_find_nearest(index,timeConvert(timeStamp)))      
+        #file name of the closest matching time stamp. Convert to string format
+        matchedFile = '%s%s' %(matchedTime,self.suffix)
+        '''
         deltaX = xPhotonPixel - self.refPixARCONS[0]
         deltaY = -yPhotonPixel + self.refPixARCONS[1]
         
         #find (x,y) in guide pixel coordinate
         x = deltaX*(self.arconsPlate/self.guidePlate) + self.refPixGuide[0]
         y = deltaY*(self.arconsPlate/self.guidePlate) + self.refPixGuide[1]
+        '''
+        filePath = directory + matchedFile    
         
-        filePath = self.caldir + matchedFile    
-        
-        #return RA,DEC world coordinate
+        #return RA,DEC world coordinate. Try param files
         try:
-            world = pix2world(filePath[:-5]+self.suffix,[[x,y]])
+            world = pix2world(filePath,[[x,y]],'param.npz')
         except:
-            world = pix2world(filePath[:-5]+'_offCal_rotCal.fits',[[x,y]])
-        
+            world = pix2world(filePath,[[x,y]])
         #RA,DEC in degreess
         RA = world[0][0]
         DEC = world[0][1]
@@ -140,7 +207,7 @@ class radec(object):
 
 if __name__ == '__main__':
     #testing script
-    test = radec(tolError=10000)  
+    test = radec()  
     #nlist = test.centroid(worldCoor=[98.172422,-0.031578365])
     #print nlist
     print test.photonMapping('20121207',102340,30,12)

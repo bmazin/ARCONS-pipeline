@@ -110,7 +110,7 @@ def pix2world(fitsImageName,pix,paramFile=None,crval1=None,crval2=None):
     If param file is provided, apply distortion to the coordinate conversion.
     """
     
-    
+    print pix
     #apply distortion params if it exist prior to conversion
     if paramFile != None:
         pix = distApp(pix,paramFile,crval1,crval2)
@@ -181,7 +181,7 @@ def world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
             
     return pix
     
-def sortList(fileList):
+def sortList(fileList,sec=True):
     '''
     Sort the file list in time ascending order. The first six letters in the file name has to be the time stamp (eg.061234)
     It assumes all files have same suffix in this case.
@@ -199,13 +199,16 @@ def sortList(fileList):
     
     #time-ascending order
     tempList1.sort() 
-
-    for ntime in tempList1:
-        timeStr = timeConvert(ntime)
-        outputFileName = '%s%s' %(timeStr,self.suffix)
-        returnList.append(outputFileName)
-        
-    return returnList
+    
+    #return in seconds format if sec is True
+    if Sec:
+        return tempList1
+    else:
+        for ntime in tempList1:
+            timeStr = timeConvert(ntime)
+            outputFileName = '%s%s' %(timeStr,suffix)
+            returnList.append(outputFileName)
+            return returnList
  
 def distApp(pix,paramFile,crval1,crval2):
     """
