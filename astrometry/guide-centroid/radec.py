@@ -154,18 +154,19 @@ class radec(object):
             #initialize h5 table
             saveName = date + 'lookup.hdf5'
             h5f = h5py.File(directory+saveName,'w')
-            fileList = timeConvert(self.dictionary[directory])
+            fileList = self.dictionary[directory]
             count = 1
             for calFile in fileList:
+                filePath = directory + timeConvert(calFile) + self.suffix
                 print '> Calculating %s with 0.1 step (%s/%s)...' %(calFile,count,len(fileList))
-                worldCoor = np.array(pix2world(directory + calFile,flatList))
+                worldCoor = np.array(pix2world(filePath,flatList))
                 worldCoor = worldCoor.reshape(arrayYLen,arrayXLen,2)
                 #create a dataset in h5 table with its name specified by the calFile name
                 h5f.create_dataset(calFile,data=worldCoor)
                 count += 1
             
             #save the file list to h5 table for indexing purposes. Here, the file list is stored in seconds.
-            h5f.creat_dataset('index',data=timeConvert(fileList))
+            h5f.creat_dataset('index',data=np.array(fileList))
             
             print '> saving h5 file to %s!' %directory+saveNmae
             h5f.close()

@@ -201,7 +201,7 @@ def sortList(fileList,sec=True):
     tempList1.sort() 
     
     #return in seconds format if sec is True
-    if Sec:
+    if sec:
         return tempList1
     else:
         for ntime in tempList1:
