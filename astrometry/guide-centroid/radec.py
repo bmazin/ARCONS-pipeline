@@ -9,17 +9,19 @@ import pyfits
 import numpy as np
 from astropy import wcs
 from scipy.optimize import fsolve
-
-inputFile = 'runRecord.txt'  
+  
 
 class radec(object):
 
-    def __init__(self,recordFile='runRecord.txt',tolError=400,caldir='./cal/',refPixGuide=[565,366],refPixARCONS=[11.18,13.5]):
+    def __init__(self,tolErr=2500,caldir='/Scratch/larry/psr0614/',refPixGuide=[565,366],refPixARCONS=[11.18,13.5],suffix='_offCal_rotCal.fits'):
     
         self.sortList = []
         #notice that self.timeStamp contains timeStamp in seconds(integers)
         self.timeStampList = []
         self.caldir = caldir
+        self.tolErr = tolErr
+        #record the sorted file and corresponding directory
+        self.dictionary = {}
         
         #initialize ARCONS parameters      
         self.guidePlate = 3.5833*10**(-5)
@@ -28,58 +30,51 @@ class radec(object):
         self.dimY = 46
         self.refPixGuide = refPixGuide
         self.refPixARCONS = refPixARCONS
-        self.sufix = ''
+        self.sufix = suffix
         
-        #sorting the list of files in time-ascending order and discard any images that have error greater than 400 pixels
-        fileList = []
-        recordFile = open(recordFile,'r')
-        while True:
-            line = recordFile.readline()
+        #sorting the list of files in time-ascending order and discard any images that have error greater than 2500 pixel distance in default
         
-            if line == '':
-                break
-            fileName,error = line.split()
-            error = float(error)    
-            
-            
-            if error < tolError:
-                fileList.append(fileName)
-
-        tempList1 = []
-        tempList2 = []
-        tempList3 = []
+        #first, find all the directories with different date in the main calibration directory
+        directories = []
+        for subdir in os.listdir(self.caldir):
+            directories.append(self.caldir+subdir+'/')
         
-        for nfile in fileList:
-            timeStamp = nfile[0:6]
-            sec = timeConvert(timeStamp)
-            tempList1.append(sec)
-            self.suffix = nfile[6:]
-        
-        #time-ascending order
-        tempList1.sort() 
-
-        for ntime in tempList1:
-            timeStr = timeConvert(ntime)
-            outputFileName = '%s%s' %(timeStr,self.suffix)
-            tempList2.append(outputFileName)       
+        #then sort the files in each directory separately. Create a dictionary and have the directory name to be keyword and sorted list be the argument
+        for directory in directories:
+            calList = []
+            for calFile in os.listdir():
+                imageList = pyfits.open(calFile)
+                header = imageList[0].header
+                if header['CALERR'] < self.tolErr:
+                    calList.append(calFile[0:6])
+                imageList.close()
+            #append dictionary entry. Here, the calList contains only the time stamp of each file(in seconds NOT in eg 063014 format). Suffix is removed
+            self.dictionary[directory] = timeConvert(sortList(calList))
+    
         
         #output sorted file and timeStamp lists
+        '''
         self.sortList = tempList2
         self.timeStampList = tempList1
-
-    def centroid(self,worldCoor,refPixGuide=[629.67,318.49],refPixARCONS=[32.024,28.849]):
+        '''
+        
+    def centroid(self,directory,worldCoor,refPixGuide=[629.67,318.49],refPixARCONS=[32.024,28.849]):
         '''
         Convert world coordinate into arcons coordinate.
         '''
         guidePixel = [] 
-
-        for nfile in self.sortList:
+        
+        fileList = timeConvert(self.dictionary[directory])
+        
+        for nfile in fileList:
             #include the prefix for file directory
-            nfiledir = self.caldir + nfile
+            nfiledir = self.caldir + nfile + self.suffix
+            
+            #try to include distortion parameter if presented
             try:
-                pix = world2pix(nfiledir[:-5]+'_allCals.fits',[worldCoor],'params.npz')
+                pix = world2pix(nfiledir,[worldCoor],'params.npz')
             except:
-                pix = world2pix(nfiledir[:-5]+'_offCal_rotCal.fits',[worldCoor], None)
+                pix = world2pix(nfiledir,[worldCoor], None)
             guidePixel.append([nfile[0:6],pix[0]]) 
 
        
@@ -105,15 +100,10 @@ class radec(object):
         print arconsCoor
         return arconsCoor
 
-    def photonMapping(self,timeStamp,xPhotonPixel,yPhotonPixel):
+    def photonMapping(self,directory,timeStamp,xPhotonPixel,yPhotonPixel):
         #the timestamp variable has to be a string input of format eg: 041527
         
-        
-        #first convert timeStamp to seconds in interger and compare with the list to find the closest neighbor
-        timeStamp = timeConvert(timeStamp)
-        
-        #convert to np array for faster processing
-        timeStampListNp = np.array([self.timeStampList])
+        timeStampListNp = np.arry([self.dictionary[directory]])   
         
         def _find_nearest(array,value):
         #find closest neighbor from a given array for a given value
@@ -136,7 +126,7 @@ class radec(object):
         
         #return RA,DEC world coordinate
         try:
-            world = pix2world(filePath[:-5]+'_allCal.fits',[[x,y]])
+            world = pix2world(filePath[:-5]+self.suffix,[[x,y]])
         except:
             world = pix2world(filePath[:-5]+'_offCal_rotCal.fits',[[x,y]])
         
@@ -144,17 +134,16 @@ class radec(object):
         RA = world[0][0]
         DEC = world[0][1]
         
-        print RA,DEC
         return RA,DEC
 
 
 
 if __name__ == '__main__':
- 
-    test = radec(tolError=10000)
-    
-    nlist = test.centroid(worldCoor=[98.172422,-0.031578365])
-    print nlist
+    #testing script
+    test = radec(tolError=10000)  
+    #nlist = test.centroid(worldCoor=[98.172422,-0.031578365])
+    #print nlist
+    print test.photonMapping('20121207',102340,30,12)
 
 '''
 coor = [[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[8.08,11.57],[8.52,11.7],[8.9,11.9],[8.96,11.467],[22.1,15.67],[21.7,15.55],[21.39,15.05],[21.01,15.42],[21.88,14.93],[35.36,18.8],[36,18.88],[35.85,19.38],[3.7,24.45],[3.83,24.2],[3.58,24.45],[4.07,24.577],[4.07,24.7],[16.9,27.91],[17.3,27.42],[16.69,27.3],[16.8,27.05],[16.07,27.916],[29.55,31],[29.18,31.62],[29.3,31.74],[29.18,31.74],[29.3,31.37],[9.14,39.787],[9.27,39.416],[9.148,39.41],[8.9,39.1688],[8.28,40.03],[8.28,40.03],[22,43.86],[21.63,43.62],[21.88,43.25],[21.637,43.37],[21.143,44.3624]]

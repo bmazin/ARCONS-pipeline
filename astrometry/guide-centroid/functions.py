@@ -180,6 +180,32 @@ def world2pix(fitsImageName,world,paramFile=None,crval1=None,crval2=None):
             pix[index][1] = x2 + x2ref
             
     return pix
+    
+def sortList(fileList):
+    '''
+    Sort the file list in time ascending order. The first six letters in the file name has to be the time stamp (eg.061234)
+    It assumes all files have same suffix in this case.
+    '''
+    returnList = [] 
+    tempList1 = []
+    
+    for nfile in fileList:
+        
+        timeStamp = nfile[0:6]
+        sec = timeConvert(timeStamp)
+        tempList1.append(sec)
+        #actually this only has to be done once since it assume all files have same suffix
+        suffix = nfile[6:]
+    
+    #time-ascending order
+    tempList1.sort() 
+
+    for ntime in tempList1:
+        timeStr = timeConvert(ntime)
+        outputFileName = '%s%s' %(timeStr,self.suffix)
+        returnList.append(outputFileName)
+        
+    return returnList
  
 def distApp(pix,paramFile,crval1,crval2):
     """
@@ -277,7 +303,9 @@ def readCat(catFile,flagList=[0,1,4]):
       
 
 def timeConvert(timeStamp):
-    #eg convert '021456' expression to seconds in integer or convert seconds in integer into string expression
+    '''
+    eg convert '021456' expression to seconds in integer or convert seconds in integer into string expression
+    '''
     if isinstance(timeStamp,str):
         hr = int(timeStamp[0:2])
         minu = int(timeStamp[2:4])

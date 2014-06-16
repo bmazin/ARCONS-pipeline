@@ -113,8 +113,8 @@ for fitsImage in os.listdir(fdir):
     
     #try to remove the intermediate files after calibration
     try:
-        os.remove(caldir + fitsImageName[:-5] + '_offCal.fits')
-        os.remove(caldir + fitsImageName[:-5] + '.check')
+        os.remove(caldir + fitsImage[:-5] + '_offCal.fits')
+        os.remove(caldir + fitsImage[:-5] + '.check')
         print 'clean up completed'
     except:
         pass

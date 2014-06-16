@@ -195,7 +195,8 @@ class StarCalibration(StarClass):
         
         #Initialize the super class, StarClass
         super(StarCalibration,self).__init__(self.fitsImageName,self.fitsTableName,self.manual,self.fitsCatalogName,self.caldir,self.fdir,self.sedir,manCat=manCat,manCatFile=manCatFile)
-
+        
+        #calibration needs at least 2 star to perform. Raise error if it has fewer than 2 star detected. This becomes a warning in manage.py
         if len(self.starList) < 2 and self.calibrate:        
             raise ValueError, '2 of more stars required to calculate calibration parameters. Only %s star/s detected!' %len(self.starList)
         
@@ -594,7 +595,7 @@ class StarCalibration(StarClass):
         """
         
         if not self.calibrate:
-            imageList = pyfits.open(self.fitsdir)
+            imageList = pyfits.open(self.caldir+self.fitsImageName[:-5]+'_offCal_rotCal.fits')
             header = imageList[0].header
             CALERR = header['CALERR']
             return CALERR
