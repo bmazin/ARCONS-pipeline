@@ -45,6 +45,9 @@ class radec(object):
         for directory in directories:
             calList = []
             for calFile in os.listdir(directory):
+                #skip loop if it is not a fits file
+                if calFile[-5:] != '.fits':
+                    continue
                 imageList = pyfits.open(directory+calFile)
                 header = imageList[0].header
                 if header['CALERR'] < self.tolErr:
@@ -142,8 +145,8 @@ class radec(object):
             x = deltaX*(self.arconsPlate/self.guidePlate) + self.refPixGuide[0]
             y = deltaY*(self.arconsPlate/self.guidePlate) + self.refPixGuide[1]
             
-            #here is stack in (y,x) order
-            arrayMatrix = np.dstack((y,x))
+            #here is stack in (x,y) order(but the slicing is in REVERSE order. Namely, (x=3,y=5)=arrayMatrix[5][3])
+            arrayMatrix = np.dstack((x,y))
                         
             #reshape the array to pass to pix2world
             arrayYLen = arrayMatrix.shape[0]
@@ -158,11 +161,11 @@ class radec(object):
             count = 1
             for calFile in fileList:
                 filePath = directory + timeConvert(calFile) + self.suffix
-                print '> Calculating %s with 0.1 step (%s/%s)...' %(calFile,count,len(fileList))
+                print '> Calculating %s with 0.1 step (%s/%s)...' %(filePath,count,len(fileList))
                 worldCoor = np.array(pix2world(filePath,flatList))
                 worldCoor = worldCoor.reshape(arrayYLen,arrayXLen,2)
                 #create a dataset in h5 table with its name specified by the calFile name
-                h5f.create_dataset(calFile,data=worldCoor)
+                h5f.create_dataset(str(calFile),data=worldCoor)
                 count += 1
             
             #save the file list to h5 table for indexing purposes. Here, the file list is stored in seconds.
@@ -174,15 +177,13 @@ class radec(object):
             print '> restart the program to map the photons!'
             exit(-1)
             
-
+                 
+        #look up world coordinate in the table
+        matchedTime = str(_find_nearest(index,timeConvert(timeStamp)))
+        pixel = h5f[matchedTime][:]
+        RA,DEC = pixel[yPhotonPixel][xPhotonPixel]
+        return RA,DEC
         
-
-        
-       
-        
-        matchedTime = timeConvert(_find_nearest(index,timeConvert(timeStamp)))      
-        #file name of the closest matching time stamp. Convert to string format
-        matchedFile = '%s%s' %(matchedTime,self.suffix)
         '''
         deltaX = xPhotonPixel - self.refPixARCONS[0]
         deltaY = -yPhotonPixel + self.refPixARCONS[1]
@@ -191,19 +192,6 @@ class radec(object):
         x = deltaX*(self.arconsPlate/self.guidePlate) + self.refPixGuide[0]
         y = deltaY*(self.arconsPlate/self.guidePlate) + self.refPixGuide[1]
         '''
-        filePath = directory + matchedFile    
-        
-        #return RA,DEC world coordinate. Try param files
-        try:
-            world = pix2world(filePath,[[x,y]],'param.npz')
-        except:
-            world = pix2world(filePath,[[x,y]])
-        #RA,DEC in degreess
-        RA = world[0][0]
-        DEC = world[0][1]
-        
-        return RA,DEC
-
 
 
 if __name__ == '__main__':
@@ -211,7 +199,7 @@ if __name__ == '__main__':
     test = radec()  
     #nlist = test.centroid(worldCoor=[98.172422,-0.031578365])
     #print nlist
-    print test.photonMapping('20121207',102340,30,12)
+    print test.photonMapping('20121208',102340,30,12)
 
 '''
 coor = [[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[8.08,11.57],[8.52,11.7],[8.9,11.9],[8.96,11.467],[22.1,15.67],[21.7,15.55],[21.39,15.05],[21.01,15.42],[21.88,14.93],[35.36,18.8],[36,18.88],[35.85,19.38],[3.7,24.45],[3.83,24.2],[3.58,24.45],[4.07,24.577],[4.07,24.7],[16.9,27.91],[17.3,27.42],[16.69,27.3],[16.8,27.05],[16.07,27.916],[29.55,31],[29.18,31.62],[29.3,31.74],[29.18,31.74],[29.3,31.37],[9.14,39.787],[9.27,39.416],[9.148,39.41],[8.9,39.1688],[8.28,40.03],[8.28,40.03],[22,43.86],[21.63,43.62],[21.88,43.25],[21.637,43.37],[21.143,44.3624]]

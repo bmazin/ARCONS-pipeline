@@ -109,8 +109,6 @@ def pix2world(fitsImageName,pix,paramFile=None,crval1=None,crval2=None):
     Input a LIST of pixel coordinates and output a list of world coordinates in degrees (example, pix=[[55,23],[34,43],[142,888]]). 
     If param file is provided, apply distortion to the coordinate conversion.
     """
-    
-    print pix
     #apply distortion params if it exist prior to conversion
     if paramFile != None:
         pix = distApp(pix,paramFile,crval1,crval2)
