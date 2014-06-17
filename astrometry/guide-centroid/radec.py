@@ -45,6 +45,14 @@ class radec(object):
         for directory in directories:
             calList = []
             for calFile in os.listdir(directory):
+                #firstly, fix this annoying error. Namely, the ambiguity in nameing the file (063960=064000!!) which causes error
+                if calFile[4:6] == '60':
+                    timeStamp = calFile[0:6]
+                    #this double conversion will convert to the right format (i.e no 60 present)
+                    newFileName = directory + timeConvert(timeConvert(timeStamp))
+                    oldFileName = directory + calFile
+                    os.rename(oldFileName,newFileName)
+                    
                 #skip loop if it is not a fits file
                 if calFile[-5:] != '.fits':
                     continue
