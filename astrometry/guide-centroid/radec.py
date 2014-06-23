@@ -130,13 +130,12 @@ class radec(object):
             stackList = []
             for i in range(numCol):
                 stackList.append(array)
-            arraryList = np.vstack(stackList)
+            arrayList = np.vstack(stackList)
             #return list of index of nearest nb
             idx = (np.abs(arrayList-value)).argmin(axis=1)
             idx = idx.reshape(numCol)
             #return list of cloest nbh in seconds
             return array[idx]
-            
         #Constructing lookup table if not presented
         try:
             print '> Loading lookup table in %s...' %directory
@@ -202,9 +201,10 @@ class radec(object):
                  
         
         #look up world coordinate in the table
-        matchedTime = _find_nearest(index,timeConvert(timeStamp)).astype('str')
+        matchedTime = _find_nearest(index,timeConvert(timeStamp))
+        matchedStr = [str(x) for x in mathcedTime.tolist()]
         returnList = []
-        for count,listName in enumerate(matchedTime.tolist()):
+        for count,listName in enumerate(matchedStr):
             pixel = h5f[listName]
             x = xPhotonPixel[count]
             y = yPhotonPixel[count]

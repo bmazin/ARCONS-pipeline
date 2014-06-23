@@ -329,13 +329,10 @@ def timeConvert(timeStamp):
         hr = timeStamp/3600
         minu = (timeStamp-(hr*3600))/60
         sec = timeStamp-(hr*3600)-(minu*60)       
-        hr = hr.astype('str')
-        minu = minu.astype('str')
-        sec = sec.astype('str')
         
-        hrNew = ['0'+x if len(x)==1 else x for x in hr.tolist()]
-        minuNew = ['0'+x if len(x)==1 else x for x in minu.tolist()]
-        secNew = ['0'+x if len(x)==1 else x for x in sec.tolist()]
+        hrNew = ['0'+str(x) if len(str(x))==1 else str(x) for x in hr.tolist()]
+        minuNew = ['0'+str(x) if len(str(x))==1 else x for x in minu.tolist()]
+        secNew = ['0'+str(x) if len(str(x))==1 else x for x in sec.tolist()]
         
         returnList = ['{}{}{}'.format(hr_,minu_,sec_) for hr_,minu_,sec_ in zip(hrNew,minuNew,secNew)]
         
