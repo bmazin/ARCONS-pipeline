@@ -202,14 +202,18 @@ class radec(object):
         
         #look up world coordinate in the table
         matchedTime = _find_nearest(index,timeConvert(timeStamp))
-        matchedStr = [str(x) for x in mathcedTime.tolist()]
-        returnList = []
+        matchedStr = [str(x) for x in matchedTime.tolist()]
+        returnList = [h5f[listName][yPhotonPixel[count]][xPhotonPixel[count]] for count,listName in enumerate(matchedStr)]
+        
+        '''
+        #The list comprehension above is equivalent to the following code
         for count,listName in enumerate(matchedStr):
             pixel = h5f[listName]
             x = xPhotonPixel[count]
             y = yPhotonPixel[count]
             RA,DEC = pixel[y][x]
             returnList.append([RA,DEC])
+        '''
             
         return np.array(returnList)
         
