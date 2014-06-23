@@ -307,25 +307,52 @@ def timeConvert(timeStamp):
     '''
     eg convert '021456' expression to seconds in integer or convert seconds in integer into string expression
     '''
-    if isinstance(timeStamp,str):
+    singleOutput = False
+    #make a single item to list if it is not already. From now on, assume everything is in a list
+    if isinstance(timeStamp,str) or isinstance(timeStamp,int):
+        singleOutput = True
+        timeStamp = [timeStamp]
+    
+    if isinstance(timeStamp[0],str):
+        #use list comprehension to obtain faster performance
+        secList = np.array([int(x[0:2])*3600 + int(x[2:4])*60 + int(x[4:6]) for x in timeStamp])
+        '''
         hr = int(timeStamp[0:2])
         minu = int(timeStamp[2:4])
         sec = int(timeStamp[4:6])
         sec = hr*3600 + minu*60 + sec
-        return sec
-    elif isinstance(timeStamp,int):
+        '''
+        return secList
+        
+    elif isinstance(timeStamp[0],int):
+        timeStamp = np.asarray(timeStamp)
         hr = timeStamp/3600
         minu = (timeStamp-(hr*3600))/60
         sec = timeStamp-(hr*3600)-(minu*60)       
-        hr = str(hr)
-        minu = str(minu)
-        sec = str(sec)        
+        hr = hr.astype('str')
+        minu = minu.astype('str')
+        sec = sec.astype('str')
+        
+        hrNew = ['0'+x if len(x)==1 else x for x in hr.tolist()]
+        minuNew = ['0'+x if len(x)==1 else x for x in minu.tolist()]
+        secNew = ['0'+x if len(x)==1 else x for x in sec.tolist()]
+        
+        returnList = ['{}{}{}'.format(hr_,minu_,sec_) for hr_,minu_,sec_ in zip(hrNew,minuNew,secNew)]
+        
+        if singleOutput:
+            return returnList[0]
+        else:
+            return returnList
+        
+        '''
         if len(hr) == 1:
             hr = '0' + hr
         if len(minu) == 1:   
             minu = '0' + minu
         if len(sec) == 1:
             sec = '0' + sec
+        '''
+        
         return hr+minu+sec
     else:
         raise ValueError, 'Error in Timestamp Converting Type!'

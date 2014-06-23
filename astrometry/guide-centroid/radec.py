@@ -204,7 +204,7 @@ class radec(object):
         #look up world coordinate in the table
         matchedTime = _find_nearest(index,timeConvert(timeStamp)).astype('str')
         returnList = []
-        for count,listName in enumerate(matchedTime):
+        for count,listName in enumerate(matchedTime.tolist()):
             pixel = h5f[listName]
             x = xPhotonPixel[count]
             y = yPhotonPixel[count]
