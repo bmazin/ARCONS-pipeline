@@ -211,15 +211,14 @@ class radec(object):
         allTime = startTime
         matchedTime = _find_nearest(index,timeConvert(timeStamp))
         print 'done in %s seconds' %int(time.clock()-startTime)
-        print 'finding pixels...'
-        startTime = time.clock()
         matchedStr = [str(x) for x in matchedTime.tolist()]
-        print 'done in %s seconds' %int(time.clock()-startTime)
         print 'constructing return list...'
         startTime = time.clock()
-        returnList = [h5f[listName][yPhotonPixel[count]][xPhotonPixel[count]] for count,listName in enumerate(matchedStr)]
+        #enumerate is slow. Dont use enumerate!
+        #returnList = [h5f[listName][yPhotonPixel[count]][xPhotonPixel[count]] for count,listName in enumerate(matchedStr)]
+        returnList = [h5f[listName][y][x] for x,y,listName in zip(xPhotonPixel,yPhotonPixel,matchedStr)]
         print 'done in %s seconds' %int(time.clock()-startTime)
-        print 'all done in %s' %int(time.clock()-allTime)
+        print 'all done in %s seconds' %int(time.clock()-allTime)
         
         '''
         #The list comprehension above is equivalent to the following code
