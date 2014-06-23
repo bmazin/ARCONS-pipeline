@@ -322,7 +322,10 @@ def timeConvert(timeStamp):
         sec = int(timeStamp[4:6])
         sec = hr*3600 + minu*60 + sec
         '''
-        return secList
+        if singleOutput:
+            return secList[0]
+        else: 
+            return secList
         
     elif isinstance(timeStamp[0],int):
         timeStamp = np.asarray(timeStamp)

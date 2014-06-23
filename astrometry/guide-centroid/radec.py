@@ -151,7 +151,6 @@ class radec(object):
             print '> Table found in %s! Proceed to photon mapping!' %saveName
             
         except:
-            raise
             print '> Lookup table not presented in %s. Constructing a new table NOW!' %directory
             
             '''
