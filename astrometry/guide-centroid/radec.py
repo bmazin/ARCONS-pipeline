@@ -125,15 +125,20 @@ class radec(object):
         #find closest neighbor from a given array for a given value
             value = np.array(value)
             array = np.array(array)
+            '''
             numCol = len(value)
             value = value.reshape(numCol,1)
-            stackList = []
+            stackList = [array for i in range(numCol)]        
             for i in range(numCol):
                 stackList.append(array)
             arrayList = np.vstack(stackList)
+            '''
             #return list of index of nearest nb
+            idx = np.array([np.abs(array-x).argmin() for x in value.toList()])
+            '''
             idx = (np.abs(arrayList-value)).argmin(axis=1)
             idx = idx.reshape(numCol)
+            '''
             #return list of cloest nbh in seconds
             return array[idx]
         #Constructing lookup table if not presented
