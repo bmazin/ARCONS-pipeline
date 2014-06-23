@@ -11,7 +11,7 @@ from astropy import wcs
 from scipy.optimize import fsolve
 import itertools
 import h5py
-  
+import time
 
 class radec(object):
 
@@ -134,7 +134,7 @@ class radec(object):
             arrayList = np.vstack(stackList)
             '''
             #return list of index of nearest nb
-            idx = np.array([np.abs(array-x).argmin() for x in value.toList()])
+            idx = np.array([np.abs(array-x).argmin() for x in value.tolist()])
             '''
             idx = (np.abs(arrayList-value)).argmin(axis=1)
             idx = idx.reshape(numCol)
@@ -206,9 +206,20 @@ class radec(object):
                  
         
         #look up world coordinate in the table
+        print 'finding neighbors...'
+        startTime = time.clock()
+        allTime = startTime
         matchedTime = _find_nearest(index,timeConvert(timeStamp))
+        print 'done in %s seconds' %int(time.clock()-startTime)
+        print 'finding pixels...'
+        startTime = time.clock()
         matchedStr = [str(x) for x in matchedTime.tolist()]
+        print 'done in %s seconds' %int(time.clock()-startTime)
+        print 'constructing return list...'
+        startTime = time.clock()
         returnList = [h5f[listName][yPhotonPixel[count]][xPhotonPixel[count]] for count,listName in enumerate(matchedStr)]
+        print 'done in %s seconds' %int(time.clock()-startTime)
+        print 'all done in %s' %int(time.clock()-allTime)
         
         '''
         #The list comprehension above is equivalent to the following code
@@ -238,7 +249,7 @@ if __name__ == '__main__':
     #nlist = test.centroid(worldCoor=[98.172422,-0.031578365])
     #print nlist
     #timestamp HAS TO BE IN STR FORMAT
-    print test.photonMapping('20121208',['102340'],[30],[12])
+    print test.photonMapping('20121208',['102340']*1000000,[30]*1000000,[12]*1000000)
 
 '''
 coor = [[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[8.08,11.57],[8.52,11.7],[8.9,11.9],[8.96,11.467],[22.1,15.67],[21.7,15.55],[21.39,15.05],[21.01,15.42],[21.88,14.93],[35.36,18.8],[36,18.88],[35.85,19.38],[3.7,24.45],[3.83,24.2],[3.58,24.45],[4.07,24.577],[4.07,24.7],[16.9,27.91],[17.3,27.42],[16.69,27.3],[16.8,27.05],[16.07,27.916],[29.55,31],[29.18,31.62],[29.3,31.74],[29.18,31.74],[29.3,31.37],[9.14,39.787],[9.27,39.416],[9.148,39.41],[8.9,39.1688],[8.28,40.03],[8.28,40.03],[22,43.86],[21.63,43.62],[21.88,43.25],[21.637,43.37],[21.143,44.3624]]
