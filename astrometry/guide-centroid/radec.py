@@ -49,9 +49,11 @@ class radec(object):
                 if calFile[4:6] == '60':
                     timeStamp = calFile[0:6]
                     #this double conversion will convert to the right format (i.e no 60 present)
-                    newFileName = directory + timeConvert(timeConvert(timeStamp))
+                    newFormat = timeConvert(timeConvert(timeStamp)) + self.suffix
+                    newFileName = directory + newFormat
                     oldFileName = directory + calFile
                     os.rename(oldFileName,newFileName)
+                    calFile = newFormat
                     
                 #skip loop if it is not a fits file
                 if calFile[-5:] != '.fits':
@@ -121,19 +123,31 @@ class radec(object):
         
         def _find_nearest(array,value):
         #find closest neighbor from a given array for a given value
-            idx = (np.abs(array-value)).argmin()
+            value = np.array(value)
+            array = np.array(array)
+            numCol = len(value)
+            value = value.reshape(numCol,1)
+            stackList = []
+            for i in range(numCol):
+                stackList.append(array)
+            arraryList = np.vstack(stackList)
+            #return list of index of nearest nb
+            idx = (np.abs(arrayList-value)).argmin(axis=1)
+            idx = idx.reshape(numCol)
+            #return list of cloest nbh in seconds
             return array[idx]
             
         #Constructing lookup table if not presented
         try:
             print '> Loading lookup table in %s...' %directory
-            saveName = date + 'lookup.hdf5'
+            saveName = directory + date + 'lookup.hdf5'
             h5f = h5py.File(saveName,'r')
             #loading index
             index = h5f['index'][:]
             print '> Table found in %s! Proceed to photon mapping!' %saveName
             
         except:
+            raise
             print '> Lookup table not presented in %s. Constructing a new table NOW!' %directory
             
             '''
@@ -177,20 +191,27 @@ class radec(object):
                 count += 1
             
             #save the file list to h5 table for indexing purposes. Here, the file list is stored in seconds.
-            h5f.creat_dataset('index',data=np.array(fileList))
+            h5f.create_dataset('index',data=np.array(fileList))
             
-            print '> saving h5 file to %s!' %directory+saveNmae
+            print '> saving h5 file to %s' %directory+saveNmae
             h5f.close()
             print '> all done!'
             print '> restart the program to map the photons!'
             exit(-1)
             
                  
+        
         #look up world coordinate in the table
-        matchedTime = str(_find_nearest(index,timeConvert(timeStamp)))
-        pixel = h5f[matchedTime][:]
-        RA,DEC = pixel[yPhotonPixel][xPhotonPixel]
-        return RA,DEC
+        matchedTime = _find_nearest(index,timeConvert(timeStamp)).astype('str')
+        returnList = []
+        for count,listName in enumerate(matchedTime):
+            pixel = h5f[listName]
+            x = xPhotonPixel[count]
+            y = yPhotonPixel[count]
+            RA,DEC = pixel[y][x]
+            returnList.append([RA,DEC])
+            
+        return np.array(returnList)
         
         '''
         deltaX = xPhotonPixel - self.refPixARCONS[0]
@@ -207,7 +228,8 @@ if __name__ == '__main__':
     test = radec()  
     #nlist = test.centroid(worldCoor=[98.172422,-0.031578365])
     #print nlist
-    print test.photonMapping('20121208',102340,30,12)
+    #timestamp HAS TO BE IN STR FORMAT
+    print test.photonMapping('20121208',['102340'],[30],[12])
 
 '''
 coor = [[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[14.02,-0.18],[8.08,11.57],[8.52,11.7],[8.9,11.9],[8.96,11.467],[22.1,15.67],[21.7,15.55],[21.39,15.05],[21.01,15.42],[21.88,14.93],[35.36,18.8],[36,18.88],[35.85,19.38],[3.7,24.45],[3.83,24.2],[3.58,24.45],[4.07,24.577],[4.07,24.7],[16.9,27.91],[17.3,27.42],[16.69,27.3],[16.8,27.05],[16.07,27.916],[29.55,31],[29.18,31.62],[29.3,31.74],[29.18,31.74],[29.3,31.37],[9.14,39.787],[9.27,39.416],[9.148,39.41],[8.9,39.1688],[8.28,40.03],[8.28,40.03],[22,43.86],[21.63,43.62],[21.88,43.25],[21.637,43.37],[21.143,44.3624]]
