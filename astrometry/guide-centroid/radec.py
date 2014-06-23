@@ -211,12 +211,22 @@ class radec(object):
         allTime = startTime
         matchedTime = _find_nearest(index,timeConvert(timeStamp))
         print 'done in %s seconds' %int(time.clock()-startTime)
+        
         matchedStr = [str(x) for x in matchedTime.tolist()]
+        
+        startTime = time.clock()
+        print 'reconstructing lookup tables...'
+        index.sort()
+        lookupTable = np.array([h5f[str(x)] for x in index.tolist()])
+        print 'done in %s seconds' %int(time.clock()-startTime)
+        
         print 'constructing return list...'
         startTime = time.clock()
         #enumerate is slow. Dont use enumerate!
+        indexList = np.searchsorted(index,matchedTime)
+        returnList = lookupTable[indexList,np.array(yPhotonPixel),np.array(xPhotonPixel)]
         #returnList = [h5f[listName][yPhotonPixel[count]][xPhotonPixel[count]] for count,listName in enumerate(matchedStr)]
-        returnList = [h5f[listName][y][x] for x,y,listName in zip(xPhotonPixel,yPhotonPixel,matchedStr)]
+        #returnList = [h5f[listName][y][x] for x,y,listName in zip(xPhotonPixel,yPhotonPixel,matchedStr)]
         print 'done in %s seconds' %int(time.clock()-startTime)
         print 'all done in %s seconds' %int(time.clock()-allTime)
         
@@ -230,7 +240,7 @@ class radec(object):
             returnList.append([RA,DEC])
         '''
             
-        return np.array(returnList)
+        return returnList
         
         '''
         deltaX = xPhotonPixel - self.refPixARCONS[0]
