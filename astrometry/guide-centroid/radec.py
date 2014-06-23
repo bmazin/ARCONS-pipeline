@@ -228,7 +228,7 @@ class radec(object):
         #enumerate is slow. Dont use enumerate!
         indexList = np.searchsorted(index,matchedTime)
         #8 bits intergers should be suffice since the arcons only have 40*40
-        returnList = lookupTable[indexList,np.array(yPhotonPixel*10).astype(np.int8),np.array(int(xPhotonPixel*10).astype(np.int8)]
+        returnList = lookupTable[indexList,(np.array(yPhotonPixel)*10).astype(np.int16),(np.array(xPhotonPixel)*10).astype(np.int16)]
         #returnList = [h5f[listName][yPhotonPixel[count]][xPhotonPixel[count]] for count,listName in enumerate(matchedStr)]
         #returnList = [h5f[listName][y][x] for x,y,listName in zip(xPhotonPixel,yPhotonPixel,matchedStr)]
         print 'done in %s seconds' %int(time.clock()-startTime)
