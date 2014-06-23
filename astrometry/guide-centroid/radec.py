@@ -184,16 +184,20 @@ class radec(object):
             saveName = date + 'lookup.hdf5'
             h5f = h5py.File(directory+saveName,'w')
             fileList = self.dictionary[directory]
+            fileList.sort()
+            worldCoorList = []
             count = 1
             for calFile in fileList:
                 filePath = directory + timeConvert(calFile) + self.suffix
                 print '> Calculating %s with 0.1 step (%s/%s)...' %(filePath,count,len(fileList))
                 worldCoor = np.array(pix2world(filePath,flatList))
                 worldCoor = worldCoor.reshape(arrayYLen,arrayXLen,2)
+                worldCoorList.append(worldCoor)
                 #create a dataset in h5 table with its name specified by the calFile name
-                h5f.create_dataset(str(calFile),data=worldCoor)
                 count += 1
-            
+                
+            #main data set here
+            h5f.create_dataset('main',data=worldCoorList)
             #save the file list to h5 table for indexing purposes. Here, the file list is stored in seconds.
             h5f.create_dataset('index',data=np.array(fileList))
             
@@ -212,12 +216,12 @@ class radec(object):
         matchedTime = _find_nearest(index,timeConvert(timeStamp))
         print 'done in %s seconds' %int(time.clock()-startTime)
         
-        matchedStr = [str(x) for x in matchedTime.tolist()]
+        #matchedStr = [str(x) for x in matchedTime.tolist()]
         
         startTime = time.clock()
         print 'reconstructing lookup tables...'
-        index.sort()
-        lookupTable = np.array([h5f[str(x)] for x in index.tolist()])
+        #lookupTable = np.array([h5f[str(x)] for x in index.tolist()])
+        lookupTable = np.array(h5f['main'])
         print 'done in %s seconds' %int(time.clock()-startTime)
         
         print 'constructing return list...'
