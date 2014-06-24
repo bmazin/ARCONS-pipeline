@@ -58,8 +58,8 @@ class CalculateRaDec:
         
         
         self.params = np.array(centroidListNode.params.read())
-        self.nRow = self.params[0]
-        self.nCol = self.params[1]
+        self.nRow = int(self.params[0])
+        self.nCol = int(self.params[1])
         self.centroidRightAscension = self.params[2]
         self.centroidDeclination = self.params[3]
         self.times = np.array(centroidListNode.times.read())
