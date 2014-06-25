@@ -56,12 +56,21 @@ class CalculateRaDec:
         else:
             raise ValueError('Input parameter centroidListFile must be either a pathname string or a PyTables file instance.')
         
+        header = clFile.root.header.header
+        titles = header.colnames
+        info = header[0]
+        self.nRow = info[titles.index('nRow')]
+        self.nCol = info[titles.index('nCol')]
+        self.centroidRightAscension = info[titles.index('RA')]
+        self.centroidDeclination = info[titles.index('Dec')]
         
-        self.params = np.array(centroidListNode.params.read())
-        self.nRow = int(self.params[0])
-        self.nCol = int(self.params[1])
-        self.centroidRightAscension = self.params[2]
-        self.centroidDeclination = self.params[3]
+        #self.params = np.array(centroidListNode.params.read())
+        #self.nRow = int(self.params[0])
+        #self.nCol = int(self.params[1])
+        #self.centroidRightAscension = self.params[2]
+        #self.centroidDeclination = self.params[3]
+
+
         self.times = np.array(centroidListNode.times.read())
         self.hourAngles = np.array(centroidListNode.hourAngles.read())
         self.xCentroids = np.array(centroidListNode.xPositions.read())

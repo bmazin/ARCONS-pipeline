@@ -61,6 +61,12 @@ def radians_to_arcsec(total_radians):
     total_arcsec = total_degrees*3600.0
     return total_arcsec
 
+class headerDescription(tables.IsDescription):
+    RA = tables.StringCol(80)
+    Dec = tables.StringCol(80)
+    nCol = tables.UInt32Col(dflt=-1)
+    nRow = tables.UInt32Col(dflt=-1)
+
 # Function that save
 def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionList,hourAngleList,flagList):
 
@@ -82,9 +88,32 @@ def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionLi
     print 'wrote to', centroidListFileName
 
     # Set up and write h5 table with relevant parameters, centroid times and positions, hour angles, and flags.
-    centroidgroup = centroidListFile.createGroup(centroidListFile.root,'centroidlist','Table of times, x positions, y positions, hour angles, and flags')
 
-    paramstable = tables.Array(centroidgroup,'params', object=paramsList, title = 'Object and array params')
+
+    headerGroupName = 'header'
+    headerTableName = 'header'
+
+    nRowColName = 'nRow'
+    nColColName = 'nCol'
+    RAColName = 'RA'
+    DecColName = 'Dec'
+
+    headerGroup = centroidListFile.createGroup("/", headerGroupName, 'Header')
+    headerTable = centroidListFile.createTable(headerGroup, headerTableName, headerDescription,
+                                        'Header Info')
+
+    header = headerTable.row
+    header[nColColName] = paramsList[0]
+    header[nRowColName] = paramsList[1]
+    header[RAColName] = paramsList[2]
+    header[DecColName] = paramsList[3]
+
+    header.append()
+
+    centroidgroup = centroidListFile.createGroup(centroidListFile.root,'centroidlist','Table of times, x positions, y positions, hour angles, and flags')
+    
+
+    #paramstable = tables.Array(centroidgroup,'params', object=paramsList, title = 'Object and array params')
     timestable = tables.Array(centroidgroup,'times',object=timeList,title='Times at which centroids were calculated')
     xpostable = tables.Array(centroidgroup,'xPositions',object=xPositionList,title='X centroid positions')
     ypostable = tables.Array(centroidgroup,'yPositions',object=yPositionList,title='Y centroid positions')
@@ -269,16 +298,16 @@ if __name__=='__main__':
     wfn = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln()
     ffn = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln()
     
-    #ffn = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+    ffn = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
     
     # Create ObsFile instance
     ob = ObsFile(obsFn)
     
-    '''
+    
     # Load wavelength and flat cal solutions
-    #ob.loadWvlCalFile(wfn)
-    #ob.loadFlatCalFile(ffn)
-    #ob.setWvlCutoffs(3000,8000)
+    ob.loadWvlCalFile(wfn)
+    ob.loadFlatCalFile(ffn)
+    ob.setWvlCutoffs(3000,8000)
     
     # Load/generate hot pixel mask file
     index1 = obsFn.find('_')
@@ -289,7 +318,8 @@ if __name__=='__main__':
         print "Flux file pixel mask saved to %s"%(hotPixFn)
     ob.loadHotPixCalFile(hotPixFn,switchOnMask=False)
     print "Hot pixel mask loaded %s"%(hotPixFn)
-    '''
-    centroidCalc(ob, centroid_RA, centroid_DEC, outputFileName='home/pszypryt/test', guessTime=300, integrationTime=30,
+    
+
+    centroidCalc(ob, centroid_RA, centroid_DEC, guessTime=300, integrationTime=30,
                  secondMaxCountsForDisplay=500)
     

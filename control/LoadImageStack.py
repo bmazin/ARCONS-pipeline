@@ -7,6 +7,8 @@ import DisplayStack
 import numpy as np
 import matplotlib.pyplot as plt
 from GaussFitter import gaussfit
+from util.readDict import readDict
+import tables
 
 '''
 Author: Paul Szypryt		Date: November 4, 2013
@@ -52,11 +54,22 @@ class LoadImageStack(QDialog):
 
         self.ui.psfPhotometryButton.clicked.connect(self.performPSFPhotometry)
         self.ui.aperturePhotometryButton.clicked.connect(self.performAperturePhotometry)
+        
+        self.ui.centroidButton.clicked.connect(self.performCentroiding)
 
     def loadStackData(self):
-        self.stackFile = np.load(str(self.loadStackName))
-        self.stackData = np.array(self.stackFile['stack'])
-        self.jdData = np.array(self.stackFile['jd'])
+
+        self.stackFile = tables.openFile(self.loadStackName, mode='r')
+
+        self.header = self.stackFile.root.header.header
+        self.headerTitles = self.header.colnames
+        self.headerInfo = self.header[0]
+    
+        self.stackNode = self.stackFile.root.stack
+
+        self.stackData = np.array(self.stackNode.stack.read())
+        self.jdData = np.array(self.stackNode.time.read()[0])
+
         self.nRow = self.stackData.shape[0]
         self.nCol = self.stackData.shape[1]
         self.totalFrames = self.stackData.shape[2]
@@ -325,5 +338,18 @@ class LoadImageStack(QDialog):
         plt.show()    
 
         print 'Done performing PSF fitting photometry...'
+
+    def performCentroiding(self):
+        print 'Not currently implemented...'
+
+        self.RA = self.headerInfo[self.headerTitles.index('RA')]
+        self.Dec = self.headerInfo[self.headerTitles.index('Dec')]
+
+        print 'RA = ' + self.RA
+        print 'Dec = ' + self.Dec
+
+        # Will also need to pull the actual obs file to get LST, for HA calculation.
+        
+        #print 'Done performing centroiding...'
 
 
