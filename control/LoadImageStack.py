@@ -215,6 +215,8 @@ class LoadImageStack(QDialog):
 
                 frameCounts.append((apertureCountsPerPixel - annulusCountsPerPixel) * aperturePix)
 
+            np.savez(self.outputFileName, counts=frameCounts, jd=self.jdData)
+
             fig = plt.figure()
             ax = fig.add_subplot(111)
             ax.plot(self.jdData, frameCounts)
