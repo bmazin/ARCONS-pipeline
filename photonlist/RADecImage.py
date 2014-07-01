@@ -288,8 +288,8 @@ class RADecImage(object):
         
         #Save the time slice images in detector coordinates if image saving is requested.        
         if savePreStackImage is not None:
-            saveName = 'det'+str(start)+'-'+str(fin)+'s-'+savePreStackImage
-            print 'Making det-frame image for diagnostics: '+saveName
+            saveName = 'det-'+savePreStackImage
+            print 'Making detector-frame image slice for diagnostics: '+saveName
             detImSlice = np.histogram2d(photons['yPix'],photons['xPix'])
             mpl.imsave(fname=saveName,arr=detImSlice,origin='lower',
                        cmap=mpl.cm.gray,vmin=np.percentile(detImSlice, 0.5), vmax=np.percentile(detImSlice,99.5))
