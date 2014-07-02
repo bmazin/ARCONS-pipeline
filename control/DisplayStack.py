@@ -123,6 +123,7 @@ class DisplayStack(QMainWindow):
             self.flatCalDates = self.paramData['flatCalDates']
             self.RA = self.paramData['RA']
             self.Dec = self.paramData['Dec']
+            self.hourAngleOffset = self.paramData['HA_offset']
 
             print 'Loading parameter file at ' + self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
             self.createSunsetList()
@@ -302,9 +303,11 @@ class DisplayStack(QMainWindow):
         lowWvlCutoff = tables.Float64Col(dflt=np.nan)
         highWvlCutoff = tables.Float64Col(dflt=np.nan)
         exptime = tables.Float64Col(dflt=np.nan)
+        lst = tables.StringCol(100, dflt='')
         integrationTime = tables.Float64Col(dflt=np.nan)
         RA = tables.StringCol(100, dflt='')
         Dec = tables.StringCol(100, dflt='')
+        HA_offset = tables.Float64Col(dflt=0.0)
 
 
     # Create output name
@@ -342,7 +345,9 @@ class DisplayStack(QMainWindow):
         lowWvlColName = 'lowWvlCutoff'
         highWvlColName = 'highWvlCutoff'
         expTimeColName = 'exptime'
+        lstColName = 'lst'
         integrationTimeColName = 'integrationTime'
+        HA_offsetColName = 'HA_offset'
 
 
         # Create and h5 output file, create header and data groups
@@ -364,7 +369,9 @@ class DisplayStack(QMainWindow):
         header[RAColName] = self.RA
         header[DecColName] = self.Dec
         header[expTimeColName] = self.exptime
+        header[lstColName] = self.lst
         header[integrationTimeColName] = self.integrationTime
+        header[HA_offsetColName] = self.hourAngleOffset
         if self.useDeadPixelMasking:
             header[deadPixColName] = self.deadPixelFilename
         if self.useHotPixelMasking:
@@ -445,6 +452,7 @@ class DisplayStack(QMainWindow):
                     self.unix = self.ob.getFromHeader('unixtime')
                     self.startJD = self.unix/86400.+2440587.5
                     self.exptime = self.ob.getFromHeader('exptime')
+                    self.lst = self.ob.getFromHeader('lst')
                     
                     self.times = []
                     self.frames = []
