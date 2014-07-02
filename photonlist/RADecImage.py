@@ -4,6 +4,8 @@ Author: Julian van Eyken                    Date: May 15 2013
 Package/class for handling of images created from photon lists that are derotated and
 mapped to sky coordinates, and stacked.
 
+(NB - NEED TO DOCUMENT OBJECT PROPERTIES)
+
 '''
 
 import time
@@ -103,6 +105,7 @@ class RADecImage(object):
         if photList is not None:
             self.loadImage(photList,firstSec=firstSec,integrationTime=integrationTime)     
     
+    
     def setCoordGrid(self):
         '''
         Establish RA and dec coordinates for pixel boundaries in the virtual pixel grid,
@@ -119,6 +122,7 @@ class RADecImage(object):
         self.gridRA = self.cenRA + (self.vPlateScale*(np.arange(self.nPixRA+1) - ((self.nPixRA+1)//2)))
         self.gridDec = self.cenDec + (self.vPlateScale*(np.arange(self.nPixDec+1) - ((self.nPixDec+1)//2)))
     
+   
     def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=None,wvlMax=None,
                   doStack=False,        #expWeightTimeStep=None, 
                   savePreStackImage=None, doWeighted=True):  #savePreStackImage is temporary for test purposes
@@ -143,7 +147,7 @@ class RADecImage(object):
             
             wvlMin, wvlMax - set min and max wavelength cutoffs for photons to be loaded in.
             savePreStackImage - temporary fudge, set to a file-name to save the image out to a file prior to stacking.
-            doWeighted - if True, includes flat and flux weighting (i.e. flatfielding and spectral response)factors from photons,
+            doWeighted - if True, includes flat and flux weighting (i.e. flatfielding and spectral response) factors from photons,
                                 and rejects photons from pixels where the flatfield is bad at any wavelength within the requested
                                 wavelength range (all if wvlMin/wvl Max not specified).
                                 ****NOTE - FLUX WEIGHTING NOT FULLY TESTED -- but looks probably okay.****
@@ -263,7 +267,7 @@ class RADecImage(object):
         
         #Add uniform random dither to each photon, distributed over a square 
         #area of the same size and orientation as the originating pixel at 
-        #the time of observation.
+        #the time of observation (assume RA and dec are defined at center of pixel).
         xRand = np.random.rand(nPhot)*self.detPlateScale-self.detPlateScale/2.0
         yRand = np.random.rand(nPhot)*self.detPlateScale-self.detPlateScale/2.0       #Not the same array!
         ditherRAs = xRand*np.cos(photHAs) - yRand*np.sin(photHAs)
@@ -280,163 +284,146 @@ class RADecImage(object):
         else:
             print 'Making unweighted image'        
             thisImage,thisGridDec,thisGridRA = np.histogram2d(photDecs,photRAs,[self.gridDec,self.gridRA])
-                
-        if 1==1:
-            #If hot pixels time-mask data not already parsed in, then parse it.
-            if photList.hotPixTimeMask is None:
-                photList.parseHotPixTimeMask()      #Loads time mask dictionary into photList.hotPixTimeMask
-             
-            #And start figuring out the exposure time weights....            
-            print 'Calculating effective exposure times'
-            
-            #First find start/end times of each timestep ('frame') for calculating effective exp. times
-            #Use the same timesteps as used in calculating the astrometry.
-            
-            #tStartFrames = np.arange(start=firstSec,stop=lastSec,
-            #                         step=self.expWeightTimeStep)
-            #tEndFrames = (tStartFrames+self.expWeightTimeStep).clip(max=lastSec)    #Clip so that the last value doesn't go beyond the end of the exposure.
-            tStartFramesAll = np.array(photList.file.root.centroidList.times.read()) #Convert to array, since it's saved as a list.
-            tEndFramesAll = np.append(tStartFramesAll[1:], np.inf)                   #Last frame goes on forever as far as we know at the moment
-            withinIntegration = ((tStartFramesAll < lastSec) & (tEndFramesAll > firstSec))
-            tStartFrames = tStartFramesAll[withinIntegration].clip(min=firstSec)   #Now clip so that everything is within the requested integration time.
-            tEndFrames = tEndFramesAll[withinIntegration].clip(max=lastSec)
-            nFrames = len(tStartFrames)
-            assert nFrames > 0      #Otherwise we have a problem....
-            assert np.all(tStartFrames <= lastSec) and np.all(tEndFrames >= firstSec)
-            
-            #Get x,y locations of detector pixel corners (2D array of each x,y value, in detector space)
-            dPixXmin = np.indices((nDPixRow,nDPixCol))[1] - 0.5
-            dPixXmax = np.indices((nDPixRow,nDPixCol))[1] + 0.5
-            dPixYmin = np.indices((nDPixRow,nDPixCol))[0] - 0.5
-            dPixYmax = np.indices((nDPixRow,nDPixCol))[0] + 0.5
-            dPixXminFlat = dPixXmin.flatten()   #Flattened versions of the same since getRaDec() only works on flat arrays.
-            dPixXmaxFlat = dPixXmax.flatten()
-            dPixYminFlat = dPixYmin.flatten()
-            dPixYmaxFlat = dPixYmax.flatten()
-            
-            #Create (1D) arrays for normalised center locations of virtual pixel grid (=index numbers, representing location of unit squares)
-            vPixRANormCen = np.arange(nVPixRA)   #np.indices(nVPixDec,nVPixRA)[1]
-            vPixDecNormCen = np.arange(nVPixDec) #np.indices(nVPixDec,nVPixRA)[0]
-            
-            #Create 1D arrays marking edges of virtual pixels (in 'normalised' space...)
-            vPixRANormMin = np.arange(nVPixRA)-0.5
-            vPixRANormMax = np.arange(nVPixRA)+0.5
-            vPixDecNormMin = np.arange(nVPixDec)-0.5
-            vPixDecNormMax = np.arange(nVPixDec)+0.5
-            
-            #Find origin of virtual array (center of virtual pixel 0,0) in RA/dec space.
-            vPixOriginRA = np.mean(self.gridRA[0:2])     
-            vPixOriginDec = np.mean(self.gridDec[0:2])
-            vPixSize = self.vPlateScale       #Short hand, Length of side of virtual pixel in radians (assume square pixels)
-            
-            #Make array to take the total exposure times for each virtual pixel at each time step
-            vExpTimesStack = np.zeros((nVPixDec,nVPixRA,nFrames))
-            #vExpTimesStack2 = np.zeros((nVPixDec,nVPixRA,nFrames))  #FOR TEST PURPOSES
-            
-            #And one for the total exposure time at each pixel summed over all time steps
-            vExpTimes = np.zeros((nVPixDec,nVPixRA))
-            
-            #Array to hold list of (equal) timestamps for each pixel at each timestep
-            #(just for calculating the RA/dec coordinates of the pixel corners)
-            frameTimeFlat = np.zeros((nDPixRow*nDPixCol))   #Also flat array for the purposes of getRaDec()
-            frameTimeFlat.fill(np.nan)
-            
-            #Initialise RA/dec calculations of pixel locations for exposure time weighting
-            raDecCalcObject = crd.CalculateRaDec(photList.file.root.centroidList)            
-             
-            #------------ Loop through the time steps ----------
-            for iFrame in range(nFrames):
-                
-                print 'Time slice: ',iFrame+1, '/', nFrames
-
-                #Calculate detector pixel corner locations in RA/dec space (needs to be clockwise in RA/dec space! (checked, gives +ve answers).
-                frameTimeFlat.fill(tStartFrames[iFrame])
-                dPixRA1,dPixDec1,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXminFlat,dPixYminFlat)      #dPix* should all be flat
-                dPixRA2,dPixDec2,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXminFlat,dPixYmaxFlat)   
-                dPixRA3,dPixDec3,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXmaxFlat,dPixYmaxFlat)
-                dPixRA4,dPixDec4,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXmaxFlat,dPixYminFlat)
-                
-                #Reshape the flat-array results into arrays matching the detector shape.
-                #Default ordering for reshape should just be the reverse of flatten().
-                #(Note all this can probably be avoided by just using flat arrays throughout
-                # - this is just a bit more intuitive this way at the moment).
-                #dPixRA1,dPixDec1 = dPixRA1Flat.reshape(detShape),dPixDec1Flat.reshape(detShape)
-                #dPixRA2,dPixDec2 = dPixRA2Flat.reshape(detShape),dPixDec2Flat.reshape(detShape)
-                #dPixRA3,dPixDec3 = dPixRA3Flat.reshape(detShape),dPixDec3Flat.reshape(detShape)
-                #dPixRA4,dPixDec4 = dPixRA4Flat.reshape(detShape),dPixDec4Flat.reshape(detShape)
-
-                #Normalise to scale where virtual pixel size=1 and origin is the origin of the virtual pixel grid
-                dPixNormRA1 = (dPixRA1 - vPixOriginRA)/vPixSize     #dPixNorm* should all be flat.
-                dPixNormRA2 = (dPixRA2 - vPixOriginRA)/vPixSize
-                dPixNormRA3 = (dPixRA3 - vPixOriginRA)/vPixSize
-                dPixNormRA4 = (dPixRA4 - vPixOriginRA)/vPixSize
-                dPixNormDec1 = (dPixDec1 - vPixOriginDec)/vPixSize
-                dPixNormDec2 = (dPixDec2 - vPixOriginDec)/vPixSize
-                dPixNormDec3 = (dPixDec3 - vPixOriginDec)/vPixSize
-                dPixNormDec4 = (dPixDec4 - vPixOriginDec)/vPixSize
-                    
-                #Get min and max RA/decs for each of the detector pixels    
-                dPixCornersRA = np.array([dPixNormRA1,dPixNormRA2,dPixNormRA3,dPixNormRA4])      #2D array, 4 by nRow*nCol - should be clockwise, I think!
-                dPixCornersDec = np.array([dPixNormDec1,dPixNormDec2,dPixNormDec3,dPixNormDec4])
-                #dPixCornersRA = np.array([dPixNormRA4,dPixNormRA3,dPixNormRA2,dPixNormRA1])      #2D array, 4 by nRow*nCol - reversed, but gives -ve results, so prob. anti-clockwise....
-                #dPixCornersDec = np.array([dPixNormDec4,dPixNormDec3,dPixNormDec2,dPixNormDec1])
-                dPixRANormMin = dPixCornersRA.min(axis=0)     #Flat 1D array, nRow * nCol
-                dPixRANormMax = dPixCornersRA.max(axis=0)
-                dPixDecNormMin = dPixCornersDec.min(axis=0)
-                dPixDecNormMax = dPixCornersDec.max(axis=0)
-
-                #Get array of effective exposure times for each detector pixel based on the hot pixel time mask
-                #Multiply by the bad pixel mask and the flatcal mask so that non-functioning pixels have zero exposure time.
-                #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
-                detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
-                                                     firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
-                
-                
-                #Temporary switch between two looping methods
-                #if 1==0:
-                #    #Loop over the virtual pixels and accumulate the exposure time that falls in each
-                #    #print 'Method 1...'
-                #    #tic = time.clock()
-                #    for iVDec in np.arange(nVPixDec):
-                #        for iVRA in np.arange(nVPixRA):
-                #            maybeOverlapping = np.where((dPixRANormMax > vPixRANormMin[iVRA]) & 
-                #                                    (dPixRANormMin < vPixRANormMax[iVRA]) &
-                #                                    (dPixDecNormMax > vPixDecNormMin[iVDec]) &
-                #                                    (dPixDecNormMin < vPixDecNormMax[iVDec]))[0]       #[0] since 'where' returns an array in a 1-element tuple
-                #
-                #           #Loop over the detector pixels which may be overlapping the current virtual pixel
-                #           for overlapLoc in maybeOverlapping:
-                #               #Calculate overlap fraction for given virtual pixel with given detector pixel
-                #               overlapFrac = boxer.boxer(iVDec,iVRA,dPixCornersDec[:,overlapLoc],dPixCornersRA[:,overlapLoc])      #Feed one set of pixel corners at a time to boxer.
-                #               #And add the contributing exposure time to vexptimes:
-                #               expTimeToAdd = overlapFrac*detExpTimes[overlapLoc]
-                #               vExpTimesStack[iVDec,iVRA,iFrame] += expTimeToAdd        #vExpTimes is 2D and it should all magically work out.
-                #   #print 'Time taken (s): ',time.clock()-tic
-                #else:
-                
-                #Alternatively.... loop over the detector pixels.... should be faster
-                #print 'Method 2...'
-                #tic = time.clock()
-                for iDPix in np.arange(nDPixRow * nDPixCol):
-                        #Find the pixels which are likely to be overlapping (note - could do this as a sorted search to make things faster)
-                        maybeOverlappingRA = np.where((dPixRANormMax[iDPix] > vPixRANormMin) & (dPixRANormMin[iDPix] < vPixRANormMax))[0]
-                        maybeOverlappingDec = np.where((dPixDecNormMax[iDPix] > vPixDecNormMin) & (dPixDecNormMin[iDPix] < vPixDecNormMax))[0]
-                        
-                        for overlapLocRA in maybeOverlappingRA:
-                            for overlapLocDec in maybeOverlappingDec:
-                                overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
-                                expTimeToAdd = overlapFrac*detExpTimes[iDPix]
-                                vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
-               
-               #print 'Time taken (s): ',time.clock()-tic                
-
-               #vExpTimesStack = vExpTimesStack2                    
-                    
-               #assert np.all(vExpTimesStack2 == vExpTimesStack)
-               #print 'Yup, all seems okay...'
-                
         
-            #------------ End loop through time steps ----------
+        
+        #Save the time slice images in detector coordinates if image saving is requested.        
+        if savePreStackImage is not None:
+            saveName = 'det-'+savePreStackImage
+            print 'Making detector-frame image slice for diagnostics: '+saveName
+            detImSlice = np.histogram2d(photons['yPix'],photons['xPix'])
+            mpl.imsave(fname=saveName,arr=detImSlice,origin='lower',
+                       cmap=mpl.cm.gray,vmin=np.percentile(detImSlice, 0.5), vmax=np.percentile(detImSlice,99.5))
+    
+
+
+        #------------
+        #Time masking
+        #------------
+
+        #If hot pixels time-mask data not already parsed in, then parse it.
+        if photList.hotPixTimeMask is None:
+            photList.parseHotPixTimeMask()      #Loads time mask dictionary into photList.hotPixTimeMask
+         
+        #And start figuring out the exposure time weights....            
+        print 'Calculating effective exposure times'
+        
+        #First find start/end times of each timestep ('frame') for calculating effective exp. times
+        #Use the same timesteps as used in calculating the astrometry.
+        
+        #tStartFrames = np.arange(start=firstSec,stop=lastSec,
+        #                         step=self.expWeightTimeStep)
+        #tEndFrames = (tStartFrames+self.expWeightTimeStep).clip(max=lastSec)    #Clip so that the last value doesn't go beyond the end of the exposure.
+        tStartFramesAll = np.array(photList.file.root.centroidList.times.read()) #Convert to array, since it's saved as a list.
+        tEndFramesAll = np.append(tStartFramesAll[1:], np.inf)                   #Last frame goes on forever as far as we know at the moment
+        withinIntegration = ((tStartFramesAll < lastSec) & (tEndFramesAll > firstSec))
+        tStartFrames = tStartFramesAll[withinIntegration].clip(min=firstSec)   #Now clip so that everything is within the requested integration time.
+        tEndFrames = tEndFramesAll[withinIntegration].clip(max=lastSec)
+        nFrames = len(tStartFrames)
+        assert nFrames > 0      #Otherwise we have a problem....
+        assert np.all(tStartFrames <= lastSec) and np.all(tEndFrames >= firstSec)
+        
+        #Get x,y locations of detector pixel corners (2D array of each x,y value, in detector space)
+        #Assume definition where integer values represent location of pixel center.
+        dPixXmin = np.indices((nDPixRow,nDPixCol))[1] - 0.5
+        dPixXmax = np.indices((nDPixRow,nDPixCol))[1] + 0.5
+        dPixYmin = np.indices((nDPixRow,nDPixCol))[0] - 0.5
+        dPixYmax = np.indices((nDPixRow,nDPixCol))[0] + 0.5
+        dPixXminFlat = dPixXmin.flatten()   #Flattened versions of the same since getRaDec() only works on flat arrays.
+        dPixXmaxFlat = dPixXmax.flatten()
+        dPixYminFlat = dPixYmin.flatten()
+        dPixYmaxFlat = dPixYmax.flatten()
+        
+        #Create (1D) arrays for normalised center locations of virtual pixel grid (=index numbers, representing location of unit squares)
+        vPixRANormCen = np.arange(nVPixRA)   #np.indices(nVPixDec,nVPixRA)[1]
+        vPixDecNormCen = np.arange(nVPixDec) #np.indices(nVPixDec,nVPixRA)[0]
+        
+        #Create 1D arrays marking edges of virtual pixels (in 'normalised' space...)
+        vPixRANormMin = np.arange(nVPixRA)-0.5
+        vPixRANormMax = np.arange(nVPixRA)+0.5
+        vPixDecNormMin = np.arange(nVPixDec)-0.5
+        vPixDecNormMax = np.arange(nVPixDec)+0.5
+        
+        #Find origin of virtual array (center of virtual pixel 0,0) in RA/dec space.
+        vPixOriginRA = np.mean(self.gridRA[0:2])     
+        vPixOriginDec = np.mean(self.gridDec[0:2])
+        vPixSize = self.vPlateScale       #Short hand, Length of side of virtual pixel in radians (assume square pixels)
+        
+        #Make array to take the total exposure times for each virtual pixel at each time step
+        vExpTimesStack = np.zeros((nVPixDec,nVPixRA,nFrames))
+        #vExpTimesStack2 = np.zeros((nVPixDec,nVPixRA,nFrames))  #FOR TEST PURPOSES
+        
+        #And one for the total exposure time at each pixel summed over all time steps
+        vExpTimes = np.zeros((nVPixDec,nVPixRA))
+        
+        #Array to hold list of (equal) timestamps for each pixel at each timestep
+        #(just for calculating the RA/dec coordinates of the pixel corners)
+        frameTimeFlat = np.zeros((nDPixRow*nDPixCol))   #Also flat array for the purposes of getRaDec()
+        frameTimeFlat.fill(np.nan)
+        
+        #Initialise RA/dec calculations of pixel locations for exposure time weighting
+        raDecCalcObject = crd.CalculateRaDec(photList.file.root.centroidList)            
+         
+        #------------ Loop through the time steps ----------
+        for iFrame in range(nFrames):
+            
+            print 'Time slice: ',iFrame+1, '/', nFrames
+
+            #Calculate detector pixel corner locations in RA/dec space (needs to be clockwise in RA/dec space! (checked, gives +ve answers).
+            frameTimeFlat.fill(tStartFrames[iFrame])
+            dPixRA1,dPixDec1,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXminFlat,dPixYminFlat)      #dPix* should all be flat
+            dPixRA2,dPixDec2,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXminFlat,dPixYmaxFlat)   
+            dPixRA3,dPixDec3,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXmaxFlat,dPixYmaxFlat)
+            dPixRA4,dPixDec4,dummy = raDecCalcObject.getRaDec(frameTimeFlat,dPixXmaxFlat,dPixYminFlat)
+            
+            #Reshape the flat-array results into arrays matching the detector shape.
+            #Default ordering for reshape should just be the reverse of flatten().
+            #(Note all this can probably be avoided by just using flat arrays throughout
+            # - this is just a bit more intuitive this way at the moment).
+            #dPixRA1,dPixDec1 = dPixRA1Flat.reshape(detShape),dPixDec1Flat.reshape(detShape)
+            #dPixRA2,dPixDec2 = dPixRA2Flat.reshape(detShape),dPixDec2Flat.reshape(detShape)
+            #dPixRA3,dPixDec3 = dPixRA3Flat.reshape(detShape),dPixDec3Flat.reshape(detShape)
+            #dPixRA4,dPixDec4 = dPixRA4Flat.reshape(detShape),dPixDec4Flat.reshape(detShape)
+
+            #Normalise to scale where virtual pixel size=1 and origin is the origin of the virtual pixel grid
+            dPixNormRA1 = (dPixRA1 - vPixOriginRA)/vPixSize     #dPixNorm* should all be flat.
+            dPixNormRA2 = (dPixRA2 - vPixOriginRA)/vPixSize
+            dPixNormRA3 = (dPixRA3 - vPixOriginRA)/vPixSize
+            dPixNormRA4 = (dPixRA4 - vPixOriginRA)/vPixSize
+            dPixNormDec1 = (dPixDec1 - vPixOriginDec)/vPixSize
+            dPixNormDec2 = (dPixDec2 - vPixOriginDec)/vPixSize
+            dPixNormDec3 = (dPixDec3 - vPixOriginDec)/vPixSize
+            dPixNormDec4 = (dPixDec4 - vPixOriginDec)/vPixSize
+                
+            #Get min and max RA/decs for each of the detector pixels    
+            dPixCornersRA = np.array([dPixNormRA1,dPixNormRA2,dPixNormRA3,dPixNormRA4])      #2D array, 4 by nRow*nCol - should be clockwise, I think!
+            dPixCornersDec = np.array([dPixNormDec1,dPixNormDec2,dPixNormDec3,dPixNormDec4])
+            #dPixCornersRA = np.array([dPixNormRA4,dPixNormRA3,dPixNormRA2,dPixNormRA1])      #2D array, 4 by nRow*nCol - reversed, but gives -ve results, so prob. anti-clockwise....
+            #dPixCornersDec = np.array([dPixNormDec4,dPixNormDec3,dPixNormDec2,dPixNormDec1])
+            dPixRANormMin = dPixCornersRA.min(axis=0)     #Flat 1D array, nRow * nCol
+            dPixRANormMax = dPixCornersRA.max(axis=0)
+            dPixDecNormMin = dPixCornersDec.min(axis=0)
+            dPixDecNormMax = dPixCornersDec.max(axis=0)
+
+            #Get array of effective exposure times for each detector pixel based on the hot pixel time mask
+            #Multiply by the bad pixel mask and the flatcal mask so that non-functioning pixels have zero exposure time.
+            #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
+            detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
+                                                 firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
+                     
+            #Loop over the detector pixels.... (should be faster than looping over virtual pixels)
+            for iDPix in np.arange(nDPixRow * nDPixCol):
+                    #Find the pixels which are likely to be overlapping (note - could do this as a sorted search to make things faster)
+                    maybeOverlappingRA = np.where((dPixRANormMax[iDPix] > vPixRANormMin) & (dPixRANormMin[iDPix] < vPixRANormMax))[0]
+                    maybeOverlappingDec = np.where((dPixDecNormMax[iDPix] > vPixDecNormMin) & (dPixDecNormMin[iDPix] < vPixDecNormMax))[0]
+                    
+                    for overlapLocRA in maybeOverlappingRA:
+                        for overlapLocDec in maybeOverlappingDec:
+                            overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
+                            expTimeToAdd = overlapFrac*detExpTimes[iDPix]
+                            vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
+           
+    
+        #------------ End loop through time steps ----------
                 
         #Sum up the exposure times from each frame:
         vExpTimes = np.sum(vExpTimesStack,axis=2)
@@ -445,11 +432,11 @@ class RADecImage(object):
         #assert np.all(thisImage[vExpTimes==0] == 0)
         #assert 1==0
         
-        #Temporary for testing-------------
         if savePreStackImage is not None:
-            print 'Saving pre-stacked image to '+savePreStackImage
-            mpl.imsave(fname=savePreStackImage,arr=thisImage,origin='lower',cmap=mpl.cm.gnuplot2,vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
-        #---------------------------------
+            print 'Saving exp.time weighted pre-stacked image to '+savePreStackImage
+            print 'cmap: ', mpl.cm.gray
+            mpl.imsave(fname=savePreStackImage,arr=thisImage/vExpTimes,origin='lower',cmap=mpl.cm.gray,
+                       vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
         
         if self.imageIsLoaded is False or doStack is False:
             self.image = thisImage           #For now, let's keep it this way.... Since weighting does odd things.
@@ -471,7 +458,7 @@ class RADecImage(object):
 
 
     def display(self,normMin=None,normMax=None,expWeight=True,pclip=None,colormap=mpl.cm.gnuplot2,
-                image=None, logScale=False):
+                image=None, logScale=False, fileName=None):
         '''
         Display the current image. Currently just a short-cut to utils.plotArray,
         but needs updating to mark RA and Dec on the axes.
@@ -484,6 +471,9 @@ class RADecImage(object):
             colorMap: as for plotArray, can specify the matplotlib color map to use.
             image: if set to a 2D array, displays that array instead of the default image.
             logScale: if True, display the intensities on a log scale.
+            fileName: if a string, save the plot to this filename. If anything else (inc. None),
+                      display to screen.
+            
         '''
         
         if expWeight:
@@ -512,7 +502,9 @@ class RADecImage(object):
         #raMin = (self.gridRA[0:-1] + self.gridRA[1:])/2.0 / np.pi * 180.
         #dec = (self.gridDec[0:-1] + self.gridDec[1:])/2.0 / np.pi * 180.
         
-        utils.plotArray(toDisplay,cbar=True,normMin=normMin,normMax=normMax,colormap=colormap)
+        utils.plotArray(toDisplay,cbar=True,normMin=normMin,normMax=normMax,
+                        colormap=colormap,plotFileName=fileName,
+                        showMe=(type(fileName) is not str))
         #mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=(180./np.pi)*
         #           np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]])
 
