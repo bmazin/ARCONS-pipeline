@@ -462,19 +462,14 @@ class LoadImageStack(QDialog):
 
         # Should probably just copy original header information over, more info this way!!!
         centroidHeaderGroup = centroidListFile.createGroup("/", centroidHeaderGroupName, 'Header')
-        centroidHeaderTable = centroidListFile.createTable(centroidHeaderGroup, centroidHeaderTableName, centroidHeaderDescription,
+        centroidHeaderTable = centroidListFile.createTable(centroidHeaderGroup, centroidHeaderTableName, DisplayStack.DisplayStack.headerDescription,
                                             'Header Info')
 
-        nRowColName = 'nRow'
-        nColColName = 'nCol'
-        RAColName = 'RA'
-        DecColName = 'Dec'
 
         centroidHeader = centroidHeaderTable.row
-        centroidHeader[nColColName] = nCol
-        centroidHeader[nRowColName] = nRow
-        centroidHeader[RAColName] = centroid_RA
-        centroidHeader[DecColName] = centroid_DEC
+
+        for iItem in range(len(self.headerInfo)):
+            centroidHeader[self.headerTitles[iItem]] = self.headerInfo[iItem]
 
         centroidHeader.append()
 
@@ -483,11 +478,7 @@ class LoadImageStack(QDialog):
   
         print 'Done performing centroiding...'
 
-class centroidHeaderDescription(tables.IsDescription):
-    RA = tables.StringCol(100)
-    Dec = tables.StringCol(100)
-    nCol = tables.UInt32Col(dflt=-1)
-    nRow = tables.UInt32Col(dflt=-1)
+
 
 
 
