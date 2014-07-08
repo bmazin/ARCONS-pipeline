@@ -84,13 +84,14 @@ def main():
     run = 'PAL2012'
     obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
-    #TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES...
+    #--------TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES----
     obsSequences = ['9999999',
                     '''
                     033323
                     ''',
                     '9999999',
                     '9999999']
+    #---------------------------------------------------------------
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']
@@ -144,7 +145,7 @@ def main():
                 hp.findHotPixels(obsFileNames[iSeq][iOb],timeMaskFileName)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             else:
-                print 'Skipping hot pixel mask creation for non-existent file '+obsFileNames[iSeq][iOb]
+                print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
 
 
     apertureRadius = 4

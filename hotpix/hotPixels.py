@@ -487,10 +487,6 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 
 
 
-
-
-
-
 def findHotPixels(inputFileName=None, outputFileName=None,
                   paramFile=None, timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,

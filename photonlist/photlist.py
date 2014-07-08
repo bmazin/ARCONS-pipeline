@@ -122,9 +122,16 @@ class PhotList(object):
         Return a 2D image consisting of photon counts in each pixel, in the detector pixel
         coordinate frame.
         
-        newMethod=True to use numpy histogram for creating image. Runs faster for short integration times,
-        but just a little slower for full images.
+        INPUTS:
+            firstSec - start time for integration within photon list object (in sec)
+            integrationTime - time to integrate for in seconds. If -1, integrates to end of file.
+            wvlMin,wvlMax - minimum and maximum wavelengths to include in the integration (Angstroms) 
+            newMethod=True to use numpy histogram for creating image. Runs faster for short integration times,
+                      but just a little slower for full images.
+        OUPUTS:
+            A 2D image array matching the shape/size of the detector.
         '''
+        
         if integrationTime==-1:
             lastSec=np.Inf
         else:  

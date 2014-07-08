@@ -93,7 +93,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
                     normMax = np.percentile(medComImage[np.isfinite(medComImage)],q=99.9)
                     toDisplay = np.copy(medComImage)
                     toDisplay[~np.isfinite(toDisplay)] = 0
-                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax,colormap=cm.gray,
+                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax,colormap=mpl.cm.gray,
                                     cbar=True)
                 else:
                     virtualImage.display(pclip=0.1)
@@ -102,8 +102,10 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         else:
             print 'File doesn''t exist: ',eachFile
     
-    #Save the results
+    #Save the results.
+    #Note, if median combining, 'vim' will only contain one frame. If not, medComImage will be None.
     results = {'vim':virtualImage,'imstack':imageStack,'medim':medComImage}
+
     try:
         output = open(saveFileName,'wb')
         pickle.dump(results,output,-1)

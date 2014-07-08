@@ -477,6 +477,7 @@ class ObsFile:
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime}
             
+    
     def getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,
                       weighted=False, fluxWeighted=False, getRawCount=False):
         """
@@ -772,6 +773,7 @@ class ObsFile:
 
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
                 'baselines':baselines, 'effIntTime':effectiveIntTime}
+
 
     def getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,
                            fluxWeighted=False, getRawCount=False,
