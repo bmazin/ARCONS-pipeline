@@ -180,6 +180,9 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     
     original_lst_radians = ephem.hours(original_lst).real
     original_lst_seconds = radians_to_arcsec(original_lst_radians)/15.0
+
+    # Move the lst to the midpoint of the frame rather than the start
+    original_lst_seconds += float(integrationTime)/2.
     
     # Create saturated pixel mask to apply to PyGuide algorithm.
     print 'Creating saturation mask...'
