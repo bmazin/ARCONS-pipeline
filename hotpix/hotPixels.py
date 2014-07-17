@@ -121,8 +121,8 @@ class headerDescription(tables.IsDescription):
 def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.0,
                   nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
                   display=False, ds9display=False, dispToPickle=None, weighted=False,
-                  maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
-                  useLocalStdDev=False):
+                  fluxWeighted=False, maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, 
+                  diagnosticPlots=False, useLocalStdDev=False, useRawCounts=True):
     '''
     To find the hot, cold, or dead pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
@@ -179,6 +179,15 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                     instead of Poisson statistics. Mainly intended for situations where
                     you know there is no astrophysical source in the image (e.g. flatfields,
                     laser calibrations), where you can also set fwhm=np.inf
+        weighted: boolean, set to True to use flat cal weights (see flatcal/ 
+                    and util.ObsFile.getPixelCountImage() ).
+        fluxWeighted: boolean, if True, flux cal weights are applied (also see fluxcal
+                    and util.ObsFile.getPixelCountImage() ) Added JvE 7/16/2014
+        useRawCounts - Boolean. if True, creates the mask on the basis of the raw photon counts summed
+                        across all wavelengths in the obs file. **If False, input must be provided
+                        in obsFile** - in which case, whatever calibrations are already loaded and
+                        (and switched on) in the obsFile instance will be applied before looking
+                        for badly behaved pixels. *Overrides weighted and fluxWeighted*. Added JvE 7/16/2014
 
     OUTPUTS:
         A dictionary containing the result and various diagnostics. Keys are:
@@ -195,8 +204,6 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         'diff': the difference between the input image and an image representing
                 the max allowed flux in each pixel.
         'differr': the expected error in the difference calculation.
-        'weighted': boolean, set to True to use flat cal weights (see flatcal/ 
-                    and util.obsFile.getPixelCountImage() )
         'niter': number of iterations performed.
 
     HISTORY:
@@ -216,6 +223,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                                 #not a user option at this point....
     
     defaultPklFileName = 'badPixels.pickle'
+
+    if useRawCounts is False and obsFile is None:
+        raise ValueError, 'Must provide obsFile object if you want to use calibrated (not raw) counts'
 
     if image is not None:
         im = np.copy(image)      #So that we pass by value instead of by reference (since we will change 'im').
@@ -237,9 +247,10 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         plotTitle = ''
 
     if im is None:
-        print 'Counting photons per pixel'
+        print 'Getting image time-slice'
         im = (obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
-                                           weighted=weighted, getRawCount=True))['image']
+                                           weighted=weighted, fluxWeighted=fluxWeighted, 
+                                           getRawCount=useRawCounts))['image']
         print 'Done'
     
     #Now im definitely exists, make a copy for display purposes later (before we change im).
@@ -487,12 +498,12 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 
 
 
-def findHotPixels(inputFileName=None, outputFileName=None,
+def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                   paramFile=None, timeStep=1, startTime=0, endTime= -1, fwhm=3.0,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
-                  ds9display=False, dispToPickle=False, weighted=False, maxIter=5,
-                  dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
-                  useLocalStdDev=None):
+                  ds9display=False, dispToPickle=False, weighted=False, fluxWeighted=False,
+                  maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
+                  useLocalStdDev=None, useRawCounts=True):
     '''
     To find hot (and cold/dead) pixels. This routine is the main code entry point.
     Takes an obs. file as input and outputs an .h5 file containing lists of bad time
@@ -509,12 +520,14 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     WITHOUT WARNING (should update this behaviour....)
     
     INPUTS:
+        inputFileName - string, pathname of input observation file.
+        obsFile - instead of providing inputFileName, can optionally directly pass
+                  an ObsFile instance here instead (overrides inputFileName). (Added JvE 7/16/2014)
+        outputFileName - string, pathname of output .h5 file.
         paramFile - string, name of input parameter file. Other parameters 
                     provided as arguments will override values in the parameter
                     file. See example parameter file .dict in pipeline
                     'params' directory.
-        inputFileName - string, pathname of input observation file.
-        outputFileName - string, pathname of output .h5 file.
         timeStep - integer (for now), check for hot pixels in intervals of 
                    timeStep seconds.
         startTime - integer (for now), number of seconds into exposure to begin
@@ -548,6 +561,8 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                     file name. Otherwise use a default. See checkInterval for more info.
         weighted: boolean, set to True to use flat cal weights (see flatcal/ 
                     and util.obsFile.getPixelCountImage() )
+        fluxWeighted: boolean, if True, flux cal weights are applied (also see fluxcal
+                    and util.ObsFile.getPixelCountImage() ). Added JvE 7/16/2014.
         maxIter: Max. number of iterations to do on the bad pixel detection before
                     stopping trying to improve it.
         dispMinPerc: Lower percentile for image stretch if display=True
@@ -559,6 +574,12 @@ def findHotPixels(inputFileName=None, outputFileName=None,
                     instead of Poisson statistics. Mainly intended for situations where
                     you know there is no astrophysical source in the image (e.g. flatfields,
                     laser calibrations), where you can also set fwhm=np.inf
+        useRawCounts - Boolean. if True, creates the mask on the basis of the raw photon counts summed
+                    across all wavelengths in the obs file. If False, input must be provided
+                    in obsFile - in which case, whatever calibrations are already loaded and
+                    (and switched on) in the obsFile instance will be applied before looking
+                    for badly behaved pixels. *Overrides weighted and fluxWeighted*.
+                    Added JvE 7/16/2014
 
         
     OUTPUTS:
@@ -641,8 +662,14 @@ def findHotPixels(inputFileName=None, outputFileName=None,
     if outputFileName is None: outputFileName = 'badPixTimeMask.h5'
     if useLocalStdDev is None: useLocalStdDev = False
     
-    obsFile = ObsFile.ObsFile(inputFileName)
-    expTime = obsFile.getFromHeader('exptime')
+    if useRawCounts is False and obsFile is None:
+        raise ValueError, ("Must provide obsFile instance if you want to use" +
+                            "calibrated (not raw) counts")
+        
+    if obsFile is None:
+        obsFile = ObsFile.ObsFile(inputFileName)
+    
+    expTime = obsFile.getFromHeader('exptime')    
     if endTime < 0: endTime = expTime
     stepStarts = np.arange(startTime, endTime, timeStep)  #Start time for each step (in seconds).
     stepEnds = stepStarts + timeStep                      #End time for each step
@@ -667,10 +694,10 @@ def findHotPixels(inputFileName=None, outputFileName=None,
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
                                      nSigmaCold=nSigmaCold, display=displayThisOne, ds9display=ds9ThisOne, 
-                                     dispToPickle=dispToPickleThisOne, weighted=weighted,
+                                     dispToPickle=dispToPickleThisOne, weighted=weighted, fluxWeighted=fluxWeighted,
                                      maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc,
                                      useLocalStdDev=useLocalStdDev, diagnosticPlots=diagnosticPlots 
-                                     and displayThisOne)['mask']
+                                     and displayThisOne, useRawCounts=useRawCounts)['mask']
                                      #Note checkInterval call should automatically clip at end of obsFile,
                                      #so don't need to worry about endTime.
     

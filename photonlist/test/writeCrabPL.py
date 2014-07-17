@@ -135,17 +135,18 @@ def main():
         centroidFileNames.append(FileName(run=run,date=sunsetDate,tstamp=ts).centroidList())
 
 
-    for iSeq,obsSequence in enumerate(obsSequences):
-        obsSequence = obsSequence.strip().split()
-        print obsSequence
-        for iOb,obs in enumerate(obsSequence):
-            timeMaskFileName = timeMaskFileNames[iSeq][iOb]
-            if os.path.exists(obsFileNames[iSeq][iOb]) and not os.path.exists(timeMaskFileName):
-                print 'Running hotpix for ',obs
-                hp.findHotPixels(obsFileNames[iSeq][iOb],timeMaskFileName)
-                print "Flux file pixel mask saved to %s"%(timeMaskFileName)
-            else:
-                print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
+#     #Make hot pixel masks if needed
+#     for iSeq,obsSequence in enumerate(obsSequences):
+#         obsSequence = obsSequence.strip().split()
+#         print obsSequence
+#         for iOb,obs in enumerate(obsSequence):
+#             timeMaskFileName = timeMaskFileNames[iSeq][iOb]
+#             if os.path.exists(obsFileNames[iSeq][iOb]) and not os.path.exists(timeMaskFileName):
+#                 print 'Running hotpix for ',obs
+#                 hp.findHotPixels(obsFileNames[iSeq][iOb],timeMaskFileName)
+#                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
+#             else:
+#                 print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
 
 
     apertureRadius = 4
@@ -153,7 +154,7 @@ def main():
     tstampFormat = '%H:%M:%S'
     #print 'fileName','headerUnix','headerUTC','logUnix','packetReceivedUnixTime'
    
-    print '---------Getting centroids-----------' 
+    print '---------Making hot pixel masks/getting centroids-----------' 
     for iSeq,obList in enumerate(obLists):
         for iOb,ob in enumerate(obList):
             timeAdjFileName = FileName(run='PAL2012').timeAdjustments()
@@ -162,7 +163,7 @@ def main():
             fluxCalFileName = fluxFileNames[iSeq]
             timeMaskFileName = FileName(obsFile=ob).timeMask() #timeMaskFileNames[iSeq][iOb]
             centroidFileName = FileName(obsFile=ob).centroidList()
-            if not os.path.exists(centroidFileName):
+            if not os.path.exists(centroidFileName) or not os.path.exists(timeMaskFileName):
                 print 'Loading calibration files:'
                 print [os.path.basename(x) for x in [timeAdjFileName,wvlCalFileName,flatCalFileName, \
                         fluxCalFileName,timeMaskFileName, centroidFileName]]
@@ -170,6 +171,16 @@ def main():
                 ob.loadWvlCalFile(wvlCalFileName)
                 ob.loadFlatCalFile(flatCalFileName)
                 ob.loadFluxCalFile(fluxCalFileName)
+                
+            if not os.path.exists(timeMaskFileName):
+                print 'Running hotpix for ',obs
+                hp.findHotPixels(obsFile=ob,outputFileName=timeMaskFileName,
+                                 useRawCounts=True,weighted=True,fluxWeighted=True)
+                print "Flux file pixel mask saved to %s"%(timeMaskFileName)
+            else:
+                print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
+                
+            if not os.path.exists(centroidFileName):
                 ob.loadHotPixCalFile(timeMaskFileName)
                 ob.setWvlCutoffs(None,None)
                 print 'Running CentroidCalc for ',ob.fileName
@@ -178,19 +189,11 @@ def main():
                                 xyapprox=[centersCol[iSeq],centersRow[iSeq]])
                 print "Centroiding calculations saved to %s"%(centroidFileName)
             else:
-                print "File already exists - skipping: "+centroidFileName
+                print "Centroid file already exists - skipping: "+centroidFileName
                 
     print '---------Writing photon lists----------'
     for iSeq,obList in enumerate(obLists):
         for ob in obList:
-#            ob.loadTimeAdjustmentFile(FileName(run='PAL2012').timeAdjustments())
-#            ob.loadWvlCalFile(wvlFileNames[iSeq])
-#            ob.loadFlatCalFile(flatFileNames[iSeq])
-#            ob.loadFluxCalFile(fluxFileNames[iSeq])
-#            timeMaskFileName = timeMaskFileNames[iSeq][iOb]
-#            ob.loadHotPixCalFile(timeMaskFileName)
-#            ob.setWvlCutoffs(None,None)
-#                        timeAdjFileName = FileName(run='PAL2012').timeAdjustments()
             photListFileName = FileName(obsFile=ob).photonList()
             if os.path.exists(photListFileName):
                 print 'Phot. list file already exists - skipping: ',photListFileName

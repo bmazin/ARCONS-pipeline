@@ -482,15 +482,17 @@ class ObsFile:
                       weighted=False, fluxWeighted=False, getRawCount=False):
         """
         returns the number of photons received in a given pixel from firstSec to firstSec + integrationTime
-        if integrationTime is -1, All time after firstSec is used.  
-        if weighted is True, flat cal weights are applied
-        if fluxWeighted is True, flux weights are applied.
-        if getRawCount is True, the total raw count for all photon event detections
-        is returned irrespective of wavelength calibration, and with no wavelength
-        cutoffs (in this case, no wavecal file need have been applied, though 
-        bad pixel time-masks *will* still be applied if present and switched 'on'.) 
-        Otherwise will now always call getPixelSpectrum (which is also capable 
-        of handling hot pixel removal) -- JvE 3/1/2013.
+        - if integrationTime is -1, all time after firstSec is used.  
+        - if weighted is True, flat cal weights are applied
+        - if fluxWeighted is True, flux weights are applied.
+        - if getRawCount is True, the total raw count for all photon event detections
+          is returned irrespective of wavelength calibration, and with no wavelength
+          cutoffs (in this case, no wavecal file need have been applied, though 
+          bad pixel time-masks *will* still be applied if present and switched 'on'.) 
+          Otherwise will now always call getPixelSpectrum (which is also capable 
+          of handling hot pixel removal) -- JvE 3/1/2013.
+        *Note getRawCount overrides weighted and fluxWeighted.
+        
         Updated to return effective exp. times; see below. -- JvE 3/2013. 
         
         OUTPUTS:
@@ -780,15 +782,15 @@ class ObsFile:
                            scaleByEffInt=False):
         """
         Return a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime.
-        If integration time is -1, all time after firstSec is used.
-        If weighted is True, flat cal weights are applied. JvE 12/28/12
-        If fluxWeighted is True, flux cal weights are applied. SM 2/7/13
-        If getRawCount is True then the raw non-wavelength-calibrated image is
-        returned with no wavelength cutoffs applied (in which case no wavecal
-        file need be loaded). JvE 3/1/13
-        If scaleByEffInt is True, any pixels that have 'bad' times masked out
-        will have their counts scaled up to match the equivalent integration 
-        time requested.
+        - If integration time is -1, all time after firstSec is used.
+        - If weighted is True, flat cal weights are applied. JvE 12/28/12
+        - If fluxWeighted is True, flux cal weights are applied. SM 2/7/13
+        - If getRawCount is True then the raw non-wavelength-calibrated image is
+          returned with no wavelength cutoffs applied (in which case no wavecal
+          file need be loaded). *Note getRawCount overrides weighted and fluxWeighted
+        - If scaleByEffInt is True, any pixels that have 'bad' times masked out
+          will have their counts scaled up to match the equivalent integration 
+          time requested.
         RETURNS:
             Dictionary with keys:
                 'image' - a 2D array representing the image
