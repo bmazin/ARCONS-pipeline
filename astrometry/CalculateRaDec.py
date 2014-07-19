@@ -28,8 +28,9 @@ class CalculateRaDec:
     def __init__(self,centroidListFile):
         '''
         centroidListFile may either be a pathname (string) to a centroid list file, a PyTables instance
-        of a centroid list file, or a PyTables instance of the actual centroid list node (table) within
+        of a centroid list file, or a PyTables instance of the actual centroid list root node within
         a centroid list file (as stored in PhotList instances).
+        Note the last option has changed slightly! (JvE 7/18/2014)
         '''
         
         if type(centroidListFile) is str:
@@ -46,31 +47,35 @@ class CalculateRaDec:
                 #return
             # Load centroid positions, center of rotation, hour angle, and RA/DEC data from centroidListFile.
             clFile = tables.openFile(fullCentroidListFileName, mode='r')
+            clRoot = clFile.root
             centroidListNode = clFile.root.centroidlist
         elif type(centroidListFile) is tables.file.File:
             clFile = None
+            clRoot = centroidListFile.root
             centroidListNode = centroidListFile.root.centroidlist
         elif type(centroidListFile) is tables.group.Group:
             clFile = None
-            centroidListNode = centroidListFile
+            clRoot = centroidListFile 
+            centroidListNode = centroidListFile.centroidlist
         else:
-            raise ValueError('Input parameter centroidListFile must be either a pathname string or a PyTables file instance.')
+            raise ValueError('''Input parameter centroidListFile must be either a pathname string,
+                                a PyTables file instance, or a PyTables node instance''')
         
-        try:
-            header = clFile.root.header.header
+        if 'header' in clRoot:
+            header = clRoot.header.header
             titles = header.colnames
             info = header[0]
             self.nRow = info[titles.index('nRow')]
             self.nCol = info[titles.index('nCol')]
             self.centroidRightAscension = info[titles.index('RA')]
             self.centroidDeclination = info[titles.index('Dec')]
-        except:
+        else:
+            #For back-compatibility purposes
             self.params = np.array(centroidListNode.params.read())
             self.nRow = int(self.params[0])
             self.nCol = int(self.params[1])
             self.centroidRightAscension = self.params[2]
             self.centroidDeclination = self.params[3]
-
 
         self.times = np.array(centroidListNode.times.read())
         self.hourAngles = np.array(centroidListNode.hourAngles.read())

@@ -173,7 +173,7 @@ def main():
                 ob.loadFluxCalFile(fluxCalFileName)
                 
             if not os.path.exists(timeMaskFileName):
-                print 'Running hotpix for ',obs
+                print 'Running hotpix for ',ob.fileName
                 hp.findHotPixels(obsFile=ob,outputFileName=timeMaskFileName,
                                  useRawCounts=True,weighted=True,fluxWeighted=True)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)

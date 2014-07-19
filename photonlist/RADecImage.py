@@ -39,7 +39,8 @@ class RADecImage(object):
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
-                 vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1):
+                 vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1,
+                 doWeighted=True,wvlMin=None,wvlMax=None):
                  #expWeightTimeStep=1.0):
         '''
         Initialise a (possibly empty) RA-dec coordinate frame image.
@@ -61,6 +62,8 @@ class RADecImage(object):
                         begin integration 
             integrationTime: float, length of time to integrate for in seconds. If
                         -1, integrate to end of photon list.
+            doWeighted,wvlMin,wvlMax - passed on to loadImage() if 'photList' keyword
+                        is provided. Otherwise ignored.
             
             #### DEPRECATED ##### 
             expWeightTimeStep: float, time step to use when calculating exposure
@@ -103,7 +106,8 @@ class RADecImage(object):
             and nPixRA is not None and nPixDec is not None):
             self.setCoordGrid()            
         if photList is not None:
-            self.loadImage(photList,firstSec=firstSec,integrationTime=integrationTime)     
+            self.loadImage(photList,firstSec=firstSec,integrationTime=integrationTime,
+                           doWeighted=doWeighted,wvlMin=wvlMin,wvlMax=wvlMax)     
     
     
     def setCoordGrid(self):
@@ -313,7 +317,10 @@ class RADecImage(object):
         #tStartFrames = np.arange(start=firstSec,stop=lastSec,
         #                         step=self.expWeightTimeStep)
         #tEndFrames = (tStartFrames+self.expWeightTimeStep).clip(max=lastSec)    #Clip so that the last value doesn't go beyond the end of the exposure.
-        tStartFramesAll = np.array(photList.file.root.centroidList.times.read()) #Convert to array, since it's saved as a list.
+        if 'centroidlist' in photList.file.root.centroidList:
+            tStartFramesAll = np.array(photList.file.root.centroidList.centroidlist.times.read()) #Convert to array, since it's saved as a list.
+        else:
+            tStartFramesAll = np.array(photList.file.root.centroidList.times.read())   #For back compatibility
         tEndFramesAll = np.append(tStartFramesAll[1:], np.inf)                   #Last frame goes on forever as far as we know at the moment
         withinIntegration = ((tStartFramesAll < lastSec) & (tEndFramesAll > firstSec))
         tStartFrames = tStartFramesAll[withinIntegration].clip(min=firstSec)   #Now clip so that everything is within the requested integration time.
@@ -483,7 +490,7 @@ class RADecImage(object):
         
         if logScale is True: toDisplay = np.log10(toDisplay)
         
-        if image is not None: toDisplay = image
+        if image is not None: toDisplay = np.copy(image)
         
         #####################
         #Rotate by 180deg so north is up and east is left - just a fudge for now, need to
@@ -502,12 +509,32 @@ class RADecImage(object):
         #raMin = (self.gridRA[0:-1] + self.gridRA[1:])/2.0 / np.pi * 180.
         #dec = (self.gridDec[0:-1] + self.gridDec[1:])/2.0 / np.pi * 180.
         
-        utils.plotArray(toDisplay,cbar=True,normMin=normMin,normMax=normMax,
-                        colormap=colormap,plotFileName=fileName,
-                        showMe=(type(fileName) is not str))
-        #mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=(180./np.pi)*
-        #           np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]])
-
+        #utils.plotArray(toDisplay,cbar=True,normMin=normMin,normMax=normMax,
+        #                colormap=colormap,plotFileName=fileName,
+        #                showMe=(type(fileName) is not str))
+        #fig = mpl.figure()
+        #ax = fig.add_subplot(111)
+        #ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
+        mpl.ticklabel_format(style='plain',useOffset=False)
+        mpl.tick_params(direction='out')
+        mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=(180./np.pi)*
+                    np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]]),
+                    origin='upper', cmap=colormap)
+        #mpl.ticklabel_format(style='plain',useOffset=False)
+ 
+        ax = mpl.gca()
+        xtickBase = 10**(np.round(np.log10((self.gridRA[-1]-self.gridRA[0])*180./np.pi/10.)))
+        ytickBase = 10**(np.round(np.log10((self.gridDec[-1]-self.gridDec[0])*180./np.pi/10.)))
+        ax.xaxis.set_major_locator(mpl.MultipleLocator(base=xtickBase))
+        ax.yaxis.set_major_locator(mpl.MultipleLocator(base=ytickBase))
+        mpl.xticks(rotation=90)
+        mpl.xlabel('R.A. (deg)')
+        mpl.ylabel('Dec. (deg)')
+        
+        #ax.xaxis.set_major_locator(mpl.MultipleLocator(base=0.001))
+        #ax.yaxis.set_major_locator(mpl.MultipleLocator(base=0.001))
+        #mpl.show()
+        
         
     def writeFits(self, fileName='RADecImage.fits', expWeight=True):
         '''
