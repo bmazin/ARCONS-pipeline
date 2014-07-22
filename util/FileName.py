@@ -175,6 +175,20 @@ class FileName:
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.h5'
 
+    def illumSoln(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.tstamp + '.h5'
+
     def flatInfo(self):
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
@@ -189,6 +203,19 @@ class FileName:
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
+    def flatInfo(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.tstamp + '.npz'
 
     def oldFlatInfo(self):
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
