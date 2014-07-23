@@ -203,7 +203,7 @@ class FileName:
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
-    def flatInfo(self):
+    def illumInfo(self):
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
