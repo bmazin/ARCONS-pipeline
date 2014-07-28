@@ -5,14 +5,14 @@ from photonlist import photlist
 
 
 def testGetImageDet(fileName=FileName(run='PAL2012',date='20121208',tstamp='20121209-120530').photonList(),
-                    firstSec=0,integrationTime=-1,newMethod=True):
+                    firstSec=0,integrationTime=-1,newMethod=True,doWeighted=False):
     
     plFile = photlist.PhotList(fileName)
     
     try:
         tic=time.time()
         image = plFile.getImageDet(firstSec=firstSec,integrationTime=integrationTime,newMethod=newMethod,
-                                   wvlMin=4000,wvlMax=6000)
+                                   wvlMin=4000,wvlMax=6000,doWeighted=doWeighted)
         tElapsed = time.time()-tic
     finally:
         #plFile.close()

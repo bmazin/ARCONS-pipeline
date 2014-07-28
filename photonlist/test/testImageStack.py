@@ -1,6 +1,8 @@
 '''
 Author: Julian van Eyken            Date: May 31 2013
 A bit of photon-list image stacking testing....
+NB - really designed for Crab pulsar image, but should
+be somewhat flexible.
 '''
 
 import warnings
@@ -91,7 +93,8 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
                     normMax = np.percentile(medComImage[np.isfinite(medComImage)],q=99.9)
                     toDisplay = np.copy(medComImage)
                     toDisplay[~np.isfinite(toDisplay)] = 0
-                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax)
+                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax,colormap=mpl.cm.gray,
+                                    cbar=True)
                 else:
                     virtualImage.display(pclip=0.1)
                     medComImage = None
@@ -99,15 +102,19 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         else:
             print 'File doesn''t exist: ',eachFile
     
-    #Save the results
+    #Save the results.
+    #Note, if median combining, 'vim' will only contain one frame. If not, medComImage will be None.
+    results = {'vim':virtualImage,'imstack':imageStack,'medim':medComImage}
+
     try:
         output = open(saveFileName,'wb')
-        pickle.dump(virtualImage,output,-1)
+        pickle.dump(results,output,-1)
         output.close()
+            
     except:
         warnings.warn('Unable to save results for some reason...')
     
-    return virtualImage, imageStack, medComImage
+    return results
 
 
 

@@ -33,3 +33,6 @@ maxIter = 5			#Max num. of iterations for the hot pixel algorithm.
 
 display = False		#If 'True', show plots of each extracted sub-exposure with
 					#detected bad pixels highlighted. 
+
+useLocalStdDev = False      #Use local robust std. dev. approx. instead of sqrt(counts)
+                            #for sigma estimate.

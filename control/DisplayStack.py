@@ -16,6 +16,7 @@ import os
 from time import time
 import sys
 import LoadImageStack
+from tables import *
 
 from PyQt4.QtGui import *
 from PyQt4.QtGui import *
@@ -112,13 +113,17 @@ class DisplayStack(QMainWindow):
         self.run = self.runNames[self.runNumber]
         self.target = self.targetNames[self.runNumber][self.targetNumber]
         try:
+            self.paramName = self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
             self.paramData = readDict()
-            self.paramData.read_from_file(self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict')
+            self.paramData.read_from_file(self.paramName)
             self.obsTimes = np.array(self.paramData['obsTimes'])
             self.utcDates = self.paramData['utcDates']
             self.sunsetDates = self.paramData['sunsetDates']
             self.calTimestamps = self.paramData['calTimestamps']
-            self.flatCalDates = self.paramData['flatCalDates']  
+            self.flatCalDates = self.paramData['flatCalDates']
+            self.RA = self.paramData['RA']
+            self.Dec = self.paramData['Dec']
+            self.hourAngleOffset = self.paramData['HA_offset']
 
             print 'Loading parameter file at ' + self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
             self.createSunsetList()
@@ -286,17 +291,113 @@ class DisplayStack(QMainWindow):
             self.deadFile = np.load(self.deadPixelFilename)
             self.deadMask = self.deadFile['deadMask']
 
+    # Describe the structure of the header row
+    class headerDescription(tables.IsDescription):
+        targetName = tables.StringCol(100, dflt='')
+        run = tables.StringCol(100, dflt='')
+        obsFileName = tables.StringCol(100, dflt='')
+        wvlCalFileName = tables.StringCol(100, dflt=np.nan)
+        flatCalFileName = tables.StringCol(100, dflt='')
+        deadPixFileName = tables.StringCol(100, dflt='')
+        hotPixFileName = tables.StringCol(100, dflt='')
+        nCol = tables.UInt32Col(dflt=-1)
+        nRow = tables.UInt32Col(dflt=-1)
+        lowWvlCutoff = tables.Float64Col(dflt=np.nan)
+        highWvlCutoff = tables.Float64Col(dflt=np.nan)
+        exptime = tables.Float64Col(dflt=np.nan)
+        lst = tables.StringCol(100, dflt='')
+        integrationTime = tables.Float64Col(dflt=np.nan)
+        RA = tables.StringCol(100, dflt='')
+        Dec = tables.StringCol(100, dflt='')
+        HA_offset = tables.Float64Col(dflt=0.0)
+
+
     # Create output name
     def createOutputName(self):
         self.rawName = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks/' + 'ImageStack_' + self.obsTS + '_' + str(self.integrationTime) + 's')
         if self.useWavelengthCalibration and self.useHotPixelMasking:
-            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '_hp.npz')
+            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '_hp.h5')
         elif self.useWavelengthCalibration and not self.useHotPixelMasking:
-            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '.npz')
-        elif not self.waveLengthCalibration and self.useHotPixelMasking:
-            self.outputFilename = str(self.rawName + '_hp.npz')
+            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '.h5')
+        elif not self.useWavelengthCalibration and self.useHotPixelMasking:
+            self.outputFilename = str(self.rawName + '_hp.h5')
         else:
-            self.outputFilename = str(self.rawName + '.npz')
+            self.outputFilename = str(self.rawName + '.h5')
+
+    def createH5File(self):
+        # Create header and data group and table names
+        headerGroupName = 'header'
+        headerTableName = 'header'
+        dataGroupName = 'stack'
+        dataTableName = 'stack'
+        timeTableName = 'time'
+
+        # Create lookup names for header information
+        runColName = 'run'
+        targetColName = 'targetName'
+        obsFileColName = 'obsFileName'
+        wvlCalFileColName = 'wvlCalFileName'
+        flatCalFileColName = 'flatCalFileName'
+        nRowColName = 'nRow'
+        nColColName = 'nCol'
+        RAColName = 'RA'
+        DecColName = 'Dec'
+        deadPixColName = 'deadPixFileName'
+        hotPixColName = 'hotPixFileName'
+        lowWvlColName = 'lowWvlCutoff'
+        highWvlColName = 'highWvlCutoff'
+        expTimeColName = 'exptime'
+        lstColName = 'lst'
+        integrationTimeColName = 'integrationTime'
+        HA_offsetColName = 'HA_offset'
+
+
+        # Create and h5 output file, create header and data groups
+        fileh = tables.openFile(self.outputFilename, mode='w')
+        headerGroup = fileh.createGroup("/", headerGroupName, 'Header')
+        stackGroup = fileh.createGroup("/", dataGroupName, 'Image Stack')
+
+        # Create row for header information
+        headerTable = fileh.createTable(headerGroup, headerTableName, self.headerDescription,
+                                        'Header Info')
+        header = headerTable.row
+
+        # Fill in the header with possibly useful information.
+        header[runColName] = self.run
+        header[targetColName] = self.target
+        header[obsFileColName] = self.obsFn       
+        header[nColColName] = self.numberCols
+        header[nRowColName] = self.numberRows
+        header[RAColName] = self.RA
+        header[DecColName] = self.Dec
+        header[expTimeColName] = self.exptime
+        header[lstColName] = self.lst
+        header[integrationTimeColName] = self.integrationTime
+        header[HA_offsetColName] = self.hourAngleOffset
+        if self.useDeadPixelMasking:
+            header[deadPixColName] = self.deadPixelFilename
+        if self.useHotPixelMasking:
+            header[hotPixColName] = self.hotPixelFilename
+        if self.useWavelengthCalibration:
+            header[wvlCalFileColName] = self.wvlCalFilename       
+            header[lowWvlColName] = self.lowerWavelengthCutoff
+            header[highWvlColName] = self.upperWavelengthCutoff
+        if self.useFlatCalibration:
+            header[flatCalFileColName] = self.flatCalFilename
+        header.append()
+
+        # Create an h5 array for the midtime of each frame in the image cube.
+        timeTable = fileh.createCArray(stackGroup, timeTableName, Float64Atom(), (1,len(self.times)))       
+        timeTable[:] = self.times
+        
+        # Create an h5 table for the image cube.
+        stackTable = fileh.createCArray(stackGroup, dataTableName, Float64Atom(), (self.numberRows,self.numberCols, self.cube.shape[2]))        
+        stackTable[:] = self.cube
+
+        # Flush the h5 output file
+        fileh.flush()
+        fileh.close()
+
 
     # Start process for creating image stacks
     def stackProcess(self):
@@ -315,6 +416,9 @@ class DisplayStack(QMainWindow):
                     self.obsFn = str(FileName(run=self.run,date=self.currentSunsetDate,tstamp=self.obsTS).obs())
                     print 'Processing file ' + self.obsFn + '...'
                     self.ob = ObsFile(self.obsFn)
+
+                    self.numberRows = self.ob.nRow
+                    self.numberCols = self.ob.nCol
 
                     # Load time adjustment file
                     if self.useTimeAdjustment:
@@ -350,6 +454,7 @@ class DisplayStack(QMainWindow):
                     self.unix = self.ob.getFromHeader('unixtime')
                     self.startJD = self.unix/86400.+2440587.5
                     self.exptime = self.ob.getFromHeader('exptime')
+                    self.lst = self.ob.getFromHeader('lst')
                     
                     self.times = []
                     self.frames = []
@@ -373,7 +478,7 @@ class DisplayStack(QMainWindow):
                     # Create output file
                     self.createOutputName()
                     print 'Saving image stack to ' + self.outputFilename
-                    np.savez(self.outputFilename, stack=self.cube, jd=self.times)
+                    self.createH5File()                 
 
         # Invalid params file
         else:
@@ -383,16 +488,14 @@ class DisplayStack(QMainWindow):
     
     def chooseStack(self):
         self.defaultLoadStackDirectory = str(self.displayStackPath)
-        #self.defaultLoadStackDirectory = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks')
         self.stackName = ''
-        self.stackName = QFileDialog.getOpenFileName(parent=None, directory=self.defaultLoadStackDirectory, caption=str("Choose Image Stack"), filter=str("NPZ (*.npz)")) 
+        self.stackName = QFileDialog.getOpenFileName(parent=None, directory=self.defaultLoadStackDirectory, caption=str("Choose Image Stack"), filter=str("H5 (*.h5)")) 
         if self.stackName == '':
             print 'No file chosen'
         else:          
             loadStackApp = LoadImageStack.LoadImageStack(stackName = self.stackName)
             loadStackApp.show()
             loadStackApp.exec_()
-            # Change to a QDialog...
     
 
 # Start up main gui

@@ -46,6 +46,7 @@ getGitStatus()
 findNearestFinite(im,i,j,n=10)
 nearestNstdDevFilter(inputArray,n=24)
 nearestNmedFilter(inputArray,n=24)
+showzcoord()
 """
 
 def aperture(startpx,startpy,radius=3):
@@ -650,13 +651,20 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     
     INPUTS:
         inputarray - input array
-        mode - 'mean' or 'median' to replace with the mean or median of the neighbouring pixels.
+        mode - 'mean', 'median', or 'nearestNmedian', to replace with the mean or median of
+                the neighbouring pixels. In the first two cases, calculates on the basis of
+                a surrounding box of side 'boxsize'. In the latter, calculates median on the 
+                basis of the nearest N='boxsize' non-NaN pixels (this is probably a lot slower
+                than the first two methods). 
         boxsize - scalar integer, length of edge of box surrounding bad pixels from which to
-                  calculate the mean or median.
+                  calculate the mean or median; or in the case that mode='nearestNmedian', the 
+                  number of nearest non-NaN pixels from which to calculate the median.
         iterate - If iterate is set to True then iterate until there are no NaN values left.
                   (To deal with cases where there are many adjacent NaN's, where some NaN
                   elements may not have any valid neighbours to calculate a mean/median. 
-                  Such elements will remain NaN if only a single pass is done.)
+                  Such elements will remain NaN if only a single pass is done.) In principle,
+                  should be redundant if mode='nearestNmedian', as far as I can think right now
+    
     OUTPUTS:
         Returns 'inputarray' with NaN values replaced.
         
@@ -667,16 +675,17 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     '''
     
     outputarray = numpy.copy(inputarray)
-    print numpy.sum(numpy.isnan(outputarray))
-    while numpy.sum(numpy.isnan(outputarray)) > 0:
+    while numpy.sum(numpy.isnan(outputarray)) > 0 and numpy.all(numpy.isnan(outputarray)) == False:
         
         #Calculate interpolates at *all* locations (because it's easier...)
         if mode=='mean':
-            interpolates=mean_filterNaN(outputarray,size=boxsize,mode='mirror')
+            interpolates = mean_filterNaN(outputarray,size=boxsize,mode='mirror')
         elif mode=='median':
-            interpolates=median_filterNaN(outputarray,size=boxsize,mode='mirror')
+            interpolates = median_filterNaN(outputarray,size=boxsize,mode='mirror')
+        elif mode=='nearestNmedian':
+            interpolates = nearestNmedFilter(outputarray,n=boxsize)
         else:
-            raise ValueError('Invalid mode selection - should be one of "mean" or "median"')
+            raise ValueError('Invalid mode selection - should be one of "mean", "median", or "nearestNmedian"')
         
         #Then substitute those values in wherever there are NaN values.
         outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
@@ -766,7 +775,9 @@ def findNearestFinite(im,i,j,n=10):
     The element i,j itself is *not* returned.
     
     If n is greater than the number of finite valued elements available,
-    it will return non
+    it will return the indices of only the valued elements that exist.
+    If there are no finite valued elements, it will return a tuple of
+    empty arrays. 
     
     No guarantees about the order
     in which elements are returned that are equidistant from i,j.
@@ -779,21 +790,26 @@ def findNearestFinite(im,i,j,n=10):
         n - find the nearest n finite-valued elements
 
     OUTPUTS:
-        Returns an boolean array matching the shape of im, with 'True' where the nearest
-        n finite values are, and False everywhere else.
+        (#Returns an boolean array matching the shape of im, with 'True' where the nearest
+        #n finite values are, and False everywhere else. Seems to be outdated - see below. 06/11/2014,
+        JvE. Should probably check to be sure there wasn't some mistake. ).
+        
+        Returns a tuple of index arrays (row_array, col_array), similar to results
+        returned by the numpy 'where' function.
     """
     
     imShape = numpy.shape(im)
     assert len(imShape) == 2
-    ii,jj = numpy.indices(imShape,dtype=float)
-    distsq = (i-ii)**2 + (j-jj)**2 #Calculate distance squared from i,j (no need to bother taking square root)
+    nRows,nCols = imShape
+    ii2,jj2 = numpy.atleast_2d(numpy.arange(-i,nRows-i,dtype=float), numpy.arange(-j,nCols-j,dtype=float))
+    distsq = ii2.T**2 + jj2**2
     good = numpy.isfinite(im)
     good[i,j] = False #Get rid of element i,j itself.
     ngood = numpy.sum(good)
     distsq[~good] = numpy.nan   #Get rid of non-finite valued elements
     #Find indices of the nearest finite values, and unravel the flattened results back into 2D arrays
     nearest = (numpy.unravel_index(
-                                   (numpy.argsort(distsq,axis=None))[0:min(n,ngood)],numpy.shape(im)
+                                   (numpy.argsort(distsq,axis=None))[0:min(n,ngood)],imShape
                                    )) #Should ignore NaN values automatically
     
     #Below version is maybe slightly quicker, but at this stage doesn't give quite the same results -- not worth the trouble
@@ -881,4 +897,37 @@ def nearestNmedFilter(inputArray,n=24):
         for iCol in numpy.arange(nCol):
             outputArray[iRow,iCol] = numpy.median(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)])
     return outputArray
+
+
+
+
+def showzcoord():
+    '''
+    For arrays displayed using 'matshow', hack to set the cursor location
+    display to include the value under the cursor, for the currently
+    selected axes.
+    
+    NB - watch out if you have several windows open - sometimes it
+    will show values in one window from another window. Avoid this by
+    making sure you've clicked *within* the plot itself to make it
+    the current active axis set (or hold down mouse button while scanning
+    values). That should reset the values to the current window.
+    
+    JvE 5/28/2014
+    
+    '''
+    
+    def format_coord(x,y):
+        try:
+            im = plt.gca().get_images()[0].get_array().data
+            nrow,ncol = numpy.shape(im)
+            row,col = int(y+0.5),int(x+0.5)
+            z = im[row,col]
+            return 'x=%1.4f, y=%1.4f, z=%1.4f'%(x, y, z)
+        except:
+            return 'x=%1.4f, y=%1.4f, --'%(x, y)
+    
+    ax = plt.gca()
+    ax.format_coord = format_coord
+
 

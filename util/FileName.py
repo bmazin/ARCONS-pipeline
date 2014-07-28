@@ -119,6 +119,21 @@ class FileName:
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
 
+    def mastercalSoln(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
+            'master_cals' + os.sep + \
+            "mastercal_" + self.tstamp + '.h5'
+
+    def mastercalDriftInfo(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
+            'master_cals' + os.sep + \
+            'drift_study'+ os.sep+\
+            "mastercal_" + self.tstamp + '_drift.h5'
+
     def centroidList(self):
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
@@ -160,6 +175,20 @@ class FileName:
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.h5'
 
+    def illumSoln(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.tstamp + '.h5'
+
     def flatInfo(self):
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
@@ -174,6 +203,19 @@ class FileName:
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
+    def illumInfo(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.tstamp + '.npz'
 
     def oldFlatInfo(self):
         if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
@@ -192,6 +234,12 @@ class FileName:
             'photonLists' + os.sep + \
             self.date + os.sep + \
             "photons_" + self.tstamp + '.h5'
+
+    def timedPhotonList(self):
+        return self.intermDir + os.sep + \
+            'photonLists' + os.sep + \
+            self.date + os.sep + \
+            "timedPhotons_" + self.tstamp + '.h5'
                            
     def packetMasterLog(self):
         return self.mkidDataDir + os.sep + \
@@ -208,6 +256,10 @@ class FileName:
             'pixRemap' + os.sep + \
             'pixRemap_' + self.run + '.h5'
             
+    def beammap(self):
+        return self.intermDir + os.sep + \
+            'pixRemap' + os.sep + \
+            'beamimage_' + self.run + '.h5'
     ##################################
     
     def getComponents(self):

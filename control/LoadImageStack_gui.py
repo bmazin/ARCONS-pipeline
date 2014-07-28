@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'LoadImageStack_gui.ui'
 #
-# Created: Tue Apr 22 12:24:54 2014
+# Created: Wed May  7 11:28:48 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -84,11 +84,11 @@ class Ui_LoadImageStack_gui(object):
         self.jdLabel.setIndent(0)
         self.jdLabel.setObjectName(_fromUtf8("jdLabel"))
         self.aperturePhotometryButton = QtGui.QPushButton(LoadImageStack_gui)
-        self.aperturePhotometryButton.setGeometry(QtCore.QRect(560, 610, 91, 51))
+        self.aperturePhotometryButton.setGeometry(QtCore.QRect(560, 560, 91, 51))
         self.aperturePhotometryButton.setAutoDefault(False)
         self.aperturePhotometryButton.setObjectName(_fromUtf8("aperturePhotometryButton"))
         self.psfPhotometryButton = QtGui.QPushButton(LoadImageStack_gui)
-        self.psfPhotometryButton.setGeometry(QtCore.QRect(560, 700, 91, 51))
+        self.psfPhotometryButton.setGeometry(QtCore.QRect(560, 630, 91, 51))
         self.psfPhotometryButton.setAutoDefault(False)
         self.psfPhotometryButton.setObjectName(_fromUtf8("psfPhotometryButton"))
         self.apertureLine = QtGui.QLineEdit(LoadImageStack_gui)
@@ -160,9 +160,13 @@ class Ui_LoadImageStack_gui(object):
         self.shortcutLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.shortcutLabel.setObjectName(_fromUtf8("shortcutLabel"))
         self.skySubtractionCheckbox = QtGui.QCheckBox(LoadImageStack_gui)
-        self.skySubtractionCheckbox.setGeometry(QtCore.QRect(540, 580, 131, 22))
+        self.skySubtractionCheckbox.setGeometry(QtCore.QRect(540, 530, 131, 22))
         self.skySubtractionCheckbox.setChecked(True)
         self.skySubtractionCheckbox.setObjectName(_fromUtf8("skySubtractionCheckbox"))
+        self.centroidButton = QtGui.QPushButton(LoadImageStack_gui)
+        self.centroidButton.setGeometry(QtCore.QRect(560, 700, 92, 51))
+        self.centroidButton.setAutoDefault(False)
+        self.centroidButton.setObjectName(_fromUtf8("centroidButton"))
 
         self.retranslateUi(LoadImageStack_gui)
         QtCore.QMetaObject.connectSlotsByName(LoadImageStack_gui)
@@ -210,5 +214,7 @@ class Ui_LoadImageStack_gui(object):
         self.shortcutLabel.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Aperture and\n"
 "annulus shortcuts", None, QtGui.QApplication.UnicodeUTF8))
         self.skySubtractionCheckbox.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Sky Subtraction", None, QtGui.QApplication.UnicodeUTF8))
+        self.centroidButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Centroid\n"
+"Frames", None, QtGui.QApplication.UnicodeUTF8))
 
 from mpl_pyqt4_widget import MPL_Widget

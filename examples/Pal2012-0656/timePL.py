@@ -1,8 +1,8 @@
 #!/bin/python
 '''
-Author: Matt Strader        Date: March 6,2013
+Author: Matt Strader        Date: March 20,2014
 
-This program takes previously created photon lists (customized crab aperture lists with empty columns for timing information) and feeds them through tempo2 to fill the jd,bjd,pulseNumber,totalPhase, and phase columns.  It then creates an index in the PLs so that they may be searched for pulseNumber efficiently. It also fills the waveOutOfRange and waveUpperLimit columns using the corresponding obs file's wavecal solution.
+This program takes previously created photon lists (customized pulsar lists with empty columns for timing information) and feeds them through tempo2 to fill the jd,bjd,pulseNumber,totalPhase, and phase columns.  It then creates an index in the PLs so that they may be searched for pulseNumber efficiently. It also fills the waveOutOfRange and waveUpperLimit columns using the corresponding obs file's wavecal solution.
 
 In the course of running, this program creates temporary text files filled with timestamps to feed to tempo2. Tempo2 makes it's own temporary output files for this program to read.
 '''
