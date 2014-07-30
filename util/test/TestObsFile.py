@@ -101,8 +101,8 @@ class TestObsFile(unittest.TestCase):
 
         """
 
-        INTERM_DIR = '../../examples/mask-interval-performance/'
-        os.environ['INTERM_DIR'] = INTERM_DIR
+        MKID_PROC_PATH = '../../examples/mask-interval-performance/'
+        os.environ['MKID_PROC_PATH'] = MKID_PROC_PATH
         run = 'PAL2012'
         sunsetDate = '20121211'
         obsSequence = '20121212-074700'

@@ -18,7 +18,7 @@ import matplotlib
 """
 
 def getTimeMaskFileName(obsFileName):
-    scratchDir = os.getenv('INTERM_PATH')
+    scratchDir = os.getenv('MKID_PROC_PATH')
     hotPixDir = os.path.join(scratchDir,'timeMasks')
     fileName = obsFileName.split('/')[-1]
     fileNameBase = fileName.split('_')[-1]
@@ -84,7 +84,7 @@ def main():
 
     for n in xrange(nWvlBins):
         print "Making image for wvls %i to %i"%(wvlBinEdges[n], wvlBinEdges[n+1])
-        virtualImage, imageStack, medImage = makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default="/Scratch")+'/photonLists/20131209',
+        virtualImage, imageStack, medImage = makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', default="/Scratch")+'/photonLists/20131209',
                    detImage=False, saveFileName='stackedImage.pkl', wvlMin=wvlBinEdges[n],
                    wvlMax=wvlBinEdges[n+1], doWeighted=True, medCombine=False, vPlateScale=0.2,
                    nPixRA=nVirtPixX,nPixDec=nVirtPixY)

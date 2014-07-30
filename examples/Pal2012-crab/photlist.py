@@ -60,9 +60,9 @@ class PhotList(object):
         self.fullFileName = os.path.abspath(fileName)
         #else:
         #    # make the full file name by joining the input name 
-        #    # to the MKID_DATA_DIR (or . if the environment variable 
+        #    # to the MKID_RAW_PATH (or . if the environment variable 
         #    # is not defined)
-        #    dataDir = os.getenv('MKID_DATA_DIR', '/')
+        #    dataDir = os.getenv('MKID_RAW_PATH', '/')
         #    self.fullFileName = os.path.join(dataDir, self.fileName)
 
         if (not os.path.exists(self.fullFileName)):
@@ -187,7 +187,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
 
 def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,rowList=None,colList=None):
     """
-    writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+    writes out the photon list for this obs file at $MKID_PROC_PATH/photonListFileName
     currently cuts out photons outside the valid wavelength ranges from the wavecal
    
     Currently being updated... JvE 4/26/2013.

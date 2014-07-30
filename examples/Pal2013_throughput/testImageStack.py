@@ -17,7 +17,7 @@ from util.FileName import FileName
 from util import utils
 
 
-def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default="/Scratch")+'/photonLists/20131209',
+def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', default="/Scratch")+'/photonLists/20131209',
                    detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
                    wvlMax=None, doWeighted=True, medCombine=False, vPlateScale=0.2,
                    nPixRA=250,nPixDec=250):

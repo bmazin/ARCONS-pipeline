@@ -33,7 +33,7 @@ class CalculateRaDec:
             if os.path.isabs(centroidListFile) == True:
                 fullCentroidListFileName = centroidListFile
             else:
-                scratchDir = os.getenv('INTERM_PATH')
+                scratchDir = os.getenv('MKID_PROC_PATH')
                 centroidDir = os.path.join(scratchDir,'centroidListFiles')
                 fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
             if (not os.path.exists(fullCentroidListFileName)):

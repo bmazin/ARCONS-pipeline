@@ -766,7 +766,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     HISTORY:
         2/15/2013: Updated so that behaviour of outputFileName is consistent with the
         behaviour of the input file name for an ObsFile instance. (i.e., 
-        unless the path provided is absolute, $MKID_DATA_DIR is prepended
+        unless the path provided is absolute, $MKID_RAW_PATH is prepended
         to the file name.)
         
         11/22/2013 (actually a few days before): added startTime, and endTime to saved
@@ -779,9 +779,9 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     else:
         #self.fileName = fileName
         # make the full file name by joining the input name 
-        # to the MKID_DATA_DIR (or . if the environment variable 
+        # to the MKID_RAW_PATH (or . if the environment variable 
         # is not defined)
-        dataDir = os.getenv('MKID_DATA_DIR', '/')
+        dataDir = os.getenv('MKID_RAW_PATH', '/')
         fullFileName = os.path.join(dataDir, outputFileName)
     
     fileh = tables.openFile(fullFileName, mode='w')

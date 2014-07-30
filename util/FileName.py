@@ -3,9 +3,9 @@ Author:  Chris Stoughton
 Build up complete file names from:
 
 mkidDataDir -- root of all raw. If not specified, looks for system variable
-                MKID_DATA_DIR, otherwise '/ScienceData'.
+                MKID_RAW_PATH, otherwise '/ScienceData'.
 intermDir -- root of all generated files. If not specified, looks for 
-                sys. variable INTERM_DIR, otherwise '/Scratch')
+                sys. variable MKID_PROC_PATH, otherwise '/Scratch')
 run -- such as LICK201 or PAL2012
 date -- in format yyyymmdd -- the local year, month, and date of sunset
 flavor -- obs or cal are the only ones I know about
@@ -30,14 +30,14 @@ class FileName:
             obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out 
                       the required parameters automatically. Alternatively, obsFile can also be a string containing
                       a full obs file path name instead.
-            mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_DATA_DIR' if not specified.)
-            intermDir - data reduction product directory (uses path pointed to by system variable 'INTERM_DIR' if not specified.
+            mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_RAW_PATH' if not specified.)
+            intermDir - data reduction product directory (uses path pointed to by system variable 'MKID_PROC_PATH' if not specified.
         '''
             
         if mkidDataDir is None:
-            mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
+            mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
         if intermDir is None:
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         
 
         self.mkidDataDir = mkidDataDir

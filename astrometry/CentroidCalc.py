@@ -75,7 +75,7 @@ def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionLi
     if os.path.isabs(centroidListFileName) == True:
         fullCentroidListFileName = centroidListFileName
     else:
-        scratchDir = os.getenv('INTERM_PATH')
+        scratchDir = os.getenv('MKID_PROC_PATH')
         centroidDir = os.path.join(scratchDir,'centroidListFiles')
         fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
 
