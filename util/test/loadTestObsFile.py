@@ -15,6 +15,7 @@ def loadTestObsFile(obsFileName=None, wvlCalFileName=None, flatCalFileName=None,
     run = 'PAL2012'
     date = '20121208'
     if obsFileName is None: obsFileName = fn.FileName(run=run,date=date,tstamp='20121209-044636').obs()   #'obs_20121209-044636.h5'
+    if timeAdjFileName is None: timeAdjFileName = FileName(run='PAL2012').timeAdjustments()
     if wvlCalFileName is None: wvlCalFileName = fn.FileName(run=run, date=date, tstamp='20121209-060704').calSoln()    #'calsol_20121209-060704.h5'
     if flatCalFileName is None: flatCalFileName = fn.FileName(run=run, date='20121210').flatSoln()    #'flatsol_20121210.h5'
     if fluxCalFileName is None: fluxCalFileName = fn.FileName(run=run, date=date, tstamp='20121209-020416').fluxSoln()
@@ -25,6 +26,8 @@ def loadTestObsFile(obsFileName=None, wvlCalFileName=None, flatCalFileName=None,
     print 'Loading obs file and calibrations:'
     print obsFileName
     obsFile = of.ObsFile(obsFileName)
+    obsFile.loadTimeAdjustmentsFile(timeAdjFileName)
+    print timeAdjFileName
     obsFile.loadBestWvlCalFile()
     print obsFile.wvlCalFileName
     print flatCalFileName

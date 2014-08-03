@@ -171,18 +171,19 @@ def main():
                 ob.loadWvlCalFile(wvlCalFileName)
                 ob.loadFlatCalFile(flatCalFileName)
                 ob.loadFluxCalFile(fluxCalFileName)
+                ob.setWvlCutoffs(3000.,12000.) #Keep most of the wavelength range for the purposes of centroiding/hot pixel detection.
+
                 
             if not os.path.exists(timeMaskFileName):
                 print 'Running hotpix for ',ob.fileName
                 hp.findHotPixels(obsFile=ob,outputFileName=timeMaskFileName,
-                                 useRawCounts=True,weighted=True,fluxWeighted=True)
+                                 useRawCounts=False,weighted=True,fluxWeighted=True)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             else:
                 print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
                 
             if not os.path.exists(centroidFileName):
                 ob.loadHotPixCalFile(timeMaskFileName)
-                ob.setWvlCutoffs(None,None)
                 print 'Running CentroidCalc for ',ob.fileName
                 cc.centroidCalc(ob, centerRA, centerDec, outputFileName=centroidFileName,
                                 guessTime=300, integrationTime=30, secondMaxCountsForDisplay=500,
