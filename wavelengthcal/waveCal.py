@@ -62,14 +62,14 @@ def getCalFileNames(paramFile):
 
     #if tStampList == None:
     #    #search for all cal files in date
-    #    mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
+    #    mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
     #    path = mkidDataDir + os.sep + run + os.sep + sunsetDate + os.sep
     #    tStampList = [f.split('.')[-2].split('_')[1] for f in os.listdir(path) if f.endswith('.h5') and f.startswith('cal_')]
 
     if sunsetDate == None:
-        walkPath=os.getenv('MKID_DATA_DIR', default="/ScienceData")+os.sep+run+os.sep
+        walkPath=os.getenv('MKID_RAW_PATH', default="/ScienceData")+os.sep+run+os.sep
     elif tStampList == None:
-        walkPath=os.getenv('MKID_DATA_DIR', default="/ScienceData")+os.sep+run+os.sep+sunsetDate+os.sep
+        walkPath=os.getenv('MKID_RAW_PATH', default="/ScienceData")+os.sep+run+os.sep+sunsetDate+os.sep
     if walkPath != None:
         print 'Using all files from: '+walkPath
         calFNs = []
@@ -251,7 +251,7 @@ class waveCal:
         intermDir=self.params['intermdir']
         outdir=self.params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
         if outdir is None or outdir is '':
             outdir = 'waveCalSolnFiles/'
         self.outpath=intermDir+outdir+calFN.run+os.sep+calFN.date+os.sep

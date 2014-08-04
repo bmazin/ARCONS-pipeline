@@ -401,7 +401,7 @@ class FlatCal:
         if os.path.isabs(self.flatCalFileName) == True:
             fullFlatCalFileName = self.flatCalFileName
         else:
-            scratchDir = os.getenv('INTERM_PATH')
+            scratchDir = os.getenv('MKID_PROC_PATH')
             flatDir = os.path.join(scratchDir,'flatCalSolnFiles')
             fullFlatCalFileName = os.path.join(flatDir,self.flatCalFileName)
 

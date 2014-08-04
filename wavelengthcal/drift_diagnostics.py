@@ -46,7 +46,7 @@ def getDriftFileNames(paramFile,nameStart='calsol_',nameEnd='_drift.h5'):
         intermDir=params['intermdir']
         outdir=params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
         if outdir is None or outdir is '':
             outdir = 'waveCalSolnFiles/'
         walkPath=intermDir+outdir+run+os.sep
@@ -54,7 +54,7 @@ def getDriftFileNames(paramFile,nameStart='calsol_',nameEnd='_drift.h5'):
         intermDir=params['intermdir']
         outdir=params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
         if outdir is None or outdir is '':
             outdir = 'waveCalSolnFiles/'
         walkPath=intermDir+outdir+run+os.sep+sunsetDate+os.sep
@@ -83,7 +83,7 @@ class drift_ana:
             intermDir=params['intermdir']
             outdir=params['outdir']
             if intermDir is None or intermDir is '':
-                intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+                intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
             if outdir is None or outdir is '':
                 outdir = 'waveCalSolnFiles/'
             self.outpath=intermDir+outdir+driftFNs[0].run+os.sep+'drift_figs/'

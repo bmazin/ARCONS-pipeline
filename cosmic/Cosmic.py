@@ -36,7 +36,7 @@ class Cosmic:
                  loggingHandler=logging.StreamHandler()):
         
         """
-        Opens fileName in MKID_DATA_DIR, sets roachList
+        Opens fileName in MKID_RAW_PATH, sets roachList
         endTime is exclusive
         """
         self.logger = logging.getLogger("cosmic")

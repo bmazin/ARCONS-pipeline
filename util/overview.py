@@ -19,7 +19,7 @@ class Overview:
         if os.path.exists(directory):
             self.dataDir = directory
         else:
-            self.dataDir = os.getenv('MKID_DATA_DIR','.')
+            self.dataDir = os.getenv('MKID_RAW_PATH','.')
                 
         self.calFiles = []
         self.obsFiles = []

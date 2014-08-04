@@ -122,7 +122,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                   nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
                   display=False, ds9display=False, dispToPickle=None, weighted=False,
                   fluxWeighted=False, maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, 
-                  diagnosticPlots=False, useLocalStdDev=False, useRawCounts=True):
+                  diagnosticPlots=False, useLocalStdDev=False, useRawCounts=True,
+                  bkgdPercentile=10.0):
     '''
     To find the hot, cold, or dead pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
@@ -188,6 +189,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                         in obsFile** - in which case, whatever calibrations are already loaded and
                         (and switched on) in the obsFile instance will be applied before looking
                         for badly behaved pixels. *Overrides weighted and fluxWeighted*. Added JvE 7/16/2014
+        bkgdPercentile - percentile level (in %) in image to use as an estimate of the background.
+                         ***SHOULD BE ADDED AS A PARAMETER TO THE PARAMETER FILE...!!****
 
     OUTPUTS:
         A dictionary containing the result and various diagnostics. Keys are:
@@ -291,14 +294,15 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             medFiltImage = spfilters.median_filter(nanFixedImage, boxSize, mode='mirror')
             #medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')  #Original version without interpolating the NaNs
             
+            overallMedian = np.median(im[~np.isnan(im)])
+            overallBkgd = np.percentile(im[~np.isnan(im)],bkgdPercentile)
+        
             if doColdFlagging is True or useLocalStdDev is True:
-                stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
-    
+                stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)    
             
             #-------------- Cold flagging switched off for now, May 6 2014-----------------    
             if doColdFlagging is True:
                 nrstNbrMedFiltImage = utils.nearestNmedFilter(im, n=boxSize**2-1)  #Possibly useful with cold pixel flagging.
-                overallMedian = np.median(im[~np.isnan(im)])
                 overallStdDev = astropy.stats.median_absolute_deviation(im[~np.isnan(im)])*1.4826
                 #Calculate the standard-deviation filtered image,
                 #using a kernel footprint that will miss out the central pixel:
@@ -310,7 +314,10 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     
             #Calculate difference between flux in each pixel and maxRatio * the median in the enclosing box.
             #Also calculate the error that would exist in a measurment of a pixel that *was* at the peak of a real PSF
-            diff = im - maxRatio * medFiltImage
+            print 'overallMedian: ',overallMedian
+            print 'overallBkgd: ',overallBkgd
+            print 'maxRatio: ',maxRatio
+            diff = im - maxRatio * medFiltImage + (maxRatio-1.)*overallBkgd   #****TESTING ACCOUNTING FOR BACKGROUND - SEE LAST TERM****
     
             #Simple estimate, probably makes the most sense: photon error in the max value allowed. Neglect errors in the median itself here.
             if useLocalStdDev is False:
@@ -403,8 +410,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             utils.ds9Array(imForDisplay, normMin=vmin, normMax=vmax, colormap='bb')
             d=ds9.ds9()     #Get reference to the now (hopefully) open ds9 instance.
             for i in range(np.sum(hotMask)):
-                d.set("regions command {circle "+str(xx[hotMask][i]+1)+" "+str(yy[hotMask][i]+1)
-                      +" 0.3 #color=red}")
+                d.set("regions command {point "+str(xx[hotMask][i]+1)+" "+str(yy[hotMask][i]+1)
+                      +"  #point=x color=blue}")
             for i in range(np.sum(coldMask)):
                 d.set("regions command {circle "+str(xx[coldMask][i]+1)+" "+str(yy[coldMask][i]+1)
                       +" 0.3 #color=white}")
@@ -448,6 +455,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.colorbar()
             mpl.title('Median filtered image')
             mpl.suptitle(plotTitle)
+            utils.showzcoord()
+
             
             fig = mpl.figure(figsize=(5,5))
             imToPlot = np.copy(diffOriginal)
@@ -457,6 +466,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.colorbar()
             mpl.title('Difference image')
             mpl.suptitle(plotTitle)
+            utils.showzcoord()
+
             
             fig = mpl.figure(figsize=(5,5))            
             imToPlot = np.copy(diffErrOriginal)
@@ -466,6 +477,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.colorbar()
             mpl.title('Difference Error')
             mpl.suptitle(plotTitle)
+            utils.showzcoord()
+
             
             fig = mpl.figure(figsize=(5,5))            
             imToPlot = utils.replaceNaN(np.copy(im),mode='nearestNmedian',boxsize=24)
@@ -475,6 +488,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             mpl.colorbar()
             mpl.title('Cleaned+interpolated image')
             mpl.suptitle(plotTitle)
+            utils.showzcoord()
+
             
             #--------------------------------------------------------------------
 
@@ -503,7 +518,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
                   ds9display=False, dispToPickle=False, weighted=False, fluxWeighted=False,
                   maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
-                  useLocalStdDev=None, useRawCounts=True):
+                  useLocalStdDev=None, useRawCounts=True, bkgdPercentile=10.0):
     '''
     To find hot (and cold/dead) pixels. This routine is the main code entry point.
     Takes an obs. file as input and outputs an .h5 file containing lists of bad time
@@ -580,6 +595,9 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                     (and switched on) in the obsFile instance will be applied before looking
                     for badly behaved pixels. *Overrides weighted and fluxWeighted*.
                     Added JvE 7/16/2014
+        bkgdPercentile - percentile level (in %) in image to use as an estimate of the background.
+                         Added JvE 8/1/2014
+                         ***SHOULD BE ADDED AS A PARAMETER TO THE PARAMETER FILE...!!****
 
         
     OUTPUTS:
@@ -631,7 +649,8 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                   unambiguous enough.
         6/7/2014: Added option to use local box robust estimate of sigma instead
                   of sigma from photon noise estimate.
-
+        8/1/2014: Added proper handling of sky background level in statistics
+                  for hot pixel code.  
     '''
 
     if paramFile is not None:
@@ -697,7 +716,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                                      dispToPickle=dispToPickleThisOne, weighted=weighted, fluxWeighted=fluxWeighted,
                                      maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc,
                                      useLocalStdDev=useLocalStdDev, diagnosticPlots=diagnosticPlots 
-                                     and displayThisOne, useRawCounts=useRawCounts)['mask']
+                                     and displayThisOne, useRawCounts=useRawCounts, bkgdPercentile=bkgdPercentile)['mask']
                                      #Note checkInterval call should automatically clip at end of obsFile,
                                      #so don't need to worry about endTime.
     
@@ -766,24 +785,30 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     HISTORY:
         2/15/2013: Updated so that behaviour of outputFileName is consistent with the
         behaviour of the input file name for an ObsFile instance. (i.e., 
-        unless the path provided is absolute, $MKID_DATA_DIR is prepended
+        unless the path provided is absolute, $MKID_RAW_PATH is prepended
         to the file name.)
         
         11/22/2013 (actually a few days before): added startTime, and endTime to saved
         header information. Had also added expTime to saved header info some time ago....
     '''
     
-    if (os.path.isabs(outputFileName)):
-        #self.fileName = os.path.basename(fileName)
-        fullFileName = outputFileName
-    else:
-        #self.fileName = fileName
-        # make the full file name by joining the input name 
-        # to the MKID_DATA_DIR (or . if the environment variable 
-        # is not defined)
-        dataDir = os.getenv('MKID_DATA_DIR', '/')
-        fullFileName = os.path.join(dataDir, outputFileName)
+    #**** - THIS MECHANISM IS KIND OF REDUNDANT NOW, PRETTY MEANINGLESS *****
+    #Don't try and do anything fancy with interpreting the file name here any more.
+    #
+    #if (os.path.isabs(outputFileName)):
+    #    #self.fileName = os.path.basename(fileName)
+    #    fullFileName = outputFileName
+    #else:
+    #    #self.fileName = fileName
+    #    # make the full file name by joining the input name 
+    #    # to the MKID_RAW_PATH (or . if the environment variable 
+    #    # is not defined)
+    #    dataDir = os.getenv('MKID_RAW_PATH', '/')
+    #    fullFileName = os.path.join(dataDir, outputFileName)
     
+    
+    fullFileName = os.path.abspath(outputFileName)
+
     fileh = tables.openFile(fullFileName, mode='w')
     
     try:    

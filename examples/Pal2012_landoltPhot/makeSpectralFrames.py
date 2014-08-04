@@ -17,7 +17,7 @@ import matplotlib
 """
 
 def getTimeMaskFileName(obsFileName):
-    scratchDir = os.getenv('INTERM_PATH')
+    scratchDir = os.getenv('MKID_PROC_PATH')
     hotPixDir = os.path.join(scratchDir,'timeMasks')
     fileName = obsFileName.split('/')[-1]
     fileNameBase = fileName.split('_')[-1]

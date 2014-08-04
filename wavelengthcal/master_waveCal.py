@@ -36,7 +36,7 @@ class master_waveCal:
         intermDir=self.params['intermdir']
         outdir=self.params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
         if outdir is None or outdir is '':
             outdir = 'waveCalSolnFiles/'
         self.outpath=intermDir+outdir+self.drift.driftFNs[0].run+os.sep+'master_cals/'

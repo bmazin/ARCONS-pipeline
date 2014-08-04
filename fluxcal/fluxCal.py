@@ -114,7 +114,7 @@ class FluxCal:
             sys.exit(1)
 
     def getTimeMaskFileName(self, obsFileName):
-        scratchDir = os.getenv('INTERM_PATH')
+        scratchDir = os.getenv('MKID_PROC_PATH')
         hotPixDir = os.path.join(scratchDir,'timeMasks')
         fileName = obsFileName.split('/')[-1]
         fileNameBase = fileName.split('_')[-1]
@@ -336,7 +336,7 @@ class FluxCal:
         """
         Output all debugging plots of ARCONS sky and object spectra, known calibrator spectrum, and sensitivity curve
         """
-        scratchDir = os.getenv('INTERM_PATH')
+        scratchDir = os.getenv('MKID_PROC_PATH')
         fluxDir = os.path.join(scratchDir,'fluxCalSolnFiles')
         fluxCalBase = obsfile.split("/")[-1].split(".")[0]        
         plotFileName = fluxCalBase+".pdf"
@@ -394,7 +394,7 @@ class FluxCal:
         if os.path.isabs(fluxCalFileName) == True:
             fullFluxCalFileName = fluxCalFileName
         else:
-            scratchDir = os.getenv('INTERM_PATH')
+            scratchDir = os.getenv('MKID_PROC_PATH')
             fluxDir = os.path.join(scratchDir,'fluxCalSolnFiles')
             fullFluxCalFileName = os.path.join(fluxDir,fluxCalFileName)
 

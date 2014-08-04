@@ -37,7 +37,7 @@ def getCalFileNames(paramFile):
         intermDir=params['intermdir']
         outdir=params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
         if outdir is None or outdir is '':
             outdir = 'waveCalSolnFiles/'
         path=intermDir+outdir+run+os.sep+sunsetDate+os.sep
@@ -53,7 +53,7 @@ class waveCal_diagnostic():
         intermDir=params['intermdir']
         outdir=params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
         if outdir is None or outdir is '':
             outdir = 'waveCalSolnFiles/'
         path=intermDir+outdir+calFN.run+os.sep+calFN.date+os.sep

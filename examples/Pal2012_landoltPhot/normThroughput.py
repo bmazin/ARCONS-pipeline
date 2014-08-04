@@ -105,7 +105,7 @@ fluxCalFileName = "fluxsol_ones.h5"
 if os.path.isabs(fluxCalFileName) == True:
     fullFluxCalFileName = fluxCalFileName
 else:
-    scratchDir = os.getenv('INTERM_PATH')
+    scratchDir = os.getenv('MKID_PROC_PATH')
     fluxDir = os.path.join(scratchDir,'fluxCalSolnFiles')
     fullFluxCalFileName = os.path.join(fluxDir,fluxCalFileName)
 

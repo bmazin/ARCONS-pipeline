@@ -27,7 +27,7 @@ def listFiles():
     table = h5file.createTable(group, "location", Location, "Locations")
     row = table.row
 
-    dataDir = os.getenv('MKID_DATA_DIR','.')
+    dataDir = os.getenv('MKID_RAW_PATH','.')
     print "listFiles in dataDir=",dataDir
     files = os.listdir(dataDir)
     print "number of files found:",len(files)

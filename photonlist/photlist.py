@@ -267,7 +267,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
 def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, 
                     doIndex=True, pixRemapFileName=None):
     """
-    writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+    writes out the photon list for this obs file at $MKID_PROC_PATH/photonListFileName
     currently cuts out photons outside the valid wavelength ranges from the wavecal
    
     Currently being updated... JvE 4/26/2013.
