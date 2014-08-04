@@ -114,33 +114,18 @@ class PopUp(QMainWindow):
         self.axes.errorbar(self.parent.drift.timeArray,self.parent.drift.IR_xOffset[i,j,:],yerr=self.parent.drift.IR_sigma[i,j,:],fmt='ko', markersize=2., capsize=0, elinewidth=0.4, ecolor='k')
         self.axes.set_ylabel("Peak Location [phase]")
         self.axes.set_xlabel("Date [s]")
+
+
+
+        master_time_extent = (self.parent.drift.master_end_time - self.parent.drift.master_start_time)/2.0
+        master_midtime = self.parent.drift.master_start_time+master_time_extent
+        self.axes.errorbar(master_midtime,self.parent.drift.master_blue[i,j,:], xerr = master_time_extent,fmt='go')
+        self.axes.errorbar(master_midtime,self.parent.drift.master_red[i,j,:], xerr = master_time_extent,fmt='go')
+        self.axes.errorbar(master_midtime,self.parent.drift.master_IR[i,j,:], xerr = master_time_extent,fmt='go',markersize=5.)
+
+        #print master_midtime,self.parent.drift.master_blue[i,j,:]
+
         cid = self.fig.canvas.mpl_connect('button_press_event', self.clickCanvas_x_offset)
-
-
-        #print self.parent.drift.parab_const[i,j,:]
-        #print self.parent.drift.parab_lin[i,j,:]
-        #print self.parent.drift.parab_quad[i,j,:]
-        good_ind = np.where( ( (np.asarray(self.parent.drift.parab_const[i,j,:]) != -1.0) * ((self.parent.drift.parab_lin[i,j,:]) != -1.0) * (np.asarray(self.parent.drift.parab_quad[i,j,:]) != -1.0) ) > 0)[0]
-        #print 'good ind: '+str(good_ind)
-        a = np.asarray(self.parent.drift.parab_const[i,j,:])[good_ind]
-        b = np.asarray(self.parent.drift.parab_lin[i,j,:])[good_ind]
-        c = np.asarray(self.parent.drift.parab_quad[i,j,:])[good_ind]
-
-        blue = self.parent.drift.params['h'] * self.parent.drift.params['c'] / (self.parent.drift.params['ang2m'] * self.parent.drift.params['bluelambda'])
-        cal_blue_x_offset = (blue-a)/b
-        cal_blue_x_offset[np.where(c!=0)] = (-b[np.where(c!=0)] - np.sqrt(b[np.where(c!=0)]**2-4*c[np.where(c!=0)]*(a[np.where(c!=0)]-blue)))/(2*c[np.where(c!=0)])
-        #self.axes.plot(np.asarray(self.parent.drift.timeArray)[good_ind], cal_blue_x_offset, 'go')
-
-        red = self.parent.drift.params['h'] * self.parent.drift.params['c'] / (self.parent.drift.params['ang2m'] * self.parent.drift.params['redlambda'])
-        cal_red_x_offset = (red-a)/b
-        cal_red_x_offset[np.where(c!=0)] = (-b[np.where(c!=0)] - np.sqrt(b[np.where(c!=0)]**2-4*c[np.where(c!=0)]*(a[np.where(c!=0)]-red)))/(2*c[np.where(c!=0)])
-        #self.axes.plot(np.asarray(self.parent.drift.timeArray)[good_ind], cal_red_x_offset, 'go')
-
-        ir = self.parent.drift.params['h'] * self.parent.drift.params['c'] / (self.parent.drift.params['ang2m'] * self.parent.drift.params['irlambda'])
-        cal_ir_x_offset = (ir-a)/b
-        cal_ir_x_offset[np.where(c!=0)] = (-b[np.where(c!=0)] - np.sqrt(b[np.where(c!=0)]**2-4*c[np.where(c!=0)]*(a[np.where(c!=0)]-ir)))/(2*c[np.where(c!=0)])
-        #self.axes.plot(np.asarray(self.parent.drift.timeArray)[good_ind], cal_ir_x_offset, 'go')
-
         print "\tDone."
 
     def plot_polyfit(self,i,j):
@@ -188,6 +173,12 @@ class PopUp(QMainWindow):
                 self.axes.errorbar([self.parent.drift.blue_xOffset[i,j,k], self.parent.drift.red_xOffset[i,j,k]],energies[:-1],xerr=[self.parent.drift.blue_sigma[i,j,k],self.parent.drift.red_sigma[i,j,k]],fmt='o',markersize=7)
             else:
                 self.axes.errorbar([self.parent.drift.blue_xOffset[i,j,k], self.parent.drift.red_xOffset[i,j,k],self.parent.drift.IR_xOffset[i,j,k]],energies,xerr=[self.parent.drift.blue_sigma[i,j,k],self.parent.drift.red_sigma[i,j,k],self.parent.drift.IR_sigma[i,j,k]],fmt='o',markersize=7)
+
+        for k in range(len(self.parent.drift.masterFNs)):
+            parab_x = 1.0*np.asarray(range(0,-1000,-1))
+            fit_params = [self.parent.drift.master_parab_const[i,j,k],self.parent.drift.master_parab_lin[i,j,k],self.parent.drift.master_parab_quad[i,j,k]]
+            parab_y = (parabola(p=fit_params,x=parab_x,return_models=True))[0]
+            self.axes.plot(parab_x,parab_y,'r-')
 
         self.axes.set_xlabel('phase')
         self.axes.set_ylabel('Energy (eV)')
@@ -378,10 +369,13 @@ if __name__ == "__main__":
     paramFile = sys.argv[1]
     calFNs, params = getDriftFileNames(paramFile)
 
-    drift = drift_ana(calFNs,params,save=False)
+    drift = drift_ana(calFNs,params)
     drift.populate_peak_data()
     drift.populate_cal_data()
     drift.make_numSols_array()
+    drift.populate_master_peak_data()
+    drift.populate_master_cal_data()
+    drift.populate_master_times_data()
 
     plotArray(drift.numSols,win_title=params['run'],title='Drift Analysis:\nNumber of waveCal solutions',drift=drift)
 

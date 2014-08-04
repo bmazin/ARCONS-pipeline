@@ -26,8 +26,6 @@ Depends on ObsFile.py, FileName.py, hotPixels.py, waveCal_diagnostics.py, readDi
 see README.txt for more info
 '''
 
-
-
 #!/bin/env python
 
 import time
@@ -50,39 +48,55 @@ from fitFunctions import *
 import mpfit
 from waveCal_diagnostics import *
 
-def getCalFileNames(paramFile):
-    params = readDict(paramFile)
-    params.readFromFile(paramFile)
+def getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**kwargs):
+    """
+    Reads the parameter file with filename paramFile and then finds the correct cal_*.h5 observations in the mkidDataDir directory
+    """
+    try:
+        params = readDict(paramFile)
+        params.readFromFile(paramFile)
+    except:
+        params = paramFile
+
+    mkidDataDir=params['mkidDataDir']
+    if mkidDataDir==None:
+        mkidDataDir=os.getenv('MKID_DATA_DIR', default="/ScienceData")
+    intermDir=params['intermDir']
+    if intermDir is None:
+        intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+    outdir=params['outdir']
+    if outdir is None or outdir is '':
+        outdir = '/waveCalSolnFiles'
+    if params['filename']!=None:
+        return [FileName(obsFile = params['filename'], mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir,**kwargs)], params
 
     #Load in cal files from param file
     run = params['run']
+    if run==None:
+        raise IOError
     sunsetDate = params['sunsetDate']
     tStampList = params['calTimeStamps']
+    if getAll:
+        sunsetDate=None
     walkPath = None
-
-    #if tStampList == None:
-    #    #search for all cal files in date
-    #    mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
-    #    path = mkidDataDir + os.sep + run + os.sep + sunsetDate + os.sep
-    #    tStampList = [f.split('.')[-2].split('_')[1] for f in os.listdir(path) if f.endswith('.h5') and f.startswith('cal_')]
-
-    if sunsetDate == None:
-        walkPath=os.getenv('MKID_RAW_PATH', default="/ScienceData")+os.sep+run+os.sep
-    elif tStampList == None:
-        walkPath=os.getenv('MKID_RAW_PATH', default="/ScienceData")+os.sep+run+os.sep+sunsetDate+os.sep
-    if walkPath != None:
-        print 'Using all files from: '+walkPath
-        calFNs = []
+    if sunsetDate==None or tStampList==None:
+        if startswith=='cal_' or startswith=='obs_' or startswith=='flat_':
+            walkPath=mkidDataDir+os.sep+run
+        else:
+            walkPath=intermDir+outdir+os.sep+run
+        if not startswith.startswith('master') and sunsetDate != None:
+            walkPath+=os.sep+sunsetDate
+    if walkPath==None:
+        return [FileName(run=run, date=sunsetDate,tstamp=tStamp,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for tStamp in tStampList], params
+    else:
+        calFNs=[]
+        #print 'walking: ',walkPath
         for root,dirs,files in os.walk(walkPath):
             for f in files:
-                if f.startswith('cal_') and f.endswith('.h5'):
-                    d=(root.split(run)[-1]).split('/')[1]
-                    t=f.split('.')[-2].split('_')[1]
-                    calFNs.append(FileName(run=run, date=d,tstamp=t))
-    else:
-        calFNs = [FileName(run=run, date=sunsetDate,tstamp=tStamp) for tStamp in tStampList]
+                if f.startswith(startswith) and f.endswith(endswith) and not f.endswith('_drift'+endswith):
+                    calFNs.append(root+os.sep+f)
+        return [FileName(obsFile=fn,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for fn in calFNs], params
 
-    return calFNs, params
 
 def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,cut_off_phase=None,make_plot=False,verbose=False):
     #model=str(model)
@@ -195,7 +209,7 @@ class waveCal:
             pass
         if not os.path.exists(self.calFN.timeMask()):
             print 'Running hotpix for ',self.calFN.cal()
-            hp.findHotPixels(self.calFN.cal(),self.calFN.timeMask())
+            hp.findHotPixels(self.calFN.cal(),self.calFN.timeMask(),fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
             print "Laser cal file pixel mask saved to %s"%(self.calFN.timeMask())
         self.laserCalFile.loadHotPixCalFile(self.calFN.timeMask())
 
@@ -224,7 +238,7 @@ class waveCal:
         self.drift_perrors=[]
 
         if (not debug) and (self.save_pdf):
-            self.pp = PdfPages(self.outpath+params['figdir']+'calsol_'+calFN.tstamp+'_fits.pdf')
+            self.pp = PdfPages(self.outpath+params['figdir']+os.sep+'calsol_'+calFN.tstamp+'_fits.pdf')
             mpl.rcParams['font.size'] = 4
             self.n_plots_x = 3
             self.n_plots_y = 4
@@ -248,13 +262,15 @@ class waveCal:
         pass
 
     def setupOutDirs(self,calFN):
-        intermDir=self.params['intermdir']
+        intermDir=self.params['intermDir']
         outdir=self.params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        self.outpath=intermDir+outdir+calFN.run+os.sep+calFN.date+os.sep
+            outdir = '/waveCalSolnFiles'
+        self.outpath=intermDir+outdir+os.sep+calFN.run+os.sep+calFN.date
+
+
         try:
             os.makedirs(self.outpath)
         except:
@@ -303,7 +319,7 @@ class waveCal:
             "solnrange" : Float32Col(2),    # start and stop wavelengths for the fit in Angstroms
             "wave_flag" : UInt16Col()}      # flag to indicate if pixel is good (0), unallocated (1), dead (2), or failed during wave cal fitting (2+)   
 
-        cal_file_name = self.outpath+"calsol_" + self.calFN.tstamp + '.h5'
+        cal_file_name = self.outpath+"/calsol_" + self.calFN.tstamp + '.h5'
         try:
             waveCalFile = tables.openFile(cal_file_name,mode='w')
         except:
@@ -346,7 +362,7 @@ class waveCal:
             "gaussparams"   : Float64Col(num_params),        # parameters used to fit data
             "perrors"       : Float64Col(num_params)}        # the errors on the fits
 
-        drift_file_name = self.outpath+self.params['driftdir']+"calsol_" + self.calFN.tstamp + '_drift.h5'
+        drift_file_name = self.outpath+self.params['driftdir']+os.sep+"calsol_" + self.calFN.tstamp + '_drift.h5'
         try:
             driftCalFile = tables.openFile(drift_file_name,mode='w')
         except:
@@ -752,10 +768,16 @@ class waveCal:
         peakHeights=np.asarray(dataDict['peakHeights'])*1.0
         ## less than 'min_amp' per second average count rate
         if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
-            self.finish_pixel(i,j,failFlag=2)
-            if self.verbose:
-                print "Dead Pixel"
-            return False
+            # See if it's hot the whole time, this might be a bad hotpixel mask
+            self.laserCalFile.switchOffHotPixTimeMask()
+            dataDict=self.laserCalFile.getTimedPacketList(i,j,timeSpacingCut=self.params['danicas_cut'])
+            peakHeights=np.asarray(dataDict['peakHeights'])*1.0
+            self.laserCalFile.switchOnHotPixTimeMask()
+            if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
+                self.finish_pixel(i,j,failFlag=2)
+                if self.verbose:
+                    print "Dead Pixel"
+                return False
         baselines=np.asarray(dataDict['baselines'])*1.0
         peakHeights-=baselines
         biggest_photon = int(min(peakHeights))
@@ -1081,8 +1103,14 @@ class waveCal:
 
 if __name__ == '__main__':
     
-    paramFile = sys.argv[1]
+    try:
+        paramFile = sys.argv[1]
+    except IndexError:
+        paramFile=os.getenv('ARCONS_PARAMS_PATH', default=os.path.expanduser('~')+'/ARCONS-pipeline/params/')+'waveCal.dict'
+        #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
+        print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)
+    #calFNs, params = getCalFileNames(paramFile,wavecal='obs_',timeMaskDir='/ChargeDrift')
     for calFN in calFNs:
         print calFN.cal()
     debug=False

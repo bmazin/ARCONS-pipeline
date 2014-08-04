@@ -22,7 +22,7 @@ from util.readDict import readDict
 from util.FileName import FileName
 #from fitFunctions import *
 from utils import *
-from waveCal import fitData,print_guesses
+from waveCal import fitData,print_guesses,getCalFileNames
 from drift_diagnostics import *
 
 class master_waveCal:
@@ -30,21 +30,21 @@ class master_waveCal:
     def __init__(self,drift_object,times_to_combine_str,save_plots=True):
         self.drift = drift_object
         self.times_to_combine = [[strpdate2num("%Y%m%d-%H%M%S")(tstamp1),strpdate2num("%Y%m%d-%H%M%S")(tstamp2)] for [tstamp1,tstamp2] in times_to_combine_str]
-        self.drift.mastercalFNs, self.params = getDriftFileNames(self.drift.params,nameStart='mastercal_')
+        self.drift.mastercalFNs, self.params = getCalFileNames(self.drift.params,'mastercal_','_drift')
         self.save_plots=save_plots
 
-        intermDir=self.params['intermdir']
+        intermDir=self.params['intermDir']
         outdir=self.params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        self.outpath=intermDir+outdir+self.drift.driftFNs[0].run+os.sep+'master_cals/'
+            outdir = '/waveCalSolnFiles'
+        self.outpath=intermDir+outdir+os.sep+self.drift.driftFNs[0].run+os.sep+'master_cals'
         try:
             os.mkdir(self.outpath)
-            os.mkdir(self.outpath+'drift_study/')
+            os.mkdir(self.outpath+'/drift_study')
             if self.save_plots:
-                os.mkdir(self.outpath+'figs/')
+                os.mkdir(self.outpath+'/figs')
         except:
             pass
 
@@ -191,7 +191,7 @@ class master_waveCal:
         print "Saving nlaser plots..."
         for i in range(len(self.times_to_combine)):
             index_of_first_wavecal=np.argsort(self.drift.timeArray)[np.argmax(np.asarray(self.drift.timeArray)[np.argsort(self.drift.timeArray)] >= self.times_to_combine[i][0])]
-            pltfilename = self.outpath + 'figs/mastercal_'+self.drift.driftFNs[index_of_first_wavecal].tstamp + '_nlaserPlot.png'
+            pltfilename = self.outpath + '/figs/mastercal_'+self.drift.driftFNs[index_of_first_wavecal].tstamp + '_nlaserPlot.png'
             self.nlaser = 1.0*(self.master_blue[:,:,i] < 0.0) + 1.0*(self.master_red[:,:,i] < 0.0) +1.0*(self.master_IR[:,:,i] < 0.0)
             plotArray( self.nlaser, showMe=False, cbar=True,plotFileName=pltfilename, plotTitle='Number of Lasers for Fit')
             print '\tSaving n laser plot to: '+pltfilename
@@ -205,7 +205,7 @@ class master_waveCal:
             indices_of_wavecals = (np.where((np.asarray(self.drift.timeArray) >= self.times_to_combine[i][0]) * (np.asarray(self.drift.timeArray) <= self.times_to_combine[i][1])))[0]
             midtime= np.average([np.amax(np.asarray(self.drift.timeArray)[indices_of_wavecals]), np.amin(np.asarray(self.drift.timeArray)[indices_of_wavecals])])
             index_of_first_wavecal=np.argsort(self.drift.timeArray)[np.argmax(np.asarray(self.drift.timeArray)[np.argsort(self.drift.timeArray)] >= self.times_to_combine[i][0])]
-            pltfilename = self.outpath + 'figs/mastercal_'+self.drift.driftFNs[index_of_first_wavecal].tstamp + '_xOffsets.pdf'
+            pltfilename = self.outpath + '/figs/mastercal_'+self.drift.driftFNs[index_of_first_wavecal].tstamp + '_xOffsets.pdf'
             pp = PdfPages(pltfilename)
             mpl.rcParams['font.size'] = 4
             n_plots_x = 3
@@ -269,7 +269,7 @@ class master_waveCal:
 
             index_of_first_wavecal=np.argsort(self.drift.timeArray)[np.argmax(np.asarray(self.drift.timeArray)[np.argsort(self.drift.timeArray)] >= self.times_to_combine[i][0])]
 
-            master_cal_file_name = self.outpath+"mastercal_" + self.drift.driftFNs[index_of_first_wavecal].tstamp + '.h5'
+            master_cal_file_name = self.outpath+"/mastercal_" + self.drift.driftFNs[index_of_first_wavecal].tstamp + '.h5'
             try:
                 waveCalFile = tables.openFile(master_cal_file_name,mode='w')
             except:
@@ -322,7 +322,7 @@ class master_waveCal:
 
             index_of_first_wavecal=np.argsort(self.drift.timeArray)[np.argmax(np.asarray(self.drift.timeArray)[np.argsort(self.drift.timeArray)] >= self.times_to_combine[i][0])]
 
-            master_drift_file_name = self.outpath+"drift_study/mastercal_" + self.drift.driftFNs[index_of_first_wavecal].tstamp + '_drift.h5'
+            master_drift_file_name = self.outpath+"/drift_study/mastercal_" + self.drift.driftFNs[index_of_first_wavecal].tstamp + '_drift.h5'
 
             try:
                 driftCalFile = tables.openFile(master_drift_file_name,mode='w')
@@ -365,18 +365,40 @@ class master_waveCal:
 
 
 if __name__ == "__main__":
-    paramFile = sys.argv[1]
-    calFNs, params = getDriftFileNames(paramFile)
-    drift_object = drift_ana(calFNs,params,save=False)
+    try:
+        paramFile = sys.argv[1]
+    except IndexError:
+        paramFile=os.getenv('ARCONS_PARAMS_PATH', default=os.path.expanduser('~')+'/ARCONS-pipeline/params/')+'waveCal.dict'
+        #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
+        print "Loading parameters from: "+paramFile
+    calFNs, params = getCalFileNames(paramFile,'calsol_','_drift.h5',getAll=True)   #Automatically grabs all cal files
+    drift_object = drift_object(calFNs,params)
+    drift_object.populate_peak_data()
+
 
     #PAL2012
-    times_to_combine_str = [['20121206-030038', '20121206-124822'],
-                            ['20121207-023126', '20121207-135957'],
-                            ['20121208-024053', '20121208-031249'],
-                            ['20121208-031718', '20121208-133819'], 
-                            ['20121209-021608', '20121209-133420'], 
-                            ['20121211-020440', '20121211-135845'],
-                            ['20121212-023030', '20121212-133822']]
+    #times_to_combine_str = [['20121206-030038', '20121206-124822'],
+    #                        ['20121207-023126', '20121207-135957'],
+    #                        ['20121208-024053', '20121208-031249'],
+    #                        ['20121208-031718', '20121208-133819'], 
+    #                        ['20121209-021608', '20121209-133420'], 
+    #                        ['20121211-020440', '20121211-135845'],
+    #                        ['20121212-023030', '20121212-133822']]
+    times_to_combine_str = [['20121206-030039', '20121206-034635'],         # Dec 5
+                            ['20121206-044321', '20121206-115709'],         # Dec 5, realigned laser and retuned array
+                            ['20121207-023127', '20121207-062840'],         # Dec 6
+                            ['20121207-064749', '20121207-132325'],         # Dec 6, retuned
+                            ['20121208-024054', '20121208-031248'],         # Dec 7, optimal filters from day 1, 2
+                            ['20121208-031719', '20121208-063741'],         # Dec 7, template FIR filters
+                            ['20121208-070505', '20121208-133818'],         # Dec 7, retuned
+                            ['20121209-021609', '20121209-060704'],         # Dec 8
+                            ['20121209-062404', '20121209-131132'],         # Dec 8, retuned
+                            ['20121211-020441', '20121211-072632'],         # Dec 10
+                            ['20121211-074031', '20121211-135844'],         # Dec 10, retuned
+                            ['20121212-023031', '20121212-063518'],         # Dec 11
+                            ['20121212-065247', '20121212-133821']]         # Dec 11, retuned
+    #times_to_combine_str = [['20121206-030039', '20121212-133821']]
+
     #PAL2013
     #times_to_combine_str = [['20131209-093153','20131209-132225']]
 
@@ -384,6 +406,11 @@ if __name__ == "__main__":
     master.create_master_peak_data()
     master.create_master_cal_data()
     master.write_master()
+    drift_object.plot_laser_xOffset()
+    drift_object.plot_numSols_map()
+    #drift.populate_drift_fluctuations()
+    #drift.plot_fluct_map()
+    #drift.hist_fluct()
 
 
 
