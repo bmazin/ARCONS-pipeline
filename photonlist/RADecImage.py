@@ -294,7 +294,7 @@ class RADecImage(object):
         if savePreStackImage is not None:
             saveName = 'det-'+savePreStackImage
             print 'Making detector-frame image slice for diagnostics: '+saveName
-            detImSlice = np.histogram2d(photons['yPix'],photons['xPix'])
+            detImSlice = np.histogram2d(photons['yPix'],photons['xPix'],bins=[photList.nRow,photList.nCol])[0]  #CHECK NROW/NCOL IS THE RIGHT WAY ROUND!
             mpl.imsave(fname=saveName,arr=detImSlice,origin='lower',
                        cmap=mpl.cm.gray,vmin=np.percentile(detImSlice, 0.5), vmax=np.percentile(detImSlice,99.5))
     
@@ -442,8 +442,9 @@ class RADecImage(object):
         if savePreStackImage is not None:
             print 'Saving exp.time weighted pre-stacked image to '+savePreStackImage
             print 'cmap: ', mpl.cm.gray
-            mpl.imsave(fname=savePreStackImage,arr=thisImage/vExpTimes,origin='lower',cmap=mpl.cm.gray,
-                       vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
+            imToSave = thisImage/vExpTimes
+            mpl.imsave(fname=savePreStackImage,arr=imToSave,origin='lower',cmap=mpl.cm.gray,
+                       vmin=np.percentile(imToSave, 0.5), vmax=np.percentile(imToSave,99.5))
         
         if self.imageIsLoaded is False or doStack is False:
             self.image = thisImage           #For now, let's keep it this way.... Since weighting does odd things.
