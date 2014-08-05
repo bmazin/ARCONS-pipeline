@@ -1,11 +1,61 @@
 '''
 Author: Alex Walter                             Date: March 18, 2014
 
-This code analyzes the wavecal solutions over time using the _drift.h5 files.
-You can use it by itself but usually it is automatically called by master_waveCal.py
+The drift_object class is a wrapper for the data stored in the wavecal solution files. It also does some
+simple analysis and can make and save plots.
+
+It loads all data with its populate_* functions into an easily accesible array in memory:
+    populate_sig_range_data()           - grabs the blue peak sigma and wavelength validity range for every pixel in each wavecal sol specified
+        -->     self.sigma
+        -->     self.range_min
+        -->     self.range_max
+    populate_gaussparam_data()          - grabs the best fit parameters for the phase peak histogram for every pixel in each wavecal sol specified
+        -->     self.gauss_params
+    populate_peak_data()                - grabs the best fit parameters unpacking them into easier to access arrays. Ignores noise tail fit
+        -->     self.blue_xOffset
+        -->     self.blue_sigma
+        -->     self.red_xOffset
+        -->     self.red_sigma
+        -->     self.IR_xOffset
+        -->     self.IR_sigma
+    populate_cal_data()                 - grabs the parabola coefficients for every pixel in each wavecal sol specified
+        -->     self.parab_const
+        -->     self.parab_lin
+        -->     self.parab_quad
+    populate_master_sig_range_data()    - grabs the blue peak sigma and wavelength validity from the relevent master cal solution files
+        -->     self.master_sigma
+        -->     self.master_range_min
+        -->     self.master_range_max
+    populate_master_cal_data()          - grabs the parabola coefficiencts from the master cal solutions files
+        -->     self.master_parab_const
+        -->     self.master_parab_lin
+        -->     self.master_parab_quad
+    populate_master_peak_data()         - grabs the blue/red/IR peak locations from the master cal soln files
+        -->     self.master_blue
+        -->     self.master_red
+        -->     self.master_IR
+    populate_master_times_data()        - grabs the start and end time over which each master cal is valid
+        -->     self.master_start_time
+        -->     self.master_end_time
+        
+It also does some simple analysis and puts the result in arrays in memory:
+    populate_R_data()                   - Calculates R (@ 400nm) for every pixel in each wavecal sol specified
+        -->     self.r_blue
+    populate_drift_fluctuations()       - Calculates the fluctuations in the blue peak location for every pixel in every mastercal solution
+        -->     self.drift_fluct
+    make_numSols_array()                - Determines the number of times a pixel as a valid wavecal soln
+        -->     self.numSols
+        
+Finally, it can make/save plots:
+    plot_laser_xOffset()                - plots the blue/red/IR peak locations as a function of time
+    plot_fluct_map()                    - plots a heat map of the array showing the average fluxuations of each pixel
+    hist_fluct()                        - plots a histogram of the pixel fluxuations
+    plot_numSols_map()                  - plots a map of the array showing the number of times that pixel had a valid wavecal soln
+
 
 Input:
-    paramFile - same as wavecal parameter file
+    driftFNs - list of FileName objects of the calsol_..._drift.h5 files
+    paramFile - same as wavecal parameter file, /params/waveCal.dict
 Output:
     - Array map showing number of solutions for each pixel
     - PDF file of plots showing location of blue peak with error bars equal to sigma of blue peak for each pixel and each wavecal soln

@@ -26,8 +26,14 @@ from waveCal import fitData,print_guesses,getCalFileNames
 from drift_diagnostics import *
 
 class master_waveCal:
+    """
+        Class to combine multiple wavecals into a master wavecal
+    """
 
     def __init__(self,drift_object,times_to_combine_str,save_plots=True):
+        """
+            Creates a drift_diagnositc object to load wavecal soln data into memory. Set's up outpath
+        """
         self.drift = drift_object
         self.times_to_combine = [[strpdate2num("%Y%m%d-%H%M%S")(tstamp1),strpdate2num("%Y%m%d-%H%M%S")(tstamp2)] for [tstamp1,tstamp2] in times_to_combine_str]
         self.drift.mastercalFNs, self.params = getCalFileNames(self.drift.params,'mastercal_','_drift')
@@ -50,6 +56,9 @@ class master_waveCal:
 
 
     def create_master_peak_data(self):
+        """
+            Calculates average location of the blue/red/IR peaks for the wavecals within a master cal. 
+        """
         if not hasattr(self.drift, 'blue_xOffset'):
             self.drift.populate_peak_data()
         if not hasattr(self.drift, 'sigma'):
