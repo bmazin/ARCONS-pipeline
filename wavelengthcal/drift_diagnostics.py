@@ -29,54 +29,6 @@ from waveCal import fitData,print_guesses,getCalFileNames
 from waveCal_diagnostics import waveCal_diagnostic
 
 
-'''
-def getDriftFileNames(paramFile,nameStart='calsol_',nameEnd='_drift.h5'):
-    """
-    Reads the parameter file with filename/dictionary object paramFile and then finds the correct calsol_*_drift.h5 calibration files in the scratch directory
-    """
-    try:
-        params = readDict(paramFile)
-        params.readFromFile(paramFile)
-    except:
-        params = paramFile
-
-
-    #Load in cal files from param file
-    run = params['run']
-    sunsetDate = params['sunsetDate']
-    tStampList = params['calTimeStamps']
-    walkPath = None
-
-    if sunsetDate == None:
-        intermDir=params['intermdir']
-        outdir=params['outdir']
-        if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
-        if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        walkPath=intermDir+outdir+run+os.sep
-    elif tStampList == None:
-        intermDir=params['intermdir']
-        outdir=params['outdir']
-        if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
-        if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        walkPath=intermDir+outdir+run+os.sep+sunsetDate+os.sep
-    if walkPath != None:
-        print 'Using all files from: '+walkPath
-        calFNs = []
-        for root,dirs,files in os.walk(walkPath):
-            for f in files:
-                if f.startswith(nameStart) and f.endswith(nameEnd):
-                    d=(root.split(run)[-1]).split('/')[1]
-                    t=f.split('_')[1]
-                    calFNs.append(FileName(run=run, date=d,tstamp=t))
-    else:
-        calFNs = [FileName(run=run, date=sunsetDate,tstamp=tStamp) for tStamp in tStampList]
-    return calFNs, params
-'''
-
 class drift_object:
     def __init__(self,driftFNs,params):
 
@@ -500,7 +452,7 @@ if __name__ == '__main__':
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('ARCONS_PARAMS_PATH', default=os.path.expanduser('~')+'/ARCONS-pipeline/params/')+'waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline/')+'params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     driftFNs, params = getCalFileNames(paramFile,'calsol_','_drift.h5',getAll=True)
     
