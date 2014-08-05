@@ -9,7 +9,6 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib
-from functools import partial
 
 class PopUp(QMainWindow):
     def __init__(self, parent=None,plotFunc=None,title='',separateProcess=False, image=None,showMe=True):
@@ -52,16 +51,25 @@ class PopUp(QMainWindow):
         self.statusBar().addWidget(self.status_text, 1)
 
 
-    def plotArray(self,image,normNSigma=3,title='',**kwargs):
+    def plotArray(self,image,normNSigma=3,title='',showColorBar=True,**kwargs):
         self.image = image
-        cmap=matplotlib.cm.gnuplot2
-        cmap.set_bad('0.15')
-        self.handleMatshow = self.axes.matshow(image,cmap=cmap,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image),**kwargs)
-        self.fig.cbar = self.fig.colorbar(self.handleMatshow)
+        if not 'vmax' in kwargs:
+            goodImage = image[np.isfinite(image)]
+            kwargs['vmax'] = np.mean(goodImage)+normNSigma*np.std(goodImage)
+        if not 'cmap' in kwargs:
+            defaultCmap=matplotlib.cm.gnuplot2
+            defaultCmap.set_bad('0.15')
+            kwargs['cmap'] = defaultCmap
+        if not 'origin' in kwargs:
+            kwargs['origin'] = 'lower'
+            
+        self.handleMatshow = self.axes.matshow(image,**kwargs)
+        if showColorBar:
+            self.fig.cbar = self.fig.colorbar(self.handleMatshow)
+            cid = self.fig.canvas.mpl_connect('scroll_event', self.onscroll_cbar)
+            cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick_cbar)
         self.axes.set_title(title)
-        cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
         cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
-        cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
         self.draw()
 
     def show(self):
@@ -81,27 +89,27 @@ class PopUp(QMainWindow):
         self.status_text = QLabel("Awaiting orders.")
         self.statusBar().addWidget(self.status_text, 1)
         
-def onscroll_cbar(fig, event):
-    if event.inaxes is fig.cbar.ax:
-        increment=0.05
-        currentClim = fig.cbar.mappable.get_clim()
-        if event.button == 'up':
-            newClim = (currentClim[0],(1.+increment)*currentClim[1])
-        if event.button == 'down':
-            newClim = (currentClim[0],(1.-increment)*currentClim[1])
-        fig.cbar.mappable.set_clim(newClim)
-        fig.canvas.draw()
+    def onscroll_cbar(self, event):
+        if event.inaxes is self.fig.cbar.ax:
+            increment=0.05
+            currentClim = self.fig.cbar.mappable.get_clim()
+            if event.button == 'up':
+                newClim = (currentClim[0],(1.+increment)*currentClim[1])
+            if event.button == 'down':
+                newClim = (currentClim[0],(1.-increment)*currentClim[1])
+            self.fig.cbar.mappable.set_clim(newClim)
+            self.fig.canvas.draw()
 
-def onclick_cbar(fig,event):
-    if event.inaxes is fig.cbar.ax:
-        if event.button == 1:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
-        if event.button == 3:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],1/event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
+    def onclick_cbar(self,event):
+        if event.inaxes is self.fig.cbar.ax:
+            if event.button == 1:
+                self.fig.oldClim = self.fig.cbar.mappable.get_clim()
+                self.fig.cbar.mappable.set_clim(self.fig.oldClim[0],event.ydata*self.fig.oldClim[1])
+                self.fig.canvas.draw()
+            if event.button == 3:
+                self.fig.oldClim = self.fig.cbar.mappable.get_clim()
+                self.fig.cbar.mappable.set_clim(self.fig.oldClim[0],1/event.ydata*self.fig.oldClim[1])
+                self.fig.canvas.draw()
 
 def plotArray(*args,**kwargs):
     #Waring: Does not play well with matplotlib state machine style plotting!

@@ -71,16 +71,24 @@ class FlatCal:
 
         print len(self.obsFileNames), 'flat files to co-add'
         self.flatCalFileName = FileName(run=run,date=sunsetDate,tstamp=flatTstamp).flatSoln()
-        wvlCalFileName = FileName(run=run,date=wvlSunsetDate,tstamp=wvlTimestamp).calSoln()
+        if wvlSunsetDate != '':
+            wvlCalFileName = FileName(run=run,date=wvlSunsetDate,tstamp=wvlTimestamp).calSoln()
         for iObs,obs in enumerate(self.obsList):
-           obs.loadWvlCalFile(wvlCalFileName)
-           obs.loadTimeAdjustmentFile(timeAdjustFileName)
-           timeMaskFileName = timeMaskFileNames[iObs]
-           if not os.path.exists(timeMaskFileName):
+            if wvlSunsetDate != '':
+                obs.loadWvlCalFile(wvlCalFileName)
+            else:
+                obs.loadBestWvlCalFile()
+            obs.loadTimeAdjustmentFile(timeAdjustFileName)
+            timeMaskFileName = timeMaskFileNames[iObs]
+            print timeMaskFileName
+            #Temporary step, remove old hotpix file
+            #if os.path.exists(timeMaskFileName):
+            #    os.remove(timeMaskFileName)
+            if not os.path.exists(timeMaskFileName):
                 print 'Running hotpix for ',obs
-                hp.findHotPixels(self.obsFileNames[iObs],timeMaskFileName)
+                hp.findHotPixels(self.obsFileNames[iObs],timeMaskFileName,fwhm=np.inf,useLocalStdDev=True)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
-           obs.loadHotPixCalFile(timeMaskFileName)
+            obs.loadHotPixCalFile(timeMaskFileName)
         self.wvlFlags = self.obsList[0].wvlFlagTable
 
         self.nRow = self.obsList[0].nRow
@@ -133,6 +141,7 @@ class FlatCal:
                 self.spectralCubes.append(cube)
                 self.cubeEffIntTimes.append(effIntTime3d)
         self.spectralCubes = np.array(self.spectralCubes)
+        self.cubeEffIntTimes = np.array(self.cubeEffIntTimes)
         self.countCubes = self.cubeEffIntTimes * self.spectralCubes
 
     def checkCountRates(self):
@@ -421,7 +430,7 @@ class FlatCal:
             spectrum = spectra2d[:,iWvl]
             goodSpectrum = spectrum[spectrum != 0]#dead pixels need to be taken out before calculating medians
             wvlAverages[iWvl] = np.median(goodSpectrum)
-        np.savez(npzFileName,median=wvlAverages,averageSpectra=np.array(self.averageSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data),deltaWeights=np.array(self.deltaFlatWeights.data),mask=self.flatFlags,totalFrame=self.totalFrame,totalCube=self.totalCube)
+        np.savez(npzFileName,median=wvlAverages,averageSpectra=np.array(self.averageSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data),deltaWeights=np.array(self.deltaFlatWeights.data),mask=self.flatFlags,totalFrame=self.totalFrame,totalCube=self.totalCube,spectralCubes=self.spectralCubes,countCubes=self.countCubes,cubeEffIntTimes=self.cubeEffIntTimes )
 
 
 if __name__ == '__main__':
