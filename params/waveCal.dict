@@ -3,16 +3,18 @@
 run = 'PAL2012'
 sunsetDate = None                       # if None then do all dates and all files for run
 calTimeStamps = None                    # if None then do all files in directory
-#sunsetDate = '20121211'
-#calTimeStamps = ['20121211-020441']
+#sunsetDate = '20131209'
+#calTimeStamps = ['20121212-133821']
 
 
-
-intermdir=None      # /Scratch/ by default
-outdir=None         # waveCalSolnFiles/ by default
-#outdir='waveCalSolnFiles/test/'
-figdir = 'figs/'
-driftdir = 'drift_study/'
+mkidDataDir=None    # /ScienceData by default
+#mkidDataDir='/Scratch/Alex'
+intermDir=None      # /Scratch by default
+outdir=None         # /waveCalSolnFiles by default
+#outdir='/waveCalSolnFiles/test'
+figdir = '/figs'
+driftdir = '/drift_study'
+filename=None
 
 
 min_count_rate=2        # per second; decides if pixel is dead
