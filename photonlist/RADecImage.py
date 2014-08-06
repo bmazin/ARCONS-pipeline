@@ -4,7 +4,7 @@ Author: Julian van Eyken                    Date: May 15 2013
 Package/class for handling of images created from photon lists that are derotated and
 mapped to sky coordinates, and stacked.
 
-(NB - NEED TO DOCUMENT OBJECT PROPERTIES)
+(NB - NEED TO COMPLETE DOCUMENTATION OF OBJECT ATTRIBUTES)
 
 '''
 
@@ -36,6 +36,24 @@ class RADecImage(object):
     should all then be importable in python using 'import boxer', 
     and this module should all then run fine (see also readme.txt
     in this directory).
+
+    OBJECT ATTRIBUTES (assume read-only unless otherwise stated!):
+    
+        .nPixRA, .nPixDec   - number of virtual pixels in RA and Dec directions
+        .cenRA, .cenDec     - RA and dec of center of virtual image grid (radians)
+        .vPlateScale        - Arcseconds per pixel for virtual image grid
+        .imageIsLoaded      - True if image data has been loaded into the object
+        
+        .image              - nPixRA x nPixDec array representing the virtual image stored
+                                (NOT weighted by exposure time!)
+        .effIntTimes        - nPixRA x nPixDec array of total effective exposure times for each 
+                                virtual image pixel (seconds)
+        .expTimeWeights     - weights to apply to .image to account for effective exposure times
+                                of each pixel. i.e., to get a fully exposure time corrected image,
+                                use .image x .expTimeWeights
+        .gridRA, .gridDec   - 1D arrays containing the virtual pixel boundaries in the RA and dec 
+                                directions.
+        .totExpTime         - Scalar, total exposure time for the current image (seconds)
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
