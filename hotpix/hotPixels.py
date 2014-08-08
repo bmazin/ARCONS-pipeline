@@ -224,7 +224,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     
     doColdFlagging = False      #Switch off cold flagging for now, 5/6/2014. Hard coded in as this is
                                 #not a user option at this point....
-    
+    #assert 1==0
     defaultPklFileName = 'badPixels.pickle'
 
     if useRawCounts is False and obsFile is None:
@@ -707,7 +707,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
     #Get the mask for each time step
     for i, eachTime in enumerate(stepStarts):
         print 'Processing time slice: ', str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
-        displayThisOne = display and (i==0 or i==len(stepStarts)-1)
+        displayThisOne = (display or diagnosticPlots) and (i==0 or i==len(stepStarts)-1)
         ds9ThisOne = ds9display and (i==0 or i==len(stepStarts)-1)
         dispToPickleThisOne = dispToPickle and (i==0 or i==len(stepStarts)-1)
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
