@@ -84,14 +84,14 @@ def main():
     run = 'PAL2012'
     obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
+
     #--------TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES----
-    obsSequences = ['9999999',
-                    '''
-                    033323
-                    ''',
-                    '9999999',
-                    '9999999']
-    #---------------------------------------------------------------
+    #obsSequences = ['9999999',
+    #                '''
+    #                033322
+    #                ''',
+    #                '9999999',
+    #                '9999999']
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']
@@ -178,8 +178,13 @@ def main():
                 
             if not os.path.exists(timeMaskFileName):
                 print 'Running hotpix for ',ob.fileName
+                #Run hot pixel detection on *calibrated* file.
+                #But don't use flux weighting, as this scales by a large amount, and throws
+                #the poisson statistics way too much. (i.e., we really need to use
+                #counts *detected* for shot noise statistics, rather than 
+                #estimated counts above the atmosphere....)
                 hp.findHotPixels(obsFile=ob,outputFileName=timeMaskFileName,
-                                 useRawCounts=False,weighted=True,fluxWeighted=True)
+                                 useRawCounts=False,weighted=True,fluxWeighted=False)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             else:
                 print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
