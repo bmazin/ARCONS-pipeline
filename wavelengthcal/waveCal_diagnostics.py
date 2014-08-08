@@ -21,53 +21,24 @@ from util.readDict import readDict
 from util.FileName import FileName
 from fitFunctions import *
 from utils import *
-
-
-
-def getCalFileNames(paramFile):
-    params = readDict(paramFile)
-    params.readFromFile(paramFile)
-
-    #Load in cal files from param file
-    run = params['run']
-    sunsetDate = params['sunsetDate']
-    tStampList = params['calTimeStamps']
-    if tStampList == None:
-        #search outpath for files
-        intermDir=params['intermdir']
-        outdir=params['outdir']
-        if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
-        if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        path=intermDir+outdir+run+os.sep+sunsetDate+os.sep
-        tStampList = [f.split('.')[0].split('_')[1] for f in os.listdir(path) if f.endswith('.h5') and f.startswith('calsol_')]
-    calFNs = [FileName(run=run, date=sunsetDate,tstamp=tStamp) for tStamp in tStampList]
-    return calFNs, params
+from waveCal import *
 
 
 class waveCal_diagnostic():
     def __init__(self,calFN,params,save=True):
         self.calFN = calFN
         self.params=params
-        intermDir=params['intermdir']
-        outdir=params['outdir']
-        if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
-        if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        path=intermDir+outdir+calFN.run+os.sep+calFN.date+os.sep
+
         self.outpath=None
         if save:
-            self.outpath=path
+            self.outpath=self.calFN.calSoln().rsplit('/',1)[0]+os.sep
         ## open cal file
-        cal_file_name = path+"calsol_" + calFN.tstamp + '.h5'
-        print 'Opening file: '+cal_file_name
-        self.calsol_file = tables.openFile(cal_file_name, mode="r")
+        print 'Opening file: '+self.calFN.calSoln()
+        self.calsol_file = tables.openFile(self.calFN.calSoln(), mode="r")
         ## open drift file
-        drift_file_name = path+params['driftdir']+'calsol_' + calFN.tstamp + '_drift.h5'
-        print 'Opening file: '+drift_file_name
-        self.drift_file = tables.openFile(drift_file_name, mode="r")
+        print 'Opening file: '+self.calFN.calDriftInfo()
+        self.drift_file = tables.openFile(self.calFN.calDriftInfo(), mode="r")
+        
 
     def __del__(self):
         """
@@ -98,16 +69,16 @@ class waveCal_diagnostic():
         self.xyrarray = np.zeros((nRows, nCols))
         self.roacharray =  np.zeros((nRows, nCols))
         self.nlaserarray =  np.zeros((nRows, nCols))
-        #blue_energy=params['h'] * params['c'] / (params['bluelambda'] * params['ang2m'])
+        blue_energy=params['h'] * params['c'] / (params['bluelambda'] * params['ang2m'])
         for k in range(len(pixSigma)):
             if pixSigma[k]>0:
                 drift_ind = np.where((drift_row==pixRow[k]) * (drift_col==pixCol[k]))[0][0]
                 peak_fit = drift_params[drift_ind]
-                blue_energy = (parabola(pix_polyfit[k],x=np.asarray([peak_fit[1]]),return_models=True))[0][0]
+                #blue_energy = (parabola(pix_polyfit[k],x=np.asarray([peak_fit[1]]),return_models=True))[0][0]
                 self.xyrarray[pixRow[k]][pixCol[k]]=blue_energy/(self.params['fwhm2sig']*pixSigma[k])
                 if peak_fit[8]>0:
                     self.nlaserarray[pixRow[k]][pixCol[k]]=3
-                else:
+                else:   #peak_fit[8]==0
                     self.nlaserarray[pixRow[k]][pixCol[k]]=2
                 if peak_fit[8]<0:
                     print "shouldn't happen"
@@ -120,7 +91,7 @@ class waveCal_diagnostic():
         if self.outpath==None:
             plotArray(self.nlaserarray, showMe=True, cbar=True,plotTitle='Number of Lasers for Fit')
         else:
-            fname=self.outpath+self.params['figdir']+'calsol_' + self.calFN.tstamp +'_nlaserPlot.png'
+            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_nlaserPlot.png'
             plotArray(self.nlaserarray, showMe=False, cbar=True, plotFileName=fname,plotTitle='Number of Lasers for Fit')
             print '\tSaving n laser plot to: '+fname
             plt.close('all')
@@ -129,7 +100,7 @@ class waveCal_diagnostic():
         if self.outpath==None:
             plotArray( self.xyrarray, showMe=True, cbar=True,plotTitle='Energy Resolution at 400nm')
         else:
-            fname=self.outpath+self.params['figdir']+'calsol_' + self.calFN.tstamp +'_arrayPlot.png'
+            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_arrayPlot.png'
             plotArray( self.xyrarray, showMe=False, cbar=True, plotFileName=fname,plotTitle='Energy Resolution at 400nm')
             print '\tSaving R array to: '+fname
             plt.close('all')
@@ -151,7 +122,7 @@ class waveCal_diagnostic():
         if self.outpath==None:
             plt.show()
         else:
-            fname=self.outpath+self.params['figdir']+'calsol_' + self.calFN.tstamp +'_R_Estimates.png'
+            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_R_Estimates.png'
             print '\tSaving R histogram to: '+fname
             plt.savefig(fname)
             plt.close('all')
@@ -281,15 +252,16 @@ class waveCal_diagnostic():
 if __name__ == '__main__':
     paramFile = sys.argv[1]
     calFNs, params = getCalFileNames(paramFile)
+    #calFNs, params = getCalFileNames(paramFile,wavecal='obs_',timeMaskDir='/ChargeDrift')
 
     for calFN in calFNs:
         try:
-            diag_obj=waveCal_diagnostic(calFN,params,save=False)
-            #diag_obj.make_R_array()
-            #diag_obj.plot_R_array()
-            #diag_obj.plot_nlaser_array()
-            #diag_obj.plot_R_hist()
-            diag_obj.plot_parabolafit_hist()
+            diag_obj=waveCal_diagnostic(calFN,params,save=True)
+            diag_obj.make_R_array()
+            diag_obj.plot_R_array()
+            diag_obj.plot_nlaser_array()
+            diag_obj.plot_R_hist()
+            #diag_obj.plot_parabolafit_hist()
             #diag_obj.plot_parameterfit_hist()
             #diag_obj.plot_sigmas()
             #diag_obj.plot_amps()
@@ -297,6 +269,7 @@ if __name__ == '__main__':
             plt.close('all')
             del diag_obj
         except:
+            raise
             pass
 
 

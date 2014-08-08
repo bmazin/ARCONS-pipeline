@@ -1,3 +1,4 @@
+#!/bin/env python
 '''
 Author: Alex Walter                         Date: March 18, 2014
 Based on Danica Marsden's earlier code
@@ -7,28 +8,50 @@ Reads in a wavelength calibration file (blue, red and IR laser light
 amplitudes for each pixel. Bad pixels are flagged.  Gaussians are fit
 to the histograms.
 
-The peaks are fit with a polynomial and that gives a phase amplitude
+The gaussian peaks are fit with a polynomial and that gives a phase amplitude
 <-> wavelength correspondance.
 
 Returns the polynomial fit parameters for each pixel, the error in
 Angstroms (the width of the Gaussian), and the start and stop wave-
 lengths, as well as the array of flagged pixels.
 
-To run inside another script:
+Also saves the guassian fit parameters in _drift files
 
-paramFile = sys.argv[1]
-wavelengthCal(paramFile)
+See main() for execution example
 
-where paramFile has the same parameters as e.g. waveCal.dict
-
-Depends on ObsFile.py, FileName.py, hotPixels.py, waveCal_diagnostics.py, readDict.py, mpfit.py, smooth.py, fitFunctions.py
+Depends on waveCal_diagnostics.py, ObsFile.py, FileName.py, hotPixels.py, readDict.py, mpfit.py, smooth.py, fitFunctions.py
+Uses waveCal.dict parameter file
 
 see README.txt for more info
+
+pixel flags:
+    0 - Success!
+    1 - Pixel not in beammap
+    2 - Dead pixel or count rate less than 'min_count_rate'
+    3 - Unable to find blue laser peak
+    4 - Fit failed on blue laser peak
+    5 - Blue peak fit has chi^2 larger than 'max_chi2_blue'
+    6 - Unable to guess parameters for blue/red/IR/noise fit
+    ====== If 3 laser peak fails, try 2 laser peak =====
+    7 - Unable to find blue/red laser peaks
+    8 - Fit failed on blue/red laser peaks
+    9 - Fit hit parameter limits
+    10 - 
+    11 -
+    12 - Fit has chi^2 larger than 'max_chi2_all'
+    13 - Parabola fit failed
+    
+    
+    
+    
+Classes:
+    waveCal(calFN,params,save_pdf=True,verbose=False,debug=False)
+Functions:
+    getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**kwargs)
+    fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,cut_off_phase=None,make_plot=False,verbose=False)
 '''
 
 
-
-#!/bin/env python
 
 import time
 import sys, os
@@ -50,41 +73,89 @@ from fitFunctions import *
 import mpfit
 from waveCal_diagnostics import *
 
-def getCalFileNames(paramFile):
-    params = readDict(paramFile)
-    params.readFromFile(paramFile)
+def getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**kwargs):
+    """
+        Reads the parameter file with filename paramFile and then finds the correct cal_*.h5 observations in the mkidDataDir directory.
+        Use the waveCal.dict file in ARCONS-pipline/params/
+        
+        Inputs:
+            paramFile - path to waveCal.dict file (or equivelent). Alternatively, it could be the dictionary already extracted.
+            startswith - string that the cal file name starts with
+            endswith - string that the cal file name ends with
+            getAll - if True, just find all the cal files for run specified in the param file. 
+                     Otherwise, look cal files in the place(s) specified by the param file.
+            **kwargs - extra keyword arguments for FileName()
+            
+        Outputs:
+            calFNs - list of FileName objects
+            params - dictionary of parameters
+    """
+    try:
+        params = readDict(paramFile)
+        params.readFromFile(paramFile)
+    except:
+        params = paramFile
+
+    mkidDataDir=params['mkidDataDir']
+    if mkidDataDir==None:
+        mkidDataDir=os.getenv('MKID_RAW_DIR', default="/ScienceData")
+    intermDir=params['intermDir']
+    if intermDir is None:
+        intermDir = os.getenv('MKID_PROC_DIR', default="/Scratch")
+    outdir=params['outdir']
+    if outdir is None or outdir is '':
+        outdir = '/waveCalSolnFiles'
+    if params['filename']!=None:
+        return [FileName(obsFile = params['filename'], mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir,**kwargs)], params
 
     #Load in cal files from param file
     run = params['run']
+    if run==None:
+        raise IOError
     sunsetDate = params['sunsetDate']
     tStampList = params['calTimeStamps']
+    if getAll:
+        sunsetDate=None
     walkPath = None
-
-    #if tStampList == None:
-    #    #search for all cal files in date
-    #    mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
-    #    path = mkidDataDir + os.sep + run + os.sep + sunsetDate + os.sep
-    #    tStampList = [f.split('.')[-2].split('_')[1] for f in os.listdir(path) if f.endswith('.h5') and f.startswith('cal_')]
-
-    if sunsetDate == None:
-        walkPath=os.getenv('MKID_RAW_PATH', default="/ScienceData")+os.sep+run+os.sep
-    elif tStampList == None:
-        walkPath=os.getenv('MKID_RAW_PATH', default="/ScienceData")+os.sep+run+os.sep+sunsetDate+os.sep
-    if walkPath != None:
-        print 'Using all files from: '+walkPath
-        calFNs = []
+    if sunsetDate==None or tStampList==None:
+        if startswith=='cal_' or startswith=='obs_' or startswith=='flat_':
+            walkPath=mkidDataDir+os.sep+run
+        else:
+            walkPath=intermDir+outdir+os.sep+run
+        if not startswith.startswith('master') and sunsetDate != None:
+            walkPath+=os.sep+sunsetDate
+    if walkPath==None:
+        return [FileName(run=run, date=sunsetDate,tstamp=tStamp,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for tStamp in tStampList], params
+    else:
+        calFNs=[]
+        #print 'walking: ',walkPath
         for root,dirs,files in os.walk(walkPath):
             for f in files:
-                if f.startswith('cal_') and f.endswith('.h5'):
-                    d=(root.split(run)[-1]).split('/')[1]
-                    t=f.split('.')[-2].split('_')[1]
-                    calFNs.append(FileName(run=run, date=d,tstamp=t))
-    else:
-        calFNs = [FileName(run=run, date=sunsetDate,tstamp=tStamp) for tStamp in tStampList]
+                if f.startswith(startswith) and f.endswith(endswith) and not f.endswith('_drift'+endswith):
+                    calFNs.append(root+os.sep+f)
+        return [FileName(obsFile=fn,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for fn in calFNs], params
 
-    return calFNs, params
 
 def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,cut_off_phase=None,make_plot=False,verbose=False):
+    """
+        Runs mpfit.py
+        
+        Inputs:
+            xArr - X data
+            yArr - Y data
+            parameter_guess - Best guess for parameters
+            parameter_lowerlimit - Strict lower limit in parameter space
+            parameter_upperlimit - Strict upper limit in parameter space
+            model - [String] model used to fit data. Must be contained in model_list below. See /util/fitFunctions.py
+            cut_off_phase - if give, ignore data with X higher than this value
+            make_plot - If true, show a plot of the data and fit. Pauses program until you close plot
+            verbose - Show runtime comments
+            
+        Outputs:
+            parameter_fit - array of parameters for best fit
+            redchi2gauss2 - the reduced chi^2 of the fit
+            mpperr - array of errors on fit parameters
+    """
     #model=str(model)
     ##Model
     model_list = {
@@ -159,20 +230,32 @@ def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,
         plt.plot(xArr,fullModel,'r')
         plt.xlim(-600,0)
         plt.ylim(0,500)
-        if not debug:
-            plt.show()
+        #if not debug:
+        plt.show()
 
     return parameter_fit, redchi2gauss2, mpperr
 
 def print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, parameter_fit):
+    """
+        Prints a nicely formatted list of parameters:
+            lower_limit < guess < upper_limit --> best_fit
+    """
     print 'parameters -'
     for k in range(len(parameter_guess)):
         print '\t'+str(k)+': '+str(parameter_lowerlimit[k])+' < '+str(parameter_guess[k])+' < '+ str(parameter_upperlimit[k]) +' --> '+str(parameter_fit[k])
 
 class waveCal:
+    """
+        Wavelength calibration reads in a wavelength calibration file ('cal_...h5'; blue, red and IR laser 
+        light) that has a beam map solution, and makes a histogram of photon phase amplitudes for 
+        each pixel. Bad pixels are flagged.  Gaussians are fit to the histograms. If the 3 laser gaussian fit fails 
+        it tries to just fit the blue and red laser peaks instead. The peaks are fit with a polynomial and that 
+        gives a phase amplitude <-> wavelength correspondence.
+    """
+    
     def __init__(self,calFN,params,save_pdf=True,verbose=False,debug=False):
         """
-        opens cal file, prepares hot pixel mask
+        opens cal file, prepares hot pixel mask, sets up output directory, initializes variables
 
         Inputs:
             calFN - FileName object to analyze
@@ -195,7 +278,7 @@ class waveCal:
             pass
         if not os.path.exists(self.calFN.timeMask()):
             print 'Running hotpix for ',self.calFN.cal()
-            hp.findHotPixels(self.calFN.cal(),self.calFN.timeMask())
+            hp.findHotPixels(self.calFN.cal(),self.calFN.timeMask(),fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
             print "Laser cal file pixel mask saved to %s"%(self.calFN.timeMask())
         self.laserCalFile.loadHotPixCalFile(self.calFN.timeMask())
 
@@ -224,7 +307,7 @@ class waveCal:
         self.drift_perrors=[]
 
         if (not debug) and (self.save_pdf):
-            self.pp = PdfPages(self.outpath+params['figdir']+'calsol_'+calFN.tstamp+'_fits.pdf')
+            self.pp = PdfPages(self.outpath+params['figdir']+os.sep+'calsol_'+calFN.tstamp+'_fits.pdf')
             mpl.rcParams['font.size'] = 4
             self.n_plots_x = 3
             self.n_plots_y = 4
@@ -248,13 +331,18 @@ class waveCal:
         pass
 
     def setupOutDirs(self,calFN):
-        intermDir=self.params['intermdir']
+        """
+            Sets up output directory according to the parameter file
+        """
+        intermDir=self.params['intermDir']
         outdir=self.params['outdir']
         if intermDir is None or intermDir is '':
-            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")+os.sep
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         if outdir is None or outdir is '':
-            outdir = 'waveCalSolnFiles/'
-        self.outpath=intermDir+outdir+calFN.run+os.sep+calFN.date+os.sep
+            outdir = '/waveCalSolnFiles'
+        self.outpath=intermDir+outdir+os.sep+calFN.run+os.sep+calFN.date
+
+
         try:
             os.makedirs(self.outpath)
         except:
@@ -270,6 +358,19 @@ class waveCal:
 
 
     def finish_pixel(self, pixelrow,pixelcol,polyfit=[-1]*3,sigma=-1,solnrange=[-1]*2,fitparams=None,mpperr=None,failFlag=None):
+        """
+            Saves important pixel fit information in arrays so we can write it to a file later
+            
+            Input:
+                pixelrow [int] - beammap row
+                pixelcol [int] - beammap column
+                polyfit [int, int int] - parameters of parabola fit
+                sigma [int] - resolution of blue peak in eV
+                solnrange [int, int] - [min, max] range of solution validity in angstroms
+                fitparams [double, ..., ] - parameters of gaussian fits
+                mpperr [double, ..., ] - errors on parameters of gaussian fits
+                failFlag [int] - flag indicating if pixel failed
+        """
         if failFlag==None or failFlag>13:
             raise RuntimeError("Invalid failFlag!")
         if self.verbose and failFlag!=0:
@@ -292,6 +393,9 @@ class waveCal:
             self.drift_perrors.append(mpperr)
 
     def write_waveCal(self):
+        """
+            Once all the solutions have been found for the pixels you can call this function to write the result to disk
+        """
 
         WaveCalSoln_Description = {
             "roach"     : UInt16Col(),      # ROACH board number
@@ -303,7 +407,7 @@ class waveCal:
             "solnrange" : Float32Col(2),    # start and stop wavelengths for the fit in Angstroms
             "wave_flag" : UInt16Col()}      # flag to indicate if pixel is good (0), unallocated (1), dead (2), or failed during wave cal fitting (2+)   
 
-        cal_file_name = self.outpath+"calsol_" + self.calFN.tstamp + '.h5'
+        cal_file_name = self.outpath+"/calsol_" + self.calFN.tstamp + '.h5'
         try:
             waveCalFile = tables.openFile(cal_file_name,mode='w')
         except:
@@ -339,6 +443,9 @@ class waveCal:
         waveCalFile.close()
 
     def write_waveCal_drift(self):
+        """
+            Once all the solutions have been found for the pixels you can call this function to write the _drift result to disk
+        """
         num_params = len(self.drift_gaussParams[0])
         DriftObj_Description = {
             "pixelrow"      : UInt16Col(),                  # physical x location - from beam map
@@ -346,7 +453,7 @@ class waveCal:
             "gaussparams"   : Float64Col(num_params),        # parameters used to fit data
             "perrors"       : Float64Col(num_params)}        # the errors on the fits
 
-        drift_file_name = self.outpath+self.params['driftdir']+"calsol_" + self.calFN.tstamp + '_drift.h5'
+        drift_file_name = self.outpath+self.params['driftdir']+os.sep+"calsol_" + self.calFN.tstamp + '_drift.h5'
         try:
             driftCalFile = tables.openFile(drift_file_name,mode='w')
         except:
@@ -375,6 +482,27 @@ class waveCal:
         driftCalFile.close()
 
     def guessBluePeak(self,n_inbin_total,phase_bins_total):
+        """
+            Guess location of blue peak in phase histogram. First finds where channelizer trigger suddenly catches photons and 
+            estimates the energy resolution from the size of the phase noise. Next, smoothes data and finds location of peaks and valleys. 
+            The first peak surrounded by two valleys is evidently the blue laser peak. 
+            
+            Inputs:
+                n_inbin_total - total number of photons counted in each phase bin
+                phase_bins_total - A list of phase values making up the phase bins. ADC/DAC units
+                
+            Outputs:
+                bluePeak_guess - parameters for blue peak gaussian
+                bluePeak_lowerlimit - lower limit of parameters
+                bluePeak_upperlimit - upper limit of parameters
+                phase_cut_off - phase at edge of blue peak. This allows us to ignore the red/IR/noise peaks while fitting the blue peak
+                
+            Uses parameters from params dictionary:
+                min_amp - Cuts data with fewer than min_amp counts at the beginning and end of the phase height histogram
+                threshold_sigma - The number of sigmas used for photon triggering in channelizer. 
+                                  If the energy resolution is determined by the phase noise we can guess the sigma of the blue peak
+                bin_smooth - number of bins to use in the smoothing window
+        """
         last_ind_temp = np.where(n_inbin_total>self.params['min_amp'])[0][-1]
         sigma4_guess=np.abs(phase_bins_total[last_ind_temp]/(self.params['threshold_sigma']))
         #print sigma4_guess
@@ -427,6 +555,15 @@ class waveCal:
         return bluePeak_guess, bluePeak_lowerlimit, bluePeak_upperlimit, phase_bins[smallest_min_after_first_max]
 
     def check_IR_in_Noise(self,parameter_fit):
+        """
+            This function simply checks if the IR peak is less than the value of the noise tail at the IR peak location.
+            
+            Inputs:
+                parameter_fit - parameters of model
+            Output:
+                True if noise is greater than IR peak --> Probably bad fit
+                False otherwise
+        """
         IR_offset = parameter_fit[7]
         IR_amp = parameter_fit[8]
         model_list = {
@@ -448,6 +585,40 @@ class waveCal:
             return False
 
     def guessBlueRedIrPeaks(self,n_inbin,phase_bins,effIntTime,bluePeak_Fit):
+        """
+            This functions guesses the location of the blue, red, and IR peaks as well as the noise tail parameters. The blue peak
+            guess is from the best fit already done on the blue peak. The locations of the red and IR peak are can be guessed from 
+            the location of the blue peak and assuming the phase response is linear to energy. Since the phase response is not always
+            linear we also try to correct this guess by looking at peak closest to the guess. The red and IR sigmas should be about
+            the same as the blue sigma. The guess parameters for the noise tail are hard coded. They were determined by trial and error.
+            
+            Inputs:
+                n_inbin - total number of photons counted in each phase bin
+                phase_bins - A list of phase values making up the phase bins. ADC/DAC units
+                effIntTime - Currently not used
+                bluePeak_Fit - parameters for best gaussian fit of blue peak
+                
+            Outputs:
+                parameter_guess - parameters for gaussian peaks
+                parameter_lowerlimit - lower limit of parameters
+                parameter_upperlimit - upper limit of parameters
+                phase_cut_off - phase at trigger cut off. Ignores zeros at end for fit
+                
+            Uses parameters from params dictionary:
+                model_type - determines model used for noise tail. threegaussian_power works well.
+                bluelambda - wavelength of blue laser in Angstroms
+                redlambda - wavelength of red laser in Angstroms
+                irlambda - wavelength of IR laser in Angstroms
+                noise_guess_lower - Currently not used
+                noise_guess_upper - Currently not used
+                threshold_sigma - Currently not used
+                sample_rate - Currently not used
+                num_points_per_photon - Currently not used
+                noise_scale_factor - Currently not used
+                noise_fall - how fast the noise tail falls off on right. Phase in ADC/DAC units.
+                             Used to determine where triggering starts and cut off zeros on right of phase histogram.
+                
+        """
         ##Model
         model_list = {
             'parabola': parabola,
@@ -618,6 +789,21 @@ class waveCal:
 
 
     def fitparabola(self,n_inbin,phase_bins,fit_params,make_plot=False):
+        """
+            This function finds the parameters of the parabola for the wavelength solution from the best fit gaussian laser peak locations.
+            It doesn't need to be this complicated...
+            
+            Inputs:
+                n_inbin - total number of photons counted in each phase bin
+                phase_bins - A list of phase values making up the phase bins. ADC/DAC units
+                fit_params - parameters for best gaussian fits and noise tail
+                make_plot - if True, show a plot of the fit
+                
+            Outputs:
+                parameter_fit - parabola coefficients
+                soln_range - wavelengths between which the solution is valid
+                blue_sigma - sigma of blue peak in eV
+        """
         model_list = {
             'parabola': parabola,
             'gaussian': gaussian,
@@ -704,6 +890,13 @@ class waveCal:
         return parameter_fit, soln_range, blue_sigma
 
     def fitHitLimit(self,parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
+        """
+            This function just checks if the fit is railed against one of its parameter limits
+            
+            Returns:
+                True if fit has a parameter that hit its upper or lower limit --> Bad fit
+                False otherwise
+        """
         fixed_guess = (parameter_lowerlimit==parameter_upperlimit) * (parameter_lowerlimit!=np.asarray([None]*len(parameter_lowerlimit)))
         s1=np.sum((parameter_fit==parameter_lowerlimit)*(np.logical_not(fixed_guess)))
         s2=np.sum((parameter_fit==parameter_upperlimit)*(np.logical_not(fixed_guess)))
@@ -714,6 +907,9 @@ class waveCal:
             return False
 
     def findWaveLengthSoln(self):
+        """
+            Loops through each pixel to find its wavelength soln
+        """
 
         print 'Starting file ', self.calFN.cal(), ' at time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         for i in range(self.n_rows):
@@ -737,7 +933,50 @@ class waveCal:
         '''
             Finds wavelength solution for pixel i,j. Uses fit_guesses as first guess of parameters. If None, it automatically finds these
             
-            fit_guesses: [sigma_blue,x_offset_blue,amplitude_blue,sigma_red,x_offset_red,amplitude_red,sigma_IR,x_offset_IR,amplitude_IR,scale_factor_noise,x_offset_noise,amplitude_noise,phase_cutoff]
+            Inputs:
+                i - row of pixel in beammap
+                j - column of pixel
+                fit_guesses - [sigma_blue,x_offset_blue,amplitude_blue,sigma_red,x_offset_red,amplitude_red,sigma_IR,x_offset_IR,amplitude_IR,scale_factor_noise,x_offset_noise,amplitude_noise,phase_cutoff]
+                
+            Output:
+                Returns True if successful wavecal solution is found. Otherwise False
+                
+            Procedure:
+                - Load data and histogram phase
+                - guess blue peak parameters
+                - fit blue peak
+                - guess blue/red/IR/noise parameters
+                - fit blue/red/IR/noise peaks
+                    --> if failed then fit blue/red/noise peaks
+                - fit parabola
+                - save fit information to class variables
+                - plot phase histogram to pdf
+                **after each step, check if something went wrong and break out with finish_pixel() and the correct failFlag**
+                
+            failFlags:
+                0 - Success!
+                1 - Pixel not in beammap
+                2 - Dead pixel or count rate less than 'min_count_rate'
+                3 - Unable to find blue laser peak
+                4 - Fit failed on blue laser peak
+                5 - Blue peak fit has chi^2 larger than 'max_chi2_blue'
+                6 - Unable to guess parameters for blue/red/IR/noise fit
+                ====== If 3 laser peak fails, try 2 laser peak =====
+                7 - Unable to find blue/red laser peaks
+                8 - Fit failed on blue/red laser peaks
+                9 - Fit hit parameter limits
+                10 - 
+                11 -
+                12 - Fit has chi^2 larger than 'max_chi2_all'
+                13 - Parabola fit failed
+                
+            Uses parameters from params dictionary:
+                danicas_cut - Removes photons that occur this many microseconds after another one
+                min_count_rate - minimum count rate required to not be a 'dead' pixel
+                min_amp - Minimum number of photon counts used to determine where channelizer trigger starts seeing photons (or noise)
+                max_chi2_blue - bad blue peak fit if the chi^2 is greater than this
+                model_type - determines model used for noise tail. threegaussian_power works well.
+                max_chi2_all - bad peak fit if the chi^2 is greater than this
         '''
 
         if self.verbose:
@@ -752,10 +991,16 @@ class waveCal:
         peakHeights=np.asarray(dataDict['peakHeights'])*1.0
         ## less than 'min_amp' per second average count rate
         if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
-            self.finish_pixel(i,j,failFlag=2)
-            if self.verbose:
-                print "Dead Pixel"
-            return False
+            # See if it's hot the whole time, this might be a bad hotpixel mask
+            self.laserCalFile.switchOffHotPixTimeMask()
+            dataDict=self.laserCalFile.getTimedPacketList(i,j,timeSpacingCut=self.params['danicas_cut'])
+            peakHeights=np.asarray(dataDict['peakHeights'])*1.0
+            self.laserCalFile.switchOnHotPixTimeMask()
+            if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
+                self.finish_pixel(i,j,failFlag=2)
+                if self.verbose:
+                    print "Dead Pixel"
+                return False
         baselines=np.asarray(dataDict['baselines'])*1.0
         peakHeights-=baselines
         biggest_photon = int(min(peakHeights))
@@ -896,13 +1141,13 @@ class waveCal:
             #        print "Some parameters weren't varied. Fit Failed"
             #    self.finish_pixel(i,j,failFlag=10)
             #    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,10)
-            elif redchi2==None:
-                if self.verbose:
-                    print "reduced chi^2 == None. Fit Failed"
-                self.finish_pixel(i,j,failFlag=11)
-                self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,11)
-                return False
-            elif redchi2>self.params['max_chi2_all']:
+            #elif redchi2==None:
+            #    if self.verbose:
+            #        print "reduced chi^2 == None. Fit Failed"
+            #    self.finish_pixel(i,j,failFlag=11)
+            #    self.plot_pix_pdf(i,j,n_inbin,phase_bins,parameter_fit,redchi2,11)
+            #    return False
+            elif redchi2==None or redchi2>self.params['max_chi2_all']:
                 if self.verbose:
                     print "reduced chi^2 is too large: "+str(redchi2)+". Fit Failed"
                 self.finish_pixel(i,j,failFlag=12)
@@ -940,6 +1185,9 @@ class waveCal:
 
 
     def makeDiagnositcPlots(self):
+        """
+            No longer used
+        """
 
         mpl.rcParams['font.size'] = 10
         #blueSigArr=np.asarray(self.blueSig)
@@ -989,6 +1237,9 @@ class waveCal:
         plt.show()
 
     def plot_pix_pdf(self,iRow,iCol,n_inbin,phase_bins,fit_params,redchi2=None,failFlag=0):
+        """
+            Adds a pixel's phase histogram to the pdf document. Plots the fit if applicable
+        """
 
         if self.debug:
             plt.show()
@@ -1081,8 +1332,14 @@ class waveCal:
 
 if __name__ == '__main__':
     
-    paramFile = sys.argv[1]
+    try:
+        paramFile = sys.argv[1]
+    except IndexError:
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline/')+'params/waveCal.dict'
+        #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
+        print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)
+    #calFNs, params = getCalFileNames(paramFile,wavecal='obs_',timeMaskDir='/ChargeDrift')
     for calFN in calFNs:
         print calFN.cal()
     debug=False
