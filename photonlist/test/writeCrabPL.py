@@ -1,32 +1,36 @@
 #!/bin/python
 '''
--------------
 Adapted from code by Matt to write photon lists out
-for the Palomar Crab data - see notes below. May 21 2013, JvE.
--------------
+for the Palomar Crab data. May 21 2013, JvE.
 
-Author: Matt Strader        Date: March 6,2013
+Runs through a sequence of Obs Files for the Crab data, creates
+hot pixel masks (on calibrated data), runs centroiding, then
+creates calibrated photon list files.
 
-This program opens a series of observations of the crab pulsar.  It calculates
-the period, and calcluates the phase for every photon in the series of
-observations, It then plots a light curve, and a histogram of counts per period
+Currently does *not* overwrite anything that already exists.
+
+NOTE - CURRENTLY USING ILLUMINATION CORRECTION FLATS ONLY, 
+INSTEAD OF FULL FLAT SOLUTIONS. 8/8/2014, JvE.
 '''
+
+import os
+import numpy as np
+import datetime
+#import tables
+#import ephem
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import hotpix.hotPixels as hp
+import astrometry.CentroidCalc as cc
 from util.ObsFile import ObsFile
 from util.FileName import FileName
 from util.popup import PopUp
-import matplotlib.pyplot as plt
-import numpy as np
-import datetime
-import tables
-import ephem
-import matplotlib
-import matplotlib.cm as cm
-import matplotlib.pylab as mpl
-import os
-import hotpix.hotPixels as hp
-import astrometry.CentroidCalc as cc
+from util.test import loadTestObsFile as ltof
 
-def main():
+def main(testRun=False):
+
+    #INPUTS:
+    #    - testRun :    If True, run only a single exposure.
 
     #Try remapping the pixels - set to None to not do this....
     pixRemapFileName = FileName(run='PAL2012').pixRemap()
@@ -84,14 +88,15 @@ def main():
     run = 'PAL2012'
     obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
-    #--------TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES----
-    obsSequences = ['9999999',
-                    '''
-                    033323
-                    ''',
-                    '9999999',
-                    '9999999']
-    #---------------------------------------------------------------
+    #If test run is requested, override and just run one test exposure.
+    if testRun is True:
+        obsSequences = ['9999999',
+                        '''
+                        033323
+                        ''',
+                        '9999999',
+                        '9999999']
+
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']
@@ -133,7 +138,7 @@ def main():
         wvlCalTstamp = obsUtcDate+'-'+wvlCals[iSeq]
         wvlFileNames.append(FileName(run=run,date=sunsetDate,tstamp=wvlCalTstamp).calSoln())
         fluxFileNames.append(FileName(run=run,date=fluxCalDates[iSeq],tstamp=fluxCals[iSeq]).fluxSoln())
-        flatFileNames.append(FileName(run=run,date=flatCals[iSeq],tstamp='').flatSoln())
+        flatFileNames.append(FileName(run=run,date=flatCals[iSeq]).illumSoln()) # *** CURRENTLY USES ILLUMINATION SOLUTION! ***
         centroidFileNames.append(FileName(run=run,date=sunsetDate,tstamp=ts).centroidList())
 
 
@@ -151,7 +156,7 @@ def main():
 #                 print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
 
 
-    apertureRadius = 4
+    #apertureRadius = 4
     obLists = [[ObsFile(fn)for fn in seq if os.path.exists(fn)] for seq in obsFileNames]
     tstampFormat = '%H:%M:%S'
     #print 'fileName','headerUnix','headerUTC','logUnix','packetReceivedUnixTime'
@@ -179,11 +184,11 @@ def main():
             if not os.path.exists(timeMaskFileName):
                 print 'Running hotpix for ',ob.fileName
                 hp.findHotPixels(obsFile=ob,outputFileName=timeMaskFileName,
-                                 useRawCounts=False,weighted=True,fluxWeighted=True)
+                                 useRawCounts=False,weighted=True,fluxWeighted=True,
+                                 diagnosticPlots=True,startTime=0,endTime=1)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             else:
                 print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
-                
             if not os.path.exists(centroidFileName):
                 ob.loadHotPixCalFile(timeMaskFileName)
                 print 'Running CentroidCalc for ',ob.fileName
