@@ -192,7 +192,7 @@ def convertHexToDeg(ra, dec):
    return(hh*15.+mm/4.+ss/240., sign*(deg+(arcmin*5./3.+arcsec*5./180.)/100.) )
 
 
-def ds9Array(xyarray, colormap='B', normMin=None, normMax=None,
+def ds9Array(xyarray, colormap='heat', normMin=None, normMax=None,
              sigma=None, scale=None,
              #pixelsToMark=[], pixelMarkColor='red',
              frame=None):
@@ -232,7 +232,7 @@ def ds9Array(xyarray, colormap='B', normMin=None, normMax=None,
     ## Not yet implemented: pixelMarkColor is the color to fill in marked pixels
     
     frame - to specify which DS9 frame number the array should be displayed in.
-             Default is None. 
+             Default is None (current frame). 
     
     """
     if sigma != None:

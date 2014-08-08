@@ -98,7 +98,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
                 else:
                     virtualImage.display(pclip=0.1)
                     medComImage = None
-                        
+            show()            
         else:
             print 'File doesn''t exist: ',eachFile
     
