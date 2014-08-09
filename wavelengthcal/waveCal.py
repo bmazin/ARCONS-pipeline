@@ -1280,7 +1280,7 @@ if __name__ == '__main__':
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline/')+'params/waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline')+'/params/waveCal.dict'
         #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)

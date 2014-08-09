@@ -377,7 +377,7 @@ if __name__ == "__main__":
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline/')+'params/waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'/params/waveCal.dict'
         #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile,'calsol_','_drift.h5',getAll=True)   #Automatically grabs all cal files
@@ -405,7 +405,8 @@ if __name__ == "__main__":
                             ['20121211-020441', '20121211-072632'],         # Dec 10
                             ['20121211-074031', '20121211-135844'],         # Dec 10, retuned
                             ['20121212-023031', '20121212-063518'],         # Dec 11
-                            ['20121212-065247', '20121212-133821']]         # Dec 11, retuned
+                            ['20121212-065247', '20121212-091828'],         # Dec 11, retuned
+                            ['20121212-102334', '20121212-133821']]         # Dec 11, possibly retuned???
     #times_to_combine_str = [['20121206-030039', '20121212-133821']]
 
     #PAL2013
@@ -417,6 +418,8 @@ if __name__ == "__main__":
     master.write_master()
     drift_object.plot_laser_xOffset()
     drift_object.plot_numSols_map()
+    drift.populate_drift_fluctuations()
+    drift_object.hist_fluct(save=True)
     #drift.populate_drift_fluctuations()
     #drift.plot_fluct_map()
     #drift.hist_fluct()
