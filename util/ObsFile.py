@@ -342,11 +342,12 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False, getRawCount=False, fignum=None):
+                   scaleByEffInt=False, getRawCount=False, fignum=None, ds9=False):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
+        If fluxWeighted is True, apply flux cal weights.
         if scaleByEffInt is True, then counts are scaled by effective exposure
         time on a per-pixel basis.
         nSdevMax - max end of stretch scale for display, in # sigmas above the mean.
@@ -355,10 +356,14 @@ class ObsFile:
         file need be loaded).
         fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
                  specify target window number).
+        ds9 - boolean, if True, display in DS9 instead of regular plot window.
         """
         secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
                                          getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
-        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
+        if ds9 is True:
+            utils.ds9Array(secImg)
+        else:
+            utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
                         plotTitle=plotTitle, fignum=fignum)
 
             
@@ -445,6 +450,10 @@ class ObsFile:
         #    
         #else:
         
+        #************TEST********
+        #dither = False
+        #*************************
+        
         x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         timestamps, parabolaPeaks, baselines, effIntTime = \
             x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
@@ -487,7 +496,7 @@ class ObsFile:
             
     
     def getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,
-                      weighted=False, fluxWeighted=False, getRawCount=False):
+                      weighted=False, fluxWeighted=False, getRawCount=False, timeSpacingCut=None):
         """
         returns the number of photons received in a given pixel from firstSec to firstSec + integrationTime
         - if integrationTime is -1, all time after firstSec is used.  
@@ -511,7 +520,7 @@ class ObsFile:
         """
         
         if getRawCount is True:
-            x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
+            x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime, timeSpacingCut=timeSpacingCut)
             #x2 = self.getTimedPacketList_old(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
             #assert np.array_equal(x['timestamps'],x2['timestamps'])
             #assert np.array_equal(x['effIntTime'],x2['effIntTime'])
@@ -522,7 +531,7 @@ class ObsFile:
             return {'counts':counts, 'effIntTime':effIntTime}
 
         else:
-            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted)
+            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted, timeSpacingCut=timeSpacingCut)
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 

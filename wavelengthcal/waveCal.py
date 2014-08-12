@@ -83,7 +83,7 @@ def getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**k
             startswith - string that the cal file name starts with
             endswith - string that the cal file name ends with
             getAll - if True, just find all the cal files for run specified in the param file. 
-                     Otherwise, look cal files in the place(s) specified by the param file.
+                     Otherwise, look for cal files in the place(s) specified by the param file.
             **kwargs - extra keyword arguments for FileName()
             
         Outputs:
@@ -1181,61 +1181,6 @@ class waveCal:
 
 
 
-
-
-
-    def makeDiagnositcPlots(self):
-        """
-            No longer used
-        """
-
-        mpl.rcParams['font.size'] = 10
-        #blueSigArr=np.asarray(self.blueSig)
-        #noiseSigArr=np.asarray(self.noiseSig)
-        sensArr=np.asarray(self.sensitivity)
-        cutoffArr=np.asarray(self.noisecutoff)
-        deltanoiseArr=np.asarray(self.deltaNoise)
-        
-        plt.figure()
-        plt.plot(sensArr,cutoffArr,'.b')
-        plt.xlabel("sensitivity (location of blue peak)")
-        plt.ylabel("phase cutoff")
-
-        plt.figure()
-        plt.plot(sensArr,deltanoiseArr,'.b')
-        plt.xlabel("sensitivity (location of blue peak)")
-        plt.ylabel("extended fall off")
-        '''
-
-
-        plt.figure()
-        plt.plot(sensArr,blueSigArr,'.b',label="blue sigma")
-        plt.plot(sensArr,noiseSigArr,'.r',label="noise sigma")
-        plt.xlabel("sensitivity (location of blue peak)")
-        plt.ylabel("Sigma")
-        plt.legend()
-        
-        plt.figure()
-        plt.plot(sensArr,blueSigArr/noiseSigArr,'.',label="blue/noise sigma ratio")
-        plt.xlabel("sensitivity (location of blue peak)")
-        plt.ylabel("Sigma ratio")
-        plt.legend()
-
-        plt.figure()
-        plt.plot(blueSigArr,noiseSigArr,'.r',label="noise Sig")
-        plt.plot(blueSigArr,blueSigArr,'-k',label="1")
-        plt.xlabel("blue sigma")
-        plt.ylabel("noise sigma")
-        plt.legend()
-
-        plt.figure()
-        plt.plot(sensArr,sensArr/blueSigArr,'.b')
-        plt.xlabel("sensitivity (location of blue peak)")
-        plt.ylabel("R (location of blue peak / sigma blue peak)")
-        '''
-
-        plt.show()
-
     def plot_pix_pdf(self,iRow,iCol,n_inbin,phase_bins,fit_params,redchi2=None,failFlag=0):
         """
             Adds a pixel's phase histogram to the pdf document. Plots the fit if applicable
@@ -1335,7 +1280,7 @@ if __name__ == '__main__':
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline/')+'params/waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline')+'/params/waveCal.dict'
         #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)

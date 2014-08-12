@@ -1,7 +1,7 @@
 import sys
 import os.path
 import numpy as np
-import matplotlib.pylab as mpl
+import matplotlib.pyplot as mpl
 from interval import interval
 import hotpix.hotPixels as hp
 from util.FileName import FileName 
