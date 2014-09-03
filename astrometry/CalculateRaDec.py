@@ -109,7 +109,7 @@ class CalculateRaDec:
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
         self.timestamp = np.array(timestamp)
         self.xPhotonPixel = np.array(xPhotonPixel)  #.astype('int')        #Don't require integer values for inputs - JvE 7/19/2013
-        self.yPhotonPixel = np.array(yPhotonPixel)  #.astype('int')
+        self.yPhotonPixel = np.array(self.nRow-yPhotonPixel)  #.astype('int')
         self.xyPhotonPixel = np.array([self.xPhotonPixel,self.yPhotonPixel])  #2 x nPhotons array of x,y pairs
 
         self.inputLength = len(self.timestamp)
@@ -144,7 +144,7 @@ class CalculateRaDec:
 
 
         # Use the centroid as the zero point for ra and dec offsets
-        self.rightAscensionOffset = -1.0*CalculateRaDec.platescale*(self.xPhotonRotated - self.centroidRotated[0][self.binNumber])
+        self.rightAscensionOffset = -CalculateRaDec.platescale*(self.xPhotonRotated - self.centroidRotated[0][self.binNumber])
         self.declinationOffset = CalculateRaDec.platescale*(self.yPhotonRotated - self.centroidRotated[1][self.binNumber])
         
         # Convert centroid positions in DD:MM:SS.S and HH:MM:SS.S format to radians.
