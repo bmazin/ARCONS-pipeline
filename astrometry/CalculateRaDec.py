@@ -144,7 +144,7 @@ class CalculateRaDec:
 
 
         # Use the centroid as the zero point for ra and dec offsets
-        self.rightAscensionOffset = -CalculateRaDec.platescale*(self.xPhotonRotated - self.centroidRotated[0][self.binNumber])
+        self.rightAscensionOffset = -1.0*CalculateRaDec.platescale*(self.xPhotonRotated - self.centroidRotated[0][self.binNumber])
         self.declinationOffset = CalculateRaDec.platescale*(self.yPhotonRotated - self.centroidRotated[1][self.binNumber])
         
         # Convert centroid positions in DD:MM:SS.S and HH:MM:SS.S format to radians.
