@@ -838,7 +838,7 @@ class RADecImage(object):
         
         hdu.writeto(fileName)
         
-    def getApertureSpectrum(self, cenRA, cenDec, nPixRA, nPixDec, radius1, radius2=None, degrees=False, error = False, offSet = False, radRA = None, radDec = None,  radius3 = None, phase = False, crab = False)                                                                         
+    def getApertureSpectrum(self, cenRA, cenDec, nPixRA, nPixDec, radius1, radius2=None, degrees=False, error = False, offSet = False, radRA = None, radDec = None,  radius3 = None, phase = False, crab = False):                                                                         
         
         '''
         Added by Neil - 9/1/14
@@ -1143,7 +1143,9 @@ class RADecImage(object):
             return spectrum, wvlBinEdges, innerAp
 
 
+    
 
+    
 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=11000):
