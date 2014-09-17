@@ -1,14 +1,15 @@
 ## Files and Dirs
 
-run = 'PAL2012'
+run = 'BOBAFETT'
 sunsetDate = None                       # if None then do all dates and all files for run
 calTimeStamps = None                    # if None then do all files in directory
-#sunsetDate = '20131209'
-#calTimeStamps = ['20121212-133821']
+#sunsetDate = '20140915'
+#calTimeStamps = ['20140915-231457']
 
 
-mkidDataDir=None    # /ScienceData by default
-#mkidDataDir='/Scratch/Alex'
+
+#mkidDataDir=None    # /ScienceData by default
+mkidDataDir='/Scratch/LABTEST'
 intermDir=None      # /Scratch by default
 outdir=None         # /waveCalSolnFiles by default
 #outdir='/waveCalSolnFiles/test'
@@ -43,7 +44,8 @@ c = 3.e8        # m/s
 ang2m = 1.e-10
 fwhm2sig = 2.35
 
-model_type = 'threegaussian_power'      # model to fit noise tail with
+#model_type = 'threegaussian_power'      # model to fit noise tail with
+model_type = 'fourgaussian'
 #noise_guess_lower = [0.0,None,0.0]
 #noise_guess_upper = [None,None,None]
 noise_guess_lower = None
