@@ -53,7 +53,7 @@ class waveCal_diagnostic():
         except:
             pass
 
-    def make_R_array(self):
+    def make_R_array(self, laser='blue'):
         pixRow=self.calsol_file.root.wavecal.calsoln.cols.pixelrow[:]
         nRows=max(pixRow)+1
         pixCol=self.calsol_file.root.wavecal.calsoln.cols.pixelcol[:]
@@ -69,19 +69,59 @@ class waveCal_diagnostic():
         self.xyrarray = np.zeros((nRows, nCols))
         self.roacharray =  np.zeros((nRows, nCols))
         self.nlaserarray =  np.zeros((nRows, nCols))
-        blue_energy=params['h'] * params['c'] / (params['bluelambda'] * params['ang2m'])
+        
+
         for k in range(len(pixSigma)):
             if pixSigma[k]>0:
                 drift_ind = np.where((drift_row==pixRow[k]) * (drift_col==pixCol[k]))[0][0]
                 peak_fit = drift_params[drift_ind]
-                #blue_energy = (parabola(pix_polyfit[k],x=np.asarray([peak_fit[1]]),return_models=True))[0][0]
-                self.xyrarray[pixRow[k]][pixCol[k]]=blue_energy/(self.params['fwhm2sig']*pixSigma[k])
+                
+                #Set up nlaserarray
                 if peak_fit[8]>0:
                     self.nlaserarray[pixRow[k]][pixCol[k]]=3
                 else:   #peak_fit[8]==0
                     self.nlaserarray[pixRow[k]][pixCol[k]]=2
                 if peak_fit[8]<0:
                     print "shouldn't happen"
+                
+                if not ((laser=='IR' or laser=='ir') and self.nlaserarray[pixRow[k]][pixCol[k]]==2):
+                    #Calculate R
+                    if laser == 'blue':
+                        wavelength = self.params['bluelambda']
+                        peak_phase = peak_fit[1]
+                        sigma = peak_fit[0]
+                    elif laser=='red':
+                        wavelength = self.params['redlambda']
+                        peak_phase = peak_fit[1]+peak_fit[4]
+                        sigma = peak_fit[3]
+                    elif laser=='IR' or laser=='ir':
+                        wavelength = self.params['irlambda']
+                        peak_phase = peak_fit[1]+peak_fit[4]+peak_fit[7]
+                        sigma = peak_fit[6]
+                    else:
+                        print str(laser)+" invalid. Only have 3 lasers implemented: 'blue', 'red', 'IR'"
+                        raise ValueError
+                    laser_energy=self.params['h'] * self.params['c'] / (wavelength * self.params['ang2m'])
+                    
+                    #Calculate sigma in energy space
+                    laser_sig_high = laser_energy - (parabola(pix_polyfit[k],x=np.asarray([peak_phase+sigma]),return_models=True))[0][0]
+                    laser_sig_low = (parabola(pix_polyfit[k],x=np.asarray([peak_phase-sigma]),return_models=True))[0][0] - laser_energy
+                    if laser_sig_high>0 and laser_sig_low>0:
+                        laser_sig = (laser_sig_high + laser_sig_low)/2.
+                        
+                        l_en = (parabola(pix_polyfit[k],x=np.asarray([peak_phase]),return_models=True))[0][0]
+                        R=laser_energy/(self.params['fwhm2sig']*laser_sig)
+                        #print laser_energy,l_en,pixSigma[k],laser_sig, sigma,R
+                        if R<0:
+                            print pixRow[k], pixCol[k]
+                            print peak_fit
+                            print pix_polyfit[k]
+                            print laser_energy,l_en,pixSigma[k],laser_sig, sigma,R
+                        
+                        self.xyrarray[pixRow[k]][pixCol[k]]=laser_energy/(self.params['fwhm2sig']*laser_sig)
+                
+                
+
             #else:
             #    self.xyrarray[pixRow[k]][pixCol[k]]=0
 
@@ -96,16 +136,36 @@ class waveCal_diagnostic():
             print '\tSaving n laser plot to: '+fname
             plt.close('all')
 
-    def plot_R_array(self):
-        if self.outpath==None:
-            plotArray( self.xyrarray, showMe=True, cbar=True,plotTitle='Energy Resolution at 400nm')
+    def plot_R_array(self,laser='blue'):
+        if laser=='blue':
+            wavelength = str(self.params['bluelambda'])
+        elif laser=='red':
+            wavelength = str(self.params['redlambda'])
+        elif laser=='IR' or laser=='ir':
+            wavelength = str(self.params['irlambda'])
         else:
-            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_arrayPlot.png'
-            plotArray( self.xyrarray, showMe=False, cbar=True, plotFileName=fname,plotTitle='Energy Resolution at 400nm')
+            print str(laser)+" invalid. Only have 3 lasers implemented: 'blue', 'red', 'IR'"
+            raise ValueError
+            
+        if self.outpath==None:
+            plotArray( self.xyrarray, showMe=True, cbar=True,plotTitle='Energy Resolution at '+wavelength+' Angstroms')
+        else:
+            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_arrayPlot_'+laser+'.png'
+            plotArray( self.xyrarray, showMe=False, cbar=True, plotFileName=fname,plotTitle='Energy Resolution at '+wavelength+' Angstroms')#,normMax=6.5)
             print '\tSaving R array to: '+fname
             plt.close('all')
 
-    def plot_R_hist(self):
+    def plot_R_hist(self,laser='blue'):
+        if laser=='blue':
+            wavelength = str(self.params['bluelambda'])
+        elif laser=='red':
+            wavelength = str(self.params['redlambda'])
+        elif laser=='IR' or laser=='ir':
+            wavelength = str(self.params['irlambda'])
+        else:
+            print str(laser)+" invalid. Only have 3 lasers implemented: 'blue', 'red', 'IR'"
+            raise ValueError
+            
         plt.figure()
         plt.subplot(111)
         colormap = mpl.cm.gist_ncar
@@ -118,11 +178,11 @@ class waveCal_diagnostic():
             plt.plot(resbins,n_res,label='roach '+str(int(k)))
         plt.legend(loc='upper left')
         plt.xlim(1.,9.)
-        plt.xlabel('Energy Resolution at 400nm')
+        plt.xlabel('Energy Resolution at '+wavelength+' Angstroms')
         if self.outpath==None:
             plt.show()
         else:
-            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_R_Estimates.png'
+            fname=self.outpath+self.params['figdir']+'/calsol_' + self.calFN.tstamp +'_R_Estimates_'+laser+'.png'
             print '\tSaving R histogram to: '+fname
             plt.savefig(fname)
             plt.close('all')
@@ -142,6 +202,52 @@ class waveCal_diagnostic():
         else:
             pass
         #plt.close('all')
+        
+    def plot_noiseEnergy_hist(self):
+        """
+        Finds the energy of the 4th gaussian fit to the noise tail
+        """
+        
+        pix_polyfit = self.calsol_file.root.wavecal.calsoln.cols.polyfit[:]
+        pixRow=self.calsol_file.root.wavecal.calsoln.cols.pixelrow[:]
+        pixCol=self.calsol_file.root.wavecal.calsoln.cols.pixelcol[:]
+        pixSigma=self.calsol_file.root.wavecal.calsoln.cols.sigma[:]
+        drift_params = self.drift_file.root.params_drift.driftparams.cols.gaussparams[:]
+        drift_row = self.drift_file.root.params_drift.driftparams.cols.pixelrow[:]    
+        drift_col = self.drift_file.root.params_drift.driftparams.cols.pixelcol[:]    
+        
+        noise_en = []
+        noise_amp = []
+        for k in range(len(pixSigma)):
+            if pixSigma[k]>0:
+                drift_ind = np.where((drift_row==pixRow[k]) * (drift_col==pixCol[k]))[0][0]
+                
+                print drift_ind
+                noise_amp.append(drift_params[drift_ind,11])
+                print drift_params[drift_ind,10]
+                en = (parabola(pix_polyfit[k],x=np.asarray([drift_params[drift_ind,10]]),return_models=True))[0][0]
+                print en
+                noise_en.append(en)
+                
+        plt.figure()
+        ax=plt.gca()
+        n_en, bin_en = np.histogram(noise_en,100)
+        bin_en = (bin_en+(bin_en[1]-bin_en[0])/2.0)[:-1]
+        ax.plot(bin_en,n_en)
+        ax.set_xlabel("Noise peak energy (eV)")
+        ax.set_ylabel("# pixels")
+        
+        plt.figure()
+        ax=plt.gca()
+        n_amp, bin_amp = np.histogram(noise_amp,100)
+        bin_amp = (bin_amp+(bin_amp[1]-bin_amp[0])/2.0)[:-1] 
+        ax.plot(bin_amp,n_amp)
+        ax.set_xlabel("Noise peak amp (photons/sec)")
+        ax.set_ylabel("# pixels")
+        
+        plt.show()
+        
+        
 
     def plot_parameterfit_hist(self):
         """
@@ -250,18 +356,25 @@ class waveCal_diagnostic():
 
 
 if __name__ == '__main__':
-    paramFile = sys.argv[1]
+    try:
+        paramFile = sys.argv[1]
+    except IndexError:
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'/params/waveCal.dict'
+        #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
+        print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)
     #calFNs, params = getCalFileNames(paramFile,wavecal='obs_',timeMaskDir='/ChargeDrift')
 
     for calFN in calFNs:
         try:
-            diag_obj=waveCal_diagnostic(calFN,params,save=True)
-            diag_obj.make_R_array()
-            diag_obj.plot_R_array()
-            diag_obj.plot_nlaser_array()
-            diag_obj.plot_R_hist()
-            #diag_obj.plot_parabolafit_hist()
+            diag_obj=waveCal_diagnostic(calFN,params,save=False)
+            diag_obj.plot_noiseEnergy_hist()
+            #laser='blue'
+            #diag_obj.make_R_array(laser=laser)
+            #diag_obj.plot_R_array(laser=laser)
+            #diag_obj.plot_nlaser_array()
+            #diag_obj.plot_R_hist(laser=laser)
+            #diag_obj.plot_parameterfit_hist()
             #diag_obj.plot_parameterfit_hist()
             #diag_obj.plot_sigmas()
             #diag_obj.plot_amps()

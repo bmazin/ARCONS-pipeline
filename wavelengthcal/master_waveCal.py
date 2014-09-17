@@ -79,6 +79,7 @@ class master_waveCal:
             indices_of_wavecals = (np.where((np.asarray(self.drift.timeArray) >= self.times_to_combine[i][0]) * (np.asarray(self.drift.timeArray) <= self.times_to_combine[i][1])))[0]
             #print indices_of_wavecals
 
+
             std_blue = np.zeros(self.drift.beammap.shape)
             std_red = np.zeros(self.drift.beammap.shape)
             std_IR = np.zeros(self.drift.beammap.shape)
@@ -386,31 +387,26 @@ if __name__ == "__main__":
 
 
     #PAL2012
-    #times_to_combine_str = [['20121206-030038', '20121206-124822'],
-    #                        ['20121207-023126', '20121207-135957'],
-    #                        ['20121208-024053', '20121208-031249'],
-    #                        ['20121208-031718', '20121208-133819'], 
-    #                        ['20121209-021608', '20121209-133420'], 
-    #                        ['20121211-020440', '20121211-135845'],
-    #                        ['20121212-023030', '20121212-133822']]
-    times_to_combine_str = [['20121206-030039', '20121206-034635'],         # Dec 5
-                            ['20121206-044321', '20121206-115709'],         # Dec 5, realigned laser and retuned array
-                            ['20121207-023127', '20121207-062840'],         # Dec 6
-                            ['20121207-064749', '20121207-132325'],         # Dec 6, retuned
-                            ['20121208-024054', '20121208-031248'],         # Dec 7, optimal filters from day 1, 2
-                            ['20121208-031719', '20121208-063741'],         # Dec 7, template FIR filters
-                            ['20121208-070505', '20121208-133818'],         # Dec 7, retuned
-                            ['20121209-021609', '20121209-060704'],         # Dec 8
-                            ['20121209-062404', '20121209-131132'],         # Dec 8, retuned
-                            ['20121211-020441', '20121211-072632'],         # Dec 10
-                            ['20121211-074031', '20121211-135844'],         # Dec 10, retuned
-                            ['20121212-023031', '20121212-063518'],         # Dec 11
-                            ['20121212-065247', '20121212-091828'],         # Dec 11, retuned
-                            ['20121212-102334', '20121212-133821']]         # Dec 11, possibly retuned???
-    #times_to_combine_str = [['20121206-030039', '20121212-133821']]
-
+    #times_to_combine_str = [['20121206-030039', '20121206-034635'],         # Dec 5
+    #                        ['20121206-044321', '20121206-115709'],         # Dec 5, realigned laser and retuned array
+    #                        ['20121207-023127', '20121207-062840'],         # Dec 6
+    #                        ['20121207-064749', '20121207-132325'],         # Dec 6, retuned
+    #                        ['20121208-024054', '20121208-031248'],         # Dec 7, optimal filters from day 1, 2
+    #                        ['20121208-031719', '20121208-063741'],         # Dec 7, template FIR filters
+    #                        ['20121208-070505', '20121208-133818'],         # Dec 7, retuned
+    #                        ['20121209-021609', '20121209-060704'],         # Dec 8
+    #                        ['20121209-062404', '20121209-131132'],         # Dec 8, retuned
+    #                        ['20121211-020441', '20121211-072632'],         # Dec 10
+    #                        ['20121211-074031', '20121211-135844'],         # Dec 10, retuned
+    #                        ['20121212-023031', '20121212-063518'],         # Dec 11
+    #                        ['20121212-065247', '20121212-091828'],         # Dec 11, retuned
+    #                        ['20121212-102334', '20121212-133821']]         # Dec 11, possibly retuned???
+    
     #PAL2013
     #times_to_combine_str = [['20131209-093153','20131209-132225']]
+    
+    #Boba Fett Lab Test
+    times_to_combine_str = [['20140914-181236','20140914-194702']]
 
     master = master_waveCal(drift_object, times_to_combine_str)
     master.create_master_peak_data()
