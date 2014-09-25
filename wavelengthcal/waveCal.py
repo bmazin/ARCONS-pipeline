@@ -219,18 +219,27 @@ def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,
         plt.figure()
         if len(xArr)<20 and len(xArr)>1:
             plt.plot(xArr,yArr,'.-')
-            xArr=np.arange(xArr[0],xArr[-1],(xArr[2]-xArr[1])/10.)
+            xArr=np.arange(xArr[0],xArr[-1],(xArr[1]-xArr[0])/10.)
         else:
             plt.plot(xArr,yArr,'-')
+            
+            
+        xArr=np.arange(-2000,500,0.1)
         modelArr=model_list[model](p=parameter_fit,x=xArr,return_models=True)
         fullModel=np.zeros(len(xArr))
         for model_part in modelArr:
             plt.plot(xArr,model_part,'g')
             fullModel = fullModel+model_part
         plt.plot(xArr,fullModel,'r')
-        plt.xlim(-600,0)
+        plt.xlim(-1200,0)
         plt.ylim(0,500)
-        #if not debug:
+        
+        
+        
+        modelArr_2=model_list[model](p=parameter_guess,x=xArr,return_models=True)
+        for model_part in modelArr_2:
+            plt.plot(xArr,model_part,'k--')
+        
         plt.show()
 
     return parameter_fit, redchi2gauss2, mpperr
@@ -271,6 +280,7 @@ class waveCal:
         self.calFN=calFN
         self.run=calFN.run
         self.laserCalFile=ObsFile(calFN.cal())
+        '''
         timeAdjustFileName=FileName(run=self.run).timeAdjustments()
         try:
             self.laserCalFile.loadTimeAdjustmentFile(timeAdjustFileName,verbose=verbose)
@@ -278,10 +288,11 @@ class waveCal:
             pass
         if not os.path.exists(self.calFN.timeMask()):
             print 'Running hotpix for ',self.calFN.cal()
-            hp.findHotPixels(self.calFN.cal(),self.calFN.timeMask(),fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
+            hp.findHotPixels(self.calFN.cal(),None,self.calFN.timeMask(),fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
             print "Laser cal file pixel mask saved to %s"%(self.calFN.timeMask())
         self.laserCalFile.loadHotPixCalFile(self.calFN.timeMask())
-
+        '''
+        #self.laserCalFile.loadBeammapFile('/Scratch/LABTEST/20140910/beammap_SCI6_B140731-Force_20140910.h5')
         if not debug:
             self.setupOutDirs(calFN)
 
@@ -564,7 +575,7 @@ class waveCal:
                 True if noise is greater than IR peak --> Probably bad fit
                 False otherwise
         """
-        IR_offset = parameter_fit[7]
+        IR_offset = parameter_fit[7]+parameter_fit[4]+parameter_fit[1]
         IR_amp = parameter_fit[8]
         model_list = {
             'parabola': parabola,
@@ -680,18 +691,43 @@ class waveCal:
             if IR_amp_2 > IR_amp_1:
                 amplitude3_guess = IR_amp_2
                 if self.verbose:
-                    print "IR peak moved left!"
-        else:
-            if amplitude1_guess > amplitude3_guess:
-                amplitude3_guess=amplitude1_guess
+                    print "IR peak moved left! "
 
-        parameter_guess = [sigma1_guess,x_offset1_guess,amplitude1_guess,sigma2_guess,x_offset2_guess,amplitude2_guess,sigma3_guess,x_offset3_guess,amplitude3_guess]
+
+        parameter_guess = [sigma1_guess,x_offset1_guess,amplitude1_guess,
+                           sigma2_guess,x_offset2_guess-x_offset1_guess,amplitude2_guess,
+                           sigma3_guess,x_offset3_guess-x_offset2_guess,amplitude3_guess]
+        #parameter_lowerlimit = [sigma1_guess*0.8,x_offset1_guess-0.5*sigma1_guess,amplitude1_guess*0.80,
+        #                        sigma2_guess*0.3, x_offset2_guess-1.2*sigma2_guess,amplitude2_guess*0.5,
+        #                        sigma3_guess*0.3, x_offset3_guess-1.0*sigma3_guess,amplitude3_guess*0.5]
         parameter_lowerlimit = [sigma1_guess*0.8,x_offset1_guess-0.5*sigma1_guess,amplitude1_guess*0.80,
-                                sigma2_guess*0.3, x_offset2_guess-1.2*sigma2_guess,amplitude2_guess*0.5,
-                                sigma3_guess*0.3, x_offset3_guess-1.0*sigma3_guess,amplitude3_guess*0.5]
-        parameter_upperlimit = [sigma1_guess*1.05,x_offset1_guess+0.5*sigma1_guess,amplitude1_guess*1.5,
-                                sigma2_guess*1.3, x_offset2_guess+1.2*sigma2_guess,amplitude2_guess*1.7,
-                                sigma3_guess*1.3, x_offset3_guess+1.2*sigma3_guess,amplitude3_guess*1.6]
+                                sigma2_guess*0.3, sigma1_guess,amplitude2_guess*0.5,
+                                sigma3_guess*0.3, sigma1_guess,amplitude3_guess*0.5]
+        parameter_upperlimit = [sigma1_guess*1.10,x_offset1_guess+0.5*sigma1_guess,amplitude1_guess*1.5,
+                                sigma2_guess*1.5, x_offset2_guess-x_offset1_guess+1.3*sigma2_guess,amplitude2_guess*1.7,
+                                sigma3_guess*1.5, x_offset3_guess-x_offset2_guess+1.3*sigma3_guess,amplitude3_guess*1.5]
+                          
+                          
+        #Fix up some amplitude guesses and limits
+        if amplitude1_guess >= amplitude2_guess:
+            amplitude2_guess = amplitude1_guess+1
+            parameter_guess[5] = amplitude2_guess
+            #parameter_lowerlimit[5] = amplitude1_guess
+            
+        if amplitude1_guess >= amplitude3_guess:
+            amplitude3_guess = amplitude1_guess+1
+            parameter_guess[8] = amplitude3_guess
+            #parameter_lowerlimit[8] = amplitude1_guess
+            
+        if parameter_lowerlimit[5] < amplitude1_guess:
+            parameter_lowerlimit[5] = amplitude1_guess
+            parameter_upperlimit[5] = np.amax([parameter_upperlimit[5],np.amax(n_inbin[0:IR_ind])])
+        if parameter_lowerlimit[8] < amplitude1_guess:
+            parameter_lowerlimit[8] = amplitude1_guess
+            parameter_upperlimit[8] = np.amax([parameter_upperlimit[8],parameter_guess[5]*2.])
+        parameter_upperlimit[8] = np.amax([parameter_upperlimit[8], np.amin([2.*parameter_upperlimit[5],np.amax(n_inbin)])])
+
+
 
         if model == None:
             return parameter_guess, parameter_lowerlimit, parameter_upperlimit
@@ -701,15 +737,27 @@ class waveCal:
             parameter_upperlimit=np.concatenate((parameter_upperlimit,self.params['noise_guess_upper']))
         else:
             ##Noise tail
-            if model=='fourgaussian':    #gaussian
-                scale_factor4_guess=np.abs(phase_bins[-1]/(self.params['threshold_sigma']))
-                x_offset4_guess=0.0
-                num_noise=effIntTime*self.params['sample_rate']-np.sum(n_inbin)*self.params['num_points_per_photon']
-                amplitude4_guess=num_noise*np.sqrt(2.0/np.pi)/scale_factor4_guess*1.0/erfc((-self.params['threshold_sigma']*scale_factor4_guess-x_offset4_guess)/(np.sqrt(2.0)*scale_factor4_guess))
+            #if model=='fourgaussian':    #gaussian
+            #    scale_factor4_guess=np.abs(phase_bins[-1]/(self.params['threshold_sigma']))
+            #    x_offset4_guess=0.0
+            #    num_noise=effIntTime*self.params['sample_rate']-np.sum(n_inbin)*self.params['num_points_per_photon']
+            #    amplitude4_guess=num_noise*np.sqrt(2.0/np.pi)/scale_factor4_guess*1.0/erfc((-self.params['threshold_sigma']*scale_factor4_guess-x_offset4_guess)/(np.sqrt(2.0)*scale_factor4_guess))
+
+            #    parameter_guess=np.concatenate((parameter_guess,[scale_factor4_guess,x_offset4_guess,amplitude4_guess]))
+            #    gauss_lower=[scale_factor4_guess*0.8,phase_bins[-1]+scale_factor4_guess,max(n_inbin)]
+            #    gauss_upper=[scale_factor4_guess*1.2,None,None]
+            #    parameter_lowerlimit=np.concatenate((parameter_lowerlimit,gauss_lower))
+            #    parameter_upperlimit=np.concatenate((parameter_upperlimit,gauss_upper))
+            if model=='fourgaussian':    #fitting 2.2um ?BB? peak as noise tail
+                scale_factor4_guess=sigma1_guess
+                x_offset4_guess=x_offset1_guess*self.params['bluelambda']/(30000.)
+                amplitude4_guess=max(n_inbin)-np.sqrt(max(n_inbin))
 
                 parameter_guess=np.concatenate((parameter_guess,[scale_factor4_guess,x_offset4_guess,amplitude4_guess]))
-                gauss_lower=[scale_factor4_guess*0.8,phase_bins[-1]+scale_factor4_guess,max(n_inbin)]
-                gauss_upper=[scale_factor4_guess*1.2,None,None]
+                #gauss_lower=[scale_factor4_guess*0.8,x_offset3_guess,max(n_inbin)-5*np.sqrt(max(n_inbin))]
+                gauss_lower=[scale_factor4_guess*0.8,x_offset3_guess,0.0]
+                gauss_upper=[2.0*scale_factor4_guess,0.0,2500.]
+                #gauss_upper=[None]*3
                 parameter_lowerlimit=np.concatenate((parameter_lowerlimit,gauss_lower))
                 parameter_upperlimit=np.concatenate((parameter_upperlimit,gauss_upper))
             elif model=='threegaussian_exp':  #exponential
@@ -818,11 +866,13 @@ class waveCal:
         wavelengths = [self.params['bluelambda'],self.params['redlambda'], self.params['irlambda']]     #Angstroms
         energies = [self.params['h'] * self.params['c'] / (x * self.params['ang2m']) for x in wavelengths]             #eV
         laser_amps=np.asarray(fit_params[[1,4,7]])
+        laser_amps[1]+=laser_amps[0]
+        laser_amps[2]+=laser_amps[1]
         #energies.append(0.)
         #laser_amps = np.concatenate((fit_params[[1,4,7]],[0.0]))
 
         # parameter_guess [constant, linear term (slope), quadratic term (perturbation to straight line)]
-        parameter_guess = [0.0,(energies[0]-energies[1])*1.0/(laser_amps[0]-laser_amps[1]), -10.**-5.]
+        parameter_guess = [0.0,(energies[0]-energies[1])*1.0/(laser_amps[0]-laser_amps[1]), -10.**-6.]
         parameter_lowerlimit=[None]*3
         parameter_upperlimit=[None]*3
         if fit_params[8]==0.0:      #No IR solution
@@ -855,9 +905,9 @@ class waveCal:
 
         try:
             if fit_params[8]!=0.0:
-                start_ind=np.argmin(np.abs(phase_bins-fit_params[7]))
+                start_ind=np.argmin(np.abs(phase_bins-laser_amps[2]))
             else:
-                start_ind=np.argmin(np.abs(phase_bins-fit_params[4]))
+                start_ind=np.argmin(np.abs(phase_bins-laser_amps[1]))
             modelArr=model_list[model](p=fit_params,x=phase_bins[start_ind:],return_models=True)
             noise_model=modelArr[-1]
             last_laser_model=modelArr[-2]
@@ -884,9 +934,13 @@ class waveCal:
         #solution range in Angstroms
         soln_range = np.asarray([lambda_fromphase[-1],lambda_fromphase[0]])
         #blue sigma in eV
-        blue_peak = (parabola(parameter_fit,x=np.asarray([fit_params[1]]),return_models=True))[0][0]
+        blue_peak = (parabola(parameter_fit,x=np.asarray([laser_amps[0]]),return_models=True))[0][0]
         blue_sigma = np.abs(blue_peak - (parabola(parameter_fit,x=np.asarray([fit_params[1]+fit_params[0]]),return_models=True))[0][0])
         #print blue_sigma
+        
+        #noise_peak = (parabola(parameter_fit,x=np.asarray([fit_params[10]]),return_models=True))[0][0]
+        #print "Noise lambda = "+str((params['h'] * params['c'] / params['ang2m'])/noise_peak)+" Angstroms"
+        
         return parameter_fit, soln_range, blue_sigma
 
     def fitHitLimit(self,parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
@@ -898,6 +952,11 @@ class waveCal:
                 False otherwise
         """
         fixed_guess = (parameter_lowerlimit==parameter_upperlimit) * (parameter_lowerlimit!=np.asarray([None]*len(parameter_lowerlimit)))
+        
+        fixed_guess[9]=1 if parameter_fit[9]==parameter_upperlimit[9] else fixed_guess[9]      #ignore upper limit of noise gauss sigma
+        fixed_guess[10]=1 if parameter_fit[10]==parameter_upperlimit[10] else fixed_guess[10]  #ignore upper limit of noise guass location
+        fixed_guess[11]=1 if parameter_fit[11]==parameter_upperlimit[11] else fixed_guess[11]  #ignore upper limit of noise gauss amplitude
+        
         s1=np.sum((parameter_fit==parameter_lowerlimit)*(np.logical_not(fixed_guess)))
         s2=np.sum((parameter_fit==parameter_upperlimit)*(np.logical_not(fixed_guess)))
         s3=np.sum((parameter_fit==parameter_guess)*(np.logical_not(fixed_guess)))
@@ -914,8 +973,8 @@ class waveCal:
         print 'Starting file ', self.calFN.cal(), ' at time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         for i in range(self.n_rows):
             for j in range(self.n_cols):
-#        for i in [12,13]:
-#            for j in range(self.n_cols):
+#        for i in [11]:
+#            for j in [16]:
 
 #        for i in [12]:
 #            for j in [15,16]:
@@ -995,7 +1054,10 @@ class waveCal:
             self.laserCalFile.switchOffHotPixTimeMask()
             dataDict=self.laserCalFile.getTimedPacketList(i,j,timeSpacingCut=self.params['danicas_cut'])
             peakHeights=np.asarray(dataDict['peakHeights'])*1.0
-            self.laserCalFile.switchOnHotPixTimeMask()
+            try:
+                self.laserCalFile.switchOnHotPixTimeMask()
+            except:
+                pass
             if dataDict['effIntTime']==0.0 or len(peakHeights)<=(dataDict['effIntTime']*self.params['min_count_rate']):
                 self.finish_pixel(i,j,failFlag=2)
                 if self.verbose:
@@ -1092,7 +1154,7 @@ class waveCal:
             if self.verbose:
                 print "reduced chi^2 is too large: "+str(redchi2)+". Now fitting without IR peak"
             try_2_peak_fit = True
-        elif parameter_fit[7]>phase_bins[-5]:
+        elif (parameter_fit[7]+parameter_fit[4]+parameter_fit[1])>phase_bins[-5]:
             if self.verbose:
                 print "IR peak location outside of phase range. Now fitting without IR peak"
             try_2_peak_fit = True
@@ -1162,6 +1224,11 @@ class waveCal:
         ## Now fit parabola to get wavelength <-> phase amplitude correspondance
         try:
             polyfit, solnrange, sigma = self.fitparabola(n_inbin,phase_bins,parameter_fit,make_plot=self.debug)
+            #if parameter_fit[9]==parameter_upperlimit[9]:
+            #    print '('+str(i)+', '+str(j)+") --> Noise railed"
+            #else:
+            #    noise_peak = (parabola(polyfit,x=np.asarray([parameter_fit[10]]),return_models=True))[0][0]
+            #    print '('+str(i)+', '+str(j)+") --> Noise lambda = "+str((params['h'] * params['c'] / params['ang2m'])/noise_peak)+" Angstroms"
         except:
             if self.verbose:
                 print "Failed while fitting wavelength cal to peaks!"
@@ -1280,7 +1347,7 @@ if __name__ == '__main__':
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline')+'/params/waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'/params/waveCal.dict'
         #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)
