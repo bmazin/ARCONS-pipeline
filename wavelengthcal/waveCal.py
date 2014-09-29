@@ -54,7 +54,7 @@ Functions:
 
 
 import time
-import sys, os
+import sys, os, warnings
 import tables
 from tables import *
 import numpy as np
@@ -106,7 +106,8 @@ def getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**k
     if outdir is None or outdir is '':
         outdir = '/waveCalSolnFiles'
     if params['filename']!=None:
-        return [FileName(obsFile = params['filename'], mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir,**kwargs)], params
+        #return [FileName(obsFile = params['filename'], mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir,**kwargs)], params
+        return [FileName(obsFile = params['filename'], mkidDataDir=mkidDataDir,intermDir=intermDir,**kwargs)], params
 
     #Load in cal files from param file
     run = params['run']
@@ -125,7 +126,8 @@ def getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**k
         if not startswith.startswith('master') and sunsetDate != None:
             walkPath+=os.sep+sunsetDate
     if walkPath==None:
-        return [FileName(run=run, date=sunsetDate,tstamp=tStamp,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for tStamp in tStampList], params
+        #return [FileName(run=run, date=sunsetDate,tstamp=tStamp,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for tStamp in tStampList], params
+        return [FileName(run=run, date=sunsetDate,tstamp=tStamp,mkidDataDir=mkidDataDir,intermDir=intermDir) for tStamp in tStampList], params
     else:
         calFNs=[]
         #print 'walking: ',walkPath
@@ -133,10 +135,11 @@ def getCalFileNames(paramFile,startswith='cal_', endswith='.h5',getAll=False,**k
             for f in files:
                 if f.startswith(startswith) and f.endswith(endswith) and not f.endswith('_drift'+endswith):
                     calFNs.append(root+os.sep+f)
-        return [FileName(obsFile=fn,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for fn in calFNs], params
+        #return [FileName(obsFile=fn,mkidDataDir=mkidDataDir,intermDir=intermDir,wavecalSolnDir=outdir) for fn in calFNs], params
+        return [FileName(obsFile=fn,mkidDataDir=mkidDataDir,intermDir=intermDir) for fn in calFNs], params
 
 
-def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,cut_off_phase=None,make_plot=False,verbose=False):
+def fitData(x_Arr,y_Arr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,cut_off_phase=None,make_plot=False,verbose=False):
     """
         Runs mpfit.py
         
@@ -182,17 +185,23 @@ def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,
         parinfo.append(par)
 
     if cut_off_phase!=None:
-        cut_off_index = np.argmin(np.abs(np.asarray(xArr)-cut_off_phase))
-        xArr=xArr[:cut_off_index]
-        yArr=yArr[:cut_off_index]
+        cut_off_index = np.argmin(np.abs(np.asarray(x_Arr)-cut_off_phase))
+        xArr=x_Arr[:cut_off_index]
+        yArr=y_Arr[:cut_off_index]
+    else:
+        xArr=x_Arr
+        yArr=y_Arr
 
     errs = np.sqrt(yArr)                         # Poisson counts 
     errs[np.where(errs == 0.)] = 1.
     fa = {'x':xArr,'y':yArr,'err':errs}
     quiet=True
 
-    #m = mpfit.mpfit(model_list[model], functkw=fa, ftol=1.e-15, xtol=1.e-20, parinfo=parinfo, maxiter=2000, quiet=quiet)
-    m = mpfit.mpfit(model_list[model], functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        #m = mpfit.mpfit(model_list[model], functkw=fa, ftol=1.e-15, xtol=1.e-20, parinfo=parinfo, maxiter=2000, quiet=quiet)
+        m = mpfit.mpfit(model_list[model], functkw=fa, parinfo=parinfo, maxiter=1000, quiet=quiet)
 
     mpp = m.params                                #The fit params
     mpperr = m.perror
@@ -217,11 +226,11 @@ def fitData(xArr,yArr,parameter_guess,parameter_lowerlimit,parameter_upperlimit,
 
     if make_plot:
         plt.figure()
-        if len(xArr)<20 and len(xArr)>1:
-            plt.plot(xArr,yArr,'.-')
-            xArr=np.arange(xArr[0],xArr[-1],(xArr[1]-xArr[0])/10.)
+        if len(x_Arr)<20 and len(x_Arr)>1:
+            plt.plot(x_Arr,y_Arr,'.-')
+            xArr=np.arange(x_Arr[0],x_Arr[-1],(x_Arr[1]-x_Arr[0])/10.)
         else:
-            plt.plot(xArr,yArr,'-')
+            plt.plot(x_Arr,y_Arr,'-')
             
             
         xArr=np.arange(-2000,500,0.1)
@@ -700,11 +709,11 @@ class waveCal:
         #parameter_lowerlimit = [sigma1_guess*0.8,x_offset1_guess-0.5*sigma1_guess,amplitude1_guess*0.80,
         #                        sigma2_guess*0.3, x_offset2_guess-1.2*sigma2_guess,amplitude2_guess*0.5,
         #                        sigma3_guess*0.3, x_offset3_guess-1.0*sigma3_guess,amplitude3_guess*0.5]
-        parameter_lowerlimit = [sigma1_guess*0.8,x_offset1_guess-0.5*sigma1_guess,amplitude1_guess*0.80,
-                                sigma2_guess*0.3, sigma1_guess,amplitude2_guess*0.5,
-                                sigma3_guess*0.3, sigma1_guess,amplitude3_guess*0.5]
-        parameter_upperlimit = [sigma1_guess*1.10,x_offset1_guess+0.5*sigma1_guess,amplitude1_guess*1.5,
-                                sigma2_guess*1.5, x_offset2_guess-x_offset1_guess+1.3*sigma2_guess,amplitude2_guess*1.7,
+        parameter_lowerlimit = [sigma1_guess*0.65,x_offset1_guess-0.5*sigma1_guess,amplitude1_guess*0.80,
+                                sigma2_guess*0.3, sigma1_guess,amplitude2_guess*0.4,
+                                sigma3_guess*0.3, sigma1_guess*0.5,amplitude3_guess*0.5]
+        parameter_upperlimit = [sigma1_guess*1.15,x_offset1_guess+0.7*sigma1_guess,amplitude1_guess*1.5,
+                                sigma2_guess*1.6, x_offset2_guess-x_offset1_guess+1.3*sigma2_guess,amplitude2_guess*1.7,
                                 sigma3_guess*1.5, x_offset3_guess-x_offset2_guess+1.3*sigma3_guess,amplitude3_guess*1.5]
                           
                           
@@ -752,10 +761,11 @@ class waveCal:
                 scale_factor4_guess=sigma1_guess
                 x_offset4_guess=x_offset1_guess*self.params['bluelambda']/(30000.)
                 amplitude4_guess=max(n_inbin)-np.sqrt(max(n_inbin))
+                amplitude4_guess=min([2499.,amplitude4_guess])
 
                 parameter_guess=np.concatenate((parameter_guess,[scale_factor4_guess,x_offset4_guess,amplitude4_guess]))
                 #gauss_lower=[scale_factor4_guess*0.8,x_offset3_guess,max(n_inbin)-5*np.sqrt(max(n_inbin))]
-                gauss_lower=[scale_factor4_guess*0.8,x_offset3_guess,0.0]
+                gauss_lower=[scale_factor4_guess*0.3,x_offset3_guess,0.0]
                 gauss_upper=[2.0*scale_factor4_guess,0.0,2500.]
                 #gauss_upper=[None]*3
                 parameter_lowerlimit=np.concatenate((parameter_lowerlimit,gauss_lower))
@@ -833,6 +843,12 @@ class waveCal:
         #print '2.5 sig threshold: '+str(-self.params['threshold_sigma']*sigma1_guess)
         #print 'cut off: '+str(phase_bins[cut_off_ind])
         cut_off_ind = len(n_inbin)-self.params['noise_fall']+np.argmax(n_inbin[-self.params['noise_fall']:])
+        try:
+            cut_off_ind = np.where(n_inbin>2.5*max([amplitude1_guess, amplitude2_guess,amplitude3_guess]))[0][0]
+            #print 'cutoff: ',phase_bins[cut_off_ind]
+        except IndexError:
+            pass
+
         return parameter_guess,parameter_lowerlimit,parameter_upperlimit, phase_bins[cut_off_ind]
 
 
@@ -974,7 +990,7 @@ class waveCal:
         for i in range(self.n_rows):
             for j in range(self.n_cols):
 #        for i in [11]:
-#            for j in [16]:
+#            for j in [25]:
 
 #        for i in [12]:
 #            for j in [15,16]:
@@ -1347,7 +1363,7 @@ if __name__ == '__main__':
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'/params/waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'params/waveCal.dict'
         #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)
