@@ -16,6 +16,7 @@ import os
 from time import time
 import sys
 import LoadImageStack
+from tables import *
 
 from PyQt4.QtGui import *
 from PyQt4.QtGui import *
@@ -24,23 +25,25 @@ from DisplayStack_gui import Ui_DisplayStack_gui
 class DisplayStack(QMainWindow):
 
     def __init__(self):
-        # 0) Start up gui
+        # Start up gui
         QWidget.__init__(self, parent=None)
         self.ui = Ui_DisplayStack_gui()
         self.ui.setupUi(self)
 
         # Initialize Variables
         self.initializeVariables()
-     
-        # Initialize run and target, load param file
-        self.chooseRun()
 
-        '''
-        # Browse wavecal button
-        self.ui.wavelengthCalibrationSolutionButton.clicked.connect(self.chooseWavelengthFile)
-        # Browse flatcal button
-        self.ui.flatCalibrationSolutionButton.clicked.connect(self.chooseFlatFile)       
-        '''
+        # Lists and buttons used for specifying run and target information.
+        # Click item in runList to select a run. Run number corresponds to array index.  Load up corresponding target list.
+        self.ui.runList.itemClicked.connect(self.selectRun)
+        # Click item in targetList to select a target.
+        self.ui.targetList.itemClicked.connect(self.selectTarget)
+        # Click button in 
+        self.ui.targetButton.clicked.connect(self.loadTarget)
+
+
+        self.ui.sunsetList.itemClicked.connect(self.createObsList)
+
 
         # Use wavelength calibration checkbox
         self.ui.wavelengthCalibrationBox.clicked.connect(self.useWaveCal)
@@ -57,73 +60,70 @@ class DisplayStack(QMainWindow):
 
 
         # Load image stack button
-        #self.ui.loadStackButton.clicked.connect(self.chooseStack)
+        self.ui.loadStackButton.clicked.connect(self.chooseStack)
 
-    # 1) Initialize Variables
+    # Initialize Variables
     def initializeVariables(self):
         # Define path names
         self.displayStackPath = '/Scratch/DisplayStack/'
         self.defaultWavelengthPath = '/Scratch/waveCalSolnFiles/'
         self.defaultFlatPath = '/Scratch/flatCalSolnFiles/'
+       
+        # Load and display list of run names from /Scratch/DisplayStack/runList.dict
+        self.loadRunData()
+        
+        # Load list of target names from /Scratch/DisplayStack/runName/runName.dict, for all runs
+        self.loadTargetData()
 
-        # Arrays with run names and buttons
-        self.runNames = ['LICK2012','PAL2012','PAL2013']
-        self.runButtons = [self.ui.lick2012Button, self.ui.pal2012Button, self.ui.pal2013Button]
 
-        # Arrays with target names and buttons
-        self.lick2012TargetNames = ['LICK2012_Object']
-        self.lick2012TargetButtons = [self.ui.lick2012ObjectButton]
-        self.pal2012TargetNames = ['SDSS_J0651', 'SDSS_J0926']
-        self.pal2012TargetButtons = [self.ui.sdss0651Button,self.ui.sdss0926Button]
-        self.pal2013TargetNames = ['PAL2013_Object']
-        self.pal2013TargetButtons = [self.ui.pal2013ObjectButton]
-        self.targetNames = [self.lick2012TargetNames, self.pal2012TargetNames, self.pal2013TargetNames]
-        self.targetButtons = [self.lick2012TargetButtons, self.pal2012TargetButtons, self.pal2013TargetButtons]
+    # Function to load list of run names. Runs on initialization.
+    def loadRunData(self):
+        # Load run data from /Scratch/DisplayStack/runList.dict
+        self.runData = readDict()
+        self.runData.read_from_file(self.displayStackPath + '/runList.dict')
+        self.runNames = np.array(self.runData['runs'])
+        # Populate runList table with run names.
+        for iRun in range(len(self.runNames)):
+            self.ui.runList.addItem(self.runNames[iRun])
 
-        # Activate run and target buttons
-        for iRun in range(len(self.runButtons)):
-            self.runButtons[iRun].clicked.connect(self.chooseRun)
-            for iTarget in range(len(self.targetButtons[iRun])):
-                self.targetButtons[iRun][iTarget].clicked.connect(self.chooseTarget)
+    # Function to load a table of target names.
+    def loadTargetData(self):
+        self.targetNames = []
+        # Cycle through runs and extract target name information from various dictionaries.
+        for iRun in range(len(self.runNames)):
+            self.targetData = readDict()
+            self.targetData.read_from_file(self.displayStackPath + self.runNames[iRun] + '/' + self.runNames[iRun] + '.dict')
+            self.iTargets = np.array(self.targetData['targets'])
+            self.targetNames.append(self.iTargets)
 
-        self.ui.sunsetList.itemClicked.connect(self.createObsList)
+    # Function to select a run and populate the target list for that particular run.
+    def selectRun(self):
+        # Clear list of target information for previously selected run.
+        self.ui.targetList.clear()
+        # Define a run number by the index of the selected run.
+        self.runNumber = self.ui.runList.row(self.ui.runList.currentItem())
+        # Populate targetList table with target names for selected run.
+        for iTarget in range(len(self.targetNames[self.runNumber])):
+            self.ui.targetList.addItem(self.targetNames[self.runNumber][iTarget])
 
-    def testFunction(self):
-        print 'test'
+    def selectTarget(self):
+        self.targetNumber = self.ui.targetList.row(self.ui.targetList.currentItem())
 
-    # 2) Choose Run
-    def chooseRun(self):
-        for iRun in range(len(self.runButtons)):
-            for iTarget in range(len(self.targetButtons[iRun])):
-                    self.targetButtons[iRun][iTarget].setVisible(False)     
-            if self.runButtons[iRun].isChecked():
-                self.runNumber = iRun        
-                for iTarget in range(len(self.targetButtons[iRun])):
-                    self.targetButtons[iRun][iTarget].setVisible(True)  
-        self.run = self.runNames[self.runNumber]      
-        self.targetNumber = 0
-        self.targetButtons[self.runNumber][self.targetNumber].setChecked(True)
+    def loadTarget(self):
+        self.run = self.runNames[self.runNumber]
         self.target = self.targetNames[self.runNumber][self.targetNumber]
-        self.loadParamFile()
-           
-    # 3) Choose Target
-    def chooseTarget(self):
-        for iTarget in range(len(self.targetButtons[self.runNumber])):
-            if self.targetButtons[self.runNumber][iTarget].isChecked():
-                self.targetNumber = iTarget
-        self.target = self.targetNames[self.runNumber][self.targetNumber]
-        self.loadParamFile()
-
-    # 4) Load Param File
-    def loadParamFile(self):
         try:
+            self.paramName = self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
             self.paramData = readDict()
-            self.paramData.read_from_file(self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict')
+            self.paramData.read_from_file(self.paramName)
             self.obsTimes = np.array(self.paramData['obsTimes'])
             self.utcDates = self.paramData['utcDates']
             self.sunsetDates = self.paramData['sunsetDates']
             self.calTimestamps = self.paramData['calTimestamps']
-            self.flatCalDates = self.paramData['flatCalDates']  
+            self.flatCalDates = self.paramData['flatCalDates']
+            self.RA = self.paramData['RA']
+            self.Dec = self.paramData['Dec']
+            self.hourAngleOffset = self.paramData['HA_offset']
 
             print 'Loading parameter file at ' + self.displayStackPath + self.run + '/' + self.target + '/' + self.target + '.dict'
             self.createSunsetList()
@@ -139,8 +139,8 @@ class DisplayStack(QMainWindow):
             self.ui.wavelengthList.clear()
             self.ui.flatList.clear()
             self.paramFileExists = False
-
-    # 5) Choose Obs File
+        
+    # Choose Obs File
     # Create list of available sunset dates
     def createSunsetList(self):
         self.ui.sunsetList.clear()
@@ -168,7 +168,7 @@ class DisplayStack(QMainWindow):
         self.ui.obsList.addItem(self.removedObs)
         self.ui.obsList.sortItems()
 
-    # 6) Load settings
+    # Load settings
     def loadSettings(self):
         
         self.validSettings = True        
@@ -223,7 +223,7 @@ class DisplayStack(QMainWindow):
             print 'Please select sunset night...'
             self.validSettings = False
 
-    # 7) Load hot pixel mask
+    # Load hot pixel mask
     def loadHotMask(self):
         self.hotPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/HotPixelMasks/hotPixelMask_' + self.obsTS + '.h5')
         if not os.path.exists(self.hotPixelFilename):
@@ -231,7 +231,7 @@ class DisplayStack(QMainWindow):
             print "Hot pixel mask saved to %s"%(self.hotPixelFilename)
         self.ob.loadHotPixCalFile(self.hotPixelFilename,switchOnMask=True)
 
-    # 8) Create wavelength cal file list
+    # Create wavelength cal file list
     def createWavelengthList(self):
         self.ui.wavelengthList.clear()
         for iCal in range(len(self.calTimestamps)):
@@ -262,7 +262,7 @@ class DisplayStack(QMainWindow):
             self.ui.flatList.setEnabled(False)
 
 
-    # 9) Create flat cal file list
+    # Create flat cal file list
     def createFlatList(self):
         self.ui.flatList.clear()
         for iCal in range(len(self.flatCalDates)):
@@ -278,7 +278,7 @@ class DisplayStack(QMainWindow):
             self.ui.deadPixelBox.setEnabled(False)
             self.ui.flatList.setEnabled(False)
 
-    # 10) Load dead pixel mask
+    # Load dead pixel mask
     def loadDeadMask(self):
         self.deadPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/DeadPixelMasks/deadPixelMask_' + self.obsTS + '.npz')
         if not os.path.exists(self.deadPixelFilename):
@@ -289,17 +289,113 @@ class DisplayStack(QMainWindow):
             self.deadFile = np.load(self.deadPixelFilename)
             self.deadMask = self.deadFile['deadMask']
 
-    # 12) Create output name
+    # Describe the structure of the header row
+    class headerDescription(tables.IsDescription):
+        targetName = tables.StringCol(100, dflt='')
+        run = tables.StringCol(100, dflt='')
+        obsFileName = tables.StringCol(100, dflt='')
+        wvlCalFileName = tables.StringCol(100, dflt=np.nan)
+        flatCalFileName = tables.StringCol(100, dflt='')
+        deadPixFileName = tables.StringCol(100, dflt='')
+        hotPixFileName = tables.StringCol(100, dflt='')
+        nCol = tables.UInt32Col(dflt=-1)
+        nRow = tables.UInt32Col(dflt=-1)
+        lowWvlCutoff = tables.Float64Col(dflt=np.nan)
+        highWvlCutoff = tables.Float64Col(dflt=np.nan)
+        exptime = tables.Float64Col(dflt=np.nan)
+        lst = tables.StringCol(100, dflt='')
+        integrationTime = tables.Float64Col(dflt=np.nan)
+        RA = tables.StringCol(100, dflt='')
+        Dec = tables.StringCol(100, dflt='')
+        HA_offset = tables.Float64Col(dflt=0.0)
+
+
+    # Create output name
     def createOutputName(self):
         self.rawName = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks/' + 'ImageStack_' + self.obsTS + '_' + str(self.integrationTime) + 's')
         if self.useWavelengthCalibration and self.useHotPixelMasking:
-            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '_hp.npz')
+            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '_hp.h5')
         elif self.useWavelengthCalibration and not self.useHotPixelMasking:
-            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '.npz')
-        elif not self.waveLengthCalibration and self.useHotPixelMasking:
-            self.outputFilename = str(self.rawName + '_hp.npz')
+            self.outputFilename = str(self.rawName + '_' + str(int(self.lowerWavelengthCutoff)) + '-' + str(int(self.upperWavelengthCutoff)) + '.h5')
+        elif not self.useWavelengthCalibration and self.useHotPixelMasking:
+            self.outputFilename = str(self.rawName + '_hp.h5')
         else:
-            self.outputFilename = str(self.rawName + '.npz')
+            self.outputFilename = str(self.rawName + '.h5')
+
+    def createH5File(self):
+        # Create header and data group and table names
+        headerGroupName = 'header'
+        headerTableName = 'header'
+        dataGroupName = 'stack'
+        dataTableName = 'stack'
+        timeTableName = 'time'
+
+        # Create lookup names for header information
+        runColName = 'run'
+        targetColName = 'targetName'
+        obsFileColName = 'obsFileName'
+        wvlCalFileColName = 'wvlCalFileName'
+        flatCalFileColName = 'flatCalFileName'
+        nRowColName = 'nRow'
+        nColColName = 'nCol'
+        RAColName = 'RA'
+        DecColName = 'Dec'
+        deadPixColName = 'deadPixFileName'
+        hotPixColName = 'hotPixFileName'
+        lowWvlColName = 'lowWvlCutoff'
+        highWvlColName = 'highWvlCutoff'
+        expTimeColName = 'exptime'
+        lstColName = 'lst'
+        integrationTimeColName = 'integrationTime'
+        HA_offsetColName = 'HA_offset'
+
+
+        # Create and h5 output file, create header and data groups
+        fileh = tables.openFile(self.outputFilename, mode='w')
+        headerGroup = fileh.createGroup("/", headerGroupName, 'Header')
+        stackGroup = fileh.createGroup("/", dataGroupName, 'Image Stack')
+
+        # Create row for header information
+        headerTable = fileh.createTable(headerGroup, headerTableName, self.headerDescription,
+                                        'Header Info')
+        header = headerTable.row
+
+        # Fill in the header with possibly useful information.
+        header[runColName] = self.run
+        header[targetColName] = self.target
+        header[obsFileColName] = self.obsFn       
+        header[nColColName] = self.numberCols
+        header[nRowColName] = self.numberRows
+        header[RAColName] = self.RA
+        header[DecColName] = self.Dec
+        header[expTimeColName] = self.exptime
+        header[lstColName] = self.lst
+        header[integrationTimeColName] = self.integrationTime
+        header[HA_offsetColName] = self.hourAngleOffset
+        if self.useDeadPixelMasking:
+            header[deadPixColName] = self.deadPixelFilename
+        if self.useHotPixelMasking:
+            header[hotPixColName] = self.hotPixelFilename
+        if self.useWavelengthCalibration:
+            header[wvlCalFileColName] = self.wvlCalFilename       
+            header[lowWvlColName] = self.lowerWavelengthCutoff
+            header[highWvlColName] = self.upperWavelengthCutoff
+        if self.useFlatCalibration:
+            header[flatCalFileColName] = self.flatCalFilename
+        header.append()
+
+        # Create an h5 array for the midtime of each frame in the image cube.
+        timeTable = fileh.createCArray(stackGroup, timeTableName, Float64Atom(), (1,len(self.times)))       
+        timeTable[:] = self.times
+        
+        # Create an h5 table for the image cube.
+        stackTable = fileh.createCArray(stackGroup, dataTableName, Float64Atom(), (self.numberRows,self.numberCols, self.cube.shape[2]))        
+        stackTable[:] = self.cube
+
+        # Flush the h5 output file
+        fileh.flush()
+        fileh.close()
+
 
     # Start process for creating image stacks
     def stackProcess(self):
@@ -307,7 +403,7 @@ class DisplayStack(QMainWindow):
         # Check for valid params file
         if self.paramFileExists:
 
-            # 6) Load settings choosen from gui
+            # Load settings choosen from gui
             self.loadSettings()
             if self.validSettings:
         
@@ -319,32 +415,35 @@ class DisplayStack(QMainWindow):
                     print 'Processing file ' + self.obsFn + '...'
                     self.ob = ObsFile(self.obsFn)
 
+                    self.numberRows = self.ob.nRow
+                    self.numberCols = self.ob.nCol
+
                     # Load time adjustment file
                     if self.useTimeAdjustment:
                         print 'Loading time adjustment file...'
                         self.ob.loadTimeAdjustmentFile(FileName(run=self.run).timeAdjustments())
        
-                    # 7) Load hot pixel mask
+                    # Load hot pixel mask
                     if self.useHotPixelMasking:
                         print 'Loading hot pixel mask...'
                         self.loadHotMask()
 
-                    # 8) Load wave cal solution
+                    # Load wave cal solution
                     if self.useWavelengthCalibration:
                         print 'Loading wavelength calibration...'
                         self.ob.loadWvlCalFile(self.wvlCalFilename)
                         
-                    # 9) Load flatcal solution
+                    # Load flatcal solution
                     if self.useFlatCalibration:
                         print 'Loading flat calibration...'
                         self.ob.loadFlatCalFile(self.flatCalFilename)
 
-                    # 10) Load dead pixel mask
+                    # Load dead pixel mask
                     if self.useDeadPixelMasking:
                         print 'Loading dead pixel mask...'
                         self.loadDeadMask()
 
-                    # 11) Set wavelength cutoffs
+                    # Set wavelength cutoffs
                     if self.useWavelengthCalibration:
                         print 'Setting wavelength cutoffs...'
                         self.ob.setWvlCutoffs(self.lowerWavelengthCutoff,self.upperWavelengthCutoff)
@@ -353,16 +452,18 @@ class DisplayStack(QMainWindow):
                     self.unix = self.ob.getFromHeader('unixtime')
                     self.startJD = self.unix/86400.+2440587.5
                     self.exptime = self.ob.getFromHeader('exptime')
+                    self.lst = self.ob.getFromHeader('lst')
                     
                     self.times = []
                     self.frames = []
                         
-                    # 11) Create Image Stack
+                    # Create Image Stack
                     print 'Stacking images...'
                     for iSec in np.arange(0,self.exptime,self.integrationTime):
                         #add seconds offset to julian date, move jd to center of bin
                         self.jd = self.startJD + iSec/(24.*3600.) + self.integrationTime/2./(24.*3600.)
-                        'Creating frame for time ' + str(self.jd)
+                        self.times.append(self.jd)
+                        print 'Creating frame for time ' + str(self.jd)
                         self.frameData = self.ob.getPixelCountImage(firstSec=iSec,integrationTime=self.integrationTime,weighted=self.weighted,getRawCount=self.useRawCounts,scaleByEffInt=self.scaleByEffInt)
                         self.frame = self.frameData['image']         
                         if self.useDeadPixelMasking:
@@ -372,28 +473,28 @@ class DisplayStack(QMainWindow):
                     self.cube = np.dstack(self.frames)
                     self.times = np.array(self.times)
             
-                    # 12) Create output file
+                    # Create output file
                     self.createOutputName()
                     print 'Saving image stack to ' + self.outputFilename
-                    np.savez(self.outputFilename, stack=self.cube, jd=self.times)
+                    self.createH5File()                 
 
         # Invalid params file
         else:
             print 'Invalid parameter file...'
 
     # Choose an image stack
-    '''
+    
     def chooseStack(self):
-        self.defaultLoadStackDirectory = str(self.displayStackPath + self.run + '/' + self.target + '/ImageStacks')
-        self.stackName = QFileDialog.getOpenFileName(parent=None, directory=self.defaultLoadStackDirectory, caption=str("Choose Image Stack"), filter=str("NPZ (*.npz)")) 
+        self.defaultLoadStackDirectory = str(self.displayStackPath)
+        self.stackName = ''
+        self.stackName = QFileDialog.getOpenFileName(parent=None, directory=self.defaultLoadStackDirectory, caption=str("Choose Image Stack"), filter=str("H5 (*.h5)")) 
         if self.stackName == '':
             print 'No file chosen'
         else:          
-            loadStackApp = LoadImageStack.LoadImageStack()
+            loadStackApp = LoadImageStack.LoadImageStack(stackName = self.stackName)
             loadStackApp.show()
             loadStackApp.exec_()
-            # Change to a QDialog...
-    '''
+    
 
 # Start up main gui
 if __name__ == "__main__":

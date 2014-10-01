@@ -1,21 +1,20 @@
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
 from PyQt4 import QtGui
+from PyQt4 import QtCore
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
 from multiprocessing import Process
+from functools import partial
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib
-from functools import partial
 
-class PopUp(QMainWindow):
+class PopUp(QtGui.QMainWindow):
     def __init__(self, parent=None,plotFunc=None,title='',separateProcess=False, image=None,showMe=True):
         self.parent = parent
         if self.parent == None:
-            self.app = QApplication([])
+            self.app = QtGui.QApplication([])
         super(PopUp,self).__init__(parent)
         self.setWindowTitle(title)
         self.plotFunc = plotFunc
@@ -30,7 +29,7 @@ class PopUp(QMainWindow):
         self.fig.canvas.draw()
 
     def create_main_frame(self,title):
-        self.main_frame = QWidget()
+        self.main_frame = QtGui.QWidget()
       # Create the mpl Figure and FigCanvas objects. 
         self.dpi = 100
         self.fig = Figure((5, 5), dpi=self.dpi)
@@ -41,27 +40,42 @@ class PopUp(QMainWindow):
 
         # Create the navigation toolbar, tied to the canvas
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
-        vbox = QVBoxLayout()
+        vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.canvas)
         vbox.addWidget(self.mpl_toolbar)
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
     def create_status_bar(self):
-        self.status_text = QLabel("")
+        self.status_text = QtGui.QLabel("")
         self.statusBar().addWidget(self.status_text, 1)
 
 
-    def plotArray(self,image,normNSigma=3,title='',**kwargs):
+    def plotArray(self,image,normNSigma=3,title='',showColorBar=True,**kwargs):
         self.image = image
-        cmap=matplotlib.cm.gnuplot2
-        cmap.set_bad('0.15')
-        self.handleMatshow = self.axes.matshow(image,cmap=cmap,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image),**kwargs)
-        self.fig.cbar = self.fig.colorbar(self.handleMatshow)
+        if not 'vmax' in kwargs:
+            goodImage = image[np.isfinite(image)]
+            kwargs['vmax'] = np.mean(goodImage)+normNSigma*np.std(goodImage)
+        if not 'cmap' in kwargs:
+            defaultCmap=matplotlib.cm.gnuplot2
+            defaultCmap.set_bad('0.15')
+            kwargs['cmap'] = defaultCmap
+        if not 'origin' in kwargs:
+            kwargs['origin'] = 'lower'
+
+        if 'button_press_event' in kwargs:
+            cid = self.fig.canvas.mpl_connect('button_press_event',partial(kwargs.pop('button_press_event'),self))
+            
+        self.handleMatshow = self.axes.matshow(image,**kwargs)
+        if showColorBar:
+            self.fig.cbar = self.fig.colorbar(self.handleMatshow)
+            cid = self.fig.canvas.mpl_connect('scroll_event', self.onscroll_cbar)
+            cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick_cbar)
         self.axes.set_title(title)
-        cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
         cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
-        cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
+
+
+
         self.draw()
 
     def show(self):
@@ -78,30 +92,48 @@ class PopUp(QMainWindow):
             
 
     def create_status_bar(self):
-        self.status_text = QLabel("Awaiting orders.")
+        self.status_text = QtGui.QLabel("Awaiting orders.")
         self.statusBar().addWidget(self.status_text, 1)
         
-def onscroll_cbar(fig, event):
-    if event.inaxes is fig.cbar.ax:
-        increment=0.05
-        currentClim = fig.cbar.mappable.get_clim()
-        if event.button == 'up':
-            newClim = (currentClim[0],(1.+increment)*currentClim[1])
-        if event.button == 'down':
-            newClim = (currentClim[0],(1.-increment)*currentClim[1])
-        fig.cbar.mappable.set_clim(newClim)
-        fig.canvas.draw()
+    def onscroll_cbar(self, event):
+        if event.inaxes is self.fig.cbar.ax:
+            increment=0.05
+            currentClim = self.fig.cbar.mappable.get_clim()
+            currentRange = currentClim[1]-currentClim[0]
+            if event.button == 'up':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]+increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]+increment*currentRange)
+            if event.button == 'down':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]-increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]-increment*currentRange)
+            self.fig.cbar.mappable.set_clim(newClim)
+            self.fig.canvas.draw()
 
-def onclick_cbar(fig,event):
-    if event.inaxes is fig.cbar.ax:
-        if event.button == 1:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
-        if event.button == 3:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],1/event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
+    def onclick_cbar(self,event):
+        if event.inaxes is self.fig.cbar.ax:
+            self.fig.currentClim = self.fig.cbar.mappable.get_clim()
+            lower = self.fig.currentClim[0]
+            upper = self.fig.currentClim[1]
+            fraction = event.ydata
+            currentRange = upper-lower
+            clickedValue = lower+fraction*currentRange
+            extrapolatedValue = lower+event.ydata*currentRange
+            if event.button == 1:
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (clickedValue,upper)
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (lower,clickedValue)
+            if event.button == 3:
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = ((lower-fraction*upper)/(1.-fraction),upper)
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (lower,lower+currentRange/fraction)
+            self.fig.cbar.mappable.set_clim(newClim)
+            self.fig.canvas.draw()
 
 def plotArray(*args,**kwargs):
     #Waring: Does not play well with matplotlib state machine style plotting!

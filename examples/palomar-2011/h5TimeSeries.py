@@ -4,7 +4,7 @@
 
 # Use the /beammap/beamimage information to get the list of roach board/pixel/time
 #
-# Set the environment variable MKID_DATA_DIR to point to the data location
+# Set the environment variable MKID_RAW_PATH to point to the data location
 #
 # Example use:
 # 
@@ -25,8 +25,8 @@ def peakfit(y1,y2,y3):
 
 # Result of h5Summarize for one pixel:  ('iRow=', 0, ' iCol=', 9, ' sum', 28576, ' thisNDtNegative=', 230, ' nDtNegative=', 795)
 def lookAtTheTime(hdf5FileName, row, col):
-    # make the full file name by joining the input name to the MKID_DATA_DIR (or .)
-    dataDir = os.getenv('MKID_DATA_DIR','.')
+    # make the full file name by joining the input name to the MKID_RAW_PATH (or .)
+    dataDir = os.getenv('MKID_RAW_PATH','.')
     hdf5FullFileName = os.path.join(dataDir,hdf5FileName)
     print "full file name is ",hdf5FullFileName
     if (not os.path.exists(hdf5FullFileName)):
@@ -126,7 +126,7 @@ def plotTimes(times, dtimes, secBoundaries, tmin, tmax):
     plt.legend()
 
 def makeAllPklFiles():
-    dataDir = os.getenv('MKID_DATA_DIR','.')
+    dataDir = os.getenv('MKID_RAW_PATH','.')
     for h5File in [f for f in os.listdir(dataDir) if f.endswith(".h5")]:
         makeOrLoadPklFile(h5File)
 
@@ -139,9 +139,9 @@ def makeSummaryTable(stName):
              'nRow':'nR', 'nCol':'nC', 'nZeroPix':'n0P', 'target':'target'}
     print line
     stFile.write(line+"\n")
-    dataDir = os.getenv('MKID_DATA_DIR','.')
+    dataDir = os.getenv('MKID_RAW_PATH','.')
     for h5File in [f for f in os.listdir(dataDir) if f.endswith(".h5")]:
-        dataDir = os.getenv('MKID_DATA_DIR','.')
+        dataDir = os.getenv('MKID_RAW_PATH','.')
         hdf5FullFileName = os.path.join(dataDir,h5File)
         fid = tables.openFile(hdf5FullFileName, mode='r')
         header = fid.root.header.header

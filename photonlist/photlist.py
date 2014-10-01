@@ -117,78 +117,75 @@ class PhotList(object):
         
     
     def getImageDet(self,firstSec=0,integrationTime=-1,wvlMin=-np.Inf,
-                 wvlMax=np.Inf,newMethod=True):
+                 wvlMax=np.Inf,doWeighted=True,
+                 #newMethod=True
+                 ):
         '''
         Return a 2D image consisting of photon counts in each pixel, in the detector pixel
         coordinate frame.
         
-        newMethod=True to use numpy histogram for creating image. Runs faster for short integration times,
-        but just a little slower for full images.
+        INPUTS:
+            firstSec - start time for integration within photon list object (in sec)
+            integrationTime - time to integrate for in seconds. If -1, integrates to end of file.
+            wvlMin,wvlMax - minimum and maximum wavelengths to include in the integration (Angstroms) 
+            doWeighted - True to apply flatcal and fluxcal weights.
+            
+            ----DEPRECATED, NO LONGER FUNCTIONAL - always uses new method (Jul 9 2014)------
+            newMethod - True to use numpy histogram for creating image. Runs faster for short integration times,
+                        but just a little slower for full images.
+            --------------------------------------------------------------------------------
+            
+        OUPUTS:
+            A 2D image array matching the shape/size of the detector.
+            
         '''
+        
         if integrationTime==-1:
             lastSec=np.Inf
         else:  
             lastSec = firstSec+integrationTime
 
-        if newMethod:
-            #Should be more efficient....
-            print 'Searching photons'
-            #ind = self.photTable.getWhereList('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
-            tic = time.clock()
-            photons = self.photTable.readWhere('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
-            xPix = photons['xPix']
-            yPix = photons['yPix']
-            print 'Time taken (s): ',time.clock()-tic
-            print 'Doing by second method'
-            #tic = time.clock()
-            #photons2 = [x for x in self.photTable.iterrows() if (x['arrivalTime']>=firstSec) and (x['arrivalTime']<lastSec)
-            #            and x['wavelength'>=wvlMin] and x['wavelength']<wvlMax]
-            #print 'Time taken (s): ',time.clock()-tic
-            #print 'Doing by third method'
-            #tic = time.clock()
-            #photons2 = [(phot['xPix'], phot['yPix']) for phot in self.photTable.where('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')]
-            #photons2 = self.photTable.getWhereList('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
-            #xPix2 = self.photTable[photons2]['xPix']
-            #yPix2 = self.photTable[photons2]['yPix']
-            #print 'Time taken (s): ',time.clock()-tic
-             
-            #print 'Getting coordinates'
-            #photX = self.photTable.readCoordinates(ind,field='xPix')
-            #photY = self.photTable.readCoordinates(ind,field='yPix')
-            print 'Building 2D histogram'
-            image, y,x = np.histogram2d(yPix,xPix,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
-            #image, y,x = np.histogram2d(photX,photY,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
-            #image2, y,x = np.histogram2d(yPix2,xPix2,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]])
-            #assert np.all(image1 == image2)
-
+#         if newMethod:
+        #Should be more efficient....
+        print 'Searching photons...'
+        #ind = self.photTable.getWhereList('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+        tic = time.clock()
+        photons = self.photTable.readWhere('(arrivalTime >= firstSec) & (arrivalTime < lastSec) & (wavelength >= wvlMin) & (wavelength < wvlMax)')
+        xPix = photons['xPix']
+        yPix = photons['yPix']
+        if doWeighted is True:
+            photWeights = photons['flatWeight'] * photons['fluxWeight']   #********EXPERIMENTING WITH ADDING FLUX WEIGHT - NOT FULLY TESTED, BUT SEEMS OKAY....********
         else:
-            #Initialise an empty image
-            image = np.empty((self.nRow,self.nCol),dtype=float)
-            image.fill(np.NaN)
-           
-            #Step through pixels and fill em up.
-            for iRow in range(self.nRow):    #self.nCol):
-                print 'Reading pixel row ', iRow
-                for iCol in range(self.nCol):
-                    rowcol = xyPack(iRow,iCol)
-                    #image[iRow,iCol] = len(self.photTable.getWhereList('(Xpix == iCol) & (Ypix == iRow) & (ArrivalTime >= firstSec) & (ArrivalTime < lastSec)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))
-                    #image[iRow,iCol] = len(self.photTable.getWhereList(('XYpix==rowcol'))) # & (self.photTable.cols.Ypix == iRow) & (self.photTable.cols.ArrivalTime >= firstSec)
-                                                                        #& (self.photTable.cols.ArrivalTime < lastSec) & (self.photTable.cols.Wavelength >= wvlMin) & (self.photTable.cols.Wavelength < wvlMax) ))
-    
-                    photons = (self.photTable.readWhere('xyPix==rowcol'))
-                    image[iRow,iCol] = np.sum((photons['arrivalTime'] >= firstSec) & (photons['arrivalTime'] < lastSec)
-                                              & (photons['wavelength'] >= wvlMin) & (photons['wavelength'] < wvlMax))
-                    #rowcolplus=rowcol+1
-                    #rowcolminus=rowcol-1
-                    #arrTimes = self.photTable.getWhereList('(xyPix<rowcolplus) & (xyPix>rowcolminus)')
-                    #image[iRow,iCol] = np.sum((arrTimes >= firstSec) & (arrTimes < lastSec))
-                    
-                    #image[iRow,iCol] = len(photons.where('ArrivalTime >= firstSec) & ArrivalTime < lastSec)'))
-                    #image[iRow,iCol] = len(photons)
-                    
-                    #image[iRow,iCol] = len(self.photTable.getWhereList('(ArrivalTime >= firstSec) & (ArrivalTime < lastSec) & (Ypix == iRow) & (Xpix == iCol)')) # & (Wavelength >= wvlMin) & (Wavelength < wvlMax)' ))                
-                    #image[iRow,iCol] = len(self.photTable.getWhereList('(Ypix == iRow)' ))
-                
+            photWeights = None
+        print 'Time taken so far (s): ',time.clock()-tic
+        print 'Building 2D histogram'
+        image, y,x = np.histogram2d(yPix,xPix,bins=[self.nRow,self.nCol],range=[[-1,self.nRow],[-1,self.nCol]],
+                                    weights=photWeights)
+        print 'Done - total time taken (s): ',time.clock()-tic
+
+#         else:
+#             #Initialise an empty image
+#             image = np.empty((self.nRow,self.nCol),dtype=float)
+#             image.fill(np.NaN)
+# 
+#             #Step through pixels and fill em up.
+#             print 'Looping through pixels and counting up...'
+#             tic = time.clock()
+#             for iRow in range(self.nRow):    #self.nCol):
+#                 print 'Reading pixel row ', iRow
+#                 for iCol in range(self.nCol):
+#                     rowcol = xyPack(iRow,iCol)
+#                     photons = (self.photTable.readWhere('xyPix==rowcol'))
+#                     if doWeighted is True:
+#                         photWeights = photons['flatWeight'] * photons['fluxWeight']   #********EXPERIMENTING WITH ADDING FLUX WEIGHT - NOT FULLY TESTED, BUT SEEMS OKAY....********
+#                     else:
+#                         photWeights = np.ones(len(photons))     #Set all weights to one if doWeighted is not True.
+#                     inRange = ((photons['arrivalTime'] >= firstSec) & (photons['arrivalTime'] < lastSec)
+#                                 & (photons['wavelength'] >= wvlMin) & (photons['wavelength'] < wvlMax))
+#                     
+#                     image[iRow,iCol] = np.sum(photWeights[inRange])
+#             print 'Done - total time taken (s): ',time.clock()-tic
+
         #That should be it....
         return image
 
@@ -270,7 +267,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
 def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, 
                     doIndex=True, pixRemapFileName=None):
     """
-    writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+    writes out the photon list for this obs file at $MKID_PROC_PATH/photonListFileName
     currently cuts out photons outside the valid wavelength ranges from the wavecal
    
     Currently being updated... JvE 4/26/2013.
@@ -343,7 +340,7 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
         plFile.copyNode(obsFile.file.root.beammap, newparent=plFile.root, newname='beammap', recursive=True)
         plFile.copyNode(obsFile.file.root.header, newparent=plFile.root, recursive=True)
         if obsFile.centroidListFile is not None:
-            plFile.copyNode(obsFile.centroidListFile.root.centroidlist, newparent=plFile.root, newname='centroidList', recursive=True)
+            plFile.copyNode(obsFile.centroidListFile.root, newparent=plFile.root, newname='centroidList', recursive=True)
         if obsFile.timeAdjustFile is not None:
             #If there's any time adjustment file associated, store that too in the photon list 
             #file, and also correct the exptime in the output header info (which is generally not updated in the original obs file).
@@ -395,7 +392,6 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
         aboveWaveCalRangeFlag = pipelineFlags.flatCal['aboveWaveCalRange']  #Ditto
         for iRowRaw in xrange(obsFile.nRow):
             for iColRaw in xrange(obsFile.nCol):
-                print 'Pixel row, column (raw): ', iRowRaw, iColRaw
                 
                 #Remap pixel row/column if necessary
                 if pixMap is None:
@@ -403,7 +399,8 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
                     iColCorr = iColRaw
                 else:
                     iRowCorr,iColCorr = pixMap.remapPix(iRowRaw,iColRaw)
-                print 'Pixel row, column (remapped): ', iRowCorr, iColCorr 
+                print 'Pixel row, column (raw/remapped): ', iRowRaw, iColRaw, iRowCorr, iColCorr
+                #print 'Pixel row, column (remapped): ', iRowCorr, iColCorr 
                 
                 #Now be careful to use raw and corrected values in the right places....
                 flag = obsFile.wvlFlagTable[iRowRaw, iColRaw]
@@ -421,17 +418,17 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
                         #Fudge to make it ignore the hot pixel masking for pixels which are to be 
                         #remapped. This is really not the recommended way to do things....
                         if (iRowRaw,iColRaw) in pixMapSourceList:
-                            print 'Switching off hot pix mask'
+                            print 'Switching off hot pix mask for this pixel, since it''s being remapped'
                             obsFile.switchOffHotPixTimeMask()
                         else:
-                            print 'Hot pix mask on'
+                            #print 'Hot pix mask on'
                             obsFile.switchOnHotPixTimeMask()
                     
                     
-                    print 'Reading from obs. file...'
+                    #print 'Reading from obs. file...'
                     x = obsFile.getPixelWvlList(iRowRaw,iColRaw,excludeBad=False,dither=True,firstSec=firstSec,
                                              integrationTime=integrationTime)
-                    print 'Done reading'
+                    #print 'Done reading'
                     
                     timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
                     
@@ -477,7 +474,7 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
 
                     #New method for writing -- avoid looping over each photon.   
                     #Create rows to append for this pixel in memory, *then* write out.
-                    print 'Appending photon block'
+                    #print 'Appending photon block'
                     
                     #Create an empty table ('sub-list') in memory for this pixel:
                     newRows = np.zeros(len(timestamps), dtype=photListDtype)

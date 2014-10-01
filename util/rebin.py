@@ -27,10 +27,10 @@ def rebin(x,y,binedges):
     n=0
     binsize=binedges[n+1]-binedges[n]
     while start+(binsize/2.0)<stop:
-        print start
-        print binsize
-        print stop
-        print n
+        #print start
+        #print binsize
+        #print stop
+        #print n
         rebinned[n,0] = (start+(binsize/2.0))
         ind = np.where((x>start) & (x<start+binsize))
         rebinned[n,1] = np.mean(y[ind])
