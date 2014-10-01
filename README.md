@@ -4,6 +4,13 @@ ARCONS-pipeline
 This repository contains the code to analyze data from the ARCONS array.  
 
 ***
+Environment variables that need to be set:
+
+MKID_RAW_PATH    - path to the root of the raw data directory structure
+MKID_PROC_PATH   - path to the root of the processed data directory structure
+MKID_BEAMMAP_PATH  - path to the default beammap file to be used by h5quicklook.py (only used for quicklook)
+
+***
 
 Required external software components:
 ---------------------
@@ -124,7 +131,7 @@ Pipeline components:
 
 /skysub contains a module to subtract the sky background
 
-/imagecube contains a module to generate a FITS image cube based on an observations (no timing info)
+[/imagecube contains a module to generate a FITS image cube based on an observations (no timing info)  ]
 
 /legacy contains ARCONS analysis code that predates this repository
 

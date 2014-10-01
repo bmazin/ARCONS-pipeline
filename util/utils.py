@@ -17,12 +17,13 @@ import scipy.stats
 import astropy.stats
 import ds9
 
+
 #from interval import interval
 
 """
 Modules:
 
-aperture(startpx,startpy,radius=3)
+aperture(startpx=None, startpy=None, cenRA=None, cenDec=None, nPixRA=None, nPixDec=None, limits = None, degrees = False, radius=3)
 bin12_9ToRad(binOffset12_9)
 confirm(prompt,defaultResponse=True)
 convertDegToHex(ra, dec)
@@ -49,26 +50,135 @@ nearestNmedFilter(inputArray,n=24)
 showzcoord()
 """
 
-def aperture(startpx,startpy,radius=3):
+def aperture(startpx=None, startpy=None, cenRA=None, cenDec=None, nPixRA=None, nPixDec=None, limits = None, degrees = False, radius=3):
     """
     Creates a mask with specified radius and centered at specified pixel
     position.  Output mask is a 46x44 array with 0 represented pixels within
     the aperture and 1 representing pixels outside the aperture.
+
+    Added by Neil (7/31/14):
+    startpx/startpy - If working with an image in the detector fram specify these values as your starting x and y pixels
+    cenRA/cenDec - This is synonemous to startpx/startpy except use this for virtual images (can be given in degrees or radians)
+    nPixRA/nPixDec - These are the number of pixels in the virtual image. Need this to scale degrees/pixel in virtual image
+    limits - If working with virtual image, this will be the window of RA and Dec values. (as of right now the input requires these to be in radians)
+    degrees - set True if cenRA/cenDec are in degrees, otherwise False
+    radius - this is the radius for the aperture. Set to 3 by default for detector images. If using virtual image this must be given in degrees (at least for right now).
+    
     """
-    r = radius
+    r = radius         #sets the radius and calculates hight and length. Note that the radius should be given in whatever units the image will be plotted in
+                       #that means for the detector frame it will be given in pixels and for the virtual image probably degrees... could add option to give in radians but
+                       #julians RADecImage.display code as of now plots the image in degrees
     length = 2*r 
     height = length
-    allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
-    ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
-    pixx = []
-    pixy = []
-    mask=numpy.ones((46,44))
-    for x in allx:
-        for y in ally:
-            if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
-                mask[y,x]=0.
-    return mask
+    
+    if startpx is not None and startpy is not None:  #If the x and y postions have been defined in the detector frame.
+        print '----finding aperture mask in detector frame----'  #gathers all x and y positions within detector frame.
+        allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
+        ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
+        pixx = []
+        pixy = []
+        mask=numpy.ones((46,44))  #sets all pixels in the detector frame equal to 1.
+        for x in allx:
+            for y in ally:
+                if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
+                    mask[y,x]=0.  #If the allx and ally pixel positions are within the aperture radius, sets those pixels to 0
+        return mask   #mask is a 46,44 array of all ones except where the aperture has been defined. The aperture will have 0's.
+    
+    
+    
+    elif cenRA is not None and cenDec is not None: #If the user wants to define an initial position in RA/Dec space.
+                                                   #RADecImage.display shows the objects RA ad Dec in degrees but these can be given in radians as well
+        print '----finding aperture mask in RA/Dec frame----'
+        
+        if nPixRA is not None and nPixDec is not None and limits is not None:  #really if choosing to make an aperture mask for the virtual image nPix should never be none,
+            
+            limits = numpy.array(limits,dtype = float)  #array of the limits in radians.
+            limits = limits*(180./numpy.pi)             #converts limits into degree values
+         
+            stepRA = (limits[1]-limits[0])/nPixRA     #finds the degree/virtualpixel spacing for RA
+            stepDec = (limits[3]-limits[2])/nPixDec   #finds the degree/virtualpixel spacing for Dec
+            #print limits
+            
+            if degrees == True:   #If cenRA/cenDec are given in degrees.
+                cenRA = ((cenRA-limits[0])/stepRA)   #sets the center of the aperature by converting its location to pixel location on virtual grid.
+                cenDec = ((cenDec-limits[2])/stepDec) #both RA and Dec ^^^^
+                #print cenRA
+                #print cenDec
+            else:                   #if cenRA/cenDec are given in radians.
 
+                cenRA = ((limits[1] - (cenRA*(180./numpy.pi)))/stepRA)  #converts the RA/Dec to degrees and converts to pixel location on virtual grid.
+                cenDec = ((limits[3] - (cenDec*(180./numpy.pi)))/stepDec)  
+            
+            if numpy.allclose(stepRA, stepDec) == True:  #this ensures that the RA and Declination are being incremented by the same step values on the virtual grid.
+                r = r/stepRA   #converts radius to a radius in the virtual image.
+                length = length/stepRA
+                height = height/stepRA
+                #print r
+                #print length
+                #print height
+            else:
+                raise ValueError('cant calculate the radius')   #If stepRA!=stepDec then return erro message.
+            
+            allRA = xrange(int(cenRA)-int(numpy.ceil(length/2.0)),int(cenRA)+int(numpy.floor(length/2.0))+1)    #gathers all pixel positions in the virtual image.
+            allDec = xrange(int(cenDec)-int(numpy.ceil(height/2.0)),int(cenDec)+int(numpy.floor(height/2.0))+1) 
+            #allRA = numpy.arange((cenRA - length/2.0),(cenRA + length/2.0 + stepRA), step=stepRA)
+            #allDec = numpy.arange((cenDec - height/2.0),(cenDec + height/2.0 + stepDec), step=stepDec)
+            #print allRA
+            #print allDec
+        
+            print '----creating aperture mask for virtual Image----'
+        
+            mask = numpy.ones((nPixDec, nPixRA)) #just as before, sets all pixels in the virtual frame equal to 1.
+            for RA in allRA:
+                for Dec in allDec:
+                    if (numpy.abs(RA - cenRA))**2+(numpy.abs(Dec - cenDec))**2 <= (r)**2 and 0 <= Dec and Dec < nPixDec and 0 <= RA and RA < nPixRA:
+                        mask[Dec, RA]=0  #If the pixels of allRA/allDec are located within the aperture radius, they are set equal to 0.
+            return mask  #returns an array of size nPixRA by nPixDec with all 1's except where the aperture has been defined. these are 0's.
+          
+        else:
+            raise ValueError('oops somethings not right') 
+
+
+
+
+
+
+'''
+        #conv = (vPlateScale*2*numpy.pi/1296000)  #no. of radians on sky per virtual pixel
+        #conv = conv/.0174532925 #no of degrees per virtual pixel
+        
+            #temp = nPixRA/conv #number of radians in image
+            
+        
+        print 'conv', conv
+        print '----converting RA/Dec to virtual pixel locations----'
+        r = int(r/conv)
+        print 'r', r
+        length = int(length/conv)
+        print 'length', length
+        height = int(height/conv)
+        print 'height', height
+        cenRA = int(cenRA/conv)
+        print 'cenRA', cenRA
+        cenDec = int(cenDec/conv) #converts the RA and Dec to location on virtual grid 
+        print 'cenDec', cenDec       
+        step = int(step/conv)        
+        print 'step', step
+
+        allRA = numpy.arange((cenRA - int(numpy.ceil(length/2.0))),(cenRA + int(numpy.floor(length/2.0))+step), step=step)
+        allDec = numpy.arange((cenDec - int(numpy.ceil(height/2.0))),(cenDec + int(numpy.floor(height/2.0))+step), step=step)
+        viRA = []
+        viDec = []
+        print allRA
+        print allDec
+        
+'''         
+        
+        
+        
+        
+        
+        
 
 def bin12_9ToRad(binOffset12_9):
    """
@@ -899,6 +1009,26 @@ def nearestNmedFilter(inputArray,n=24):
     return outputArray
 
 
+def nearestNRobustMeanFilter(inputArray,n=24,nSigmaClip=3.,iters=None):
+    '''
+    Matt 7/18/2014
+    Same idea as nearestNstdDevFilter, but returns sigma clipped mean instead of std. deviations.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating median around each pixel.
+        
+    OUTPUTS:
+        A 2D array of medians with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            outputArray[iRow,iCol] = numpy.ma.mean(astropy.stats.sigma_clip(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)],sig=nSigmaClip,iters=None))
+    return outputArray
 
 
 def showzcoord():

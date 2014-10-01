@@ -267,7 +267,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
 def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, 
                     doIndex=True, pixRemapFileName=None):
     """
-    writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+    writes out the photon list for this obs file at $MKID_PROC_PATH/photonListFileName
     currently cuts out photons outside the valid wavelength ranges from the wavecal
    
     Currently being updated... JvE 4/26/2013.
@@ -392,7 +392,6 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
         aboveWaveCalRangeFlag = pipelineFlags.flatCal['aboveWaveCalRange']  #Ditto
         for iRowRaw in xrange(obsFile.nRow):
             for iColRaw in xrange(obsFile.nCol):
-                print 'Pixel row, column (raw): ', iRowRaw, iColRaw
                 
                 #Remap pixel row/column if necessary
                 if pixMap is None:
@@ -400,7 +399,8 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
                     iColCorr = iColRaw
                 else:
                     iRowCorr,iColCorr = pixMap.remapPix(iRowRaw,iColRaw)
-                print 'Pixel row, column (remapped): ', iRowCorr, iColCorr 
+                print 'Pixel row, column (raw/remapped): ', iRowRaw, iColRaw, iRowCorr, iColCorr
+                #print 'Pixel row, column (remapped): ', iRowCorr, iColCorr 
                 
                 #Now be careful to use raw and corrected values in the right places....
                 flag = obsFile.wvlFlagTable[iRowRaw, iColRaw]
@@ -418,17 +418,17 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
                         #Fudge to make it ignore the hot pixel masking for pixels which are to be 
                         #remapped. This is really not the recommended way to do things....
                         if (iRowRaw,iColRaw) in pixMapSourceList:
-                            print 'Switching off hot pix mask'
+                            print 'Switching off hot pix mask for this pixel, since it''s being remapped'
                             obsFile.switchOffHotPixTimeMask()
                         else:
-                            print 'Hot pix mask on'
+                            #print 'Hot pix mask on'
                             obsFile.switchOnHotPixTimeMask()
                     
                     
-                    print 'Reading from obs. file...'
+                    #print 'Reading from obs. file...'
                     x = obsFile.getPixelWvlList(iRowRaw,iColRaw,excludeBad=False,dither=True,firstSec=firstSec,
                                              integrationTime=integrationTime)
-                    print 'Done reading'
+                    #print 'Done reading'
                     
                     timestamps, wavelengths = x['timestamps'], x['wavelengths']     #Wavelengths in Angstroms
                     
@@ -474,7 +474,7 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
 
                     #New method for writing -- avoid looping over each photon.   
                     #Create rows to append for this pixel in memory, *then* write out.
-                    print 'Appending photon block'
+                    #print 'Appending photon block'
                     
                     #Create an empty table ('sub-list') in memory for this pixel:
                     newRows = np.zeros(len(timestamps), dtype=photListDtype)

@@ -4,8 +4,8 @@ from util.ObsFile import ObsFile
 from util.readDict import readDict
 param = readDict()
 
-INTERM_DIR = '.'
-os.environ['INTERM_DIR'] = INTERM_DIR
+MKID_PROC_PATH = '.'
+os.environ['MKID_PROC_PATH'] = MKID_PROC_PATH
 
 run = 'PAL2012'
 sunsetDate = '20121211'

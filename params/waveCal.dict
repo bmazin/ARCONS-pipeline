@@ -1,18 +1,21 @@
 ## Files and Dirs
 
-run = 'PAL2012'
-sunsetDate = None                       # if None then do all dates and all files for run
+run = 'PAL2014'
+#sunsetDate = None                       # if None then do all dates and all files for run
 calTimeStamps = None                    # if None then do all files in directory
-#sunsetDate = '20121211'
-#calTimeStamps = ['20121211-020441']
+sunsetDate = '20140924'
+#calTimeStamps = ['20140924-071950']
 
 
-
-intermdir=None      # /Scratch/ by default
-outdir=None         # waveCalSolnFiles/ by default
-#outdir='waveCalSolnFiles/test/'
-figdir = 'figs/'
-driftdir = 'drift_study/'
+#mkidDataDir=None    # /ScienceData by default
+mkidDataDir='/home/kids/PAL2014_data/ScienceData'
+#intermDir=None      # /Scratch by default
+intermDir='/home/kids/labData/PAL2014_data'
+outdir=None         # /waveCalSolnFiles by default
+#outdir='/waveCalSolnFiles/test'
+figdir = '/figs'
+driftdir = '/drift_study'
+filename=None
 
 
 min_count_rate=2        # per second; decides if pixel is dead
@@ -33,15 +36,16 @@ danicas_cut = 0.001     # cut photons that occur too close together, None to ign
 
 noise_scale_factor = 0.04  # scale factor guess for expoential fit to noise tail
 
-max_chi2_blue = 3.0         # max reduced chi^2 for blue fit
-max_chi2_all = 5.0          # max reduced chi^2 required for a good fit
+max_chi2_blue = 2.5         # max reduced chi^2 for blue fit
+max_chi2_all = 3.0          # max reduced chi^2 required for a good fit
 
 h = 4.1357e-15   # eV s    
 c = 3.e8        # m/s
 ang2m = 1.e-10
 fwhm2sig = 2.35
 
-model_type = 'threegaussian_power'      # model to fit noise tail with
+#model_type = 'threegaussian_power'      # model to fit noise tail with
+model_type = 'fourgaussian'
 #noise_guess_lower = [0.0,None,0.0]
 #noise_guess_upper = [None,None,None]
 noise_guess_lower = None

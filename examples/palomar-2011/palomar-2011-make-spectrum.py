@@ -5,11 +5,11 @@
 
 # Use the /beammap/beamimage information to gt the list of roach board/pixel/time
 #
-# Set the environment variable MKID_DATA_DIR to point to the data location
+# Set the environment variable MKID_RAW_PATH to point to the data location
 #
 # Example use:
 # 
-# $ export MKID_DATA_DIR=/Volumes/data/Palomar2011/Pal20110728
+# $ export MKID_RAW_PATH=/Volumes/data/Palomar2011/Pal20110728
 # python palomar-2011.py obs_20110729-151443.h5
 
 import sys, os
@@ -28,9 +28,9 @@ if (len(sys.argv) < 2):
     print "Usage:  ",sys.argv[0]," hdf5FileName"
     sys.exit(1)
 
-# make the full file name by joining the input name to the MKID_DATA_DIR (or .)
+# make the full file name by joining the input name to the MKID_RAW_PATH (or .)
 hdf5FileName = sys.argv[1]
-dataDir = os.getenv('MKID_DATA_DIR','.')
+dataDir = os.getenv('MKID_RAW_PATH','.')
 hdf5FullFileName = os.path.join(dataDir,hdf5FileName)
 print "full file name is ",hdf5FullFileName
 if (not os.path.exists(hdf5FullFileName)):

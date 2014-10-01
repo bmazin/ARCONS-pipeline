@@ -38,7 +38,7 @@ class CalculateRaDec:
             if os.path.isabs(centroidListFile) == True:
                 fullCentroidListFileName = centroidListFile
             else:
-                scratchDir = os.getenv('INTERM_PATH')
+                scratchDir = os.getenv('MKID_PROC_PATH')
                 centroidDir = os.path.join(scratchDir,'centroidListFiles')
                 fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
             if (not os.path.exists(fullCentroidListFileName)):
@@ -109,7 +109,8 @@ class CalculateRaDec:
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
         self.timestamp = np.array(timestamp)
         self.xPhotonPixel = np.array(xPhotonPixel)  #.astype('int')        #Don't require integer values for inputs - JvE 7/19/2013
-        self.yPhotonPixel = np.array(yPhotonPixel)  #.astype('int')
+        # INVERT Y AXIS HERE, WILL NEED TO ADD OPTION
+        self.yPhotonPixel = self.nRow - np.array(yPhotonPixel)  #.astype('int')
         self.xyPhotonPixel = np.array([self.xPhotonPixel,self.yPhotonPixel])  #2 x nPhotons array of x,y pairs
 
         self.inputLength = len(self.timestamp)

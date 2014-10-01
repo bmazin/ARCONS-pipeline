@@ -4,7 +4,7 @@ Author: Matt Strader        Date: August 19, 2012
 
 The class ObsFile is an interface to observation files.  It provides methods for typical ways of accessing and viewing observation data.  It can also load and apply wavelength and flat calibration.  With calibrations loaded, it can write the obs file out as a photon list
 
-Looks for observation files in $MKID_DATA_DIR and calibration files organized in $INTERM_PATH (intermediate or scratch path)
+Looks for observation files in $MKID_RAW_PATH and calibration files organized in $MKID_PROC_PATH (intermediate or scratch path)
 
 Class Obsfile:
 __init__(self, fileName,verbose=False)
@@ -78,20 +78,28 @@ class ObsFile:
     nCalCoeffs = 3
     def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
         """
-        load the given file with fileName relative to $MKID_DATA_DIR
+        load the given file with fileName relative to $MKID_RAW_PATH
         """
         self.makeMaskVersion = makeMaskVersion
         self.loadFile(fileName,verbose=verbose)
+        self.beammapFileName = None  #Normally the beammap comes directly from the raw obs file itself, so this is only relevant if a new one is loaded with 'loadBeammapFile'.
         self.wvlCalFile = None #initialize to None for an easy test of whether a cal file has been loaded
+        self.wvlCalFileName = None
         self.flatCalFile = None
+        self.flatCalFileName = None
         self.fluxCalFile = None
+        self.fluxCalFileName = None
         self.timeAdjustFile = None
+        self.timeAdjustFileName = None
         self.hotPixFile = None
+        self.hotPixFileName = None
         self.hotPixTimeMask = None
         self.hotPixIsApplied = False
         self.cosmicMaskIsApplied = False
         self.cosmicMask = None # interval of times to mask cosmic ray events
+        self.cosmicMaskFileName = None
         self.centroidListFile = None
+        self.centroidListFileName = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
         
@@ -154,9 +162,9 @@ class ObsFile:
         else:
             self.fileName = fileName
             # make the full file name by joining the input name 
-            # to the MKID_DATA_DIR (or . if the environment variable 
+            # to the MKID_RAW_PATH (or . if the environment variable 
             # is not defined)
-            dataDir = os.getenv('MKID_DATA_DIR', '/')
+            dataDir = os.getenv('MKID_RAW_PATH', '/')
             self.fullFileName = os.path.join(dataDir, self.fileName)
 
         if (not os.path.exists(self.fullFileName)):
@@ -334,11 +342,12 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False, getRawCount=False, fignum=None):
+                   scaleByEffInt=False, getRawCount=False, fignum=None, ds9=False):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
         if weighted is True, flat cal weights are applied
+        If fluxWeighted is True, apply flux cal weights.
         if scaleByEffInt is True, then counts are scaled by effective exposure
         time on a per-pixel basis.
         nSdevMax - max end of stretch scale for display, in # sigmas above the mean.
@@ -347,10 +356,14 @@ class ObsFile:
         file need be loaded).
         fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
                  specify target window number).
+        ds9 - boolean, if True, display in DS9 instead of regular plot window.
         """
         secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
                                          getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
-        utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
+        if ds9 is True:
+            utils.ds9Array(secImg)
+        else:
+            utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
                         plotTitle=plotTitle, fignum=fignum)
 
             
@@ -437,6 +450,10 @@ class ObsFile:
         #    
         #else:
         
+        #************TEST********
+        #dither = False
+        #*************************
+        
         x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         timestamps, parabolaPeaks, baselines, effIntTime = \
             x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
@@ -479,7 +496,7 @@ class ObsFile:
             
     
     def getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,
-                      weighted=False, fluxWeighted=False, getRawCount=False):
+                      weighted=False, fluxWeighted=False, getRawCount=False, timeSpacingCut=None):
         """
         returns the number of photons received in a given pixel from firstSec to firstSec + integrationTime
         - if integrationTime is -1, all time after firstSec is used.  
@@ -503,7 +520,7 @@ class ObsFile:
         """
         
         if getRawCount is True:
-            x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
+            x = self.getTimedPacketList(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime, timeSpacingCut=timeSpacingCut)
             #x2 = self.getTimedPacketList_old(iRow, iCol, firstSec=firstSec, integrationTime=integrationTime)
             #assert np.array_equal(x['timestamps'],x2['timestamps'])
             #assert np.array_equal(x['effIntTime'],x2['effIntTime'])
@@ -514,7 +531,7 @@ class ObsFile:
             return {'counts':counts, 'effIntTime':effIntTime}
 
         else:
-            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted)
+            pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted, timeSpacingCut=timeSpacingCut)
             counts = sum(pspec['spectrum'])
             return {'counts':counts, 'effIntTime':pspec['effIntTime']}
 
@@ -1332,13 +1349,14 @@ class ObsFile:
         Can be used to correct pixel location mistackes
         """
         #get the beam image.
-        scratchDir = os.getenv('INTERM_PATH', '/')
+        scratchDir = os.getenv('MKID_PROC_PATH', '/')
         beammapPath = os.path.join(scratchDir, 'pixRemap')
         fullBeammapFileName = os.path.join(beammapPath, beammapFileName)
         if (not os.path.exists(fullBeammapFileName)):
             print 'Beammap file does not exist: ', fullBeammapFileName
             return
-        beammapFile = tables.openFile(beammapFileName,'r')
+        beammapFile = tables.openFile(fullBeammapFileName,'r')
+        self.beammapFileName = fullBeammapFileName
         try:
             self.beamImage = beammapFile.getNode('/beammap/beamimage').read()
         except Exception as inst:
@@ -1353,25 +1371,27 @@ class ObsFile:
         Load an astrometry (centroid list) file into the 
         current obs file instance.
         """
-        scratchDir = os.getenv('INTERM_PATH', '/')
+        scratchDir = os.getenv('MKID_PROC_PATH', '/')
         centroidListPath = os.path.join(scratchDir, 'centroidListFiles')
         fullCentroidListFileName = os.path.join(centroidListPath, centroidListFileName)
-        if (not os.path.exists(centroidListFileName)):
-            print 'Astrometry centroid list file does not exist: ', centroidListFileName
+        if (not os.path.exists(fullCentroidListFileName)):
+            print 'Astrometry centroid list file does not exist: ', fullCentroidListFileName
             return
-        self.centroidListFile = tables.openFile(centroidListFileName)
+        self.centroidListFile = tables.openFile(fullCentroidListFileName)
+        self.centroidListFileName = fullCentroidListFileName
         
     def loadFlatCalFile(self, flatCalFileName):
         """
         loads the flat cal factors from the given file
         """
-        scratchDir = os.getenv('INTERM_PATH', '/')
+        scratchDir = os.getenv('MKID_PROC_PATH', '/')
         flatCalPath = os.path.join(scratchDir, 'flatCalSolnFiles')
         fullFlatCalFileName = os.path.join(flatCalPath, flatCalFileName)
         if (not os.path.exists(fullFlatCalFileName)):
             print 'flat cal file does not exist: ', fullFlatCalFileName
             return
         self.flatCalFile = tables.openFile(fullFlatCalFileName, mode='r')
+        self.flatCalFileName = fullFlatCalFileName
         self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
         self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
@@ -1381,13 +1401,14 @@ class ObsFile:
         """
         loads the flux cal factors from the given file
         """
-        scratchDir = os.getenv('INTERM_PATH', '/')
+        scratchDir = os.getenv('MKID_PROC_PATH', '/')
         fluxCalPath = os.path.join(scratchDir, 'fluxCalSolnFiles')
         fullFluxCalFileName = os.path.join(fluxCalPath, fluxCalFileName)
         if (not os.path.exists(fullFluxCalFileName)):
             print 'flux cal file does not exist: ', fullFluxCalFileName
             return
         self.fluxCalFile = tables.openFile(fullFluxCalFileName, mode='r')
+        self.fluxCalFileName = fullFluxCalFileName
         self.fluxWeights = self.fluxCalFile.root.fluxcal.weights.read()
         self.fluxFlags = self.fluxCalFile.root.fluxcal.flags.read()
         self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
@@ -1402,7 +1423,7 @@ class ObsFile:
         """
         import hotpix.hotPixels as hotPixels    #Here instead of at top to prevent circular import problems.
 
-        scratchDir = os.getenv('INTERM_PATH', '/')
+        scratchDir = os.getenv('MKID_PROC_PATH', '/')
         hotPixCalPath = os.path.join(scratchDir, 'hotPixCalFiles')
         fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
         if (not os.path.exists(fullHotPixCalFileName)):
@@ -1411,6 +1432,7 @@ class ObsFile:
 
         self.hotPixFile = tables.openFile(fullHotPixCalFileName)
         self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile)
+        self.hotPixFileName = fullHotPixCalFileName
         
         if (os.path.basename(self.hotPixTimeMask['obsFileName'])
             != os.path.basename(self.fileName)):
@@ -1439,6 +1461,7 @@ class ObsFile:
 
     def loadCosmicMask(self, cosmicMaskFileName=None, switchOnCosmicMask=True):
         self.cosmicMask = ObsFile.readCosmicIntervalFromFile(cosmicMaskFileName)
+        self.cosmicMaskFileName = os.path.abspath(cosmicMaskFileName)
         if switchOnCosmicMask: self.switchOnCosmicTimeMask()
 
     def setCosmicMask(self, cosmicMask, switchOnCosmicMask=True):
@@ -1457,9 +1480,11 @@ class ObsFile:
         roachDelayTable = self.timeAdjustFile.root.timeAdjust.roachDelays
         try:
             self.roachDelays = roachDelayTable.readWhere('obsFileName == "%s"'%self.fileName)[0]['roachDelays']
+            self.timeAdjustFileName = os.path.abspath(timeAdjustFileName)
         except:
             self.timeAdjustFile.close()
             self.timeAdjustFile=None
+            self.timeAdjustFileName=None
             del self.firmwareDelay
             if verbose:
                 print 'Unable to load time adjustment for '+self.fileName
@@ -1470,7 +1495,7 @@ class ObsFile:
         Searchs the waveCalSolnFiles directory tree for the best wavecal to apply to this obsfile.
         if master==True then it first looks for a master wavecal solution
         """
-        scratchDir = '/Scratch'
+        scratchDir = os.getenv('MKID_PROC_PATH', '/')
         run = FileName(obsFile=self).run
         wvlDir = scratchDir+"/waveCalSolnFiles/"+run+'/'
         obs_t_num = strpdate2num("%Y%m%d-%H%M%S")(FileName(obsFile=self).tstamp)
@@ -1503,12 +1528,13 @@ class ObsFile:
         if os.path.exists(str(wvlCalFileName)):
             fullWvlCalFileName = str(wvlCalFileName)
         else:
-            scratchDir = '/Scratch'
+            scratchDir = os.getenv('MKID_PROC_PATH', '/')
             wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
             fullWvlCalFileName = os.path.join(wvlDir, str(wvlCalFileName))
         try:
             self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
             wvlCalData = self.wvlCalFile.root.wavecal.calsoln
+            self.wvlCalFileName = fullWvlCalFileName 
             self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
             self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
             self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
@@ -1751,7 +1777,7 @@ class ObsFile:
         photonlist.photlist.writePhotonList(self,*nkwargs,**kwargs)
         
         
-#        writes out the photon list for this obs file at $INTERM_PATH/photonListFileName
+#        writes out the photon list for this obs file at $MKID_PROC_PATH/photonListFileName
 #        currently cuts out photons outside the valid wavelength ranges from the wavecal
 #       
 #        Currently being updated... JvE 4/26/2013.

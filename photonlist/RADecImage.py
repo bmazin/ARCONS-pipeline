@@ -4,7 +4,7 @@ Author: Julian van Eyken                    Date: May 15 2013
 Package/class for handling of images created from photon lists that are derotated and
 mapped to sky coordinates, and stacked.
 
-(NB - NEED TO DOCUMENT OBJECT PROPERTIES)
+(NB - NEED TO COMPLETE DOCUMENTATION OF OBJECT ATTRIBUTES)
 
 '''
 
@@ -36,6 +36,24 @@ class RADecImage(object):
     should all then be importable in python using 'import boxer', 
     and this module should all then run fine (see also readme.txt
     in this directory).
+
+    OBJECT ATTRIBUTES (assume read-only unless otherwise stated!):
+    
+        .nPixRA, .nPixDec   - number of virtual pixels in RA and Dec directions
+        .cenRA, .cenDec     - RA and dec of center of virtual image grid (radians)
+        .vPlateScale        - Arcseconds per pixel for virtual image grid
+        .imageIsLoaded      - True if image data has been loaded into the object
+        
+        .image              - nPixRA x nPixDec array representing the virtual image stored
+                                (NOT weighted by exposure time!)
+        .effIntTimes        - nPixRA x nPixDec array of total effective exposure times for each 
+                                virtual image pixel (seconds)
+        .expTimeWeights     - weights to apply to .image to account for effective exposure times
+                                of each pixel. i.e., to get a fully exposure time corrected image,
+                                use .image x .expTimeWeights
+        .gridRA, .gridDec   - 1D arrays containing the virtual pixel boundaries in the RA and dec 
+                                directions.
+        .totExpTime         - Scalar, total exposure time for the current image (seconds)
     '''
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
@@ -294,7 +312,7 @@ class RADecImage(object):
         if savePreStackImage is not None:
             saveName = 'det-'+savePreStackImage
             print 'Making detector-frame image slice for diagnostics: '+saveName
-            detImSlice = np.histogram2d(photons['yPix'],photons['xPix'])
+            detImSlice = np.histogram2d(photons['yPix'],photons['xPix'],bins=[photList.nRow,photList.nCol])[0]
             mpl.imsave(fname=saveName,arr=detImSlice,origin='lower',
                        cmap=mpl.cm.gray,vmin=np.percentile(detImSlice, 0.5), vmax=np.percentile(detImSlice,99.5))
     
@@ -442,8 +460,9 @@ class RADecImage(object):
         if savePreStackImage is not None:
             print 'Saving exp.time weighted pre-stacked image to '+savePreStackImage
             print 'cmap: ', mpl.cm.gray
-            mpl.imsave(fname=savePreStackImage,arr=thisImage/vExpTimes,origin='lower',cmap=mpl.cm.gray,
-                       vmin=np.percentile(thisImage, 0.5), vmax=np.percentile(thisImage,99.5))
+            imToSave = thisImage/vExpTimes
+            mpl.imsave(fname=savePreStackImage,arr=imToSave,origin='lower',cmap=mpl.cm.gray,
+                       vmin=np.percentile(imToSave, 1.0), vmax=np.percentile(imToSave,99.0))
         
         if self.imageIsLoaded is False or doStack is False:
             self.image = thisImage           #For now, let's keep it this way.... Since weighting does odd things.
@@ -464,11 +483,15 @@ class RADecImage(object):
 
 
 
-    def display(self,normMin=None,normMax=None,expWeight=True,pclip=None,colormap=mpl.cm.gnuplot2,
+    def display(self,normMin=None,normMax=None,expWeight=True,pclip=None,colormap=mpl.cm.hot,
                 image=None, logScale=False, fileName=None):
         '''
         Display the current image. Currently just a short-cut to utils.plotArray,
         but needs updating to mark RA and Dec on the axes.
+        
+        NOTE: FOR NOW, PLOTTING AGAINST RA/DEC IS SWITCHED OFF, SINCE IT LOOKS LIKE THE IMAGE FLIP/ROTATION
+        ASSUMED BY CALCULATERADEC.PY MAY BE WRONG. NEEDS SORTING OUT, BUT IN THE MEANTIME, JUST SHOW THE IMAGE
+        THE RIGHT WAY ROUND, AND DON'T LABEL THE AXES.
         
         INPUTS:
             normMin, normMax: Minimum and maximum values for the color-scale stretch
@@ -483,6 +506,8 @@ class RADecImage(object):
             
         '''
         
+        showCoordsOnAxes = False    #For now, don't try, since it looks like image flip/rotation assumed by CalculateRaDec may be wrong.
+        
         if expWeight:
             toDisplay = np.copy(self.image*self.expTimeWeights)
         else:
@@ -495,7 +520,8 @@ class RADecImage(object):
         #####################
         #Rotate by 180deg so north is up and east is left - just a fudge for now, need to
         #sort this out properly.
-        toDisplay = np.rot90(np.rot90(toDisplay))
+        if showCoordsOnAxes is False:
+            toDisplay = np.rot90(np.rot90(toDisplay))
         #####################
         
         if pclip:
@@ -517,19 +543,31 @@ class RADecImage(object):
         #ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
         mpl.ticklabel_format(style='plain',useOffset=False)
         mpl.tick_params(direction='out')
-        mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=(180./np.pi)*
-                    np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]]),
-                    origin='upper', cmap=colormap)
+        
+        ### Use until we get image rotation/flip sorted out properly
+        if showCoordsOnAxes is True:
+            origin = 'lower'
+            extent = ( (180./np.pi)*
+                    np.array([self.gridRA[0],self.gridRA[-1],self.gridDec[0],self.gridDec[-1]]) )
+        else:
+            origin = 'lower'
+            extent = None
+        ###
+        
+        mpl.imshow(toDisplay,vmin=normMin,vmax=normMax, extent=extent,
+                    origin=origin, cmap=colormap)
         #mpl.ticklabel_format(style='plain',useOffset=False)
- 
-        ax = mpl.gca()
-        xtickBase = 10**(np.round(np.log10((self.gridRA[-1]-self.gridRA[0])*180./np.pi/10.)))
-        ytickBase = 10**(np.round(np.log10((self.gridDec[-1]-self.gridDec[0])*180./np.pi/10.)))
-        ax.xaxis.set_major_locator(mpl.MultipleLocator(base=xtickBase))
-        ax.yaxis.set_major_locator(mpl.MultipleLocator(base=ytickBase))
-        mpl.xticks(rotation=90)
-        mpl.xlabel('R.A. (deg)')
-        mpl.ylabel('Dec. (deg)')
+        
+        if showCoordsOnAxes is True:
+            ax = mpl.gca()
+            xtickBase = 10**(np.round(np.log10((self.gridRA[-1]-self.gridRA[0])*180./np.pi/10.)))
+            ytickBase = 10**(np.round(np.log10((self.gridDec[-1]-self.gridDec[0])*180./np.pi/10.)))
+            ax.xaxis.set_major_locator(mpl.MultipleLocator(base=xtickBase))
+            ax.yaxis.set_major_locator(mpl.MultipleLocator(base=ytickBase))
+            mpl.xticks(rotation=90)
+            mpl.xlabel('R.A. (deg)')
+            mpl.ylabel('Dec. (deg)')
+        mpl.colorbar()
         
         #ax.xaxis.set_major_locator(mpl.MultipleLocator(base=0.001))
         #ax.yaxis.set_major_locator(mpl.MultipleLocator(base=0.001))
