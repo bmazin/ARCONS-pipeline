@@ -127,7 +127,8 @@ def main():
     flatCalFileName = os.path.join(flatdir, flatfile)
 
     obs = ObsFile(obsFileName)
-    obs.loadWvlCalFile(wvlCalFileName)
+    #obs.loadWvlCalFile(wvlCalFileName)
+    obs.loadBestWvlCalFile()
     obs.loadFlatCalFile(flatCalFileName)
     print "analyzing file %s"%(obsFileName)
     print "loaded data file and calibrations\n---------------------\n"
@@ -143,6 +144,15 @@ def main():
     #print nCol
     #print nWvlBins
     
+    #Apply Hot pixel masking before getting dead time correction
+    #HotPixFile = getTimeMaskFileName(obsFileName)
+    HotPixFile = FileName(obsFile=obs).timeMask()
+    print "making hot pixel file ", HotPixFile
+    if not os.path.exists(HotPixFile): #check if hot pix file already exists
+        hp.findHotPixels(inputFileName=obsFileName,outputFileName=HotPixFile)
+        print "Flux file pixel mask saved to %s"%(HotPixFile)
+    obs.loadHotPixCalFile(HotPixFile)
+    print "Hot pixel mask loaded %s"%(HotPixFile)
 
     #GET RAW PIXEL COUNT IMAGE TO CALCULATE CORRECTION FACTORS
     print "Making raw cube to get dead time correction"
@@ -179,18 +189,20 @@ def main():
     print "Dead time correction factors = "
     print CorrFactors
 
-    print "Making Weighted cube"
     #REMAKE CUBE WITH FLAT WEIGHTS AND APPLY DEAD TIME CORRECTION AS WELL
-
+    print "Making Weighted cube"
     #load/generate hot pixel mask file
-    HotPixFile = getTimeMaskFileName(obsFileName)
+    #HotPixFile = getTimeMaskFileName(obsFileName)
+    HotPixFile = FileName(obsFile=obs).timeMask()
     if not os.path.exists(HotPixFile): #check if hot pix file already exists
-        hp.findHotPixels(obsFileName,HotPixFile)
+        hp.findHotPixels(inputFileName=obsFileName,outputFileName=HotPixFile)
         print "Flux file pixel mask saved to %s"%(HotPixFile)
     obs.loadHotPixCalFile(HotPixFile)
     print "Hot pixel mask loaded %s"%(HotPixFile)
 
-    cubeDict = obs.getSpectralCube(firstSec=startTime, integrationTime=intTime, weighted=False)
+    cubeDict = obs.getSpectralCube(firstSec=startTime, integrationTime=intTime, weighted=True, fluxWeighted=False)
+    #cubeDict = obs.getSpectralCube(firstSec=startTime, integrationTime=intTime, weighted=True, fluxWeighted=True)
+
 
     cube= np.array(cubeDict['cube'], dtype=np.double)
     wvlBinEdges= cubeDict['wvlBinEdges']
@@ -233,8 +245,9 @@ def main():
     #print "--------------------------"
     #print movieCube
 
-    np.savez('%s_raw_%s.npz'%(objectName,fileNum),stack=movieCube,wvls=wvls)
-    utils.makeMovie(movieCube,frameTitles=wvls,cbar=True,outName='%s_raw_%s.gif'%(objectName,fileNum), normMin=0, normMax=50)
+    outdir = '/home/srmeeker/scratch/standards/'
+    np.savez(outdir+'%s_raw_%s.npz'%(objectName,fileNum),stack=movieCube,wvls=wvls)
+    utils.makeMovie(movieCube,frameTitles=wvls,cbar=True,outName=outdir+'%s_raw_%s.gif'%(objectName,fileNum), normMin=0, normMax=50)
 
     '''
     #load std spectrum for comparison
