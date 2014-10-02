@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'LoadImageStack_gui.ui'
 #
-# Created: Wed May  7 11:28:48 2014
+# Created: Thu Oct  2 12:08:24 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -136,11 +136,11 @@ class Ui_LoadImageStack_gui(object):
         self.yLine.setGeometry(QtCore.QRect(100, 740, 51, 27))
         self.yLine.setObjectName(_fromUtf8("yLine"))
         self.apertureCheckbox = QtGui.QCheckBox(LoadImageStack_gui)
-        self.apertureCheckbox.setGeometry(QtCore.QRect(530, 60, 121, 22))
+        self.apertureCheckbox.setGeometry(QtCore.QRect(530, 30, 121, 22))
         self.apertureCheckbox.setChecked(True)
         self.apertureCheckbox.setObjectName(_fromUtf8("apertureCheckbox"))
         self.annulusCheckbox = QtGui.QCheckBox(LoadImageStack_gui)
-        self.annulusCheckbox.setGeometry(QtCore.QRect(530, 100, 121, 22))
+        self.annulusCheckbox.setGeometry(QtCore.QRect(530, 70, 121, 22))
         self.annulusCheckbox.setChecked(True)
         self.annulusCheckbox.setObjectName(_fromUtf8("annulusCheckbox"))
         self.allButton = QtGui.QPushButton(LoadImageStack_gui)
@@ -167,6 +167,41 @@ class Ui_LoadImageStack_gui(object):
         self.centroidButton.setGeometry(QtCore.QRect(560, 700, 92, 51))
         self.centroidButton.setAutoDefault(False)
         self.centroidButton.setObjectName(_fromUtf8("centroidButton"))
+        self.compassDock = MPL_Widget(LoadImageStack_gui)
+        self.compassDock.setGeometry(QtCore.QRect(530, 100, 141, 141))
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.compassDock.sizePolicy().hasHeightForWidth())
+        self.compassDock.setSizePolicy(sizePolicy)
+        palette = QtGui.QPalette()
+        brush = QtGui.QBrush(QtGui.QColor(255, 245, 248))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Base, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 245, 248))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Window, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 245, 248))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Base, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 245, 248))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Window, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 245, 248))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Base, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 245, 248))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Window, brush)
+        self.compassDock.setPalette(palette)
+        self.compassDock.setObjectName(_fromUtf8("compassDock"))
+        self.hourAngleLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.hourAngleLabel.setGeometry(QtCore.QRect(580, 260, 91, 20))
+        self.hourAngleLabel.setText(_fromUtf8(""))
+        self.hourAngleLabel.setObjectName(_fromUtf8("hourAngleLabel"))
+        self.label_2 = QtGui.QLabel(LoadImageStack_gui)
+        self.label_2.setGeometry(QtCore.QRect(530, 250, 51, 31))
+        self.label_2.setObjectName(_fromUtf8("label_2"))
 
         self.retranslateUi(LoadImageStack_gui)
         QtCore.QMetaObject.connectSlotsByName(LoadImageStack_gui)
@@ -216,5 +251,7 @@ class Ui_LoadImageStack_gui(object):
         self.skySubtractionCheckbox.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Sky Subtraction", None, QtGui.QApplication.UnicodeUTF8))
         self.centroidButton.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Centroid\n"
 "Frames", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_2.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Hour\n"
+"Angle:", None, QtGui.QApplication.UnicodeUTF8))
 
 from mpl_pyqt4_widget import MPL_Widget

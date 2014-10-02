@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'DisplayStack_gui.ui'
 #
-# Created: Fri Apr 11 15:00:23 2014
+# Created: Thu Oct  2 10:19:56 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -166,6 +166,10 @@ class Ui_DisplayStack_gui(object):
         font.setWeight(75)
         self.targetButton.setFont(font)
         self.targetButton.setObjectName(_fromUtf8("targetButton"))
+        self.verticalFlipBox = QtGui.QCheckBox(self.centralwidget)
+        self.verticalFlipBox.setGeometry(QtCore.QRect(500, 580, 171, 22))
+        self.verticalFlipBox.setChecked(True)
+        self.verticalFlipBox.setObjectName(_fromUtf8("verticalFlipBox"))
         DisplayStack_gui.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(DisplayStack_gui)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1101, 25))
@@ -203,4 +207,5 @@ class Ui_DisplayStack_gui(object):
         self.runLabel.setText(QtGui.QApplication.translate("DisplayStack_gui", "Runs", None, QtGui.QApplication.UnicodeUTF8))
         self.targetLabel.setText(QtGui.QApplication.translate("DisplayStack_gui", "Targets", None, QtGui.QApplication.UnicodeUTF8))
         self.targetButton.setText(QtGui.QApplication.translate("DisplayStack_gui", "Load Target", None, QtGui.QApplication.UnicodeUTF8))
+        self.verticalFlipBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Vertical Flip", None, QtGui.QApplication.UnicodeUTF8))
 

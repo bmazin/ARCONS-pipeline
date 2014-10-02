@@ -189,7 +189,7 @@ class DisplayStack(QMainWindow):
                
         # Flat calibration settings
         self.useFlatCalibration = self.ui.flatCalibrationBox.isChecked()
-        self.useDeadPixelMasking = self.ui.deadPixelBox.isChecked()    
+        self.useDeadPixelMasking = self.ui.deadPixelBox.isChecked() 
 
         self.fileCount = self.ui.inputList.count()  
 
@@ -227,7 +227,7 @@ class DisplayStack(QMainWindow):
     def loadHotMask(self):
         self.hotPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/HotPixelMasks/hotPixelMask_' + self.obsTS + '.h5')
         if not os.path.exists(self.hotPixelFilename):
-            hp.findHotPixels(self.obsFn,self.hotPixelFilename)
+            hp.findHotPixels(obsFile=self.ob,outputFileName=self.hotPixelFilename)
             print "Hot pixel mask saved to %s"%(self.hotPixelFilename)
         self.ob.loadHotPixCalFile(self.hotPixelFilename,switchOnMask=True)
 
@@ -465,7 +465,11 @@ class DisplayStack(QMainWindow):
                         self.times.append(self.jd)
                         print 'Creating frame for time ' + str(self.jd)
                         self.frameData = self.ob.getPixelCountImage(firstSec=iSec,integrationTime=self.integrationTime,weighted=self.weighted,getRawCount=self.useRawCounts,scaleByEffInt=self.scaleByEffInt)
-                        self.frame = self.frameData['image']         
+                        self.frame = self.frameData['image']
+
+                        if self.ui.verticalFlipBox.isChecked():
+                            self.frame = np.flipud(self.frame)                   
+         
                         if self.useDeadPixelMasking:
                             self.frame[self.deadMask == 0] = np.nan
                         self.frames.append(self.frame)
