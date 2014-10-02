@@ -236,37 +236,32 @@ class LoadImageStack(QDialog):
         arrowLineNX2 = northArrowX - arrowLine*np.cos(3.*np.pi/4.-currentHA_radians)
         arrowLineNY2 = northArrowY - arrowLine*np.sin(3.*np.pi/4.-currentHA_radians)
 
-        eastLineX = northLine*np.cos(-currentHA_radians)
-        eastLineY = northLine*np.sin(-currentHA_radians)
+        eastLineX = northLine*np.cos(np.pi-currentHA_radians)
+        eastLineY = northLine*np.sin(np.pi-currentHA_radians)
         
         eastArrowX = eastLineX[-1]
         eastArrowY = eastLineY[-1]
 
-        arrowLineEX1 = eastArrowX - arrowLine*np.cos(-np.pi/4.-currentHA_radians)
-        arrowLineEY1 = eastArrowY - arrowLine*np.sin(-np.pi/4.-currentHA_radians)
-        arrowLineEX2 = eastArrowX - arrowLine*np.cos(np.pi/4.-currentHA_radians)
-        arrowLineEY2 = eastArrowY - arrowLine*np.sin(np.pi/4.-currentHA_radians)
+        arrowLineEX1 = eastArrowX - arrowLine*np.cos(3.*np.pi/4.-currentHA_radians)
+        arrowLineEY1 = eastArrowY - arrowLine*np.sin(3.*np.pi/4.-currentHA_radians)
+        arrowLineEX2 = eastArrowX - arrowLine*np.cos(5.*np.pi/4.-currentHA_radians)
+        arrowLineEY2 = eastArrowY - arrowLine*np.sin(5.*np.pi/4.-currentHA_radians)
         
 
         self.ui.hourAngleLabel.setText(str(currentHA_degrees))
 
+        stretchFactor = 1.8
+
         self.ui.compassDock.canvas.ax.clear()
-        self.ui.compassDock.canvas.ax.plot(northLineX,northLineY, 'k', arrowLineNX1, arrowLineNY1, 'k', arrowLineNX2, arrowLineNY2, 'k', eastLineX,eastLineY, 'b', arrowLineEX1, arrowLineEY1, 'b', arrowLineEX2, arrowLineEY2, 'b')
-        #self.ui.compassDock.canvas.ax.annotate(
-        self.ui.compassDock.canvas.ax.set_xlim([-1.1,1.1])
-        self.ui.compassDock.canvas.ax.set_ylim([-1.1,1.1])
+        self.ui.compassDock.canvas.ax.plot(northLineX,northLineY, 'k', arrowLineNX1, arrowLineNY1, 'k', arrowLineNX2, arrowLineNY2, 'k', eastLineX,eastLineY, 'k', arrowLineEX1, arrowLineEY1, 'k', arrowLineEX2, arrowLineEY2, 'k', [0.0,0.0], [-stretchFactor,stretchFactor], 'b--', [-stretchFactor,stretchFactor], [0.0,0.0], 'b--')
+        self.ui.compassDock.canvas.ax.annotate('N', (northArrowX*1.4,northArrowY*1.4), horizontalalignment='center', verticalalignment='center')
+        self.ui.compassDock.canvas.ax.annotate('E', (eastArrowX*1.4,eastArrowY*1.4), horizontalalignment='center', verticalalignment='center')
+        self.ui.compassDock.canvas.ax.set_xlim([-stretchFactor,stretchFactor])
+        self.ui.compassDock.canvas.ax.set_ylim([-stretchFactor,stretchFactor])
         self.ui.compassDock.canvas.ax.get_xaxis().set_visible(False)
         self.ui.compassDock.canvas.ax.get_yaxis().set_visible(False)
         self.ui.compassDock.canvas.draw()
-        #self.ui.plotDock.canvas.ax.xaxis.tick_bottom()
-        #self.ui.plotDock.canvas.ax.set_xlim([-0.5,self.nCol-0.5])
-        #self.ui.plotDock.canvas.ax.set_ylim([-0.5,self.nRow-0.5])
-
-        #plt.plot(northLineX,northLineY, 'k', eastLineX,eastLineY, 'b')
-        #plt.show()
-        #eastLine = np.zeros(100)
-
-        #currentHA = self.HA_offset + currentLST - self.centroid_RA_arcsec
+        
 
 
     def performAperturePhotometry(self):
