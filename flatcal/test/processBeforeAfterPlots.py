@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from util.popup import PopUp,plotArray,pop
 import itertools
@@ -6,6 +7,8 @@ import itertools
 from fitFunctions import gaussian
 import mpfit
 from peakWidth import peakWidth
+import pickle
+from astropy.stats.funcs import sigma_clip
 
 
 #from http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
@@ -81,34 +84,72 @@ def fitGauss(dataList,nBins=201):
 
     return {'gaussFit':gaussFit,'resolution':resolution,'sigma':sigma,'x_offset':x_offset,'amplitude':amplitude,'y_offset':y_offset,'hist':hist,'histBinEdges':histBinEdges,'gaussFitFunc':gaussFitFunc,'histBinCenters':histBinCenters,'parinfo':parinfo}
 
-fileName = 'beforeAfterImgsGem.npz'
+flatTstamp = '20140924'
+flatType = 'flat'
+#flatTstamp = '20121212-074700' #Geminga sky flat
+folder = '/Scratch/dataProcessing/flatTests/'
+lowerWvlCut = 4000
+upperWvlCut = 8000
+fileName = '{}Cube_{}m_wvl{}-{}.npz'.format(flatType,flatTstamp,lowerWvlCut,upperWvlCut)
+#fileName = 'flatCube_{}.npz'.format(flatTstamp)
 print fileName
-imgDict = np.load(fileName)
+
+imgDict = np.load(os.path.join(folder,fileName))
 beforeImg = imgDict['beforeImg']
 afterImg = imgDict['afterImg']
+
+bStableMask = False
+if bStableMask:
+    sdevImg = np.load('stableMask.npz')['sdevImg']
+    sdevThreshold = 4.
+    stableMask = np.logical_and(100.*sdevImg<sdevThreshold,sdevImg>0.)
+    beforeImg[~stableMask] = 0
+    afterImg[~stableMask] = 0
+    print 'masked stable sdev<{}%'.format(sdevThreshold)
+
+bCoolMask = False
+if bCoolMask:
+    effIntImg = np.load('stableMask.npz')['effIntImg']
+    effIntThreshold = .999
+    mask = effIntImg >= effIntThreshold
+    beforeImg[~mask] = 0
+    afterImg[~mask] = 0
+    print 'masked effIntTime fraction >{}'.format(effIntThreshold)
+
 deadBeforeImg = beforeImg == 0
 deadAfterImg = afterImg == 0
 
 
 nRows,nCols = np.shape(beforeImg)
 
-#beforeList = beforeImg[beforeImg != 0]
+beforeList = beforeImg[beforeImg != 0]
+
+#clippedBeforeImg,clipMask = sigma_clip(beforeImg,sig=3,maout=True)
 #
-#hotSigmaCutoff = 2.
-#
-#hotBefore = beforeImg > np.mean(beforeList)+hotSigmaCutoff*np.std(beforeList)
-#beforeImg[hotBefore] = 0.
-#afterImg[hotBefore] = 0.
+#beforeImg[clipMask] = 0
+#afterImg[clipMask] = 0
+
+hotSigmaCutoff = 2.
+
+hotBefore = beforeImg > np.mean(beforeList)+hotSigmaCutoff*np.std(beforeList)
+beforeImg[hotBefore] = 0.
+afterImg[hotBefore] = 0.
+
+#cut out pixels that the flatcal made hot
+afterList = afterImg[afterImg != 0]
+hotCutoff = np.percentile(afterList,97.)
+hotAfter = afterImg > np.mean(afterList)+hotCutoff
+
+beforeImg[hotAfter] = 0.
+afterImg[hotAfter] = 0.
 
 beforeList = beforeImg[beforeImg != 0]
 afterList = afterImg[afterImg != 0]
 
 
 plotArray(title='without flatcal',image=beforeImg)
-plotArray(title='with flatcal',image=afterImg)
+#plotArray(title='with flatcal',image=afterImg)
 
-beforeHist,beforeHistEdges = np.histogram(beforeList,bins=200)
-afterHist,afterHistEdges = np.histogram(afterList,bins=300)
 
 def plotFunc(fig,axes):
     axes.plot(beforeHistEdges[0:-1],beforeHist,label='without flatcal')
@@ -117,7 +158,7 @@ def plotFunc(fig,axes):
     axes.set_xlabel('Counts')
     axes.set_ylabel('Num of Pixels')
     axes.legend()
-pop(plotFunc=plotFunc)
+#pop(plotFunc=plotFunc)
 
 
 print 'before count',len(beforeList)
@@ -166,7 +207,7 @@ afterImgSub[deadAfterImg] = 0
 beforeImgSub = beforeImg * np.mean(beforeImgFit) / beforeImgFit
 beforeImgSub[deadBeforeImg] = 0
 
-plotArray(beforeImgSub,title='unflatcal\'d scaled by illumination')
+plotArray(beforeImgSub,title='unflatcal\'d, scaled by gray illumination')
 plotArray(afterImgSub,title='flatcal\'d')
 
 afterImgSub[deadAfterImg] = np.nan
@@ -174,25 +215,39 @@ beforeImgSub[deadBeforeImg] = np.nan
 
 subAfterList = afterImgSub[~np.isnan(afterImgSub)]
 subBeforeList = beforeImgSub[~np.isnan(beforeImgSub)]
-subBeforeHist,subBeforeHistEdges = np.histogram(subBeforeList,bins=300)
-subAfterHist,subAfterHistEdges = np.histogram(subAfterList,bins=300)
+nBins = int(len(afterList)/3.)
+subBeforeHist,subBeforeHistEdges = np.histogram(subBeforeList,bins=nBins)
+subAfterHist,subAfterHistEdges = np.histogram(subAfterList,bins=subBeforeHistEdges)
+beforeHist,beforeHistEdges = np.histogram(beforeList,bins=nBins)
+afterHist,afterHistEdges = np.histogram(afterList,bins=beforeHistEdges)
 
+rawFwhm = peakWidth(beforeHistEdges[0:-1],beforeHist)
 beforeFwhm = peakWidth(subBeforeHistEdges[0:-1],subBeforeHist)
 afterFwhm = peakWidth(subAfterHistEdges[0:-1],subAfterHist)
 
-print 'unflatfielded sigma', beforeFwhm['sigma']
-print 'flatfielded sigma', afterFwhm['sigma']
+print 'raw sigma', rawFwhm['sigma'],'{:.1f}%'.format(100.*rawFwhm['sigma']/rawFwhm['peakX']),np.sum((beforeList < 3200) | (beforeList > 4000))
+print 'gray scaled sigma', beforeFwhm['sigma'],'{:.1f}%'.format(100.*beforeFwhm['sigma']/beforeFwhm['peakX']),np.sum((subBeforeList < 3200) | (subBeforeList > 4000))
+print 'flatfielded sigma', afterFwhm['sigma'],'{:.1f}%'.format(100.*afterFwhm['sigma']/afterFwhm['peakX']),np.sum((subAfterList < 3200) | (subAfterList > 4000))
+
+shotNoiseSigma = np.sqrt(afterFwhm['peakX'])
+print 'shot noise sigma',shotNoiseSigma,'{:.1f}%'.format(100.*shotNoiseSigma/afterFwhm['peakX'])
+
+print 'noise ratio',afterFwhm['sigma']/shotNoiseSigma
 
 # Plot
 
 def plotFunc(fig,axes):
     axes.set_title('Distribution of pixel counts')
-    axes.plot(subBeforeHistEdges[0:-1],subBeforeHist,'k',label='unflatfielded image with \nillumination correction')
-    axes.plot(subAfterHistEdges[0:-1],subAfterHist,'gray',label='flatfield applied')
+    axes.plot(beforeHistEdges[0:-1],beforeHist,color='k',label='raw')
+    axes.plot(subBeforeHistEdges[0:-1],subBeforeHist,color='b',label='grayscale corrected')
+    axes.plot(subAfterHistEdges[0:-1],subAfterHist,'r',label='flatfield applied')
     axes.set_xlabel('Counts')
     axes.set_ylabel('Num of Pixels')
     axes.legend()
 pop(plotFunc=plotFunc)
+
+plotDict = {'rawHistEdges':beforeHistEdges,'rawHist':beforeHist,'illumHistEdges':subBeforeHistEdges,'illumHist':subBeforeHist,'flatHistEdges':subAfterHistEdges,'flatHist':subAfterHist}
+pickle.dump(plotDict,open( 'flatHist.pickle', 'wb' ))
 
 #subBeforeGaussFitDict = fitGauss(subBeforeList)
 #histBinEdges = subBeforeGaussFitDict['histBinEdges']
