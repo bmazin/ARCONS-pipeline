@@ -114,8 +114,8 @@ class LoadImageStack(QDialog):
         self.centroid_DEC_arcsec = self.radians_to_arcsec(self.centroid_DEC_radians)
     
         self.original_lst_radians = ephem.hours(self.original_lst).real
-        #self.original_lst_seconds = self.radians_to_arcsec(self.original_lst_radians)/15.0
-        self.original_lst_seconds = self.radians_to_arcsec(self.original_lst_radians)
+        self.original_lst_seconds = self.radians_to_arcsec(self.original_lst_radians)/15.0
+        #self.original_lst_seconds = self.radians_to_arcsec(self.original_lst_radians)
 
         self.HA_offset_radians = self.HA_offset*self.d2r
         
@@ -214,7 +214,7 @@ class LoadImageStack(QDialog):
     
     def drawCompass(self):
         compassAngle = np.zeros(self.totalFrames)
-        currentLST = self.original_lst_seconds + self.integrationTime/2.0 + self.currentFrame*self.integrationTime
+        currentLST = (self.original_lst_seconds + self.integrationTime/2.0 + self.currentFrame*self.integrationTime)*15.0 #in arcsec
         variableHA = currentLST - self.centroid_RA_arcsec
         variableHA_radians = self.arcsec_to_radians(variableHA)
         currentHA_radians = self.HA_offset_radians + variableHA_radians
@@ -410,14 +410,15 @@ class LoadImageStack(QDialog):
 
             currentImage = np.array(self.stackData[:,:,iFrame])
     
-            nanMask = np.isnan(currentImage)
-            #nanMask = currentImage == 0.0
+            #nanMask = np.isnan(currentImage)
+            currentImage[np.isnan(currentImage)] = 0.0#set to finite value that will be ignored
+            nanMask = currentImage == 0.0
             print nanMask
 
             err = np.sqrt(currentImage)
             #err = np.ones(np.shape(currentImage))
             err[apertureMask==0] = np.inf#weight points closer to the expected psf higher
-            currentImage[nanMask]=0#set to finite value that will be ignored
+            #currentImage[nanMask]=0#set to finite value that will be ignored
             err[nanMask] = np.inf#ignore these data points
             nearDeadCutoff=1#100/15 cps for 4000-6000 angstroms
             err[currentImage<nearDeadCutoff] = np.inf
@@ -473,7 +474,7 @@ class LoadImageStack(QDialog):
         print 'Done performing PSF fitting photometry...'
 
     def performCentroiding(self):
-        
+        '''
         # Function for converting arcseconds to radians.
         def arcsec_to_radians(total_arcsec):
             total_degrees = total_arcsec/3600.0
@@ -511,10 +512,12 @@ class LoadImageStack(QDialog):
         original_lst_radians = ephem.hours(original_lst).real
         original_lst_seconds = radians_to_arcsec(original_lst_radians)/15.0
 
+        '''
+
         # Load up dead pixel mask.  Invert for PyGuide format.
-        deadFile = np.load(deadPixelFilename)
-        deadMask = deadFile['deadMask']
-        deadMask = -1*deadMask + 1
+        #deadFile = np.load(self.deadPixelFilename)
+        #deadMask = deadFile['deadMask']
+        #deadMask = -1*deadMask + 1
         
         # Saturated pixels already taken care of by hot pixel code.
         satMask = np.zeros((46,44))
@@ -538,6 +541,10 @@ class LoadImageStack(QDialog):
             image = np.array(self.stackData[:,:,iFrame])
             nanMask = np.isnan(image)
             image[nanMask] = 0.
+        
+            deadMask = np.zeros((self.nRow,self.nCol))
+            deadMask[np.where(image==0)] = 1
+
             xyguess = np.array(self.centerPositions[iFrame])
             pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,apertureRadius,ccd,0,False,verbosity=2, doDS9=True)  
              # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
@@ -553,14 +560,14 @@ class LoadImageStack(QDialog):
 
 
             # Calculate lst for a given frame, at midpoint of frame
-            current_lst_seconds = original_lst_seconds + (iFrame+0.5)*integrationTime
-            current_lst_radians = arcsec_to_radians(current_lst_seconds*15.0)
+            current_lst_seconds = self.original_lst_seconds + (iFrame+0.5)*self.integrationTime
+            current_lst_radians = self.arcsec_to_radians(current_lst_seconds*15.0)
             # Calculate hour angle for a given frame. Include a constant offset for instrumental rotation.
-            HA_variable = current_lst_radians - centroid_RA_radians
-            HA_static = HA_offset*d2r
+            HA_variable = current_lst_radians - self.centroid_RA_radians
+            HA_static = self.HA_offset*self.d2r
             HA_current = HA_variable + HA_static
             # Make lists to save to h5 file
-            timeList.append((iFrame+0.5)*integrationTime)
+            timeList.append((iFrame+0.5)*self.integrationTime)
             xPositionList.append(xycenter[0])
             yPositionList.append(xycenter[1])
             hourAngleList.append(HA_current)
