@@ -301,7 +301,10 @@ class LoadImageStack(QDialog):
 
                 currentImage = np.array(self.stackData[:,:,iFrame])
                 
-                nanMask = np.isnan(currentImage)
+
+                currentImage[np.isnan(currentImage)] = 0.0#set to finite value that will be ignored
+                nanMask = currentImage == 0.0
+                #nanMask = np.isnan(currentImage)
 
                 aperturePixels = np.array(np.where(np.logical_and(apertureMask==1, nanMask==False)))
                 aperturePix = aperturePixels.shape[1]
@@ -341,7 +344,9 @@ class LoadImageStack(QDialog):
                 #print currentImage
 
                 #currentImage[np.where(currentImage==0.0)] = np.nan
-                nanMask = np.isnan(currentImage)
+                currentImage[np.isnan(currentImage)] = 0.0#set to finite value that will be ignored
+                nanMask = currentImage == 0.0
+                #nanMask = np.isnan(currentImage)
                 #nanMask = currentImage == 0.0
 
                 #currentImage[nanMask] = 0.0
