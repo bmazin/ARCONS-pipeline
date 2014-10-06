@@ -44,7 +44,7 @@ plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weigh
 plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1)
 setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000)
 switchOffHotPixTimeMask(self)
-switchOnHotPixTimeMask(self)
+switchOnHotPixTimeMask(self, reasons=[])
 writePhotonList(self)
 
 calculateSlices_old(inter, timestamps)
@@ -1037,7 +1037,7 @@ class ObsFile:
     	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
     	return summed_array, wvlBinEdges
     
-    def getPixelBadTimes(self, pixelRow, pixelCol):
+    def getPixelBadTimes(self, pixelRow, pixelCol, reasons=[]):
         """
         Get the time interval(s) for which a given pixel is bad (hot/cold,
         whatever, from the hot pixel cal file).
@@ -1046,8 +1046,8 @@ class ObsFile:
         """
         if self.hotPixTimeMask is None:
             raise RuntimeError, 'No hot pixel file loaded'
-        inter = interval.union(self.hotPixTimeMask['intervals'][pixelRow, pixelCol])
-        return inter
+
+        return self.hotPixTimeMask.get_intervals(pixelRow,pixelCol,reasons)
 
     def getDeadPixels(self, showMe=False, weighted=True, getRawCount=False):
         """
@@ -1429,23 +1429,7 @@ class ObsFile:
         self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
         self.nFluxCalWvlBins = self.nFlatCalWvlBins
 
-    def loadFlashingTimeMask(self, flashingTimeMaskFileName, flashOn=True, switchOnMask=True):
-        """
-        load hot pixel time mask for flashing wavecal file. 
-        By default it masks hot times and laser off times for each pixel.
-        Also, switches mask on by default
-        """
-        fullFileName = FileName(obsFile=self).timeMask()
-        if (not os.path.exists(fullFileName)):
-            print 'Hot pixel cal file does not exist: ', fullFileName
-            return
-
-        self.hotPixFile = tables.openFile(fullFileName)
-        self.hotPixFileName = fullFileName
-
-        if switchOnMask: self.switchOnHotPixTimeMask()
-
-    def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True):
+    def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True,reasons=[]):
         """
         Load a hot pixel time mask from the given file, in a similar way to
         loadWvlCalFile, loadFlatCalFile, etc. Switches on hot pixel
@@ -1465,21 +1449,13 @@ class ObsFile:
         self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile)
         self.hotPixFileName = fullHotPixCalFileName
         
-        if (os.path.basename(self.hotPixTimeMask['obsFileName'])
+        if (os.path.basename(self.hotPixTimeMask.obsFileName)
             != os.path.basename(self.fileName)):
             warnings.warn('Mismatch between hot pixel time mask file and obs file. Not loading/applying mask!')
             self.hotPixTimeMask = None
         else:
-            if switchOnMask: self.switchOnHotPixTimeMask()
+            if switchOnMask: self.switchOnHotPixTimeMask(reasons=reasons)
 
-        #print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
-        #print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
-        #print "one interval"
-        #for iRow in range(self.nRow):
-            #for iCol in range(self.nCol):
-                #print "iRow=",iRow," iCol=",iCol
-                #for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
-                    #print "   interval=",interval
 
     def loadStandardCosmicMask(self, switchOnCosmicMask=True):
         """
@@ -1698,7 +1674,7 @@ class ObsFile:
         """
         self.hotPixIsApplied = False
 
-    def switchOnHotPixTimeMask(self):
+    def switchOnHotPixTimeMask(self,reasons=[]):
         """
         Switch on hot pixel time masking. Subsequent calls to getPixelCountImage
         etc. will have bad pixel times removed.
@@ -1706,6 +1682,9 @@ class ObsFile:
         if self.hotPixTimeMask is None:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
+        if len(reasons)>0:
+            self.hotPixTimeMask.mask = [self.hotPixTimeMask.reasonEnum[reason] for reason in reasons]
+        
 
     def switchOffCosmicTimeMask(self):
         """
