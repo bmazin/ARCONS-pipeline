@@ -66,6 +66,9 @@ class hotPixelMasker:
     RETURNS:
         A 2D array representing the total effective exposure time
         in seconds for each pixel in the detector array.
+        
+    NOTE:
+        effective integration time calculation could act funny during timing bugs...
     '''
     
         lastSec = (firstSec + integrationTime) if (integrationTime>0 and (firstSec + integrationTime) < self.expTime) else self.expTime
