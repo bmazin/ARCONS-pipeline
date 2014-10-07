@@ -1443,7 +1443,7 @@ class ObsFile:
         fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
         if (not os.path.exists(fullHotPixCalFileName)):
             print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
-            return
+            raise IOError
 
         self.hotPixFile = tables.openFile(fullHotPixCalFileName)
         self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile)
@@ -1453,6 +1453,7 @@ class ObsFile:
             != os.path.basename(self.fileName)):
             warnings.warn('Mismatch between hot pixel time mask file and obs file. Not loading/applying mask!')
             self.hotPixTimeMask = None
+            raise ValueError
         else:
             if switchOnMask: self.switchOnHotPixTimeMask(reasons=reasons)
 
@@ -1558,6 +1559,7 @@ class ObsFile:
                     self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
         except IOError:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
+            raise
             
 
     @staticmethod
