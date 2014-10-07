@@ -12,6 +12,7 @@ parameter which allows you to mask out time intervals which are masked for a cer
 
 import numpy as np
 from interval import interval
+import util.utils as utils
 
 
 class hotPixelMasker:
@@ -49,27 +50,33 @@ class hotPixelMasker:
         intervalList = [self.intervals[row,col][i] for i in np.where(np.in1d(self.reasons[row,col],mask))[0]]
         return interval.union(intervalList)
 
+    def getEffIntTime(self,row,col,firstSec=0,integrationTime=-1,reasons=[]):
+        lastSec = (firstSec + integrationTime) if (integrationTime>0 and (firstSec + integrationTime) < self.expTime) else self.expTime
+        integrationInterval = interval([firstSec, lastSec])
+        badIntervals=self.get_intervals(row,col,reasons)
+        maskedIntervals = badIntervals & integrationInterval
+        return (lastSec-firstSec) - utils.intervalSize(maskedIntervals)
 
     def getEffIntTimeImage(self,firstSec=0,integrationTime=-1,reasons=[]):
-    '''    
-    Get the total effective exposure time for each pixel after subtracting 
-    any intervals where a pixel was masked as hot or bad.
-    
-    INPUTS:
-        firstSec - Start time (sec) to start calculations from, starting from
-                  the beginning of the exposure to which timeMask refers.
-        integrationTime - Length of integration time (sec) from firstSec to include
-                  in the calculation. 
-        reasons - Reasons to include in the bad pixel mask. By default, uses whatever
-                  is in self.mask
-
-    RETURNS:
-        A 2D array representing the total effective exposure time
-        in seconds for each pixel in the detector array.
+        '''    
+        Get the total effective exposure time for each pixel after subtracting 
+        any intervals where a pixel was masked as hot or bad.
         
-    NOTE:
-        effective integration time calculation could act funny during timing bugs...
-    '''
+        INPUTS:
+            firstSec - Start time (sec) to start calculations from, starting from
+                      the beginning of the exposure to which timeMask refers.
+            integrationTime - Length of integration time (sec) from firstSec to include
+                      in the calculation. 
+            reasons - Reasons to include in the bad pixel mask. By default, uses whatever
+                      is in self.mask
+
+        RETURNS:
+            A 2D array representing the total effective exposure time
+            in seconds for each pixel in the detector array.
+            
+        NOTE:
+            effective integration time calculation could act funny during timing bugs...
+        '''
     
         lastSec = (firstSec + integrationTime) if (integrationTime>0 and (firstSec + integrationTime) < self.expTime) else self.expTime
         integrationInterval = interval([firstSec, lastSec])
@@ -88,20 +95,20 @@ class hotPixelMasker:
         return effectiveIntTimes
     
     def getHotPixels(self,firstSec=0,integrationTime=-1,reasons=[]):
-    '''
-    Return a boolean array indicating which pixels went bad at any point
-    during the specified integration time.
-    
-    INPUTS:
-        firstSec - Start time (sec) to start calculations from, starting from
-                    the beginning of the exposure to which timeMask refers.
-        integrationTime - Length of integration time (sec) from firstSec to include
-                    in the calculation. 
-    RETURNS:
-        A 2D Boolean array matching the size/shape of the detector image. True indicates
-        a pixel that went bad between firstSec and firstSec+integrationTime, and False 
-        indicates that the pixel was okay during that time.
-    '''
+        '''
+        Return a boolean array indicating which pixels went bad at any point
+        during the specified integration time.
+        
+        INPUTS:
+            firstSec - Start time (sec) to start calculations from, starting from
+                        the beginning of the exposure to which timeMask refers.
+            integrationTime - Length of integration time (sec) from firstSec to include
+                        in the calculation. 
+        RETURNS:
+            A 2D Boolean array matching the size/shape of the detector image. True indicates
+            a pixel that went bad between firstSec and firstSec+integrationTime, and False 
+            indicates that the pixel was okay during that time.
+        '''
     
         effectiveIntTimes=self.getEffIntTimeImage(firstSec=firstSec,integrationTime=integrationTime,reasons=reasons)
         lastSec = (firstSec + integrationTime) if (integrationTime>0 and (firstSec + integrationTime) < self.expTime) else self.expTime
