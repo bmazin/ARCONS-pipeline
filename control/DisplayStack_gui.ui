@@ -517,6 +517,22 @@
      <bool>true</bool>
     </property>
    </widget>
+   <widget class="QCheckBox" name="bestWavelengthCalibrationBox">
+    <property name="geometry">
+     <rect>
+      <x>210</x>
+      <y>620</y>
+      <width>251</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Use Best Wavelength Calibration</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

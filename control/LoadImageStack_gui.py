@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'LoadImageStack_gui.ui'
 #
-# Created: Thu Oct  2 12:08:24 2014
+# Created: Mon Oct  6 15:24:52 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -25,7 +25,7 @@ class Ui_LoadImageStack_gui(object):
         LoadImageStack_gui.setSizePolicy(sizePolicy)
         LoadImageStack_gui.setAutoFillBackground(False)
         self.plotDock = MPL_Widget(LoadImageStack_gui)
-        self.plotDock.setGeometry(QtCore.QRect(10, 40, 491, 521))
+        self.plotDock.setGeometry(QtCore.QRect(10, 40, 491, 491))
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -202,6 +202,13 @@ class Ui_LoadImageStack_gui(object):
         self.label_2 = QtGui.QLabel(LoadImageStack_gui)
         self.label_2.setGeometry(QtCore.QRect(530, 250, 51, 31))
         self.label_2.setObjectName(_fromUtf8("label_2"))
+        self.matshowLabel = QtGui.QLabel(LoadImageStack_gui)
+        self.matshowLabel.setGeometry(QtCore.QRect(210, 540, 201, 20))
+        self.matshowLabel.setText(_fromUtf8(""))
+        self.matshowLabel.setObjectName(_fromUtf8("matshowLabel"))
+        self.label_3 = QtGui.QLabel(LoadImageStack_gui)
+        self.label_3.setGeometry(QtCore.QRect(130, 540, 81, 17))
+        self.label_3.setObjectName(_fromUtf8("label_3"))
 
         self.retranslateUi(LoadImageStack_gui)
         QtCore.QMetaObject.connectSlotsByName(LoadImageStack_gui)
@@ -253,5 +260,6 @@ class Ui_LoadImageStack_gui(object):
 "Frames", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Hour\n"
 "Angle:", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_3.setText(QtGui.QApplication.translate("LoadImageStack_gui", "Pixel Data:", None, QtGui.QApplication.UnicodeUTF8))
 
 from mpl_pyqt4_widget import MPL_Widget

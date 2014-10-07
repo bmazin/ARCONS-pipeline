@@ -141,8 +141,17 @@ class LoadImageStack(QDialog):
         self.ui.plotDock.canvas.ax.set_xlim([-0.5,self.nCol-0.5])
         self.ui.plotDock.canvas.ax.set_ylim([-0.5,self.nRow-0.5])
         self.updateCircles()
+        cid = self.ui.plotDock.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
         self.ui.plotDock.canvas.draw()
         self.drawCompass()
+
+    def hoverCanvas(self,event):
+        if event.inaxes is self.ui.plotDock.canvas.ax:
+            col = int(round(event.xdata))
+            row = int(round(event.ydata))
+            if row < np.shape(self.selectedFrame)[0] and col < np.shape(self.selectedFrame)[1]:
+                self.ui.matshowLabel.setText('({:d},{:d}) {}'.format(row,col,self.selectedFrame[row,col]))
+                #print '({:d},{:d}) {}'.format(row,col,self.selectedFrame[row,col])
         
     def rightButtonClicked(self):
         self.currentFrame+=1

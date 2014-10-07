@@ -184,6 +184,7 @@ class DisplayStack(QMainWindow):
 
         # Wavelength calibration settings
         self.useWavelengthCalibration = self.ui.wavelengthCalibrationBox.isChecked()
+        self.useBestWavelengthCalibration = self.ui.bestWavelengthCalibrationBox.isChecked()
         self.lowerWavelengthCutoff = float(self.ui.lowerWavelengthCutoffLine.text())
         self.upperWavelengthCutoff = float(self.ui.upperWavelengthCutoffLine.text())
                
@@ -204,7 +205,9 @@ class DisplayStack(QMainWindow):
                 self.validSettings = False
 
             if self.useWavelengthCalibration: 
-                if self.ui.wavelengthList.currentItem() == None:
+                if self.useBestWavelengthCalibration:
+                    print 'Using best wavelength calibration...'
+                elif self.ui.wavelengthList.currentItem() == None:
                     print 'Please select wavelength calibration...'
                     self.validSettings = False
                 else:
@@ -249,6 +252,8 @@ class DisplayStack(QMainWindow):
             self.ui.deadPixelBox.setEnabled(True)
             self.ui.deadPixelBox.setChecked(True)       
             self.ui.flatList.setEnabled(True)
+            self.ui.bestWavelengthCalibrationBox.setEnabled(True)
+            self.ui.bestWavelengthCalibrationBox.setChecked(True)
         else:
             self.ui.lowerWavelengthCutoffLine.setEnabled(False)
             self.ui.lowerWavelengthCutoffLabel.setEnabled(False)
@@ -260,6 +265,8 @@ class DisplayStack(QMainWindow):
             self.ui.deadPixelBox.setChecked(False)
             self.ui.deadPixelBox.setEnabled(False)
             self.ui.flatList.setEnabled(False)
+            self.ui.bestWavelengthCalibrationBox.setEnabled(False)
+            self.ui.bestWavelengthCalibrationBox.setChecked(False)
 
 
     # Create flat cal file list
@@ -377,7 +384,7 @@ class DisplayStack(QMainWindow):
         if self.useHotPixelMasking:
             header[hotPixColName] = self.hotPixelFilename
         if self.useWavelengthCalibration:
-            header[wvlCalFileColName] = self.wvlCalFilename       
+            header[wvlCalFileColName] = self.ob.wvlCalFileName       
             header[lowWvlColName] = self.lowerWavelengthCutoff
             header[highWvlColName] = self.upperWavelengthCutoff
         if self.useFlatCalibration:
@@ -430,8 +437,12 @@ class DisplayStack(QMainWindow):
 
                     # Load wave cal solution
                     if self.useWavelengthCalibration:
-                        print 'Loading wavelength calibration...'
-                        self.ob.loadWvlCalFile(self.wvlCalFilename)
+                        if self.useBestWavelengthCalibration:
+                            print 'Loading best wavelength calibration...'
+                            self.ob.loadBestWvlCalFile()
+                        else:
+                            print 'Loading selected wavelength calibration...'
+                            self.ob.loadWvlCalFile(self.wvlCalFilename)
                         
                     # Load flatcal solution
                     if self.useFlatCalibration:
