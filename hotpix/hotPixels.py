@@ -123,7 +123,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                   display=False, ds9display=False, dispToPickle=None, weighted=False,
                   fluxWeighted=False, maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, 
                   diagnosticPlots=False, useLocalStdDev=False, useRawCounts=True,
-                  bkgdPercentile=10.0):
+                  bkgdPercentile=10.0, deadTime=100.e-6):
     '''
     To find the hot, cold, or dead pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
@@ -251,9 +251,14 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 
     if im is None:
         print 'Getting image time-slice'
-        im = (obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
+        im_dict = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
                                            weighted=weighted, fluxWeighted=fluxWeighted, 
-                                           getRawCount=useRawCounts))['image']
+                                           getRawCount=useRawCounts)
+        im = im_dict['image']
+        #Correct for dead time
+        w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
+        im = im/w_deadTime
+                                           
         print 'Done'
     
     #Now im definitely exists, make a copy for display purposes later (before we change im).
@@ -525,7 +530,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
                   ds9display=False, dispToPickle=False, weighted=False, fluxWeighted=False,
                   maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
-                  useLocalStdDev=None, useRawCounts=True, bkgdPercentile=10.0):
+                  useLocalStdDev=None, useRawCounts=True, bkgdPercentile=10.0, deadTime=100.e-6):
     '''
     To find hot (and cold/dead) pixels. This routine is the main code entry point.
     Takes an obs. file as input and outputs an .h5 file containing lists of bad time
