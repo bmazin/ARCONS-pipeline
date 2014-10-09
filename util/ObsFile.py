@@ -1402,7 +1402,7 @@ class ObsFile:
             raise IOError
 
         self.hotPixFile = tables.openFile(fullHotPixCalFileName)
-        self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile)
+        self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile, reasons=reasons)
         self.hotPixFileName = fullHotPixCalFileName
         
         if (os.path.basename(self.hotPixTimeMask.obsFileName)

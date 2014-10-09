@@ -90,6 +90,7 @@ import headers.TimeMask as tm
 #from headers import pipelineFlags as pflags
 import util.readDict as readDict
 from hotPixelMasker import hotPixelMasker
+from util.popup import plotArray
 
 headerGroupName = 'header'  #Define labels for the output .h5 file.
 headerTableName = 'header'
@@ -258,7 +259,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         #Correct for dead time
         w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
         im = im/w_deadTime
-                                           
+        #plotArray(image=im)
         print 'Done'
     
     #Now im definitely exists, make a copy for display purposes later (before we change im).
@@ -266,8 +267,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         
     #For now, assume 0 counts in a pixel means the pixel is dead.
     #Turn such pixel values into NaNs.
-    deadMask = (im<1)
-    im[im < 1] = np.nan
+    deadMask = (im<0.01)
+    im[im < 0.01] = np.nan
     
     oldHotMask = np.zeros(shape=np.shape(im), dtype=bool)   #Initialise a mask for hot pixels (all False) for comparison on each iteration.
     oldColdMask = np.zeros(shape=np.shape(im), dtype=bool)  #Same for cold pixels
@@ -301,6 +302,12 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             
             overallMedian = np.median(im[~np.isnan(im)])
             overallBkgd = np.percentile(im[~np.isnan(im)],bkgdPercentile)
+            overallBkgd=overallMedian
+            
+            #mpl.figure()
+            #mpl.hist(im[~np.isnan(im)],200,range=(0,400))
+            #mpl.show()
+            
         
             if doColdFlagging is True or useLocalStdDev is True:
                 stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)    
@@ -741,7 +748,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
             flagSequence = masks[iRow, iCol, :]
 
             #What (unique) non-zero flags are listed for this pixel?
-            uniqueFlags = [x for x in set(flagSequence) if x != 0]   #What non-zero flags are listed for this pixel?
+            uniqueFlags = [x for x in set(flagSequence) if x != tm.timeMaskReason['none']]   #What non-zero flags are listed for this pixel?
 
             #Initialise a list for bad times for current pixel
             badTimeList = []
@@ -778,8 +785,6 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     Write the output hot-pixel time masks table to an .h5 file. Called by
     findHotPixels().
     
-    ** AT THE MOMENT, I THINK THIS WILL OVERWRITE PRE-EXISTING HOT PIXEL FILES
-    WITHOUT WARNING - SHOULD UPDATE THIS BEHAVIOUR **
     
     INPUTS:
         timeMaskData - list structure as constructed by findHotPixels()
@@ -822,7 +827,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     fullFileName = os.path.abspath(outputFileName)
     
     if os.path.isfile(fullFileName):
-        warnings.warn("Overwriting hotpix file",UserWarning)
+        warnings.warn("Overwriting hotpix file: "+str(fullFileName),UserWarning)
 
     fileh = tables.openFile(fullFileName, mode='w')
     
@@ -893,7 +898,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
 
 
     
-def readHotPixels(inputFile,nodePath=None,mask=None):
+def readHotPixels(inputFile,nodePath=None,reasons=[]):
     '''
     To read in a hot-pixels HDF file as written by findHotPixels(). 
     (Note 'hot pixels' may later include cold pixels and possibly other
@@ -930,7 +935,7 @@ def readHotPixels(inputFile,nodePath=None,mask=None):
                           interval is not unioned into a single 'interval' object
                           since there may be different 'reasons' for the different
                           intervals!
-            'reasons' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
+            'reasons_list' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
                         headers/TimeMask.py). Entries in these lists correspond directly 
                         to entries in the 'intervals' array.            
             'reasonEnum' - the enum instance for the 'reasons', so the 'concrete values'
@@ -942,6 +947,7 @@ def readHotPixels(inputFile,nodePath=None,mask=None):
             'expTime' - duration of original obs file (sec).
             'startTime' - start time of the time mask file within the original obs file (sec).
             'endTime' - end time of the time mask file within the original obs file (sec).
+            'reasons' - reasons to mask. ie 'hot pixel', 'dead pixel', etc (from TimeMask.py)
             
 
     
@@ -1051,8 +1057,8 @@ def readHotPixels(inputFile,nodePath=None,mask=None):
         timeIntervals = np.empty((nRow, nCol), dtype='object')
         timeIntervals.fill([])
         #And one to take lists of corresponding flags
-        reasons = np.empty((nRow, nCol), dtype='object')
-        reasons.fill([])
+        reasons_list = np.empty((nRow, nCol), dtype='object')
+        reasons_list.fill([])
         
         #Read in the data and fill in the arrays
         for iRow in range(nRow):
@@ -1064,10 +1070,10 @@ def readHotPixels(inputFile,nodePath=None,mask=None):
                 timeIntervals[iRow, iCol] = \
                     [interval([eachRow['tBegin'], eachRow['tEnd']]) / ticksPerSec for eachRow
                       in eventListTable]        #Get the times in seconds (not ticks). No doubt this can be sped up if necessary...
-                reasons[iRow, iCol] = [eachRow['reason'] for eachRow in eventListTable]
+                reasons_list[iRow, iCol] = [eachRow['reason'] for eachRow in eventListTable]
                     
         #Return a wrapper object
-        hotPixObject = hotPixelMasker(timeIntervals, reasons, reasonEnum, nRow, nCol, obsFileName, ticksPerSec, expTime, startTime, endTime, mask=mask)
+        hotPixObject = hotPixelMasker(timeIntervals, reasons_list, reasonEnum, nRow, nCol, obsFileName, ticksPerSec, expTime, startTime, endTime, reasons=reasons)
         return hotPixObject
         
         #return {"intervals":timeIntervals, "reasons":reasons,

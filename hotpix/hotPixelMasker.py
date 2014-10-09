@@ -17,7 +17,7 @@ import util.utils as utils
 
 class hotPixelMasker:
 
-    def __init__(self, intervals, reasons, reasonEnum, nRow, nCol, obsFileName, ticksPerSec, expTime, startTime, endTime, mask=None):
+    def __init__(self, intervals, reasons_list, reasonEnum, nRow, nCol, obsFileName, ticksPerSec, expTime, startTime, endTime, reasons=[]):
         """
         Use readHotPixels() in hotPixels.py to create a hotPixelMasker object. 
         
@@ -27,7 +27,7 @@ class hotPixelMasker:
         """
         
         self.intervals = intervals
-        self.reasons=reasons
+        self.reasons=reasons_list
         self.reasonEnum = reasonEnum
         self.nRow = nRow
         self.nCol = nCol
@@ -37,12 +37,14 @@ class hotPixelMasker:
         self.startTime=startTime
         self.endTime=endTime
         
-        if mask==None or mask==-1 or mask=='all':
-            self.mask = reasonEnum.__dict__['_names'].values()
-        else: self.mask=mask
+        if reasons==None or len(reasons)==0:
+            reasons = ['hot pixel', 'dead pixel']
+            
+        self.set_mask(reasons)
+
         
     def set_mask(self,reasons=[]):
-        if not len(reasons==0):
+        if not len(reasons)==0:
             self.mask = [self.reasonEnum[reason] for reason in reasons]
         
     def get_intervals(self,row,col,reasons=[]):

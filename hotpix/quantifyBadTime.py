@@ -129,6 +129,7 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
                                  weighted=False, maxIter=maxIter)
     
     
+    print "This code needs to be updated to use hotPixelMasker class which wraps the hotpixel code"
     #Read in the time mask file and calculate hot, cold, and 'other' bad time per pixel.
     timeMask = hp.readHotPixels(timeMaskFileName)
     hotTime = np.zeros((timeMask['nRow'],timeMask['nCol']))
