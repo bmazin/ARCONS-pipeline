@@ -60,6 +60,7 @@ class FlatCal:
         wvlSunsetDate = self.params['wvlSunsetDate']
         wvlTimestamp = self.params['wvlTimestamp']
         obsSequence = self.params['obsSequence']
+        needTimeAdjust = self.params['needTimeAdjust']
         self.deadtime = self.params['deadtime'] #from firmware pulse detection
         self.timeSpacingCut = self.params['timeSpacingCut']
 
@@ -78,7 +79,9 @@ class FlatCal:
                 obs.loadWvlCalFile(wvlCalFileName)
             else:
                 obs.loadBestWvlCalFile()
-            obs.loadTimeAdjustmentFile(timeAdjustFileName)
+
+            if needTimeAdjust:
+                obs.loadTimeAdjustmentFile(timeAdjustFileName)
             timeMaskFileName = timeMaskFileNames[iObs]
             print timeMaskFileName
             #Temporary step, remove old hotpix file
@@ -86,7 +89,7 @@ class FlatCal:
             #    os.remove(timeMaskFileName)
             if not os.path.exists(timeMaskFileName):
                 print 'Running hotpix for ',obs
-                hp.findHotPixels(self.obsFileNames[iObs],timeMaskFileName,fwhm=np.inf,useLocalStdDev=True)
+                hp.findHotPixels(obsFile=obs,outputFileName=timeMaskFileName,fwhm=np.inf,useLocalStdDev=True)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             obs.loadHotPixCalFile(timeMaskFileName)
         self.wvlFlags = self.obsList[0].wvlFlagTable
@@ -124,22 +127,27 @@ class FlatCal:
                 #add third dimension for broadcasting
                 effIntTime3d = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
                 cube /= effIntTime3d
-                
-                
                 cube[np.isnan(cube)]=0
+
+                #find factors to correct nonlinearity
+                rawFrameDict = obs.getPixelCountImage(firstSec=firstSec,integrationTime=self.intTime,getRawCount=True)
+                rawFrame = np.array(rawFrameDict['image'],dtype=np.double)
+                rawFrame /= rawFrameDict['effIntTime']
+                nonlinearFactors = 1. / (1. - rawFrame*self.deadtime)
+                nonlinearFactors[np.isnan(nonlinearFactors)]=0.
+
+                
                 frame = np.sum(cube,axis=2) #in counts per sec
                 #correct nonlinearity due to deadtime in firmware
-                nonlinearFactors = 1. / (1. - frame*self.deadtime)
-                nonlinearFactors[np.isnan(nonlinearFactors)]=0.
                 frame = frame * nonlinearFactors
                 
                 nonlinearFactors = np.reshape(nonlinearFactors,np.shape(nonlinearFactors)+(1,))
                 cube = cube * nonlinearFactors
-
                 
                 self.frames.append(frame)
                 self.spectralCubes.append(cube)
                 self.cubeEffIntTimes.append(effIntTime3d)
+            obs.file.close()
         self.spectralCubes = np.array(self.spectralCubes)
         self.cubeEffIntTimes = np.array(self.cubeEffIntTimes)
         self.countCubes = self.cubeEffIntTimes * self.spectralCubes
@@ -270,15 +278,30 @@ class FlatCal:
                 fig = plt.figure(figsize=(10,10),dpi=100)
 
             ax = fig.add_subplot(nPlotsPerCol,nPlotsPerRow,iPlot%nPlotsPerPage+1)
-            ax.set_title(r'%.0f $\AA$'%wvl)
+            ax.set_title(r'Weights %.0f $\AA$'%wvl)
 
             image = self.flatWeights[:,:,iWvl]
 
-            cmap = matplotlib.cm.gnuplot2
+            cmap = matplotlib.cm.hot
             cmap.set_bad('#222222')
-            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=2.)
+            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=2.,vmin=.5)
             cbar = fig.colorbar(handleMatshow)
         
+            if iPlot%nPlotsPerPage == nPlotsPerPage-1:
+                pp.savefig(fig)
+            iPlot += 1
+
+            ax = fig.add_subplot(nPlotsPerCol,nPlotsPerRow,iPlot%nPlotsPerPage+1)
+            ax.set_title(r'Twilight Image %.0f $\AA$'%wvl)
+
+            image = self.totalCube[:,:,iWvl]
+
+            nSdev = 3.
+            goodImage = image[np.isfinite(image)]
+            vmax = np.mean(goodImage)+nSdev*np.std(goodImage)
+            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=vmax)
+            cbar = fig.colorbar(handleMatshow)
+
             if iPlot%nPlotsPerPage == nPlotsPerPage-1:
                 pp.savefig(fig)
             iPlot += 1
@@ -315,7 +338,7 @@ class FlatCal:
             image = 3-image
 
             cmap = matplotlib.cm.gnuplot2
-            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower')
+            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=2.,vmin=.5)
             cbar = fig.colorbar(handleMatshow)
         
             if iPlot%nPlotsPerPage == nPlotsPerPage-1:
