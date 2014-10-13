@@ -50,8 +50,10 @@ def Image():
    ob.display(DDArr = True) #sums across the wavlength and phase dimension to get a 2D image for the display.
    mpl.show()
    
-   spectrum, spectrumP, spectrumIP, phaseProfile, wvlBinEdges, phaseBinEdges, innerAp = ob.getApertureSpectrum(cenRA=83.6330495, cenDec=22.0144933, nPixRA=250, nPixDec=250, radius1=.0005, radius2 = .0008, degrees=True, error = False, phase = True, crab = True) #this calls the spectrum code
-
+   #spectrum, spectrumP, spectrumIP, phaseProfile, wvlBinEdges, phaseBinEdges, innerAp = ob.getApertureSpectrum(cenRA=83.6330495, cenDec=22.0144933, nPixRA=250, nPixDec=250, radius1=.0005, radius2 = .0008, degrees=True, error = False, phase = True, crab = True) #this calls the spectrum code
+   print 'getting phase of crab now' 
+   spectrum, spectrumP, spectrumIP, phaseProfile, wvlBinEdges, phaseBinEdges, innerAp = ob.getAperturePhaseCrab(cenRA=83.6330495, cenDec=22.0144933, nPixRA=250, nPixDec=250, radius1=.0005, degrees=True, phase = True, crab = True)
+    
    #summed_arrayIn, wvlBinEdges, errIn, innerAp = ob.getApertureSpectrum(cenRA=83.6335573, cenDec=22.0142943, nPixRA=250, nPixDec=250, radius1=.00015, radius2 = .0002, degrees=True, error = True, offSet = True, radRA = 83.6296510, radDec = 22.0145475, radius3 = .0005) #object spectrum
    
    print 'wavelengths:', wvlBinEdges[16:25] #this is the desired wavlength range for the crab spectrum it may be worth checking.

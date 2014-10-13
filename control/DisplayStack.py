@@ -228,7 +228,8 @@ class DisplayStack(QMainWindow):
 
     # Load hot pixel mask
     def loadHotMask(self):
-        self.hotPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/HotPixelMasks/hotPixelMask_' + self.obsTS + '.h5')
+        #self.hotPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/HotPixelMasks/hotPixelMask_' + self.obsTS + '.h5')
+        self.hotPixelFilename = str(FileName(obsFile = self.ob).timeMask())
         if not os.path.exists(self.hotPixelFilename):
             hp.findHotPixels(obsFile=self.ob,outputFileName=self.hotPixelFilename)
             print "Hot pixel mask saved to %s"%(self.hotPixelFilename)
