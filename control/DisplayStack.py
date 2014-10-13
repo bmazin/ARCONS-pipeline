@@ -184,12 +184,13 @@ class DisplayStack(QMainWindow):
 
         # Wavelength calibration settings
         self.useWavelengthCalibration = self.ui.wavelengthCalibrationBox.isChecked()
+        self.useBestWavelengthCalibration = self.ui.bestWavelengthCalibrationBox.isChecked()
         self.lowerWavelengthCutoff = float(self.ui.lowerWavelengthCutoffLine.text())
         self.upperWavelengthCutoff = float(self.ui.upperWavelengthCutoffLine.text())
                
         # Flat calibration settings
         self.useFlatCalibration = self.ui.flatCalibrationBox.isChecked()
-        self.useDeadPixelMasking = self.ui.deadPixelBox.isChecked()    
+        self.useDeadPixelMasking = self.ui.deadPixelBox.isChecked() 
 
         self.fileCount = self.ui.inputList.count()  
 
@@ -204,7 +205,9 @@ class DisplayStack(QMainWindow):
                 self.validSettings = False
 
             if self.useWavelengthCalibration: 
-                if self.ui.wavelengthList.currentItem() == None:
+                if self.useBestWavelengthCalibration:
+                    print 'Using best wavelength calibration...'
+                elif self.ui.wavelengthList.currentItem() == None:
                     print 'Please select wavelength calibration...'
                     self.validSettings = False
                 else:
@@ -225,9 +228,10 @@ class DisplayStack(QMainWindow):
 
     # Load hot pixel mask
     def loadHotMask(self):
-        self.hotPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/HotPixelMasks/hotPixelMask_' + self.obsTS + '.h5')
+        #self.hotPixelFilename = str(self.displayStackPath + self.run + '/' + self.target + '/HotPixelMasks/hotPixelMask_' + self.obsTS + '.h5')
+        self.hotPixelFilename = str(FileName(obsFile = self.ob).timeMask())
         if not os.path.exists(self.hotPixelFilename):
-            hp.findHotPixels(self.obsFn,self.hotPixelFilename)
+            hp.findHotPixels(obsFile=self.ob,outputFileName=self.hotPixelFilename)
             print "Hot pixel mask saved to %s"%(self.hotPixelFilename)
         self.ob.loadHotPixCalFile(self.hotPixelFilename,switchOnMask=True)
 
@@ -249,6 +253,8 @@ class DisplayStack(QMainWindow):
             self.ui.deadPixelBox.setEnabled(True)
             self.ui.deadPixelBox.setChecked(True)       
             self.ui.flatList.setEnabled(True)
+            self.ui.bestWavelengthCalibrationBox.setEnabled(True)
+            self.ui.bestWavelengthCalibrationBox.setChecked(True)
         else:
             self.ui.lowerWavelengthCutoffLine.setEnabled(False)
             self.ui.lowerWavelengthCutoffLabel.setEnabled(False)
@@ -260,6 +266,8 @@ class DisplayStack(QMainWindow):
             self.ui.deadPixelBox.setChecked(False)
             self.ui.deadPixelBox.setEnabled(False)
             self.ui.flatList.setEnabled(False)
+            self.ui.bestWavelengthCalibrationBox.setEnabled(False)
+            self.ui.bestWavelengthCalibrationBox.setChecked(False)
 
 
     # Create flat cal file list
@@ -377,7 +385,7 @@ class DisplayStack(QMainWindow):
         if self.useHotPixelMasking:
             header[hotPixColName] = self.hotPixelFilename
         if self.useWavelengthCalibration:
-            header[wvlCalFileColName] = self.wvlCalFilename       
+            header[wvlCalFileColName] = self.ob.wvlCalFileName       
             header[lowWvlColName] = self.lowerWavelengthCutoff
             header[highWvlColName] = self.upperWavelengthCutoff
         if self.useFlatCalibration:
@@ -430,8 +438,12 @@ class DisplayStack(QMainWindow):
 
                     # Load wave cal solution
                     if self.useWavelengthCalibration:
-                        print 'Loading wavelength calibration...'
-                        self.ob.loadWvlCalFile(self.wvlCalFilename)
+                        if self.useBestWavelengthCalibration:
+                            print 'Loading best wavelength calibration...'
+                            self.ob.loadBestWvlCalFile()
+                        else:
+                            print 'Loading selected wavelength calibration...'
+                            self.ob.loadWvlCalFile(self.wvlCalFilename)
                         
                     # Load flatcal solution
                     if self.useFlatCalibration:
@@ -465,7 +477,11 @@ class DisplayStack(QMainWindow):
                         self.times.append(self.jd)
                         print 'Creating frame for time ' + str(self.jd)
                         self.frameData = self.ob.getPixelCountImage(firstSec=iSec,integrationTime=self.integrationTime,weighted=self.weighted,getRawCount=self.useRawCounts,scaleByEffInt=self.scaleByEffInt)
-                        self.frame = self.frameData['image']         
+                        self.frame = self.frameData['image']
+
+                        if self.ui.verticalFlipBox.isChecked():
+                            self.frame = np.flipud(self.frame)                   
+         
                         if self.useDeadPixelMasking:
                             self.frame[self.deadMask == 0] = np.nan
                         self.frames.append(self.frame)

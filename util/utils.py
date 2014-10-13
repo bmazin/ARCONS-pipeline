@@ -1009,6 +1009,26 @@ def nearestNmedFilter(inputArray,n=24):
     return outputArray
 
 
+def nearestNRobustMeanFilter(inputArray,n=24,nSigmaClip=3.,iters=None):
+    '''
+    Matt 7/18/2014
+    Same idea as nearestNstdDevFilter, but returns sigma clipped mean instead of std. deviations.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating median around each pixel.
+        
+    OUTPUTS:
+        A 2D array of medians with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            outputArray[iRow,iCol] = numpy.ma.mean(astropy.stats.sigma_clip(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)],sig=nSigmaClip,iters=None))
+    return outputArray
 
 
 def showzcoord():
