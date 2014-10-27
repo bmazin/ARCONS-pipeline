@@ -28,7 +28,7 @@
      <x>10</x>
      <y>40</y>
      <width>491</width>
-     <height>521</height>
+     <height>491</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -425,7 +425,7 @@ Position</string>
    <property name="geometry">
     <rect>
      <x>530</x>
-     <y>60</y>
+     <y>30</y>
      <width>121</width>
      <height>22</height>
     </rect>
@@ -441,7 +441,7 @@ Position</string>
    <property name="geometry">
     <rect>
      <x>530</x>
-     <y>100</y>
+     <y>70</y>
      <width>121</width>
      <height>22</height>
     </rect>
@@ -552,6 +552,139 @@ Frames</string>
    </property>
    <property name="autoDefault">
     <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="MPL_Widget" name="compassDock" native="true">
+   <property name="geometry">
+    <rect>
+     <x>530</x>
+     <y>100</y>
+     <width>141</width>
+     <height>141</height>
+    </rect>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="palette">
+    <palette>
+     <active>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>245</green>
+         <blue>248</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>245</green>
+         <blue>248</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </active>
+     <inactive>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>245</green>
+         <blue>248</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>245</green>
+         <blue>248</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </inactive>
+     <disabled>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>245</green>
+         <blue>248</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>245</green>
+         <blue>248</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </disabled>
+    </palette>
+   </property>
+  </widget>
+  <widget class="QLabel" name="hourAngleLabel">
+   <property name="geometry">
+    <rect>
+     <x>580</x>
+     <y>260</y>
+     <width>91</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_2">
+   <property name="geometry">
+    <rect>
+     <x>530</x>
+     <y>250</y>
+     <width>51</width>
+     <height>31</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Hour
+Angle:</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="matshowLabel">
+   <property name="geometry">
+    <rect>
+     <x>210</x>
+     <y>540</y>
+     <width>201</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_3">
+   <property name="geometry">
+    <rect>
+     <x>130</x>
+     <y>540</y>
+     <width>81</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Pixel Data:</string>
    </property>
   </widget>
  </widget>

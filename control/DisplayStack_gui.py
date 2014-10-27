@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'DisplayStack_gui.ui'
 #
-# Created: Fri Apr 11 15:00:23 2014
+# Created: Mon Oct  6 11:12:42 2014
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -166,6 +166,14 @@ class Ui_DisplayStack_gui(object):
         font.setWeight(75)
         self.targetButton.setFont(font)
         self.targetButton.setObjectName(_fromUtf8("targetButton"))
+        self.verticalFlipBox = QtGui.QCheckBox(self.centralwidget)
+        self.verticalFlipBox.setGeometry(QtCore.QRect(500, 580, 171, 22))
+        self.verticalFlipBox.setChecked(True)
+        self.verticalFlipBox.setObjectName(_fromUtf8("verticalFlipBox"))
+        self.bestWavelengthCalibrationBox = QtGui.QCheckBox(self.centralwidget)
+        self.bestWavelengthCalibrationBox.setGeometry(QtCore.QRect(210, 620, 251, 22))
+        self.bestWavelengthCalibrationBox.setChecked(True)
+        self.bestWavelengthCalibrationBox.setObjectName(_fromUtf8("bestWavelengthCalibrationBox"))
         DisplayStack_gui.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(DisplayStack_gui)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1101, 25))
@@ -203,4 +211,6 @@ class Ui_DisplayStack_gui(object):
         self.runLabel.setText(QtGui.QApplication.translate("DisplayStack_gui", "Runs", None, QtGui.QApplication.UnicodeUTF8))
         self.targetLabel.setText(QtGui.QApplication.translate("DisplayStack_gui", "Targets", None, QtGui.QApplication.UnicodeUTF8))
         self.targetButton.setText(QtGui.QApplication.translate("DisplayStack_gui", "Load Target", None, QtGui.QApplication.UnicodeUTF8))
+        self.verticalFlipBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Vertical Flip", None, QtGui.QApplication.UnicodeUTF8))
+        self.bestWavelengthCalibrationBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Use Best Wavelength Calibration", None, QtGui.QApplication.UnicodeUTF8))
 
