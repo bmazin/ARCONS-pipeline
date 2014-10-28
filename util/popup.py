@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 from multiprocessing import Process
+from functools import partial
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
@@ -61,6 +62,9 @@ class PopUp(QtGui.QMainWindow):
             kwargs['cmap'] = defaultCmap
         if not 'origin' in kwargs:
             kwargs['origin'] = 'lower'
+
+        if 'button_press_event' in kwargs:
+            cid = self.fig.canvas.mpl_connect('button_press_event',partial(kwargs.pop('button_press_event'),self))
             
         self.handleMatshow = self.axes.matshow(image,**kwargs)
         if showColorBar:
@@ -69,6 +73,9 @@ class PopUp(QtGui.QMainWindow):
             cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick_cbar)
         self.axes.set_title(title)
         cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
+
+
+
         self.draw()
 
     def show(self):

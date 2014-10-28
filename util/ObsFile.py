@@ -1382,8 +1382,8 @@ class ObsFile:
 
     def loadBeammapFile(self,beammapFileName):
         """
-        Load an external beammap file in place of the obsfile's attached beammap.
-        Can be used to correct pixel location mistackes
+        Load an external beammap file in place of the obsfile's attached beamma
+        Can be used to correct pixel location mistakes
         """
         #get the beam image.
         scratchDir = os.getenv('MKID_PROC_PATH', '/')
@@ -1392,16 +1392,31 @@ class ObsFile:
         if (not os.path.exists(fullBeammapFileName)):
             print 'Beammap file does not exist: ', fullBeammapFileName
             return
+        if (not os.path.exists(beammapFileName)):
+            #get the beam image.
+            scratchDir = os.getenv('MKID_PROC_PATH', '/')
+            beammapPath = os.path.join(scratchDir, 'pixRemap')
+            fullBeammapFileName = os.path.join(beammapPath, beammapFileName)
+            if (not os.path.exists(fullBeammapFileName)):
+                print 'Beammap file does not exist: ', fullBeammapFileName
+                return
+        else:
+            fullBeammapFileName = beammapFileName
         beammapFile = tables.openFile(fullBeammapFileName,'r')
         self.beammapFileName = fullBeammapFileName
         try:
+            old_tstamp = self.beamImage[0][0].split('/')[-1]
             self.beamImage = beammapFile.getNode('/beammap/beamimage').read()
+            if self.beamImage[0][0].split('/')[-1]=='':
+                self.beamImage = np.core.defchararray.add(self.beamImage,old_tstamp)
         except Exception as inst:
             print 'Can\'t access beamimage for ',self.fullFileName
 
         beamShape = self.beamImage.shape
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
+        
+        beammapFile.close()
         
     def loadCentroidListFile(self, centroidListFileName):
         """
@@ -1450,6 +1465,22 @@ class ObsFile:
         self.fluxFlags = self.fluxCalFile.root.fluxcal.flags.read()
         self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
         self.nFluxCalWvlBins = self.nFlatCalWvlBins
+
+    def loadFlashingTimeMask(self, flashingTimeMaskFileName, flashOn=True, switchOnMask=True):
+        """
+        load hot pixel time mask for flashing wavecal file. 
+        By default it masks hot times and laser off times for each pixel.
+        Also, switches mask on by default
+        """
+        fullFileName = FileName(obsFile=self).timeMask()
+        if (not os.path.exists(fullFileName)):
+            print 'Hot pixel cal file does not exist: ', fullFileName
+            return
+
+        self.hotPixFile = tables.openFile(fullFileName)
+        self.hotPixFileName = fullFileName
+
+        if switchOnMask: self.switchOnHotPixTimeMask()
 
     def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True):
         """
@@ -1532,9 +1563,11 @@ class ObsFile:
         Searchs the waveCalSolnFiles directory tree for the best wavecal to apply to this obsfile.
         if master==True then it first looks for a master wavecal solution
         """
-        scratchDir = os.getenv('MKID_PROC_PATH', '/')
-        run = FileName(obsFile=self).run
-        wvlDir = scratchDir+"/waveCalSolnFiles/"+run+'/'
+        #scratchDir = os.getenv('MKID_PROC_PATH', '/')
+        #run = FileName(obsFile=self).run
+        #wvlDir = scratchDir+"/waveCalSolnFiles/"+run+'/'
+        wvlDir = os.path.dirname(os.path.dirname(FileName(obsFile=self).mastercalSoln()))
+        #print wvlDir
         obs_t_num = strpdate2num("%Y%m%d-%H%M%S")(FileName(obsFile=self).tstamp)
 
         wvlCalFileName = None
@@ -1554,6 +1587,7 @@ class ObsFile:
                 self.loadBestWvlCalFile(master=False)
             else:
                 print "Searched "+wvlDir+" but no appropriate wavecal solution found"
+                raise IOError
         else:
             print "Loading wavelength calibration from: "+wvlCalFileName
             self.loadWvlCalFile(wvlCalFileName)
@@ -1565,8 +1599,9 @@ class ObsFile:
         if os.path.exists(str(wvlCalFileName)):
             fullWvlCalFileName = str(wvlCalFileName)
         else:
-            scratchDir = os.getenv('MKID_PROC_PATH', '/')
-            wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
+            #scratchDir = os.getenv('MKID_PROC_PATH', '/')
+            #wvlDir = os.path.join(scratchDir, 'waveCalSolnFiles')
+            wvlDir = os.path.dirname(os.path.dirname(FileName(obsFile=self).mastercalSoln()))
             fullWvlCalFileName = os.path.join(wvlDir, str(wvlCalFileName))
         try:
             self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')

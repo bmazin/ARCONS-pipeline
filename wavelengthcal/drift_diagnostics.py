@@ -178,10 +178,10 @@ class drift_object:
                 for p in range(len(drift_row)):
                     self.blue_xOffset[drift_row[p],drift_col[p],i]=(drift_params[p])[1]
                     self.blue_sigma[drift_row[p],drift_col[p],i]=(drift_params[p])[0]
-                    self.red_xOffset[drift_row[p],drift_col[p],i]=(drift_params[p])[4]
+                    self.red_xOffset[drift_row[p],drift_col[p],i]=(drift_params[p])[4]+(drift_params[p])[1]
                     self.red_sigma[drift_row[p],drift_col[p],i]=(drift_params[p])[3]
                     mask= (drift_params[p])[8] > 0
-                    self.IR_xOffset[drift_row[p],drift_col[p],i]=(drift_params[p])[7]*mask
+                    self.IR_xOffset[drift_row[p],drift_col[p],i]=((drift_params[p])[7]+(drift_params[p])[4]+(drift_params[p])[1])*mask
                     self.IR_sigma[drift_row[p],drift_col[p],i]=(drift_params[p])[6]*mask
                 driftFile.close()
             except:
