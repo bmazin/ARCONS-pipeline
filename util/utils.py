@@ -489,7 +489,7 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
                plotFileName='arrayPlot.png',
                plotTitle='', sigma=None, 
                pixelsToMark=[], pixelMarkColor='red',
-               fignum=1):
+               fignum=1, pclip=None):
     """
     Plots the 2D array to screen or if showMe is set to False, to
     file.  If normMin and normMax are None, the norm is just set to
@@ -527,16 +527,22 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
              Default is 1. If None, automatically selects a new figure number.
             Added 2013/7/19 2013, JvE
     
+    pclip - set to percentile level (in percent) for setting the upper and
+            lower colour stretch limits (overrides sigma).
+    
     """
     if sigma != None:
        # Chris S. does not know what accumulatePositive is supposed to do
        # so he changed the next two lines.
        #meanVal = numpy.mean(accumulatePositive(xyarray))
        #stdVal = numpy.std(accumulatePositive(xyarray))
-       meanVal = numpy.mean(xyarray)
-       stdVal = numpy.std(xyarray)
+       meanVal = numpy.nanmean(xyarray)
+       stdVal = numpy.nanstd(xyarray)
        normMin = meanVal - sigma*stdVal
        normMax = meanVal + sigma*stdVal
+    if pclip != None:
+        normMin = numpy.percentile(xyarray[numpy.isfinite(xyarray)], pclip)
+        normMax = numpy.percentile(xyarray[numpy.isfinite(xyarray)], 100.-pclip)
     if normMin == None:
        normMin = xyarray.min()
     if normMax == None:
