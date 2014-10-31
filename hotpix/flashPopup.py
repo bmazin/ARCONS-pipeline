@@ -118,7 +118,7 @@ def pop_timestream(self,row,col):
 
 
 if __name__ == '__main__':
-    filename = "/ScienceData/PAL2014/20140925/cal_20140926-024539.h5"
+    filename = "/ScienceData/PAL2014/20141020/cal_20141021-052251.h5"
     laserFlashFile = ObsFile(filename)
     print 'Loading hotpix file'
     laserFlashFile.loadHotPixCalFile(FileName(obsFile=laserFlashFile).timeMask(), reasons=['hot pixel','laser not on'])

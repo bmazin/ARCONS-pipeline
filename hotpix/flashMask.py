@@ -15,7 +15,9 @@ See __main__ for example.
 """
 import os, warnings
 import numpy as np
-#import matplotlib.pyplot as plt
+from operator import itemgetter
+from itertools import groupby
+import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from interval import interval
 import headers.TimeMask as tm
@@ -60,6 +62,7 @@ def checkHot(avg_on, std_on, avg_off, std_off,onfirst,n_sqrt=2.,n_std=3.,n_photo
     hotmask_on += std_on == 0                                       #If no standard deviation then flag as hot
     hotmask_off += std_off > n_sqrt*np.sqrt(avg_off)
     std_off[np.where(std_off==0)]=np.sqrt(avg_off)[np.where(std_off==0)]    #Sometimes only 1 bin for off times which makes the std=0
+    std_off[np.where(std_off==0)]=1                                         #Sometimes threshold is set high enough that there are no off counts.
     #hotmask_off += std_off == 0
     
     
@@ -108,7 +111,7 @@ class flashMask:
     outputFileName - where to save the h5 file
     """
     def __init__(self, flashingFileName = None, obsFile = None, 
-                 binSize = 0.1, flashBuffer = 0.2, 
+                 binSize = 0.1, flashBuffer = 0.3, 
                  n_sqrt = 2., n_std = 3., n_photons = 1.,startTime=0, endTime= -1,
                  outputFileName = None, verbose=False):
 
@@ -152,8 +155,9 @@ class flashMask:
                         badTimeList.append((eachComponent[0][0], eachComponent[0][1], tm.timeMaskReason['laser not off']))
                     for eachComponent in badIntervals['hotIntervals'].components:
                         badTimeList.append((eachComponent[0][0], eachComponent[0][1], tm.timeMaskReason['hot pixel']))
-                    for eachComponent in badIntervals['unknownIntervals'].components:
-                        badTimeList.append((eachComponent[0][0], eachComponent[0][1], tm.timeMaskReason['unknown']))
+                    #for eachComponent in badIntervals['unknownIntervals'].components:
+                    #    #badTimeList.append((eachComponent[0][0], eachComponent[0][1], tm.timeMaskReason['unknown']))
+                    #    badTimeList.append((eachComponent[0][0], eachComponent[0][1], tm.timeMaskReason['hot pixel']))  #Just mask buffer zones as if they were hot
                     badTimeList.sort(key=lambda x: x[0])
                     timeMaskData.append([row, col, badTimeList])
                 except IndexError:
@@ -179,12 +183,22 @@ class flashMask:
         start=interval([self.startTime*self.flashingFile.ticksPerSec])
         laserNotOnIntervals = [start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(laserNotOnMask)[0]]
         laserNotOffIntervals = [start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(laserNotOffMask)[0]]
-        hotIntervals = [start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(hotMask)[0]]
-        unknownIntervals = [start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(unknownMask)[0]]
         
+        hotIntervals=[start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(hotMask)[0]]
+        #group successive hot intervals together (along with intervening buffer zone)
+        for k, g in groupby(enumerate(np.where((hotMask+unknownMask) > 0)[0]), lambda (i,x):i-x):
+            group = map(itemgetter(1), g)
+            if len(group) > 2*self.flashBuffer_bin:
+                #print group
+                hotIntervals.append(start+interval([group[0]*ticksperbin,group[-1]*ticksperbin]))
+        #hotIntervals = [start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(hotMask)[0]]
+        #unknownIntervals = [start+interval([i*ticksperbin,(i+1)*ticksperbin]) for i in np.where(unknownMask)[0]]
+        
+        #return {'laserNotOnIntervals':interval().union(laserNotOnIntervals), 'laserNotOffIntervals':interval().union(laserNotOffIntervals),
+        #        'hotIntervals':interval().union(hotIntervals), 'unknownIntervals':interval().union(unknownIntervals)}
         return {'laserNotOnIntervals':interval().union(laserNotOnIntervals), 'laserNotOffIntervals':interval().union(laserNotOffIntervals),
-                'hotIntervals':interval().union(hotIntervals), 'unknownIntervals':interval().union(unknownIntervals)}
-        
+                'hotIntervals':interval().union(hotIntervals)}
+                
         
             
     def getPixMasks(self,row,col):
@@ -199,7 +213,7 @@ class flashMask:
                 'deadRoachMask':self.deadRoachMask_r[k]}
         
             
-    def findFlashingTimes(self):
+    def findFlashingTimes(self,showPlot=False):
         if self.verbose:
             print "Finding when each roach is flashing..."
         r_list = []
@@ -232,7 +246,26 @@ class flashMask:
         for k in range(len(r_list)):
             avg = np.average(timestream_r[k])
             mask = timestream_r[k]>avg
-
+            mask_raw = mask
+            
+            #remove mask times ON that are less than buffer size
+            startsOn = np.where((1.0*mask[1:]-mask[:-1])==1)[0]+1
+            s_mask = np.array_split(mask,startsOn)
+            nOn = np.asarray([np.sum(arr) for arr in s_mask])
+            #print k
+            #print startsOn
+            #print nOn
+            s_mask2 = np.asarray(s_mask)
+            s_mask2[np.where(nOn<self.flashBuffer_bin)[0]] = np.asarray(s_mask)[np.where(nOn<self.flashBuffer_bin)[0]]*0
+            mask = np.concatenate(s_mask2.tolist())
+            #remove mask time OFF that are less than buffer size
+            startsOff = np.where((1.0*mask[1:]-mask[:-1])==-1)[0]+1
+            s_mask = np.array_split(mask,startsOff)
+            nOff = np.asarray([np.sum(-1*arr+1) for arr in s_mask])
+            s_mask2 = np.asarray(s_mask)
+            s_mask2[np.where(nOff<self.flashBuffer_bin)[0]] = np.asarray(s_mask)[np.where(nOff<self.flashBuffer_bin)[0]]*0+1
+            mask = np.concatenate(s_mask2.tolist())
+            
             flashMaskOn = mask*np.concatenate((mask[self.flashBuffer_bin:],[0]*self.flashBuffer_bin))*np.concatenate(([0]*self.flashBuffer_bin,mask[:-1*self.flashBuffer_bin]))
             mask=-1*mask+1
             flashMaskOff = mask*np.concatenate((mask[self.flashBuffer_bin:],[0]*self.flashBuffer_bin))*np.concatenate(([0]*self.flashBuffer_bin,mask[:-1*self.flashBuffer_bin]))
@@ -249,17 +282,21 @@ class flashMask:
                 foundFlash.append(True)
             else: 
                 foundFlash.append(False)
-            #plt.figure()
-            ##plt.plot(diff,label=r_list[k])
-            #plt.plot(timestream_r[k],label=str(r_list[k]))
-            ##plt.plot(filtered_timestream[k],label='filtered')
-            ##plt.plot(mask*1000-500+avg,label='mask')
-            #plt.plot((flashMaskOn-0.5)*800+avg,label='on')
-            #plt.plot((flashMaskOff-0.5)*600+avg,label='off')
-            #plt.plot((deadRoachMask-0.5)*400+avg,label='dead')
-            #plt.legend()
-            #plt.show()
-        ##plt.show()
+            if showPlot:
+                plt.figure()
+                #plt.plot(diff,label=r_list[k])
+                plt.plot(timestream_r[k],label=str(r_list[k]))
+                #plt.plot(filtered_timestream[k],label='filtered')
+                #plt.plot(mask*1000-500+avg,label='mask')
+                plt.plot((flashMaskOn-0.5)*800+avg,label='on')
+                plt.plot((flashMaskOff-0.5)*600+avg,label='off')
+                plt.plot((deadRoachMask-0.5)*400+avg,label='dead')
+                plt.plot((mask_raw-0.5)*1000+avg,label='raw')
+                plt.axhline(y=avg,c='k',ls='--',label='avg')
+                plt.legend()
+                #plt.show()
+        if showPlot:
+            plt.show()
         
         self.r_list = r_list
         self.pixelNumber_r = pixelNumber_r
@@ -366,11 +403,11 @@ class flashMask:
 
 if __name__ == '__main__':
     from util.FileName import FileName
-    filename = "/ScienceData/PAL2014/20140924/cal_20140925-054328.h5"
+    filename = "/ScienceData/PAL2014/20141020/cal_20141021-052251.h5"
     outputFileName = FileName(obsFile=ObsFile(filename)).timeMask()
     #outputFileName = None
-    masker = flashMask(filename,endTime=-1,outputFileName = outputFileName,verbose=True)
-    masker.findFlashingTimes()
+    masker = flashMask(filename,startTime = 0,endTime=-1,outputFileName = outputFileName,verbose=True)
+    masker.findFlashingTimes(showPlot=False)
     masker.findHotPixels()
     masker.writeHotPixMasks()
 
