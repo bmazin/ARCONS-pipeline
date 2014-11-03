@@ -41,6 +41,7 @@ loadWvlCalFile(self, wvlCalFileName)
 makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000)
 parsePhotonPackets(self, packets, inter=interval(),doParabolaFitPeaks=True, doBaselines=True)
 plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False)getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1)
+plotPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,**kwargs)
 plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1)
 setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000)
 switchOffHotPixTimeMask(self)
@@ -342,7 +343,8 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False, getRawCount=False, fignum=None, ds9=False):
+                   scaleByEffInt=False, getRawCount=False, fignum=None, ds9=False,
+                   pclip=1.0, **kw):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
@@ -357,14 +359,22 @@ class ObsFile:
         fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
                  specify target window number).
         ds9 - boolean, if True, display in DS9 instead of regular plot window.
+        pclip - set to percentile level (in percent) to set the upper and lower bounds
+                of the colour scale.
+        **kw - any other keywords passed directly to utils.plotArray()
+        
         """
         secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
                                          getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
+        toPlot = np.copy(secImg)
+        vmin = np.percentile(toPlot[np.isfinite(toPlot)],pclip)
+        vmax = np.percentile(toPlot[np.isfinite(toPlot)],100.-pclip)
+        toPlot[np.isnan(toPlot)] = 0    #Just looks nicer when you plot it.
         if ds9 is True:
             utils.ds9Array(secImg)
         else:
             utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
-                        plotTitle=plotTitle, fignum=fignum)
+                        plotTitle=plotTitle, fignum=fignum, **kw)
 
             
     def getFromHeader(self, name):
@@ -449,10 +459,6 @@ class ObsFile:
         #    timestamps,parabolaPeaks,baselines = self.parsePhotonPackets(packetList)
         #    
         #else:
-        
-        #************TEST********
-        #dither = False
-        #*************************
         
         x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         timestamps, parabolaPeaks, baselines, effIntTime = \
@@ -539,7 +545,7 @@ class ObsFile:
     def getPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,
                            **kwargs):
         """
-        Get a simple light curve for a pixel (basically a wrapper for getPixelCount)
+        Get a simple light curve for a pixel (basically a wrapper for getPixelCount).
         
         INPUTS:
             iRow,iCol - Row and column of pixel
@@ -556,11 +562,42 @@ class ObsFile:
             between firstSec and lastSec. Note if step is non-integer may return inconsistent
             number of values depending on rounding of last value in time step sequence (see
             documentation for numpy.arange() ).
+            
+            If hot pixel masking is turned on, then returns 0 for any time that is masked out.
+            (Maybe should update this to NaN at some point in getPixelCount?)
         """
         if lastSec==-1:lSec = self.getFromHeader('exptime')
         else: lSec = lastSec
         return np.array([self.getPixelCount(iRow,iCol,firstSec=x,integrationTime=cadence,**kwargs)['counts']
                        for x in np.arange(firstSec,lSec,cadence)])
+    
+    
+    def plotPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,**kwargs):
+        """
+        Plot a simple light curve for a given pixel. Just a wrapper for getPixelLightCurve.
+        Also marks intervals flagged as bad with gray shaded regions if a hot pixel mask is
+        loaded.
+        """
+        
+        lc = self.getPixelLightCurve(iRow=iRow,iCol=iCol,firstSec=firstSec,lastSec=lastSec,
+                                     cadence=cadence,**kwargs)
+        if lastSec==-1: realLastSec = self.getFromHeader('exptime')
+        else: realLastSec = lastSec
+        
+        #Plot the lightcurve
+        x = np.arange(firstSec+cadence/2.,realLastSec)
+        assert len(x)==len(lc)      #In case there are issues with arange being inconsistent on the number of values it returns
+        plt.plot(x,lc)
+        plt.xlabel('Time since start of file (s)')
+        plt.ylabel('Counts')
+        plt.title(self.fileName+' - pixel x,y = '+str(iCol)+','+str(iRow))
+        
+        #Get bad times in time range of interest (hot pixels etc.)
+        badTimes = self.getPixelBadTimes(iRow,iCol) & interval([firstSec,realLastSec])   #Returns an 'interval' instance
+        lcRange = np.nanmax(lc)-np.nanmin(lc)
+        for eachInterval in badTimes:
+            plt.fill_betweenx([np.nanmin(lc)-0.5*lcRange,np.nanmax(lc)+0.5*lcRange], eachInterval[0],eachInterval[1],
+                              alpha=0.5,color='gray')
         
     
     def getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
