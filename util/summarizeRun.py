@@ -1,6 +1,8 @@
 import os,sys,glob,re
 from util import FileName
 from util import ObsFile
+from tables.exceptions import NoSuchNodeError,HDF5ExtError
+
 class SummarizeRun():
     def __init__(self,run, dateLimkidDataDir=None,dateList="all"):
         self.mkidDataDir = os.getenv('MKID_RAW_PATH', '/ScienceData')
@@ -14,7 +16,7 @@ class SummarizeRun():
         self.info = []
         for thisDir in dirList:
             fullDir = os.path.join(self.mkidDataDir,run,thisDir)
-            print "Now search fillDir=",fullDir
+            print "Now search for files in",fullDir
             if len(thisDir) == 8:
                 fileList = filter(os.path.isfile, glob.glob(fullDir + "/*.h5"))
             #fileList.sort(key=lambda x: os.path.getmtime(x))
@@ -29,13 +31,20 @@ class SummarizeRun():
                     description = ""
                     if flavor == "obs":
                         h5 = fileName.obs()
+                        print "open h5=",h5
                         try:
                             of = ObsFile.ObsFile(fileName.obs())
                             target = of.getFromHeader('target')
                             description = of.getFromHeader('description')
-                        except:
+                        except NoSuchNodeError:
                             pass
-                        del h5
+                        except HDF5ExtError:
+                            pass
+                        try:
+                            del of
+                        except UnboundLocalError:
+                            pass
+                        print "done with h5"
                     line = '%s,%s,%s,%s,"%s","%s"'%(run,date,ts,flavor,target,description)
                     self.lines.append(line)
 if __name__ == '__main__':
@@ -59,6 +68,7 @@ if __name__ == '__main__':
     print "number of lines is ",len(sr.lines)
     csvFile = open(run+".csv","w")
     for line in sr.lines:
-        print line
+        #print line
         csvFile.write(line+"\n")
     csvFile.close()
+    print "done writing csvFile",run+".csv"
