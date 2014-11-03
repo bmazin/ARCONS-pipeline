@@ -33,8 +33,6 @@ class ObsFileSeq():
 
     executing just this file demonstrates calls to getTargetlist and
     plotLocations for a mosaic of the ring nebula.
-
-
     """
     def __init__(self,name,run,date,timeStamps,dt):
         """
