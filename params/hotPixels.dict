@@ -21,11 +21,18 @@ fwhm = 3.0			#Expected full width half max of PSF in pixels. Any pixel
 boxSize = 5			#Compare flux in each pixel with median flux in a 
 					#surrounding box of this size on a side.
 					
-nSigma = 3.0		#Require flux in a pixel to be > nSigma std. deviations
-					#outside the statistically expected range in order for it
-					#to be flagged. Larger value => less sensitive flagging.
+nSigmaHot = 3.0		#Require flux in a pixel to be > nSigmaHot std. deviations
+					#above the max expected for a Gaussian PSF in order for it
+					#to be flagged as hot. Larger value => less sensitive flagging.
+
+nSigmaCold = 3.0    #Require flux to be < nSigmaCold std. deviations below the median 
+                    #in a surrounding box in order to be flagged as cold (where std.
+                    #deviation is estimated as the square root of the median flux).
 
 maxIter = 5			#Max num. of iterations for the hot pixel algorithm.
 
 display = False		#If 'True', show plots of each extracted sub-exposure with
 					#detected bad pixels highlighted. 
+
+useLocalStdDev = False      #Use local robust std. dev. approx. instead of sqrt(counts)
+                            #for sigma estimate.

@@ -4,6 +4,13 @@ ARCONS-pipeline
 This repository contains the code to analyze data from the ARCONS array.  
 
 ***
+Environment variables that need to be set:
+
+MKID_RAW_PATH    - path to the root of the raw data directory structure
+MKID_PROC_PATH   - path to the root of the processed data directory structure
+MKID_BEAMMAP_PATH  - path to the default beammap file to be used by h5quicklook.py (only used for quicklook)
+
+***
 
 Required external software components:
 ---------------------
@@ -16,13 +23,43 @@ PyGuide (http://www.astro.washington.edu/users/rowen/PyGuide/Manual.html)
 
 (you can check if you have them with help('modules') within the (i)python interpreter)
 
+gittle -- represents the state of the git repository in python (easy_install gittle)
+
+ds9 -- need to download pyds9 and install. Download the package from the
+   download/pyds9 section of the ds9 web page: http://ds9.si.edu
+   See instructions at: http://hea-www.harvard.edu/RD/pyds9/
+
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
 ***
+To make nicer looking plots, you need the packages configobj and mpltools
 
-Another package you will need is interval.  It depends on crlibm
+  $ easy_install configobj
+  $ git clone git@github.com:tonysyu/mpltools.git
+  $ cd mpltools
+  $ python setup.py install
+
+***
+Another package you will need is pyinterval.  It depends on crlibm
+
+NOTE:  the python package interval is not the same thing.  If this
+got installed by mistake, things might not work so well.  A tell-tale
+sign that you have the correct thing installed is that this line 
+works in ipython:
+
+from interval import interval, inf, imath
+
 
 On Turk, these packages installed in the usual way without fuss.
+
+On bender, there was a problem with the how libcrlibm.a was build:
+relocation R_X86_64_32S against `.rodata' can not be used when making
+a shared object; recompile with -fPIC
+
+To fix this, in the crlibm source tree,in scs_lib/Makefile add the -fPIC 
+option in this line:
+CPPFLAGS = -fPIC 
+
 
 On a Mac, you need to do this:
 
@@ -95,7 +132,7 @@ Pipeline components:
 
 /skysub contains a module to subtract the sky background
 
-/imagecube contains a module to generate a FITS image cube based on an observations (no timing info)
+[/imagecube contains a module to generate a FITS image cube based on an observations (no timing info)  ]
 
 /legacy contains ARCONS analysis code that predates this repository
 
@@ -105,6 +142,8 @@ Pipeline components:
 
 /hotpix contains tools for finding location and time of hot (and possibly 'cold') pixels
 
+/photonlist contains tools for creating calibrated photon lists and creating stacked, RA/dec-mapped images from them.
+
 Each directory contains a /test subdirectory, where code to test the module will be stored.
 
 ***
@@ -113,3 +152,20 @@ A beginner's guide and the observing log for the Palomar 2012 run are in example
 
 ***
 This document uses the markdown syntax, see http://daringfireball.net/projects/markdown/
+
+
+***
+Getting it working on bender during the Palomar 2013 run.  
+
+Bender has the canopy version of python installed.  To get pyqt working:
+
+yum install qt4
+
+I then tried yum install PyQt4 but the canopy version of python did
+not pick it up.
+
+sudo scp -r stoughto@turk.physics.ucsb.edu:/usr/local/epd/lib/python2.7/site-packages/PyQt4 .
+This needs the same version of sip.  On turk, sip -V says it is version 4.13.2 so I downloaded sip-4.13.3.zip,
+unzip, python configure.py; make; sudo make install.
+
+

@@ -148,8 +148,8 @@ ypos = params[:,3]
 curve = 2*np.pi*amps*widths*widths #spectrum of oberved object in counts/s
 curve /= binWidths #spectrum is now in counts/s/Angs
 
-diam = 500 #5 meter telescope
-area = np.pi * ((diam/2.0)**2 -(100)**2)
+diam = 510.55 #5 meter telescope
+area = np.pi * ((diam/2.0)**2 -(183/2.0)**2) #secondary obstruction diameter 1.83m
 curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 #SETUP PLOTTING

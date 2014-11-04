@@ -1,6 +1,8 @@
 '''
 Author: Julian van Eyken            Date: May 31 2013
 A bit of photon-list image stacking testing....
+NB - really designed for Crab pulsar image, but should
+be somewhat flexible.
 '''
 
 import warnings
@@ -8,17 +10,18 @@ import pickle
 import os.path
 import glob
 import scipy.stats
+import numpy as np
 #from astropy import coordinates as coord
-import matplotlib.pyplot as mpl
+import matplotlib.pylab as mpl
 import photonlist.photlist as pl
 import photonlist.RADecImage as rdi
 from util.FileName import FileName
 from util import utils
 
 
-def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default="/Scratch")+'/photonLists/20121211',
+def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', default="/Scratch")+'/photonLists/20121211',
                    detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
-                   wvlMax=None, doWeighted=True, medCombine=False,vPlateScale=0.1,
+                   wvlMax=None, doWeighted=True, medCombine=False, vPlateScale=0.2,
                    nPixRA=250,nPixDec=250):
     '''
     Create an image stack
@@ -37,8 +40,9 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         medCombine - experimental, if True, do a median combine of the image stack
                      instead of just adding them all.... Prob. should be implemented
                      properly at some point, just a fudge for now.
-        vPlateScale (arcsec/pixel) - plate scale of virtual pixels in output image.
-        nPixRA, nPixDec - number of pixels in output image.
+        vPlateScale - (arcsec/virtual pixel) - to set the plate scale of the virtual
+                     pixels in the outputs image.
+        nPixRA,nPixDec - size of virtual pixel grid in output image.
     
     OUTPUTS:
         Returns a stacked image object, saves the same out to a pickle file, and
@@ -46,6 +50,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
         stacked images as it goes. 
     '''
     
+
     #Get the list of filenames
     if fileNames[0]=='@':
         #(Note, actually untested, but should be more or less right...)
@@ -81,26 +86,38 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('INTERM_DIR', default
                 imSaveName=baseSaveName+'.tif'
                 virtualImage.loadImage(phList,doStack=not medCombine,savePreStackImage=imSaveName,
                                        wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted)
-                virtualImage.display(pclip=0.1)
-                imageStack.append(virtualImage.image)       #Only makes sense if medCombine==True, otherwise will be ignored
-        
+                imageStack.append(virtualImage.image*virtualImage.expTimeWeights)       #Only makes sense if medCombine==True, otherwise will be ignored
+                if medCombine==True:
+                    medComImage = scipy.stats.nanmedian(np.array(imageStack), axis=0)
+                    normMin = np.percentile(medComImage[np.isfinite(medComImage)],q=0.1)
+                    normMax = np.percentile(medComImage[np.isfinite(medComImage)],q=99.9)
+                    toDisplay = np.copy(medComImage)
+                    toDisplay[~np.isfinite(toDisplay)] = 0
+                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax,colormap=mpl.cm.gray,
+                                    cbar=True)
+                else:
+                    virtualImage.display(pclip=0.1)
+                    medComImage = None
+
+            mpl.draw() 
+
+
         else:
             print 'File doesn''t exist: ',eachFile
     
-    if medCombine == True:
-        medComImage = scipy.stats.nanmedian(np.array(imageStack), axis=0)
-    else:
-        medComImage = None
-    
-    #Save the results
+    #Save the results.
+    #Note, if median combining, 'vim' will only contain one frame. If not, medComImage will be None.
+    results = {'vim':virtualImage,'imstack':imageStack,'medim':medComImage}
+
     try:
         output = open(saveFileName,'wb')
-        pickle.dump(virtualImage,output,-1)
+        pickle.dump(results,output,-1)
         output.close()
+            
     except:
         warnings.warn('Unable to save results for some reason...')
     
-    return virtualImage, imageStack, medComImage
+    return results
 
 
 

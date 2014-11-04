@@ -3,9 +3,9 @@ Author:  Chris Stoughton
 Build up complete file names from:
 
 mkidDataDir -- root of all raw. If not specified, looks for system variable
-                MKID_DATA_DIR, otherwise '/ScienceData'.
+                MKID_RAW_PATH, otherwise '/ScienceData'.
 intermDir -- root of all generated files. If not specified, looks for 
-                sys. variable INTERM_DIR, otherwise '/Scratch')
+                sys. variable MKID_PROC_PATH, otherwise '/Scratch')
 run -- such as LICK201 or PAL2012
 date -- in format yyyymmdd -- the local year, month, and date of sunset
 flavor -- obs or cal are the only ones I know about
@@ -27,20 +27,22 @@ class FileName:
             run - string, name of folder which contains all obs files for this run
             date - string, date (usually of sunset), name of folder in which obs files for this date are stored
             tstamp - string, timestamp of the obs. file.
-            obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out the required parameters automatically.
-                      Alternatively, obsFile can also be a string containing a full obs file path name instead.
-            mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_DATA_DIR' if not specified.)
-            intermDir - data reduction product directory (uses path pointed to by system variable 'INTERM_DIR' if not specified.
+            obsFile - instead of run, date, tstamp, supply an obsFile instance instead, and it will pull out 
+                      the required parameters automatically. Alternatively, obsFile can also be a string containing
+                      a full obs file path name instead.
+            mkidDataDir - raw data directory (uses path pointed to by system variable 'MKID_RAW_PATH' if not specified.)
+            intermDir - data reduction product directory (uses path pointed to by system variable 'MKID_PROC_PATH' if not specified.
         '''
             
         if mkidDataDir is None:
-            mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
+            mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
         if intermDir is None:
-            intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+            intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         
 
         self.mkidDataDir = mkidDataDir
         self.intermDir = intermDir
+        self.obsFile = obsFile
         if obsFile is None:
             self.run = run
             self.date = date
@@ -61,12 +63,14 @@ class FileName:
             # here and then again a few lines down.  July 11, 2013
             dirs = os.path.dirname(os.path.normpath(fullObsFileName)).split(os.sep)
             #Pull out the relevant bits
-
             self.run = dirs[-2]
             self.date = dirs[-1]
             self.tstamp = (os.path.basename(fullObsFileName)
-                           .partition('obs_')[2]
+                           .partition('_')[2]
                            .rpartition('.h5')[0])
+
+            #print self.tstamp
+            #print os.path.basename(fullObsFileName).partition('_')[-1].rpartition('.h5')[0]
 
     def makeName(self, prefix="plot_", suffix="png"):
         return prefix+self.tstamp+suffix
@@ -89,6 +93,13 @@ class FileName:
             self.date + os.sep + \
             "flat_" + self.tstamp + '.h5'
 
+    def tcslog(self):
+        return self.mkidDataDir + os.sep + \
+            self.run + os.sep + \
+            self.date + os.sep + \
+            "logs" + os.sep + \
+            "tcs.log"
+
     def timeMask(self):
         return self.intermDir + os.sep + \
             'timeMasks' + os.sep + \
@@ -103,15 +114,32 @@ class FileName:
     def calSoln(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
             self.date + os.sep + \
             "calsol_" + self.tstamp + '.h5'
 
     def calDriftInfo(self):
         return self.intermDir + os.sep + \
             'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
             self.date + os.sep + \
             'drift_study'+ os.sep+\
             "calsol_" + self.tstamp + '_drift.h5'
+
+    def mastercalSoln(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
+            'master_cals' + os.sep + \
+            "mastercal_" + self.tstamp + '.h5'
+
+    def mastercalDriftInfo(self):
+        return self.intermDir + os.sep + \
+            'waveCalSolnFiles' + os.sep + \
+            self.run + os.sep + \
+            'master_cals' + os.sep + \
+            'drift_study'+ os.sep+\
+            "mastercal_" + self.tstamp + '_drift.h5'
 
     def centroidList(self):
         if self.tstamp == '' or self.tstamp == None:
@@ -129,42 +157,75 @@ class FileName:
         if self.tstamp == '' or self.tstamp == None:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'fluxCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "fluxsol_" + self.tstamp + '.h5'
 
 
     def flatSoln(self):
-        if self.tstamp == '' or self.tstamp == None:
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.h5'
         else:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.h5'
 
-    def flatInfo(self):
-        if self.tstamp == '' or self.tstamp == None:
+    def illumSoln(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.date + '.h5'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.tstamp + '.h5'
+
+    def flatInfo(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.date + '.npz'
         else:
             return self.intermDir + os.sep + \
                 'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
                 self.date + os.sep + \
                 "flatsol_" + self.tstamp + '.npz'
 
+    def illumInfo(self):
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.date + '.npz'
+        else:
+            return self.intermDir + os.sep + \
+                'flatCalSolnFiles' + os.sep + \
+                self.run + os.sep + \
+                self.date + os.sep + \
+                "illumsol_" + self.tstamp + '.npz'
 
     def oldFlatInfo(self):
-        if self.tstamp == '' or self.tstamp == None:
+        if self.tstamp == '' or self.tstamp == None or self.obsFile is not None:
             return self.intermDir + os.sep + \
                 'oldFlatCalSolnFiles' + os.sep + \
                 self.date + os.sep + \
@@ -180,6 +241,12 @@ class FileName:
             'photonLists' + os.sep + \
             self.date + os.sep + \
             "photons_" + self.tstamp + '.h5'
+
+    def timedPhotonList(self):
+        return self.intermDir + os.sep + \
+            'photonLists' + os.sep + \
+            self.date + os.sep + \
+            "timedPhotons_" + self.tstamp + '.h5'
                            
     def packetMasterLog(self):
         return self.mkidDataDir + os.sep + \
@@ -196,6 +263,10 @@ class FileName:
             'pixRemap' + os.sep + \
             'pixRemap_' + self.run + '.h5'
             
+    def beammap(self):
+        return self.intermDir + os.sep + \
+            'pixRemap' + os.sep + \
+            'beamimage_' + self.run + '.h5'
     ##################################
     
     def getComponents(self):

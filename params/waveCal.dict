@@ -1,95 +1,57 @@
 ## Files and Dirs
 
-#calfileslist = 'calfile_list_Lick.txt'                                 # generated with script list_calfiles.sh/list_calfiles.py 
-calfileslist = 'calfile_list_Palo.txt'
-#calfileslist = 'calfile_list_labtesting2013.txt'
-#calfileslist = 'calfile_list_labtesting2013_2.txt'
-
-#files2run = '/ScienceData/LICK2012/20120916/cal_20120917-072537.h5'   # specify an individual file, files from one night or all
-#files2run = '/ScienceData/PAL2012/20121204/obs_20121204-233549.h5'
-#files2run = '/Scratch/matchedData/cal_20121208-023522.h5'
-files2run = '20121204'
-#files2run = 'all'
-#files2run = '20130220'
-
-## For Matt's NLTT anal
-#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-133056.h5'
-#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-020441.h5'
-#files2run = '/ScienceData/PAL2012/20121210/cal_20121211-044853.h5'
-#files2run = '/ScienceData/PAL2012/20121211/cal_20121212-111847.h5'
-#files2run = '/ScienceData/PAL2012/20121211/cal_20121212-032455.h5'
-#files2run = '/ScienceData/PAL2012/20121208/cal_20121211-020441.h5'
-                                             
-
-#outdir = '/ScienceData/waveCalSolnFiles/'
-outdir = '/Scratch/waveCalSolnFiles/'
-#outdir = '/Scratch/newArrayData/20130201/'
-#outdir = '/Scratch/newArrayData/'
+run = 'PAL2014'
+#sunsetDate = None                       # if None then do all dates and all files for run
+calTimeStamps = None                    # if None then do all files in directory
+sunsetDate = '20140924'
+#calTimeStamps = ['20140924-071950']
 
 
-figdir = 'figs/'
-driftdir = 'drift_study/'
+#mkidDataDir=None    # /ScienceData by default
+mkidDataDir='/home/kids/PAL2014_data/ScienceData'
+#intermDir=None      # /Scratch by default
+intermDir='/home/kids/labData/PAL2014_data'
+outdir=None         # /waveCalSolnFiles by default
+#outdir='/waveCalSolnFiles/test'
+figdir = '/figs'
+driftdir = '/drift_study'
+filename=None
 
 
-## Constants
+min_count_rate=2        # per second; decides if pixel is dead
 
-#h = 6.6261e-34  # J s
-h = 4.1357e-15   # eV s    
-c = 3.e8        # m/s
-ang2m = 1.e-10
-fwhm2sig = 2.35
-
-
-## Array params - ~Aug. 2012 sci 3 gamma array
-
-n_rows = 46
-n_cols = 44
-n_roaches = 8
-
-non_alloc_pix = 250
-
-divisor = 275
-read_freq = 550
-
-n_bits_long = 12
-n_bits_time = 20
-
-n_bits_base = 20
-n_bits_peak = 32
-n_bits_parab = 44 
-
-pulseMask = int(n_bits_long*'1',2)   # bitmask of 12 ones
-timeMask = int(n_bits_time*'1',2)
-
-
-## Laser light wavelengths
-
-#bluelambda = 4009.4      # Angstroms
-#redlambda  = 6560.4 
-#irlambda   = 9744.9
+bin_smooth = 60.
+min_amp = 5             # cut out parts of histogram with amp too small
+blueR_guess = 8
 
 bluelambda = 4066.      # Angstroms; New box - Dec 2012 Palomar run
 redlambda  = 6710. 
 irlambda   = 9821.
 
-n_lasers = 3
+threshold_sigma = 2.5
+sample_rate = 10.e6     # samples per second
+num_points_per_photon = 20
+
+danicas_cut = 0.001     # cut photons that occur too close together, None to ignore
+
+noise_scale_factor = 0.04  # scale factor guess for expoential fit to noise tail
+
+max_chi2_blue = 2.5         # max reduced chi^2 for blue fit
+max_chi2_all = 3.0          # max reduced chi^2 required for a good fit
+
+h = 4.1357e-15   # eV s    
+c = 3.e8        # m/s
+ang2m = 1.e-10
+fwhm2sig = 2.35
+
+#model_type = 'threegaussian_power'      # model to fit noise tail with
+model_type = 'fourgaussian'
+#noise_guess_lower = [0.0,None,0.0]
+#noise_guess_upper = [None,None,None]
+noise_guess_lower = None
+noise_guess_upper = None
+noise_fall = 10             # how fast the noise tail falls off on right
+#noise_fall = 60             # works well for fancy baselines
 
 
-## Parameters for finding extreema
-
-big_step = 10        
-bin_smooth = 60.    ## window size needs to be even to work
-
-## Thresholds for cutting pixels
-
-low_counts_val = 10
-chi2_cutoff = 2.7
-#cr_low = 30
-#cr_high = 400
-cr_low = 0          # for sci 4
-cr_high = 150
-badfit_res = 8.
-no_peak_thresh = -350.
-sigma_thresh = 100.
-sig_ir_ind = 6
 

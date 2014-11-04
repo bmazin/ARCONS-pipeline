@@ -4,6 +4,8 @@ import numpy as np
 import unittest
 import os
 import inspect
+from util.readDict import readDict
+
 class TestUtils(unittest.TestCase):
     """
     Test functions in utils.py
@@ -31,7 +33,7 @@ class TestUtils(unittest.TestCase):
         listOfFrameObj = []
         frameTitles = []
         for iFrame in range(nrow):
-            print "iFrame=",iFrame
+            #print "iFrame=",iFrame
             frame = []
             for iRow in range(nrow):
                 if (iRow < iFrame):
@@ -66,5 +68,22 @@ class TestUtils(unittest.TestCase):
                         delay=1.0, colormap=mpl.cm.gray,
                         listOfPixelsToMark=listOfPixelsToMark, 
                         pixelMarkColor='red')
+    def testGetGitStatus(self):
+        """
+        Test that the getStatus method does not crash and returns 
+        a dictionary with more than 2 keys
+        """
+        gs = utils.getGitStatus()
+        self.assertTrue(len(gs.keys()) > 2)
+
+    def testReadDict(self):
+        """
+        Test reading geminga.dict
+        """
+        params = readDict()
+        params.read_from_file("geminga.dict")
+        self.assertTrue(params['needHotPix'])
+        self.assertEqual(26, len(params['obsSequence']))
+
 if __name__ == '__main__':
     unittest.main()

@@ -8,14 +8,14 @@ class TestFileName(unittest.TestCase):
     Test getting the raw and the timeMask file names
 
     Works by default on turk; set environment variables 
-    MKID_DATA_DIR and INTERM_DIR on other machines
+    MKID_RAW_PATH and MKID_PROC_PATH on other machines
 
     Check for one file and see that it exists:
     /ScienceData/LICK2012/20120919/obs_20120920-123350.h5
     """
     def testRaw(self):
-        mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
-        intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+        mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
+        intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         run = 'LICK2012'
         date = '20120919'
         tstamp = '20120920-123350'
@@ -29,8 +29,8 @@ class TestFileName(unittest.TestCase):
 
 
     def testCalSoln(self):
-        mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
-        intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+        mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
+        intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         run = 'LICK2012'
         date = '20120919'
         tstamp = '20120920-123900'
@@ -39,8 +39,8 @@ class TestFileName(unittest.TestCase):
         self.assertTrue(os.path.exists(calSolnFn), msg=calSolnFn)
 
     def testTimeMask(self):
-        mkidDataDir = os.getenv('MKID_DATA_DIR', default="/ScienceData")
-        intermDir = os.getenv('INTERM_DIR', default="/Scratch")
+        mkidDataDir = os.getenv('MKID_RAW_PATH', default="/ScienceData")
+        intermDir = os.getenv('MKID_PROC_PATH', default="/Scratch")
         run = 'LICK2012'
         date = '20120919'
         tstamp = '20120920-123350'
@@ -57,6 +57,16 @@ class TestFileName(unittest.TestCase):
         fn2 = FileName.FileName(obsFile=obsFile)
         self.assertTrue(fn1.obs()==fn2.obs())
         self.assertTrue(fn2.getComponents()==(run,date,tstamp))
+        
+    def testFlatCalFromObsFile(self):
+        run = 'LICK2012'
+        date = '20120919'
+        tstamp = '20120920-123350'
+        fn = FileName.FileName(run, date, tstamp)
+        obsFile = ObsFile.ObsFile(fn.obs())
+        flatCalFN1 = FileName.FileName(run, date, tstamp='').flatSoln()
+        flatCalFN2 = FileName.FileName(obsFile=obsFile).flatSoln()        
+        self.assertTrue(flatCalFN1==flatCalFN2)
         
     def testPassObsFileNameString(self):
         run = 'LICK2012'

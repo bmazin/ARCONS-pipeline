@@ -1,32 +1,36 @@
 #!/bin/python
 '''
--------------
 Adapted from code by Matt to write photon lists out
-for the Palomar Crab data - see notes below. May 21 2013, JvE.
--------------
+for the Palomar Crab data. May 21 2013, JvE.
 
-Author: Matt Strader        Date: March 6,2013
+Runs through a sequence of Obs Files for the Crab data, creates
+hot pixel masks (on calibrated data), runs centroiding, then
+creates calibrated photon list files.
 
-This program opens a series of observations of the crab pulsar.  It calculates
-the period, and calcluates the phase for every photon in the series of
-observations, It then plots a light curve, and a histogram of counts per period
+Currently does *not* overwrite anything that already exists.
+
+NOTE - CURRENTLY USING ILLUMINATION CORRECTION FLATS ONLY, 
+INSTEAD OF FULL FLAT SOLUTIONS. 8/8/2014, JvE.
 '''
+
+import os
+import numpy as np
+import datetime
+#import tables
+#import ephem
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import hotpix.hotPixels as hp
+import astrometry.CentroidCalc as cc
 from util.ObsFile import ObsFile
 from util.FileName import FileName
 from util.popup import PopUp
-import matplotlib.pyplot as plt
-import numpy as np
-import datetime
-import tables
-import ephem
-import matplotlib
-import matplotlib.cm as cm
-import matplotlib.pylab as mpl
-import os
-import hotpix.hotPixels as hp
-import astrometry.CentroidCalc as cc
+from util.test import loadTestObsFile as ltof
 
-def main():
+def main(testRun=False):
+
+    #INPUTS:
+    #    - testRun :    If True, run only a single exposure.
 
     #Try remapping the pixels - set to None to not do this....
     pixRemapFileName = FileName(run='PAL2012').pixRemap()
@@ -66,8 +70,9 @@ def main():
     052917
     053419
     053922
-    054424
     """
+    # 054424 - repointed mid-exposure, leave out for now.    
+    
 
     obsSequence3="""
     054926
@@ -84,18 +89,21 @@ def main():
     run = 'PAL2012'
     obsSequences = [obsSequence0,obsSequence1,obsSequence2,obsSequence3]
     
-    #TEMPORARY FUDGE TO JUST LOOK AT A COUPLE OF IMAGES...
-    obsSequences = ['9999999',
-                    '''
-                    033323
-                    ''',
-                    '9999999',
-                    '9999999']
+    #If test run is requested, override and just run one test exposure.
+    if testRun is True:
+        obsSequences = ['9999999',
+                        '''
+                        033323
+                        ''',
+                        '9999999',
+                        '9999999']
     
     wvlCals = ['051341','063518','063518','063518']
     flatCals = ['20121211','20121211','20121211','20121211']
-    fluxCalDates = ['20121206','20121206','20121206','20121206']
-    fluxCals = ['20121207-072055','20121207-072055','20121207-072055','20121207-072055']
+    #fluxCalDates = ['20121206','20121206','20121206','20121206']
+    #fluxCals = ['20121207-072055','20121207-072055','20121207-072055','20121207-072055']
+    fluxCalDates = ['20121211','20121211','20121211','20121211']
+    fluxCals = ['absolute_021727','absolute_021727','absolute_021727','absolute_021727']
 
     #Row coordinate of center of crab pulsar for each obsSequence
     centersRow = [9,30,29,10]
@@ -130,29 +138,30 @@ def main():
         wvlCalTstamp = obsUtcDate+'-'+wvlCals[iSeq]
         wvlFileNames.append(FileName(run=run,date=sunsetDate,tstamp=wvlCalTstamp).calSoln())
         fluxFileNames.append(FileName(run=run,date=fluxCalDates[iSeq],tstamp=fluxCals[iSeq]).fluxSoln())
-        flatFileNames.append(FileName(run=run,date=flatCals[iSeq],tstamp='').flatSoln())
+        flatFileNames.append(FileName(run=run,date=flatCals[iSeq]).illumSoln()) # *** CURRENTLY USES ILLUMINATION SOLUTION! ***
         centroidFileNames.append(FileName(run=run,date=sunsetDate,tstamp=ts).centroidList())
 
 
-    for iSeq,obsSequence in enumerate(obsSequences):
-        obsSequence = obsSequence.strip().split()
-        print obsSequence
-        for iOb,obs in enumerate(obsSequence):
-            timeMaskFileName = timeMaskFileNames[iSeq][iOb]
-            if os.path.exists(obsFileNames[iSeq][iOb]) and not os.path.exists(timeMaskFileName):
-                print 'Running hotpix for ',obs
-                hp.findHotPixels(obsFileNames[iSeq][iOb],timeMaskFileName)
-                print "Flux file pixel mask saved to %s"%(timeMaskFileName)
-            else:
-                print 'Skipping hot pixel mask creation for non-existent file '+obsFileNames[iSeq][iOb]
+#     #Make hot pixel masks if needed
+#     for iSeq,obsSequence in enumerate(obsSequences):
+#         obsSequence = obsSequence.strip().split()
+#         print obsSequence
+#         for iOb,obs in enumerate(obsSequence):
+#             timeMaskFileName = timeMaskFileNames[iSeq][iOb]
+#             if os.path.exists(obsFileNames[iSeq][iOb]) and not os.path.exists(timeMaskFileName):
+#                 print 'Running hotpix for ',obs
+#                 hp.findHotPixels(obsFileNames[iSeq][iOb],timeMaskFileName)
+#                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
+#             else:
+#                 print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
 
 
-    apertureRadius = 4
+    #apertureRadius = 4
     obLists = [[ObsFile(fn)for fn in seq if os.path.exists(fn)] for seq in obsFileNames]
     tstampFormat = '%H:%M:%S'
     #print 'fileName','headerUnix','headerUTC','logUnix','packetReceivedUnixTime'
    
-    print '---------Getting centroids-----------' 
+    print '---------Making hot pixel masks/getting centroids-----------' 
     for iSeq,obList in enumerate(obLists):
         for iOb,ob in enumerate(obList):
             timeAdjFileName = FileName(run='PAL2012').timeAdjustments()
@@ -161,7 +170,7 @@ def main():
             fluxCalFileName = fluxFileNames[iSeq]
             timeMaskFileName = FileName(obsFile=ob).timeMask() #timeMaskFileNames[iSeq][iOb]
             centroidFileName = FileName(obsFile=ob).centroidList()
-            if not os.path.exists(centroidFileName):
+            if not os.path.exists(centroidFileName) or not os.path.exists(timeMaskFileName):
                 print 'Loading calibration files:'
                 print [os.path.basename(x) for x in [timeAdjFileName,wvlCalFileName,flatCalFileName, \
                         fluxCalFileName,timeMaskFileName, centroidFileName]]
@@ -169,27 +178,34 @@ def main():
                 ob.loadWvlCalFile(wvlCalFileName)
                 ob.loadFlatCalFile(flatCalFileName)
                 ob.loadFluxCalFile(fluxCalFileName)
+                ob.setWvlCutoffs(3000.,12000.) #Keep most of the wavelength range for the purposes of centroiding/hot pixel detection.
+
+                
+            if not os.path.exists(timeMaskFileName):
+                print 'Running hotpix for ',ob.fileName
+                #Run hot pixel detection on *calibrated* file.
+                #But don't use flux weighting, as this scales by a large amount, and throws
+                #the poisson statistics way too much. (i.e., we really need to use
+                #counts *detected* for shot noise statistics, rather than 
+                #estimated counts above the atmosphere....)
+                hp.findHotPixels(obsFile=ob,outputFileName=timeMaskFileName,
+                                 useRawCounts=False,weighted=True,fluxWeighted=False)
+                print "Flux file pixel mask saved to %s"%(timeMaskFileName)
+            else:
+                print 'Skipping hot pixel mask creation for file '+obsFileNames[iSeq][iOb]
+            if not os.path.exists(centroidFileName):
                 ob.loadHotPixCalFile(timeMaskFileName)
-                ob.setWvlCutoffs(None,None)
                 print 'Running CentroidCalc for ',ob.fileName
                 cc.centroidCalc(ob, centerRA, centerDec, outputFileName=centroidFileName,
                                 guessTime=300, integrationTime=30, secondMaxCountsForDisplay=500,
                                 xyapprox=[centersCol[iSeq],centersRow[iSeq]])
                 print "Centroiding calculations saved to %s"%(centroidFileName)
             else:
-                print "File already exists - skipping: "+centroidFileName
+                print "Centroid file already exists - skipping: "+centroidFileName
                 
     print '---------Writing photon lists----------'
     for iSeq,obList in enumerate(obLists):
         for ob in obList:
-#            ob.loadTimeAdjustmentFile(FileName(run='PAL2012').timeAdjustments())
-#            ob.loadWvlCalFile(wvlFileNames[iSeq])
-#            ob.loadFlatCalFile(flatFileNames[iSeq])
-#            ob.loadFluxCalFile(fluxFileNames[iSeq])
-#            timeMaskFileName = timeMaskFileNames[iSeq][iOb]
-#            ob.loadHotPixCalFile(timeMaskFileName)
-#            ob.setWvlCutoffs(None,None)
-#                        timeAdjFileName = FileName(run='PAL2012').timeAdjustments()
             photListFileName = FileName(obsFile=ob).photonList()
             if os.path.exists(photListFileName):
                 print 'Phot. list file already exists - skipping: ',photListFileName

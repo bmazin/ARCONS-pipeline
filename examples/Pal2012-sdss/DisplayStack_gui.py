@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'DisplayStack_gui.ui'
 #
-# Created: Tue Sep 24 14:34:21 2013
+# Created: Wed Oct  2 15:02:44 2013
 #      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -96,13 +96,13 @@ class Ui_DisplayStack_gui(object):
         self.deadPixelBox.setGeometry(QtCore.QRect(500, 550, 171, 22))
         self.deadPixelBox.setChecked(True)
         self.deadPixelBox.setObjectName(_fromUtf8("deadPixelBox"))
-        self.startButton = QtGui.QPushButton(self.centralwidget)
-        self.startButton.setGeometry(QtCore.QRect(710, 410, 92, 27))
+        self.stackButton = QtGui.QPushButton(self.centralwidget)
+        self.stackButton.setGeometry(QtCore.QRect(710, 410, 111, 27))
         font = QtGui.QFont()
         font.setBold(True)
         font.setWeight(75)
-        self.startButton.setFont(font)
-        self.startButton.setObjectName(_fromUtf8("startButton"))
+        self.stackButton.setFont(font)
+        self.stackButton.setObjectName(_fromUtf8("stackButton"))
         self.label = QtGui.QLabel(self.centralwidget)
         self.label.setGeometry(QtCore.QRect(210, 260, 62, 17))
         font = QtGui.QFont()
@@ -166,6 +166,13 @@ class Ui_DisplayStack_gui(object):
         self.line_4.setFrameShape(QtGui.QFrame.VLine)
         self.line_4.setFrameShadow(QtGui.QFrame.Sunken)
         self.line_4.setObjectName(_fromUtf8("line_4"))
+        self.loadStackButton = QtGui.QPushButton(self.centralwidget)
+        self.loadStackButton.setGeometry(QtCore.QRect(710, 450, 111, 27))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.loadStackButton.setFont(font)
+        self.loadStackButton.setObjectName(_fromUtf8("loadStackButton"))
         DisplayStack_gui.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(DisplayStack_gui)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1101, 25))
@@ -199,7 +206,7 @@ class Ui_DisplayStack_gui(object):
         self.flatCalibrationBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Flat Calibration", None, QtGui.QApplication.UnicodeUTF8))
         self.hotPixelBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Hot Pixel Masking", None, QtGui.QApplication.UnicodeUTF8))
         self.deadPixelBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Remove Dead Pixels", None, QtGui.QApplication.UnicodeUTF8))
-        self.startButton.setText(QtGui.QApplication.translate("DisplayStack_gui", "Start", None, QtGui.QApplication.UnicodeUTF8))
+        self.stackButton.setText(QtGui.QApplication.translate("DisplayStack_gui", "Stack Images", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("DisplayStack_gui", "Options", None, QtGui.QApplication.UnicodeUTF8))
         self.timeAdjustmentBox.setText(QtGui.QApplication.translate("DisplayStack_gui", "Time Adjustment", None, QtGui.QApplication.UnicodeUTF8))
         self.obsTimeLabel.setText(QtGui.QApplication.translate("DisplayStack_gui", "Observations", None, QtGui.QApplication.UnicodeUTF8))
@@ -208,4 +215,5 @@ class Ui_DisplayStack_gui(object):
         self.clearButton.setText(QtGui.QApplication.translate("DisplayStack_gui", "Clear", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setText(QtGui.QApplication.translate("DisplayStack_gui", "Files to process", None, QtGui.QApplication.UnicodeUTF8))
         self.sunsetLabel.setText(QtGui.QApplication.translate("DisplayStack_gui", "Sunset Date", None, QtGui.QApplication.UnicodeUTF8))
+        self.loadStackButton.setText(QtGui.QApplication.translate("DisplayStack_gui", "Load Stack", None, QtGui.QApplication.UnicodeUTF8))
 

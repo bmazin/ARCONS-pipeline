@@ -31,11 +31,14 @@ from tables import *
 from util.FileName import FileName
 
 
-# Some useful conversions
+# Converting between degrees and radians.  Inputs and numpy functions use different units.
 d2r = np.pi/180.0
 r2d = 180.0/np.pi
 
-# Class to allow clicking of a pixel in plt.matshow and storing the xy position of the click in an array.
+'''
+Class to allow clicking of a pixel in plt.matshow and storing the xy position of the click in an array.
+Used to pick an initial guess for the centroid.
+'''
 class MouseMonitor():
     def __init__(self):
         pass
@@ -46,26 +49,37 @@ class MouseMonitor():
     def connect(self):
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
 
-# Some useful conversion functions
+# Function for converting arcseconds to radians.
 def arcsec_to_radians(total_arcsec):
     total_degrees = total_arcsec/3600.0
     total_radians = total_degrees*d2r
     return total_radians
 
+# Function for converting radians to arcseconds.
 def radians_to_arcsec(total_radians):
     total_degrees = total_radians*r2d
     total_arcsec = total_degrees*3600.0
     return total_arcsec
 
+class headerDescription(tables.IsDescription):
+    RA = tables.StringCol(80)
+    Dec = tables.StringCol(80)
+    nCol = tables.UInt32Col(dflt=-1)
+    nRow = tables.UInt32Col(dflt=-1)
+
+# Function that save
 def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionList,hourAngleList,flagList):
 
+    # Check to see if a Centroid List File exists with name centroidListFileName.
+    # If it does not exist, create a Centroid List File with that name.
     if os.path.isabs(centroidListFileName) == True:
         fullCentroidListFileName = centroidListFileName
     else:
-        scratchDir = os.getenv('INTERM_PATH')
+        scratchDir = os.getenv('MKID_PROC_PATH')
         centroidDir = os.path.join(scratchDir,'centroidListFiles')
         fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
-    
+
+    # Attempt to open h5 file with name fullCentroidListFileName.  If cannot, throw exception.
     try:
         centroidListFile = tables.openFile(fullCentroidListFileName,mode='w')
     except:
@@ -73,9 +87,33 @@ def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionLi
         return
     print 'wrote to', centroidListFileName
 
-    centroidgroup = centroidListFile.createGroup(centroidListFile.root,'centroidlist','Table of times, x positions, y positions, hour angles, and flags')
+    # Set up and write h5 table with relevant parameters, centroid times and positions, hour angles, and flags.
 
-    paramstable = tables.Array(centroidgroup,'params', object=paramsList, title = 'Object and array params')
+
+    headerGroupName = 'header'
+    headerTableName = 'header'
+
+    nRowColName = 'nRow'
+    nColColName = 'nCol'
+    RAColName = 'RA'
+    DecColName = 'Dec'
+
+    headerGroup = centroidListFile.createGroup("/", headerGroupName, 'Header')
+    headerTable = centroidListFile.createTable(headerGroup, headerTableName, headerDescription,
+                                        'Header Info')
+
+    header = headerTable.row
+    header[nColColName] = paramsList[0]
+    header[nRowColName] = paramsList[1]
+    header[RAColName] = paramsList[2]
+    header[DecColName] = paramsList[3]
+
+    header.append()
+
+    centroidgroup = centroidListFile.createGroup(centroidListFile.root,'centroidlist','Table of times, x positions, y positions, hour angles, and flags')
+    
+
+    #paramstable = tables.Array(centroidgroup,'params', object=paramsList, title = 'Object and array params')
     timestable = tables.Array(centroidgroup,'times',object=timeList,title='Times at which centroids were calculated')
     xpostable = tables.Array(centroidgroup,'xPositions',object=xPositionList,title='X centroid positions')
     ypostable = tables.Array(centroidgroup,'yPositions',object=yPositionList,title='Y centroid positions')
@@ -100,10 +138,20 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     All other inputs as previously hard-coded, currently undocumented. (See __main__ block).
     '''
     
+    # Create an instance of class obsFile.
     ob = obsFile
-    centerX = '30.5'        #Dummy values - actually doesn't matter what's entered here.
-    centerY = '30.5'
-    paramsList = [centerX,centerY,centroid_RA,centroid_DEC]
+
+    # Center of rotation positions of the array. Decided that these values weren't actually necessary.
+    # centerX = '30.5'        #Dummy values - actually doesn't matter what's entered here.
+    # centerY = '30.5'
+
+    # Get array size information from obs file
+    gridHeight = ob.nCol
+    gridWidth = ob.nRow
+
+
+    # Create an array of array and target specific parameters to include in the output file header.
+    paramsList = [gridHeight,gridWidth,centroid_RA,centroid_DEC]
     
     # Create output filename to save centroid data
     if outputFileName is None:
@@ -119,6 +167,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     
     # Get exptime and LST from header.  
     exptime = ob.getFromHeader('exptime')
+    # Can get a more accurate LST by using unix time in header. Probably off by a few seconds at most.
     original_lst = ob.getFromHeader('lst')
     print 'Original LST from telescope:', original_lst
     
@@ -131,24 +180,25 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     
     original_lst_radians = ephem.hours(original_lst).real
     original_lst_seconds = radians_to_arcsec(original_lst_radians)/15.0
-    
-    # Get array size information from obs file
-    gridHeight = ob.nCol
-    gridWidth = ob.nRow
+
+    # Move the lst to the midpoint of the frame rather than the start
+    original_lst_seconds += float(integrationTime)/2.
     
     # Create saturated pixel mask to apply to PyGuide algorithm.
     print 'Creating saturation mask...'
     nFrames = int(np.ceil(float(exptime)/float(integrationTime)))
     saturatedMask = np.zeros(((nFrames,gridWidth,gridHeight)))
-    hotPixInfo = ob.hotPixTimeMask   #hp.readHotPixels(hotPixFn)
-    intervalsMatrix = hotPixInfo['intervals']
+    #hotPixInfo = ob.hotPixTimeMask   #hp.readHotPixels(hotPixFn)
+    #intervalsMatrix = hotPixInfo['intervals']
     for t in range(nFrames):
-        for x in range(gridHeight):
-            for y in range(gridWidth):
-                if intervalsMatrix[y][x] == []:
-                    pass
-                else:
-                    saturatedMask[t][y][x]=1
+        badPixels = ob.hotPixTimeMask.getHotPixels(firstSec=int(t*integrationTime), integrationTime=int(integrationTime))
+        saturatedMask[t] = badPixels
+        #for x in range(gridHeight):
+        #    for y in range(gridWidth):
+        #        if intervalsMatrix[y][x] == []:
+        #            pass
+        #        else:
+        #            saturatedMask[t][y][x]=1
     
     # Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
     print 'Creating dead mask...'    
@@ -158,8 +208,10 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     # Specify CCDInfo (bias,readNoise,ccdGain,satLevel)
     ccd = pg.CCDInfo(0,0.00001,1,2500)
     
+    # Set a normalization to make the matshow plot more intuitive.
     norm = mpl.colors.Normalize(vmin=0,vmax=secondMaxCountsForDisplay*guessTime)
     
+    # Initialize arrays that will be saved in h5 file. 1 array element per centroid frame.
     timeList=[]
     xPositionList=[]
     yPositionList=[]
@@ -212,8 +264,10 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
                 xycenter = xyguess
                 flag = 1
             # Begin RA/DEC mapping
+            # Calculate lst for a given frame
             current_lst_seconds = original_lst_seconds + iFrame
             current_lst_radians = arcsec_to_radians(current_lst_seconds*15.0)
+            # Calculate hour angle for a given frame. Include a constant offset for instrumental rotation.
             HA_variable = current_lst_radians - centroid_RA_radians
             HA_static = HA_offset*d2r
             HA_current = HA_variable + HA_static
@@ -227,7 +281,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     saveTable(centroidListFileName=centroidListFileName,paramsList=paramsList,timeList=timeList,xPositionList=xPositionList,yPositionList=yPositionList,hourAngleList=hourAngleList,flagList=flagList)
     
 
-
+# Test Function / Example
 if __name__=='__main__':
     
     # Obs file info
@@ -245,17 +299,15 @@ if __name__=='__main__':
     integrationTime=30
     secondMaxCountsForDisplay = 500
     
-    centroidCalc(inputFileName, outputFileName, ra, dec, guessTime=300, integrationTime=30,
-                 secondMaxCountsForDisplay=500)
-    
     obsFn = FileName(run=run,date=sunsetDate,tstamp=centroidTimestamp).obs()
     wfn = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).calSoln()
     ffn = FileName(run=run,date=sunsetDate,tstamp=calTimestamp).flatSoln()
     
-    #ffn = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
+    ffn = '/Scratch/flatCalSolnFiles/20121207/flatsol_20121207.h5'
     
     # Create ObsFile instance
     ob = ObsFile(obsFn)
+    
     
     # Load wavelength and flat cal solutions
     ob.loadWvlCalFile(wfn)
@@ -271,4 +323,8 @@ if __name__=='__main__':
         print "Flux file pixel mask saved to %s"%(hotPixFn)
     ob.loadHotPixCalFile(hotPixFn,switchOnMask=False)
     print "Hot pixel mask loaded %s"%(hotPixFn)
+    
+
+    centroidCalc(ob, centroid_RA, centroid_DEC, guessTime=300, integrationTime=30,
+                 secondMaxCountsForDisplay=500)
     

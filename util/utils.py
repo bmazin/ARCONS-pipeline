@@ -2,7 +2,8 @@ import time,calendar
 import string
 import numpy
 import scipy
-import sys, os
+import sys, os, inspect
+from gittle import Gittle
 import tables
 import pylab
 import glob
@@ -12,12 +13,17 @@ import binascii
 import math
 from scipy.signal import convolve
 import scipy.ndimage
+import scipy.stats
+import astropy.stats
+import ds9
+
+
 #from interval import interval
 
 """
 Modules:
 
-aperture(startpx,startpy,radius=3)
+aperture(startpx=None, startpy=None, cenRA=None, cenDec=None, nPixRA=None, nPixDec=None, limits = None, degrees = False, radius=3)
 bin12_9ToRad(binOffset12_9)
 confirm(prompt,defaultResponse=True)
 convertDegToHex(ra, dec)
@@ -36,29 +42,143 @@ printCalFileDescriptions( dir_path )
 printObsFileDescriptions( dir_path )
 rebin2D(a, ysize, xsize)
 replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True)
-
+stdDev_filterNaN(inputarray, size=5, *nkwarg, **kwarg)
+getGitStatus()
+findNearestFinite(im,i,j,n=10)
+nearestNstdDevFilter(inputArray,n=24)
+nearestNmedFilter(inputArray,n=24)
+showzcoord()
 """
 
-def aperture(startpx,startpy,radius=3):
+def aperture(startpx=None, startpy=None, cenRA=None, cenDec=None, nPixRA=None, nPixDec=None, limits = None, degrees = False, radius=3):
     """
     Creates a mask with specified radius and centered at specified pixel
     position.  Output mask is a 46x44 array with 0 represented pixels within
     the aperture and 1 representing pixels outside the aperture.
+
+    Added by Neil (7/31/14):
+    startpx/startpy - If working with an image in the detector fram specify these values as your starting x and y pixels
+    cenRA/cenDec - This is synonemous to startpx/startpy except use this for virtual images (can be given in degrees or radians)
+    nPixRA/nPixDec - These are the number of pixels in the virtual image. Need this to scale degrees/pixel in virtual image
+    limits - If working with virtual image, this will be the window of RA and Dec values. (as of right now the input requires these to be in radians)
+    degrees - set True if cenRA/cenDec are in degrees, otherwise False
+    radius - this is the radius for the aperture. Set to 3 by default for detector images. If using virtual image this must be given in degrees (at least for right now).
+    
     """
-    r = radius
+    r = radius         #sets the radius and calculates hight and length. Note that the radius should be given in whatever units the image will be plotted in
+                       #that means for the detector frame it will be given in pixels and for the virtual image probably degrees... could add option to give in radians but
+                       #julians RADecImage.display code as of now plots the image in degrees
     length = 2*r 
     height = length
-    allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
-    ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
-    pixx = []
-    pixy = []
-    mask=numpy.ones((46,44))
-    for x in allx:
-        for y in ally:
-            if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
-                mask[y,x]=0.
-    return mask
+    
+    if startpx is not None and startpy is not None:  #If the x and y postions have been defined in the detector frame.
+        print '----finding aperture mask in detector frame----'  #gathers all x and y positions within detector frame.
+        allx = xrange(startpx-int(numpy.ceil(length/2.0)),startpx+int(numpy.floor(length/2.0))+1)
+        ally = xrange(startpy-int(numpy.ceil(height/2.0)),startpy+int(numpy.floor(height/2.0))+1)
+        pixx = []
+        pixy = []
+        mask=numpy.ones((46,44))  #sets all pixels in the detector frame equal to 1.
+        for x in allx:
+            for y in ally:
+                if (numpy.abs(x-startpx))**2+(numpy.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
+                    mask[y,x]=0.  #If the allx and ally pixel positions are within the aperture radius, sets those pixels to 0
+        return mask   #mask is a 46,44 array of all ones except where the aperture has been defined. The aperture will have 0's.
+    
+    
+    
+    elif cenRA is not None and cenDec is not None: #If the user wants to define an initial position in RA/Dec space.
+                                                   #RADecImage.display shows the objects RA ad Dec in degrees but these can be given in radians as well
+        print '----finding aperture mask in RA/Dec frame----'
+        
+        if nPixRA is not None and nPixDec is not None and limits is not None:  #really if choosing to make an aperture mask for the virtual image nPix should never be none,
+            
+            limits = numpy.array(limits,dtype = float)  #array of the limits in radians.
+            limits = limits*(180./numpy.pi)             #converts limits into degree values
+         
+            stepRA = (limits[1]-limits[0])/nPixRA     #finds the degree/virtualpixel spacing for RA
+            stepDec = (limits[3]-limits[2])/nPixDec   #finds the degree/virtualpixel spacing for Dec
+            #print limits
+            
+            if degrees == True:   #If cenRA/cenDec are given in degrees.
+                cenRA = ((cenRA-limits[0])/stepRA)   #sets the center of the aperature by converting its location to pixel location on virtual grid.
+                cenDec = ((cenDec-limits[2])/stepDec) #both RA and Dec ^^^^
+                #print cenRA
+                #print cenDec
+            else:                   #if cenRA/cenDec are given in radians.
 
+                cenRA = ((limits[1] - (cenRA*(180./numpy.pi)))/stepRA)  #converts the RA/Dec to degrees and converts to pixel location on virtual grid.
+                cenDec = ((limits[3] - (cenDec*(180./numpy.pi)))/stepDec)  
+            
+            if numpy.allclose(stepRA, stepDec) == True:  #this ensures that the RA and Declination are being incremented by the same step values on the virtual grid.
+                r = r/stepRA   #converts radius to a radius in the virtual image.
+                length = length/stepRA
+                height = height/stepRA
+                #print r
+                #print length
+                #print height
+            else:
+                raise ValueError('cant calculate the radius')   #If stepRA!=stepDec then return erro message.
+            
+            allRA = xrange(int(cenRA)-int(numpy.ceil(length/2.0)),int(cenRA)+int(numpy.floor(length/2.0))+1)    #gathers all pixel positions in the virtual image.
+            allDec = xrange(int(cenDec)-int(numpy.ceil(height/2.0)),int(cenDec)+int(numpy.floor(height/2.0))+1) 
+            #allRA = numpy.arange((cenRA - length/2.0),(cenRA + length/2.0 + stepRA), step=stepRA)
+            #allDec = numpy.arange((cenDec - height/2.0),(cenDec + height/2.0 + stepDec), step=stepDec)
+            #print allRA
+            #print allDec
+        
+            print '----creating aperture mask for virtual Image----'
+        
+            mask = numpy.ones((nPixDec, nPixRA)) #just as before, sets all pixels in the virtual frame equal to 1.
+            for RA in allRA:
+                for Dec in allDec:
+                    if (numpy.abs(RA - cenRA))**2+(numpy.abs(Dec - cenDec))**2 <= (r)**2 and 0 <= Dec and Dec < nPixDec and 0 <= RA and RA < nPixRA:
+                        mask[Dec, RA]=0  #If the pixels of allRA/allDec are located within the aperture radius, they are set equal to 0.
+            return mask  #returns an array of size nPixRA by nPixDec with all 1's except where the aperture has been defined. these are 0's.
+          
+        else:
+            raise ValueError('oops somethings not right') 
+
+
+
+
+
+
+'''
+        #conv = (vPlateScale*2*numpy.pi/1296000)  #no. of radians on sky per virtual pixel
+        #conv = conv/.0174532925 #no of degrees per virtual pixel
+        
+            #temp = nPixRA/conv #number of radians in image
+            
+        
+        print 'conv', conv
+        print '----converting RA/Dec to virtual pixel locations----'
+        r = int(r/conv)
+        print 'r', r
+        length = int(length/conv)
+        print 'length', length
+        height = int(height/conv)
+        print 'height', height
+        cenRA = int(cenRA/conv)
+        print 'cenRA', cenRA
+        cenDec = int(cenDec/conv) #converts the RA and Dec to location on virtual grid 
+        print 'cenDec', cenDec       
+        step = int(step/conv)        
+        print 'step', step
+
+        allRA = numpy.arange((cenRA - int(numpy.ceil(length/2.0))),(cenRA + int(numpy.floor(length/2.0))+step), step=step)
+        allDec = numpy.arange((cenDec - int(numpy.ceil(height/2.0))),(cenDec + int(numpy.floor(height/2.0))+step), step=step)
+        viRA = []
+        viDec = []
+        print allRA
+        print allDec
+        
+'''         
+        
+        
+        
+        
+        
+        
 
 def bin12_9ToRad(binOffset12_9):
    """
@@ -180,6 +300,85 @@ def convertHexToDeg(ra, dec):
       pass
 
    return(hh*15.+mm/4.+ss/240., sign*(deg+(arcmin*5./3.+arcsec*5./180.)/100.) )
+
+
+def ds9Array(xyarray, colormap='B', normMin=None, normMax=None,
+             sigma=None, scale=None,
+             #pixelsToMark=[], pixelMarkColor='red',
+             frame=None):
+    """
+    
+    Display a 2D array as an image in DS9 if available. Similar to 'plotArray()'
+    
+    xyarray is the array to plot
+
+    colormap - string, takes any value in the DS9 'color' menu.
+
+    normMin minimum used for normalizing color values
+
+    normMax maximum used for normalizing color values
+
+    sigma calculate normMin and normMax as this number of sigmas away
+    from the mean of positive values
+
+    scale - string, can take any value allowed by ds9 xpa interface.
+    Allowed values include:
+        linear|log|pow|sqrt|squared|asinh|sinh|histequ
+        mode minmax|<value>|zscale|zmax
+        limits <minvalue> <maxvalue>
+    e.g.: scale linear
+        scale log 100
+        scale datasec yes
+        scale histequ
+        scale limits 1 100
+        scale mode zscale
+        scale mode 99.5 
+        ...etc.
+    For more info see:
+        http://hea-www.harvard.edu/saord/ds9/ref/xpa.html#scale
+
+    ## Not yet implemented: pixelsToMark a list of pixels to mark in this image
+
+    ## Not yet implemented: pixelMarkColor is the color to fill in marked pixels
+    
+    frame - to specify which DS9 frame number the array should be displayed in.
+             Default is None. 
+    
+    """
+    if sigma != None:
+       # Chris S. does not know what accumulatePositive is supposed to do
+       # so he changed the next two lines.
+       #meanVal = numpy.mean(accumulatePositive(xyarray))
+       #stdVal = numpy.std(accumulatePositive(xyarray))
+       meanVal = numpy.mean(xyarray)
+       stdVal = numpy.std(xyarray)
+       normMin = meanVal - sigma*stdVal
+       normMax = meanVal + sigma*stdVal
+
+
+    d = ds9.ds9()   #Open a ds9 instance
+    if type(frame) is int:
+        d.set('frame '+str(frame))
+        
+    d.set_np2arr(xyarray)
+    #d.view(xyarray, frame=frame)
+    d.set('zoom to fit')
+    d.set('cmap '+colormap)
+    if normMin is not None and normMax is not None:
+        d.set('scale '+str(normMin)+' '+str(normMax))
+    if scale is not None:
+        d.set('scale '+scale)
+
+    
+    #plt.matshow(xyarray, cmap=colormap, origin='lower',norm=norm, fignum=False)
+
+    #for ptm in pixelsToMark:
+    #    box = mpl.patches.Rectangle((ptm[0]-0.5,ptm[1]-0.5),\
+    #                                    1,1,color=pixelMarkColor)
+    #    #box = mpl.patches.Rectangle((1.5,2.5),1,1,color=pixelMarkColor)
+    #    fig.axes[0].add_patch(box)
+
+ 
 
 def gaussian_psf(fwhm, boxsize, oversample=50):
     
@@ -349,8 +548,12 @@ def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
     simply ignored in calculating medians. Useful e.g. for filtering 'salt and pepper
     noise' (e.g. hot/dead pixels) from an image to make things clearer visually.
     (but note that quantitative applications are probably limited.)
+    
     Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
     calling arguments are passed.
+    
+    Note: mode='reflect' looks like it would repeat the edge row/column in the
+    'reflection'; 'mirror' does not, and may make more sense for our applications.
     
     Arguments/return values are same as for scipy median_filter.
     INPUTS:
@@ -372,6 +575,23 @@ def median_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
     '''     
     return scipy.ndimage.filters.generic_filter(inputarray, lambda x:numpy.median(x[~numpy.isnan(x)]), size,
                                                  *nkwarg, **kwarg)
+
+def nanStdDev(x):
+    '''
+    NaN resistant standard deviation - basically scipy.stats.tstd, but
+    with NaN rejection, and returning NaN if there aren't enough non-NaN
+    input values, instead of just crashing. Used by stdDev_filterNaN.
+    INPUTS:
+        x - array of input values
+    OUTPUTS:
+        The standard deviation....
+    '''
+    xClean = x[~numpy.isnan(x)]
+    if numpy.size(xClean) > 1 and xClean.min() != xClean.max():
+        return scipy.stats.tstd(xClean)
+    #Otherwise...
+    return numpy.nan
+    
     
 def plotArray( xyarray, colormap=mpl.cm.gnuplot2, 
                normMin=None, normMax=None, showMe=True,
@@ -379,7 +599,7 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
                plotFileName='arrayPlot.png',
                plotTitle='', sigma=None, 
                pixelsToMark=[], pixelMarkColor='red',
-               fignum=1):
+               fignum=1, pclip=None):
     """
     Plots the 2D array to screen or if showMe is set to False, to
     file.  If normMin and normMax are None, the norm is just set to
@@ -417,16 +637,22 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
              Default is 1. If None, automatically selects a new figure number.
             Added 2013/7/19 2013, JvE
     
+    pclip - set to percentile level (in percent) for setting the upper and
+            lower colour stretch limits (overrides sigma).
+    
     """
     if sigma != None:
        # Chris S. does not know what accumulatePositive is supposed to do
        # so he changed the next two lines.
        #meanVal = numpy.mean(accumulatePositive(xyarray))
        #stdVal = numpy.std(accumulatePositive(xyarray))
-       meanVal = numpy.mean(xyarray)
-       stdVal = numpy.std(xyarray)
+       meanVal = numpy.nanmean(xyarray)
+       stdVal = numpy.nanstd(xyarray)
        normMin = meanVal - sigma*stdVal
        normMax = meanVal + sigma*stdVal
+    if pclip != None:
+        normMin = numpy.percentile(xyarray[numpy.isfinite(xyarray)], pclip)
+        normMax = numpy.percentile(xyarray[numpy.isfinite(xyarray)], 100.-pclip)
     if normMin == None:
        normMin = xyarray.min()
     if normMax == None:
@@ -541,13 +767,20 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     
     INPUTS:
         inputarray - input array
-        mode - 'mean' or 'median' to replace with the mean or median of the neighbouring pixels.
+        mode - 'mean', 'median', or 'nearestNmedian', to replace with the mean or median of
+                the neighbouring pixels. In the first two cases, calculates on the basis of
+                a surrounding box of side 'boxsize'. In the latter, calculates median on the 
+                basis of the nearest N='boxsize' non-NaN pixels (this is probably a lot slower
+                than the first two methods). 
         boxsize - scalar integer, length of edge of box surrounding bad pixels from which to
-                  calculate the mean or median.
+                  calculate the mean or median; or in the case that mode='nearestNmedian', the 
+                  number of nearest non-NaN pixels from which to calculate the median.
         iterate - If iterate is set to True then iterate until there are no NaN values left.
                   (To deal with cases where there are many adjacent NaN's, where some NaN
                   elements may not have any valid neighbours to calculate a mean/median. 
-                  Such elements will remain NaN if only a single pass is done.)
+                  Such elements will remain NaN if only a single pass is done.) In principle,
+                  should be redundant if mode='nearestNmedian', as far as I can think right now
+    
     OUTPUTS:
         Returns 'inputarray' with NaN values replaced.
         
@@ -558,19 +791,279 @@ def replaceNaN(inputarray, mode='mean', boxsize=3, iterate=True):
     '''
     
     outputarray = numpy.copy(inputarray)
-    print numpy.sum(numpy.isnan(outputarray))
-    while numpy.sum(numpy.isnan(outputarray)) > 0:
+    while numpy.sum(numpy.isnan(outputarray)) > 0 and numpy.all(numpy.isnan(outputarray)) == False:
         
         #Calculate interpolates at *all* locations (because it's easier...)
         if mode=='mean':
-            interpolates=mean_filterNaN(outputarray,size=boxsize,mode='mirror')
+            interpolates = mean_filterNaN(outputarray,size=boxsize,mode='mirror')
         elif mode=='median':
-            interpolates=median_filterNaN(outputarray,size=boxsize,mode='mirror')
+            interpolates = median_filterNaN(outputarray,size=boxsize,mode='mirror')
+        elif mode=='nearestNmedian':
+            interpolates = nearestNmedFilter(outputarray,n=boxsize)
         else:
-            raise ValueError('Invalid mode selection - should be one of "mean" or "median"')
+            raise ValueError('Invalid mode selection - should be one of "mean", "median", or "nearestNmedian"')
         
         #Then substitute those values in wherever there are NaN values.
         outputarray[numpy.isnan(outputarray)] = interpolates[numpy.isnan(outputarray)]
         if not iterate: break 
 
     return outputarray
+
+
+def stdDev_filterNaN(inputarray, size=5, *nkwarg, **kwarg):
+    '''
+    Calculated a moving standard deviation across a 2D (image) array. The standard
+    deviation is calculated for a box of side 'size', centered at each pixel (element)
+    in the array. NaN values are ignored, and the center pixel at which the box is located
+    is masked out, so that only the surrounding pixels are included in calculating the
+    std. dev. Thus each element in the array can later be compared against
+    this std. dev. map in order to effectively find outliers.
+    
+    Works as a simple wrapper for scipy.ndimage.filters.generic-filter, to which
+    calling arguments are passed.
+    
+    Arguments/return values are same as for scipy median_filter.
+    INPUTS:
+        inputarray : array-like, input array to filter (can be n-dimensional)
+        size : scalar or tuple, optional, size of edge(s) of n-dimensional moving box. If 
+                scalar, then same value is used for all dimensions.
+    OUTPUTS:
+        NaN-resistant std. dev. filtered version of inputarray.
+    
+    '''  
+    
+    #Can set 'footprint' as follows to remove the central array element:
+    #footprint = numpy.ones((size,size))
+    #footprint[size/2,size/2] = 0
+            
+    return scipy.ndimage.filters.generic_filter(inputarray, nanStdDev, 
+                                                size=size, *nkwarg, **kwarg)
+    
+    
+    
+def getGit():
+    """
+    return a Gittle, which controls the state of the git repository
+    """
+    utilInitFile = inspect.getsourcefile(sys.modules['util'])
+    if (not os.path.isabs(utilInitFile)):
+        utilInitFile = os.path.join(os.getcwd(),utilInitFile)
+    arconsRoot = os.path.split(os.path.split(utilInitFile)[0])[0]
+    print "arconsRoot=",arconsRoot
+    git = Gittle(arconsRoot)
+    return git
+    
+def getGitStatus():
+    """
+    returns a dictionary with the following keys;
+
+    repo : the repository (local directory)
+    log0 : the most recent log entry
+    remotes: the remote repository/repositories
+    remote_branches:  name and tag for the remote branches
+    head:  the current check out commit
+    has_commits:  boolean -- True if there is code here that has not been committed
+    modified_files:  a list of files that have been modified (including ones that are not tracked by git
+    modified_unstaged_files:  a list of "important" files that are modified but not committed
+
+    """
+    git = getGit()
+    return {"repo":git.repo,
+            "log0":git.log()[0],
+            "last_commit":git.last_commit,
+            "remotes":git.remotes,
+            "remote_branches":git.remote_branches,
+            "head":git.head,
+            "has_commits":git.has_commits,
+            "modified_files":git.modified_files,
+            "modified_unstaged_files":git.modified_unstaged_files
+            }
+
+    
+    
+def findNearestFinite(im,i,j,n=10):
+    """
+    JvE 2/25/2014
+    Find the indices of the nearest n finite-valued (i.e. non-nan, non-infinity)
+    elements to a given location within a 2D array. Pretty easily extendable
+    to n dimensions in theory, but would probably mean slowing it down somewhat.
+    
+    The element i,j itself is *not* returned.
+    
+    If n is greater than the number of finite valued elements available,
+    it will return the indices of only the valued elements that exist.
+    If there are no finite valued elements, it will return a tuple of
+    empty arrays. 
+    
+    No guarantees about the order
+    in which elements are returned that are equidistant from i,j.
+    
+    
+    
+    INPUTS:
+        im - a 2D numerical array
+        i,j - position to search around (i=row, j=column)
+        n - find the nearest n finite-valued elements
+
+    OUTPUTS:
+        (#Returns an boolean array matching the shape of im, with 'True' where the nearest
+        #n finite values are, and False everywhere else. Seems to be outdated - see below. 06/11/2014,
+        JvE. Should probably check to be sure there wasn't some mistake. ).
+        
+        Returns a tuple of index arrays (row_array, col_array), similar to results
+        returned by the numpy 'where' function.
+    """
+    
+    imShape = numpy.shape(im)
+    assert len(imShape) == 2
+    nRows,nCols = imShape
+    ii2,jj2 = numpy.atleast_2d(numpy.arange(-i,nRows-i,dtype=float), numpy.arange(-j,nCols-j,dtype=float))
+    distsq = ii2.T**2 + jj2**2
+    good = numpy.isfinite(im)
+    good[i,j] = False #Get rid of element i,j itself.
+    ngood = numpy.sum(good)
+    distsq[~good] = numpy.nan   #Get rid of non-finite valued elements
+    #Find indices of the nearest finite values, and unravel the flattened results back into 2D arrays
+    nearest = (numpy.unravel_index(
+                                   (numpy.argsort(distsq,axis=None))[0:min(n,ngood)],imShape
+                                   )) #Should ignore NaN values automatically
+    
+    #Below version is maybe slightly quicker, but at this stage doesn't give quite the same results -- not worth the trouble
+    #to figure out right now.
+    #nearest = (numpy.unravel_index(
+    #                               (numpy.argpartition(distsq,min(n,ngood)-1,axis=None))[0:min(n,ngood)],
+    #                               imShape
+    #                              )) #Should ignore NaN values automatically
+    
+    return nearest
+
+
+
+def nearestNstdDevFilter(inputArray,n=24):
+    '''
+    JvE 2/25/2014
+    Return an array of the same shape as the (2D) inputArray, with output values at each element
+    corresponding to the standard deviation of the nearest n finite values in inputArray.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating std. dev. around each pixel.
+        
+    OUTPUTS:
+        A 2D array of standard deviations with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            outputArray[iRow,iCol] = numpy.std(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)])
+    return outputArray
+
+
+def nearestNrobustSigmaFilter(inputArray,n=24):
+    '''
+    JvE 4/8/2014
+    Similar to nearestNstdDevFilter, but estimate the standard deviation using the 
+    median absolute deviation instead, scaled to match 1-sigma (for a normal
+    distribution - see http://en.wikipedia.org/wiki/Robust_measures_of_scale).
+    Should be more robust to outliers than regular standard deviation.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating std. dev. around each pixel.
+        
+    OUTPUTS:
+        A 2D array of standard deviations with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            vals = inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)]
+            #MAD seems to give best compromise between speed and reasonable results.
+            #Biweight midvariance is good, somewhat slower.            
+            #outputArray[iRow,iCol] = numpy.diff(numpy.percentile(vals,[15.87,84.13]))/2.
+            outputArray[iRow,iCol] = astropy.stats.median_absolute_deviation(vals)*1.4826
+            #outputArray[iRow,iCol] = astropy.stats.biweight_midvariance(vals)
+    return outputArray
+
+
+
+def nearestNmedFilter(inputArray,n=24):
+    '''
+    JvE 2/25/2014
+    Same idea as nearestNstdDevFilter, but returns medians instead of std. deviations.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating median around each pixel.
+        
+    OUTPUTS:
+        A 2D array of medians with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            outputArray[iRow,iCol] = numpy.median(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)])
+    return outputArray
+
+
+def nearestNRobustMeanFilter(inputArray,n=24,nSigmaClip=3.,iters=None):
+    '''
+    Matt 7/18/2014
+    Same idea as nearestNstdDevFilter, but returns sigma clipped mean instead of std. deviations.
+    
+    INPUTS:
+        inputArray - 2D input array of values.
+        n - number of nearest finite neighbours to sample for calculating median around each pixel.
+        
+    OUTPUTS:
+        A 2D array of medians with the same shape as inputArray
+    '''
+    
+    outputArray = numpy.zeros_like(inputArray)
+    outputArray.fill(numpy.nan)
+    nRow,nCol = numpy.shape(inputArray)
+    for iRow in numpy.arange(nRow):
+        for iCol in numpy.arange(nCol):
+            outputArray[iRow,iCol] = numpy.ma.mean(astropy.stats.sigma_clip(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)],sig=nSigmaClip,iters=None))
+    return outputArray
+
+
+def showzcoord():
+    '''
+    For arrays displayed using 'matshow', hack to set the cursor location
+    display to include the value under the cursor, for the currently
+    selected axes.
+    
+    NB - watch out if you have several windows open - sometimes it
+    will show values in one window from another window. Avoid this by
+    making sure you've clicked *within* the plot itself to make it
+    the current active axis set (or hold down mouse button while scanning
+    values). That should reset the values to the current window.
+    
+    JvE 5/28/2014
+    
+    '''
+    
+    def format_coord(x,y):
+        try:
+            im = plt.gca().get_images()[0].get_array().data
+            nrow,ncol = numpy.shape(im)
+            row,col = int(y+0.5),int(x+0.5)
+            z = im[row,col]
+            return 'x=%1.4f, y=%1.4f, z=%1.4f'%(x, y, z)
+        except:
+            return 'x=%1.4f, y=%1.4f, --'%(x, y)
+    
+    ax = plt.gca()
+    ax.format_coord = format_coord
+
+

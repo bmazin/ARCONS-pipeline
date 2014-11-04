@@ -5,7 +5,7 @@ Author: Matt Strader        Date: March 6,2013
 This program opens a series of observations of the crab pulsar.  It calculates the period, and calcluates the phase for every photon in the series of observations, It then plots a light curve, and a histogram of counts per period
 '''
 from util.ObsFile import ObsFile
-from util.FileName import FileName
+from FileName import FileName
 from util.popup import PopUp
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +16,7 @@ import matplotlib
 import matplotlib.cm as cm
 import os
 import hotpix.hotPixels as hp
+import photlist
 
 def circ(startpx,startpy,radius=5):
     r = radius
@@ -66,12 +67,36 @@ def main():
     033825
     034327
     034830
+    035332
+    035834
+    040336
+    040838
+    041341
+    041843
+    042346
+    042848
+    043351
+    043853
+    044355
+    044857
+    045359
+    045902
     """
 
     obsSequence2="""
+    050404
+    050907
+    051409
+    051912
+    052414
+    052917
+    053419
+    053922
     """
 
     obsSequence3="""
+    054926
+    055428
     055930
     060432
     060934
@@ -80,39 +105,6 @@ def main():
     062440
     062942
     """
-
-#    obsSequence1="""
-#    035332
-#    035834
-#    040336
-#    040838
-#    041341
-#    041843
-#    042346
-#    042848
-#    043351
-#    043853
-#    044355
-#    044857
-#    045359
-#    045902
-#    """
-#
-#    obsSequence2="""
-#    050404
-#    050907
-#    051409
-#    051912
-#    052414
-#    052917
-#    053419
-#    053922
-#    """
-#
-#    obsSequence3="""
-#    054926
-#    055428
-#    """
 
     run = 'PAL2012'
     obsSequences = [obsSequence1,obsSequence2,obsSequence3]
@@ -183,9 +175,9 @@ def main():
             timeMaskFileName = timeMaskFileNames[iSeq][iOb]
             ob.loadHotPixCalFile(timeMaskFileName)
             ob.setWvlCutoffs(4000,11000)
-            ob.writePhotonList(rowList=skyRow,colList=skyCol,filename=skyFileNames[iSeq][iOb])
+            photlist.writePhotonList(ob,rowList=skyRow,colList=skyCol,filename=skyFileNames[iSeq][iOb])
             print 'wrote sky list'
-            ob.writePhotonList(rowList=circRow,colList=circCol,filename=plFileNames[iSeq][iOb])
+            photlist.writePhotonList(ob,rowList=circRow,colList=circCol,filename=plFileNames[iSeq][iOb])
             print 'wrote crab list'
 
 

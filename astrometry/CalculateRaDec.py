@@ -28,8 +28,9 @@ class CalculateRaDec:
     def __init__(self,centroidListFile):
         '''
         centroidListFile may either be a pathname (string) to a centroid list file, a PyTables instance
-        of a centroid list file, or a PyTables instance of the actual centroid list node (table) within
+        of a centroid list file, or a PyTables instance of the actual centroid list root node within
         a centroid list file (as stored in PhotList instances).
+        Note the last option has changed slightly! (JvE 7/18/2014)
         '''
         
         if type(centroidListFile) is str:
@@ -37,7 +38,7 @@ class CalculateRaDec:
             if os.path.isabs(centroidListFile) == True:
                 fullCentroidListFileName = centroidListFile
             else:
-                scratchDir = os.getenv('INTERM_PATH')
+                scratchDir = os.getenv('MKID_PROC_PATH')
                 centroidDir = os.path.join(scratchDir,'centroidListFiles')
                 fullCentroidListFileName = os.path.join(centroidDir,centroidListFileName)
             if (not os.path.exists(fullCentroidListFileName)):
@@ -46,24 +47,36 @@ class CalculateRaDec:
                 #return
             # Load centroid positions, center of rotation, hour angle, and RA/DEC data from centroidListFile.
             clFile = tables.openFile(fullCentroidListFileName, mode='r')
+            clRoot = clFile.root
             centroidListNode = clFile.root.centroidlist
         elif type(centroidListFile) is tables.file.File:
             clFile = None
+            clRoot = centroidListFile.root
             centroidListNode = centroidListFile.root.centroidlist
         elif type(centroidListFile) is tables.group.Group:
             clFile = None
-            centroidListNode = centroidListFile
+            clRoot = centroidListFile 
+            centroidListNode = centroidListFile.centroidlist
         else:
-            raise ValueError('Input parameter centroidListFile must be either a pathname string or a PyTables file instance.')
+            raise ValueError('''Input parameter centroidListFile must be either a pathname string,
+                                a PyTables file instance, or a PyTables node instance''')
         
-        
-        self.params = np.array(centroidListNode.params.read())
-        '''
-        self.xCenterOfRotation = float(self.params[0])
-        self.yCenterOfRotation = float(self.params[1])
-        '''
-        self.centroidRightAscension = self.params[2]
-        self.centroidDeclination = self.params[3]
+        if 'header' in clRoot:
+            header = clRoot.header.header
+            titles = header.colnames
+            info = header[0]
+            self.nRow = info[titles.index('nRow')]
+            self.nCol = info[titles.index('nCol')]
+            self.centroidRightAscension = info[titles.index('RA')]
+            self.centroidDeclination = info[titles.index('Dec')]
+        else:
+            #For back-compatibility purposes
+            self.params = np.array(centroidListNode.params.read())
+            self.nRow = int(self.params[0])
+            self.nCol = int(self.params[1])
+            self.centroidRightAscension = self.params[2]
+            self.centroidDeclination = self.params[3]
+
         self.times = np.array(centroidListNode.times.read())
         self.hourAngles = np.array(centroidListNode.hourAngles.read())
         self.xCentroids = np.array(centroidListNode.xPositions.read())
@@ -86,17 +99,18 @@ class CalculateRaDec:
         self.rotationMatrix = np.array([[np.cos(self.hourAngles),-np.sin(self.hourAngles)],[np.sin(self.hourAngles),np.cos(self.hourAngles)]]).T  
         self.centroidRotated = np.dot(self.rotationMatrix,np.array([self.xCentroids,self.yCentroids])).diagonal(axis1=0,axis2=2)
       
-        self.pixelCount = 44*46
+        self.pixelCount = self.nCol*self.nRow
         self.values = np.zeros((2,self.pixelCount))
         for i in range(self.pixelCount):
-            self.values[0,i] = i/46
-            self.values[1,i] = i%46
+            self.values[0,i] = i/self.nRow
+            self.values[1,i] = i%self.nRow
         self.rotatedValues = np.dot(self.rotationMatrix,self.values)
       
     def getRaDec(self,timestamp,xPhotonPixel,yPhotonPixel):
         self.timestamp = np.array(timestamp)
         self.xPhotonPixel = np.array(xPhotonPixel)  #.astype('int')        #Don't require integer values for inputs - JvE 7/19/2013
-        self.yPhotonPixel = np.array(yPhotonPixel)  #.astype('int')
+        # INVERT Y AXIS HERE, WILL NEED TO ADD OPTION
+        self.yPhotonPixel = self.nRow - np.array(yPhotonPixel)  #.astype('int')
         self.xyPhotonPixel = np.array([self.xPhotonPixel,self.yPhotonPixel])  #2 x nPhotons array of x,y pairs
 
         self.inputLength = len(self.timestamp)
@@ -106,7 +120,7 @@ class CalculateRaDec:
 
         self.photonHourAngle = self.hourAngles[self.binNumber]
 
-        self.indexArray = np.array(self.xPhotonPixel*46+self.yPhotonPixel)
+        self.indexArray = np.array(self.xPhotonPixel*self.nRow+self.yPhotonPixel)
 
         self.xPhotonRotated=np.zeros(len(self.timestamp))
         self.yPhotonRotated=np.zeros(len(self.timestamp))

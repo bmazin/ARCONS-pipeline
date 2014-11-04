@@ -17,9 +17,12 @@ from functools import partial
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_pdf import PdfPages
 
+
+from util.popup import PopUp,plotArray,pop
 from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
+import hotpix.hotPixels as hp
 
 def onscroll_cbar(fig, event):
     if event.inaxes is fig.cbar.ax:
@@ -56,9 +59,9 @@ class FlatCal:
         flatTstamp = self.params['flatTstamp']
         wvlSunsetDate = self.params['wvlSunsetDate']
         wvlTimestamp = self.params['wvlTimestamp']
-        needTimeAdjust = self.params['needTimeAdjust']
-        needHotPix = self.params['needHotPix']
         obsSequence = self.params['obsSequence']
+        self.deadtime = self.params['deadtime'] #from firmware pulse detection
+        self.timeSpacingCut = self.params['timeSpacingCut']
 
         obsFNs = [FileName(run=run,date=sunsetDate,tstamp=obsTstamp) for obsTstamp in obsSequence]
         self.obsFileNames = [fn.obs() for fn in obsFNs]
@@ -68,11 +71,24 @@ class FlatCal:
 
         print len(self.obsFileNames), 'flat files to co-add'
         self.flatCalFileName = FileName(run=run,date=sunsetDate,tstamp=flatTstamp).flatSoln()
-        wvlCalFileName = FileName(run=run,date=wvlSunsetDate,tstamp=wvlTimestamp).calSoln()
+        if wvlSunsetDate != '':
+            wvlCalFileName = FileName(run=run,date=wvlSunsetDate,tstamp=wvlTimestamp).calSoln()
         for iObs,obs in enumerate(self.obsList):
-           obs.loadWvlCalFile(wvlCalFileName)
-           obs.loadTimeAdjustmentFile(timeAdjustFileName)
-           obs.loadHotPixCalFile(timeMaskFileNames[iObs])
+            if wvlSunsetDate != '':
+                obs.loadWvlCalFile(wvlCalFileName)
+            else:
+                obs.loadBestWvlCalFile()
+            obs.loadTimeAdjustmentFile(timeAdjustFileName)
+            timeMaskFileName = timeMaskFileNames[iObs]
+            print timeMaskFileName
+            #Temporary step, remove old hotpix file
+            #if os.path.exists(timeMaskFileName):
+            #    os.remove(timeMaskFileName)
+            if not os.path.exists(timeMaskFileName):
+                print 'Running hotpix for ',obs
+                hp.findHotPixels(self.obsFileNames[iObs],timeMaskFileName,fwhm=np.inf,useLocalStdDev=True)
+                print "Flux file pixel mask saved to %s"%(timeMaskFileName)
+            obs.loadHotPixCalFile(timeMaskFileName)
         self.wvlFlags = self.obsList[0].wvlFlagTable
 
         self.nRow = self.obsList[0].nRow
@@ -86,7 +102,6 @@ class FlatCal:
         self.intTime = self.params['intTime']
         self.countRateCutoff = self.params['countRateCutoff']
         self.fractionOfChunksToTrim = self.params['fractionOfChunksToTrim']
-        self.fractionOfPixelsToTrim = self.params['fractionOfPixelsToTrim']
         #wvlBinEdges includes both lower and upper limits, so number of bins is 1 less than number of edges
         self.nWvlBins = len(self.wvlBinEdges)-1
 
@@ -103,20 +118,31 @@ class FlatCal:
             print 'obs',iObs
             for firstSec in range(0,obs.getFromHeader('exptime'),self.intTime):
                 print 'sec',firstSec
-                cubeDict = obs.getSpectralCube(firstSec=firstSec,integrationTime=self.intTime,weighted=False,wvlBinEdges = self.wvlBinEdges)
+                cubeDict = obs.getSpectralCube(firstSec=firstSec,integrationTime=self.intTime,weighted=False,wvlBinEdges = self.wvlBinEdges,timeSpacingCut = self.timeSpacingCut)
                 cube = np.array(cubeDict['cube'],dtype=np.double)
                 effIntTime = cubeDict['effIntTime']
                 #add third dimension for broadcasting
-                effIntTime = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
-                cube /= effIntTime
-                frame = np.sum(cube,axis=2)
-                frame[np.isnan(frame)]=0
+                effIntTime3d = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
+                cube /= effIntTime3d
+                
+                
+                cube[np.isnan(cube)]=0
+                frame = np.sum(cube,axis=2) #in counts per sec
+                #correct nonlinearity due to deadtime in firmware
+                nonlinearFactors = 1. / (1. - frame*self.deadtime)
+                nonlinearFactors[np.isnan(nonlinearFactors)]=0.
+                frame = frame * nonlinearFactors
+                
+                nonlinearFactors = np.reshape(nonlinearFactors,np.shape(nonlinearFactors)+(1,))
+                cube = cube * nonlinearFactors
+
+                
                 self.frames.append(frame)
-                #self.plotArray(frame)
                 self.spectralCubes.append(cube)
-                self.cubeEffIntTimes.append(effIntTime)
+                self.cubeEffIntTimes.append(effIntTime3d)
         self.spectralCubes = np.array(self.spectralCubes)
-        #self.plotArray(self.frames[0])
+        self.cubeEffIntTimes = np.array(self.cubeEffIntTimes)
+        self.countCubes = self.cubeEffIntTimes * self.spectralCubes
 
     def checkCountRates(self):
         medianCountRates = np.array([np.median(frame[frame!=0]) for frame in self.frames])
@@ -125,7 +151,7 @@ class FlatCal:
         #mask out frames, or cubes from integration time chunks with count rates too high
         self.spectralCubes = np.array([cube for cube,boolIncludeFrame in zip(self.spectralCubes,boolIncludeFrames) if boolIncludeFrame==True])
         self.frames = [frame for frame,boolIncludeFrame in zip(self.frames,boolIncludeFrames) if boolIncludeFrame==True]
-        print 'few enough counts in the chunk',boolIncludeFrames
+        print 'few enough counts in the chunk',zip(medianCountRates,boolIncludeFrames)
 
     def calculateWeights(self):
         """
@@ -140,20 +166,23 @@ class FlatCal:
             wvlAverages = np.zeros(self.nWvlBins)
             spectra2d = np.reshape(cube,[self.nRow*self.nCol,self.nWvlBins ])
             for iWvl in xrange(self.nWvlBins):
-                spectrum = spectra2d[:,iWvl]
-                goodSpectrum = np.array(spectrum[spectrum != 0])#dead pixels need to be taken out before calculating averages
-                goodSpectrum = np.sort(goodSpectrum)
-                nGoodPixels = len(goodSpectrum)
-                trimmedSpectrum = goodSpectrum[self.fractionOfPixelsToTrim*nGoodPixels:(1-self.fractionOfPixelsToTrim)*nGoodPixels]
+                wvlSlice = spectra2d[:,iWvl]
+                goodPixelWvlSlice = np.array(wvlSlice[wvlSlice != 0])#dead pixels need to be taken out before calculating averages
+                nGoodPixels = len(goodPixelWvlSlice)
 
+                #goodPixelWvlSlice = np.sort(goodPixelWvlSlice)
+                #trimmedSpectrum = goodPixelWvlSlice[self.fractionOfPixelsToTrim*nGoodPixels:(1-self.fractionOfPixelsToTrim)*nGoodPixels]
                 #trimmedPixelWeights = 1/np.sqrt(trimmedSpectrum)
-#                nBins=self.intTime*(np.max(goodSpectrum)-np.min(goodSpectrum))
-#                histGood,binEdges = np.histogram(self.intTime*goodSpectrum,bins=nBins)
+                #histGood,binEdges = np.histogram(self.intTime*goodSpectrum,bins=nBins)
+                #histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
 #                plt.plot(binEdges[0:-1],histGood)
-#                histTrim,binEdges = np.histogram(self.intTime*trimmedSpectrum,bins=binEdges)
+#                def f(fig,axes):
+#                    axes.plot(binEdges[0:-1],histGood)
+#                    axes.plot(binEdges[0:-1],histTrim)
+#                pop(plotFunc=f)
 #                plt.plot(binEdges[0:-1],histTrim)
-                wvlAverages[iWvl] = np.mean(trimmedSpectrum)
-#                print iCube,iWvl,self.intTime*wvlAverages[iWvl],self.intTime*np.median(goodSpectrum)
+
+                wvlAverages[iWvl] = np.median(goodPixelWvlSlice)
 #                plt.show()
             weights = np.divide(wvlAverages,cube)
             weights[weights==0] = np.nan
@@ -183,21 +212,33 @@ class FlatCal:
         identityIndices = np.ma.indices(np.shape(self.maskedCubeWeights))
 
         sortedWeights = self.maskedCubeWeights[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
-        spectralCubesReordered = self.spectralCubes[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
+        countCubesReordered = self.countCubes[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
         cubeDeltaWeightsReordered = self.maskedCubeDeltaWeights[sortedIndices,identityIndices[1],identityIndices[2],identityIndices[3]]
 
-        #trim the beginning and end off the sorted weights for each wvl for each pixel, to exclude extriems from averages
+        #trim the beginning and end off the sorted weights for each wvl for each pixel, to exclude extremes from averages
         nCubes = np.shape(self.maskedCubeWeights)[0]
-        #fractionOfChunksToTrim=.15 #off both top and bottom
         trimmedWeights = sortedWeights[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
-        trimmedSpectralCubesReordered = spectralCubesReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
+        trimmedCountCubesReordered = countCubesReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
+        print 'trimmed cubes shape',np.shape(trimmedCountCubesReordered)
+
+        self.totalCube = np.ma.sum(trimmedCountCubesReordered,axis=0)
+        self.totalFrame = np.ma.sum(self.totalCube,axis=-1)
+        plotArray(self.totalFrame)
+    
+
         trimmedCubeDeltaWeightsReordered = cubeDeltaWeightsReordered[self.fractionOfChunksToTrim*nCubes:(1-self.fractionOfChunksToTrim)*nCubes,:,:,:]
 
         self.flatWeights,summedAveragingWeights = np.ma.average(trimmedWeights,axis=0,weights=trimmedCubeDeltaWeightsReordered**-2.,returned=True)
         self.deltaFlatWeights = np.sqrt(summedAveragingWeights**-1.)#Uncertainty in weighted average is sqrt(1/sum(averagingWeights))
         self.flatFlags = self.flatWeights.mask
-        flagImage = np.shape(self.flatFlags)[2]-np.sum(self.flatFlags,axis=2)
-        #self.plotArray(flagImage)
+
+        #normalize weights at each wavelength bin
+        wvlWeightMedians = np.ma.median(np.reshape(self.flatWeights,(-1,self.nWvlBins)),axis=0)
+        self.flatWeights = np.divide(self.flatWeights,wvlWeightMedians)
+            
+
+        #flagImage = np.shape(self.flatFlags)[2]-np.sum(self.flatFlags,axis=2)
+        #plotArray(flagImage)
 
 #        X,Y,Z=np.mgrid[0:self.nRow,0:self.nCol,0:self.nWvlBins]
 #        Z=self.wvlBinEdges[Z]
@@ -272,6 +313,7 @@ class FlatCal:
             image = self.flatFlags[:,:,iWvl]
             image += 2*self.wvlFlags
             image = 3-image
+
             cmap = matplotlib.cm.gnuplot2
             handleMatshow = ax.matshow(image,cmap=cmap,origin='lower')
             cbar = fig.colorbar(handleMatshow)
@@ -359,7 +401,7 @@ class FlatCal:
         if os.path.isabs(self.flatCalFileName) == True:
             fullFlatCalFileName = self.flatCalFileName
         else:
-            scratchDir = os.getenv('INTERM_PATH')
+            scratchDir = os.getenv('MKID_PROC_PATH')
             flatDir = os.path.join(scratchDir,'flatCalSolnFiles')
             fullFlatCalFileName = os.path.join(flatDir,self.flatCalFileName)
 
@@ -388,17 +430,8 @@ class FlatCal:
             spectrum = spectra2d[:,iWvl]
             goodSpectrum = spectrum[spectrum != 0]#dead pixels need to be taken out before calculating medians
             wvlAverages[iWvl] = np.median(goodSpectrum)
-        np.savez(npzFileName,median=wvlAverages,averageSpectra=np.array(self.averageSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data),deltaWeights=np.array(self.deltaFlatWeights.data),mask=self.flatFlags)
+        np.savez(npzFileName,median=wvlAverages,averageSpectra=np.array(self.averageSpectra),binEdges=self.wvlBinEdges,spectra=spectra,weights=np.array(self.flatWeights.data),deltaWeights=np.array(self.deltaFlatWeights.data),mask=self.flatFlags,totalFrame=self.totalFrame,totalCube=self.totalCube,spectralCubes=self.spectralCubes,countCubes=self.countCubes,cubeEffIntTimes=self.cubeEffIntTimes )
 
-    def plotArray(self,image,normNSigma=3,title=''):
-        self.fig = plt.figure()
-        self.axes = self.fig.add_subplot(111)
-        handleMatshow = self.axes.matshow(image,cmap=matplotlib.cm.gnuplot2,origin='lower',vmax=np.mean(image)+normNSigma*np.std(image))
-        self.fig.cbar = self.fig.colorbar(handleMatshow)
-        self.axes.set_title(title)
-        cid = self.fig.canvas.mpl_connect('scroll_event', partial(onscroll_cbar, self.fig))
-        cid = self.fig.canvas.mpl_connect('button_press_event', partial(onclick_cbar, self.fig))
-        plt.show()
 
 if __name__ == '__main__':
     paramFile = sys.argv[1]
