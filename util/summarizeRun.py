@@ -29,6 +29,7 @@ class SummarizeRun():
                     fileName = FileName.FileName(run,date,ts)
                     target = ""
                     description = ""
+                    expTime = ""
                     if flavor == "obs":
                         h5 = fileName.obs()
                         print "open h5=",h5
@@ -36,6 +37,7 @@ class SummarizeRun():
                             of = ObsFile.ObsFile(fileName.obs())
                             target = of.getFromHeader('target')
                             description = of.getFromHeader('description')
+                            expTime = of.getFromHeader('exptime')
                         except NoSuchNodeError:
                             pass
                         except HDF5ExtError:
@@ -45,7 +47,7 @@ class SummarizeRun():
                         except UnboundLocalError:
                             pass
                         print "done with h5"
-                    line = '%s,%s,%s,%s,"%s","%s"'%(run,date,ts,flavor,target,description)
+                    line = '%s,%s,%s,%s,"%s","%s","%s"'%(run,date,ts,flavor,target,expTime,description)
                     self.lines.append(line)
 if __name__ == '__main__':
     try:
