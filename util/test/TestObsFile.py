@@ -1,7 +1,10 @@
 import os
 import unittest
 import numpy as np
-from interval import interval, inf, imath
+try:
+    from interval import interval, inf
+except ImportError:
+    from interfal import Interval as i
 import matplotlib.pyplot as plt
 import inspect
 from util import ObsFile, FileName
