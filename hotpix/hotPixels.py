@@ -31,13 +31,6 @@ readHotPixels: reads in a hot-pixel .h5 file into somewhat sensible structures
 checkInterval: creates a 2D mask for a given time interval within a given 
                 exposure.
                 
-getEffIntTimeImage: Once hot pixels have been found, can use this to return the
-                effective integration times for each pixel in a given period after
-                masking out bad times. 
-                
-getHotPixels: Similar to getEffIntTimeImage, but just returns a boolean array 
-                indicating which pixels went bad at any point during the specified
-                period.
 -------------
 
 
@@ -48,6 +41,11 @@ Dependencies: pytables; pyinterval; headers.TimeMask; util.ObsFile; numpy;
 
 History/notes:
     - COLD PIXEL MASKING SWITCHED OFF FOR NOW - 5/6/2014. 
+    
+    Oct 3, 2014 -- ABW
+    - Now only using enumerated types from headers/TimeMask.py for masking reason.
+      This makes it consistent with the Cosmic module and compatible with Flashing
+      Wavecal hotpixel code. 
 
 
 To do:
@@ -74,6 +72,7 @@ See individual routines for more detail.
 
 import os.path
 import sys
+import warnings
 import pickle
 from math import *
 from interval import interval
@@ -88,8 +87,10 @@ import astropy.stats
 import util.ObsFile as ObsFile
 import util.utils as utils
 import headers.TimeMask as tm
-from headers import pipelineFlags as pflags
+#from headers import pipelineFlags as pflags
 import util.readDict as readDict
+from hotPixelMasker import hotPixelMasker
+from util.popup import plotArray
 
 headerGroupName = 'header'  #Define labels for the output .h5 file.
 headerTableName = 'header'
@@ -123,7 +124,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
                   display=False, ds9display=False, dispToPickle=None, weighted=False,
                   fluxWeighted=False, maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, 
                   diagnosticPlots=False, useLocalStdDev=False, useRawCounts=True,
-                  bkgdPercentile=10.0):
+                  bkgdPercentile=10.0, deadTime=100.e-6):
     '''
     To find the hot, cold, or dead pixels in a given time interval for an observation file.
     This is the guts of the bad pixel finding algorithm, but only works on a single time
@@ -251,9 +252,14 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 
     if im is None:
         print 'Getting image time-slice'
-        im = (obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
+        im_dict = obsFile.getPixelCountImage(firstSec=firstSec, integrationTime=intTime,
                                            weighted=weighted, fluxWeighted=fluxWeighted, 
-                                           getRawCount=useRawCounts))['image']
+                                           getRawCount=useRawCounts)
+        im = im_dict['image']
+        #Correct for dead time
+        w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
+        im = im/w_deadTime
+        #plotArray(image=im)
         print 'Done'
     
     #Now im definitely exists, make a copy for display purposes later (before we change im).
@@ -261,8 +267,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
         
     #For now, assume 0 counts in a pixel means the pixel is dead.
     #Turn such pixel values into NaNs.
-    deadMask = (im<1)
-    im[im < 1] = np.nan
+    deadMask = (im<0.01)
+    im[im < 0.01] = np.nan
     
     oldHotMask = np.zeros(shape=np.shape(im), dtype=bool)   #Initialise a mask for hot pixels (all False) for comparison on each iteration.
     oldColdMask = np.zeros(shape=np.shape(im), dtype=bool)  #Same for cold pixels
@@ -296,6 +302,12 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
             
             overallMedian = np.median(im[~np.isnan(im)])
             overallBkgd = np.percentile(im[~np.isnan(im)],bkgdPercentile)
+            overallBkgd=overallMedian
+            
+            #mpl.figure()
+            #mpl.hist(im[~np.isnan(im)],200,range=(0,400))
+            #mpl.show()
+            
         
             if doColdFlagging is True or useLocalStdDev is True:
                 stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)    
@@ -372,17 +384,23 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
     assert np.all(coldMask & hotMask == False)  #Presumably a pixel can't be both hot AND cold....
     assert np.all(hotMask & deadMask == False)  #Ditto hot and dead. (But *cold* and dead maybe okay at this point).
     mask = np.empty_like(hotMask,dtype=int)
-    mask.fill(pflags.badPixCal['good'])
-    mask[hotMask] = pflags.badPixCal['hot']
-    mask[coldMask] = pflags.badPixCal['cold']
-    mask[deadMask] = pflags.badPixCal['dead']    
+
+    mask.fill(tm.timeMaskReason['none'])
+    mask[hotMask] = tm.timeMaskReason['hot pixel']
+    mask[coldMask] = tm.timeMaskReason['cold pixel']
+    mask[deadMask] = tm.timeMaskReason['dead pixel']
+    #mask.fill(pflags.badPixCal['good'])
+    #mask[hotMask] = pflags.badPixCal['hot']
+    #mask[coldMask] = pflags.badPixCal['cold']
+    #mask[deadMask] = pflags.badPixCal['dead']    
     
     
     if display or ds9display or (dispToPickle is not False):
         imForDisplay = np.copy(imOriginal)
         cleanImForDisplay = np.copy(imForDisplay)
         imForDisplay[np.isnan(imOriginal)] = 0  #Just because it looks prettier
-        cleanImForDisplay[mask!=pflags.badPixCal['good']] = 0   #An image with only good pixels
+        #cleanImForDisplay[mask!=pflags.badPixCal['good']] = 0   #An image with only good pixels
+        cleanImForDisplay[mask!=tm.timeMaskReason['none']] = 0   #An image with only good pixels
     
         vmin=np.percentile(imForDisplay,dispMinPerc)
         vmax=np.percentile(imForDisplay,dispMaxPerc)
@@ -505,7 +523,8 @@ def checkInterval(firstSec=None, intTime=None, fwhm=4.0, boxSize=5, nSigmaHot=3.
 
     if not doColdFlagging:
         assert np.sum(coldMask)==0
-        assert np.all(mask != pflags.badPixCal['cold'])
+        #assert np.all(mask != pflags.badPixCal['cold'])
+        assert np.all(mask != tm.timeMaskReason['cold pixel'])
 
     return {'mask':mask, 'image':im, 'medfiltimage':medFiltImage,
             'maxratio':maxRatio, 'diff':diff, 'differr':diffErr, 'niter':iIter + 1}
@@ -518,7 +537,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                   boxSize=5, nSigmaHot=3.0, nSigmaCold=2.5, display=False,
                   ds9display=False, dispToPickle=False, weighted=False, fluxWeighted=False,
                   maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
-                  useLocalStdDev=None, useRawCounts=True, bkgdPercentile=10.0):
+                  useLocalStdDev=None, useRawCounts=True, bkgdPercentile=10.0, deadTime=100.e-6):
     '''
     To find hot (and cold/dead) pixels. This routine is the main code entry point.
     Takes an obs. file as input and outputs an .h5 file containing lists of bad time
@@ -729,7 +748,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
             flagSequence = masks[iRow, iCol, :]
 
             #What (unique) non-zero flags are listed for this pixel?
-            uniqueFlags = [x for x in set(flagSequence) if x != 0]   #What non-zero flags are listed for this pixel?
+            uniqueFlags = [x for x in set(flagSequence) if x != tm.timeMaskReason['none']]   #What non-zero flags are listed for this pixel?
 
             #Initialise a list for bad times for current pixel
             badTimeList = []
@@ -750,7 +769,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
             badTimeList.sort(key=lambda x: x[0])
 
             #Create a new entry in the 'bad times' table with all the bad times for this pixel. 
-            timeMaskData.append([iCol, iRow, badTimeList])
+            timeMaskData.append([iRow, iCol, badTimeList])
 
     #End looping through pixels.
     
@@ -766,8 +785,6 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     Write the output hot-pixel time masks table to an .h5 file. Called by
     findHotPixels().
     
-    ** AT THE MOMENT, I THINK THIS WILL OVERWRITE PRE-EXISTING HOT PIXEL FILES
-    WITHOUT WARNING - SHOULD UPDATE THIS BEHAVIOUR **
     
     INPUTS:
         timeMaskData - list structure as constructed by findHotPixels()
@@ -808,6 +825,9 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
     
     
     fullFileName = os.path.abspath(outputFileName)
+    
+    if os.path.isfile(fullFileName):
+        warnings.warn("Overwriting hotpix file: "+str(fullFileName),UserWarning)
 
     fileh = tables.openFile(fullFileName, mode='w')
     
@@ -821,8 +841,10 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
                                         'Header Info')
         header = headerTable.row
         header[obsFileColName] = obsFile.fileName
-        header[nColColName] = max([x[0] for x in timeMaskData]) + 1  #Assume max. x value represents number of columns
-        header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
+        #header[nColColName] = max([x[0] for x in timeMaskData]) + 1  #Assume max. x value represents number of columns
+        #header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
+        header[nColColName] = obsFile.nCol
+        header[nRowColName] = obsFile.nRow
         header[ticksPerSecColName] = obsFile.ticksPerSec
         header[expTimeColName] = obsFile.getFromHeader('exptime')    #Newly implemented - SHOULD DOUBLE CHECK! Should automatically account for any of Matt's time corrections JvE 7/08/2013.
         if startTime is not None:
@@ -839,40 +861,35 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
         headerTable.close()
 
         
-        #Establish a mapping indicating which bad pixel map flag numbers (uesd in this bad pixel masking
-        #code) correspond to which timeMaskReason enumeration values (used by the headers.timeMask 
-        #table format in the output files):
-        flagMap = {
-                   pflags.badPixCal['hot']: tm.timeMaskReason['hot pixel'],
-                   pflags.badPixCal['cold']: tm.timeMaskReason['cold pixel'],
-                   pflags.badPixCal['dead']: tm.timeMaskReason['dead pixel']
-                   }
+        ##Establish a mapping indicating which bad pixel map flag numbers (uesd in this bad pixel masking
+        ##code) correspond to which timeMaskReason enumeration values (used by the headers.timeMask 
+        ##table format in the output files):
+        #flagMap = {
+        #           pflags.badPixCal['hot']: tm.timeMaskReason['hot pixel'],
+        #           pflags.badPixCal['cold']: tm.timeMaskReason['cold pixel'],
+        #           pflags.badPixCal['dead']: tm.timeMaskReason['dead pixel']
+        #           }
                   
  
         #Fill in the time mask info
         for eachPixelEntry in timeMaskData:
             
             #One table for every pixel:
-            tableName = constructDataTableName(eachPixelEntry[0], eachPixelEntry[1]) #Table name from x,y pos.    
+            tableName = constructDataTableName(eachPixelEntry[1], eachPixelEntry[0]) #Table name from x,y pos.    
             timeMaskTable = fileh.createTable(timeMaskGroup, tableName, tm.TimeMask,
                                       'Time mask for pix. ' + tableName)
             row = timeMaskTable.row
             for eachPeriod in eachPixelEntry[2]:
                 row['tBegin'] = eachPeriod[0]
                 row['tEnd'] = eachPeriod[1]
-                row['reason'] = flagMap.get(eachPeriod[2],'unknown') #Map flag number to time mask reason using flagMap dictionary (default is 'unknown').
-                #if eachPeriod[2] == pflags.badPixCal['hot']: 
-                #    row['reason'] = tm.timeMaskReason['hot pixel']
-                #elif eachPeriod[2] == pflags.badPixCal['cold']:
-                #    row['reason'] = tm.timeMaskReason['cold pixel']
-                #elif eachPeriod[2] == pflags.badPixCal['dead']:
-                #    row['reason'] = tm.timeMaskReason['dead pixel']
-                #else:
-                #    row['reason'] = tm.timeMaskReason['unknown'] #For now - other reasons (e.g. cold pixels) can be added later.
+                #row['reason'] = flagMap.get(eachPeriod[2],'unknown') #Map flag number to time mask reason using flagMap dictionary (default is 'unknown').
+                row['reason'] = eachPeriod[2]
+
                 row.append()
                 
             timeMaskTable.flush()
             timeMaskTable.close()
+
     
     finally:
         fileh.close()
@@ -881,7 +898,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
 
 
     
-def readHotPixels(inputFile,nodePath=None):
+def readHotPixels(inputFile,nodePath=None,reasons=[]):
     '''
     To read in a hot-pixels HDF file as written by findHotPixels(). 
     (Note 'hot pixels' may later include cold pixels and possibly other
@@ -902,9 +919,11 @@ def readHotPixels(inputFile,nodePath=None):
                    supply a photon list file in 'inputFile', since the hot pixel
                    data hierarchy is copied directly into a sub-group within the
                    photon list file.
+        mask - The reasons you want to include in a mask
     
     OUTPUTS:
-        Returns a dictionary with the following info:
+        ##Returns a dictionary with the following info:##
+        Now returns a wrapper class object hotPixelMasker that has the following as attributes:
         
             'nRow' - number of rows in original obs File.
             'nCol' - number of columns.
@@ -916,7 +935,7 @@ def readHotPixels(inputFile,nodePath=None):
                           interval is not unioned into a single 'interval' object
                           since there may be different 'reasons' for the different
                           intervals!
-            'reasons' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
+            'reasons_list' - nRow x nCol array of lists of 'timeMaskReason' enums (see 
                         headers/TimeMask.py). Entries in these lists correspond directly 
                         to entries in the 'intervals' array.            
             'reasonEnum' - the enum instance for the 'reasons', so the 'concrete values'
@@ -928,9 +947,9 @@ def readHotPixels(inputFile,nodePath=None):
             'expTime' - duration of original obs file (sec).
             'startTime' - start time of the time mask file within the original obs file (sec).
             'endTime' - end time of the time mask file within the original obs file (sec).
+            'reasons' - reasons to mask. ie 'hot pixel', 'dead pixel', etc (from TimeMask.py)
             
-        Note - would probably make more sense to return an object here at some point, instead
-        of a dictionary....
+
     
     
     EXAMPLES:
@@ -947,21 +966,21 @@ def readHotPixels(inputFile,nodePath=None):
         (which happens to be bad at two times between 0-5s for obs file 
         'obs_20121211-024511.h5')
             
-            >>> len(hpData['reasons'][44,5])
+            >>> len(hpData.reasons[44,5])
             2
         
 
         Find out the reason for the *first* time that this pixel was flagged:
         
-            >>> enum = hpData['reasonEnum']
-            >>> enum(hpData['reasons'][44,5][0])
-            'hot Pixel'
+            >>> enum = hpData.reasonEnum
+            >>> enum(hpData.reasons[44,5][0])
+            'hot pixel'
         
 
         Find the time range for which the same pixel was flagged the *second*
         time:
             
-            >>> hpData['intervals'][44,5][1]
+            >>> hpData.intervals[44,5][1]
             interval([2.0], [3.0])
         
             (i.e. from time=2sec to 3sec).
@@ -969,7 +988,7 @@ def readHotPixels(inputFile,nodePath=None):
 
         Make an array containing the number of bad time intervals for each pixel:
             
-            >>> nIntervals = np.vectorize(len)(hpData['intervals'])
+            >>> nIntervals = np.vectorize(len)(hpData.intervals)
         
 
         Make a boolean mask with True for all pixels where there was ANY bad time:
@@ -986,14 +1005,18 @@ def readHotPixels(inputFile,nodePath=None):
 
         Check if pixel was bad at time 2.5sec, 1.5sec, and 0.8sec:
                     
-            >>> 2.5 in interval.union(hpData['intervals'][44,5])
+            >>> 2.5 in interval.union(hpData.intervals[44,5])
             True
         
-            >>> 1.5 in interval.union(hpData['intervals'][44,5])
+            >>> 1.5 in interval.union(hpData.intervals[44,5])
             False
         
-            >>> 0.8 in interval.union(hpData['intervals'][44,5])
+            >>> 0.8 in interval.union(hpData.intervals[44,5])
             True
+            
+        Find all the times a pixel was flagged hot:
+            >>> hpData.mask = [enum['hot pixel']]
+            >>> hotIntervals = hpData.get_intervals(44,5)
             
     
     NOTES:
@@ -1034,8 +1057,8 @@ def readHotPixels(inputFile,nodePath=None):
         timeIntervals = np.empty((nRow, nCol), dtype='object')
         timeIntervals.fill([])
         #And one to take lists of corresponding flags
-        reasons = np.empty((nRow, nCol), dtype='object')
-        reasons.fill([])
+        reasons_list = np.empty((nRow, nCol), dtype='object')
+        reasons_list.fill([])
         
         #Read in the data and fill in the arrays
         for iRow in range(nRow):
@@ -1047,13 +1070,16 @@ def readHotPixels(inputFile,nodePath=None):
                 timeIntervals[iRow, iCol] = \
                     [interval([eachRow['tBegin'], eachRow['tEnd']]) / ticksPerSec for eachRow
                       in eventListTable]        #Get the times in seconds (not ticks). No doubt this can be sped up if necessary...
-                reasons[iRow, iCol] = [eachRow['reason'] for eachRow in eventListTable]
+                reasons_list[iRow, iCol] = [eachRow['reason'] for eachRow in eventListTable]
                     
-        #Return a simple dictionary
-        return {"intervals":timeIntervals, "reasons":reasons,
-                "reasonEnum":reasonEnum, "nRow":nRow, "nCol":nCol,
-                "obsFileName":obsFileName, "ticksPerSecond":ticksPerSec,
-                "expTime":expTime, "startTime":startTime, "endTime":endTime}
+        #Return a wrapper object
+        hotPixObject = hotPixelMasker(timeIntervals, reasons_list, reasonEnum, nRow, nCol, obsFileName, ticksPerSec, expTime, startTime, endTime, reasons=reasons)
+        return hotPixObject
+        
+        #return {"intervals":timeIntervals, "reasons":reasons,
+        #        "reasonEnum":reasonEnum, "nRow":nRow, "nCol":nCol,
+        #        "obsFileName":obsFileName, "ticksPerSecond":ticksPerSec,
+        #        "expTime":expTime, "startTime":startTime, "endTime":endTime}
 
 
     finally:
@@ -1062,97 +1088,6 @@ def readHotPixels(inputFile,nodePath=None):
     
 
 
-def getEffIntTimeImage(hotPixDict,integrationTime,firstSec=0):
-    '''    
-    Get the total effective exposure time for each pixel after subtracting 
-    any intervals where a pixel was masked as hot or bad.
-    
-    INPUTS:
-        hotPixDict -  a hot pixels dictionary as returned by hotPixels.readHotPixels()
-        firstSec - Start time (sec) to start calculations from, starting from
-                    the beginning of the exposure to which timeMask refers.
-        integrationTime - Length of integration time (sec) from firstSec to include
-                    in the calculation. NOTE - Don't give an integration time
-                    that goes beyond the end of the exposure! Currently does not (always)
-                    have direct access to the total exposure time, so you can't set 
-                    integrationTime=-1 and hope to integrate to the end of the 
-                    exposure for this routine. As it stands, this function just
-                    subtracts off the hot-pixel intervals from whatever integration
-                    start/length you provide it without regard to the exposure length.
-
-    RETURNS:
-        A 2D array representing the total effective exposure time
-        in seconds for each pixel in the detector array.
-    '''
-    
-    #Figure out what time represents the end of the integration
-    #if integrationTime == -1 or integerIntTime > len(pixelData):
-    #    lastSec = int(np.floor(firstSec))+len(pixelData)
-    #else:
-    lastSec = firstSec + integrationTime
-    outsideIntegration = interval([-np.inf, firstSec], [lastSec, np.inf])
-    integrationInterval = interval([firstSec, lastSec])
-    effectiveIntTimes = np.zeros((hotPixDict['nRow'],hotPixDict['nCol']),dtype=float)
-    effectiveIntTimes.fill(np.nan)
-    
-    for iRow in np.arange(hotPixDict['nRow']):
-        for iCol in np.arange(hotPixDict['nCol']):
-            #Get the unioned (possibly multi-component) bad interval for this pixel.
-            #(As in ObsFile.getPixelBadTimes)
-            allBadIntervals = interval.union(hotPixDict['intervals'][iRow, iCol])
-            #Get intersection of integration time interval and the bad time intervals.
-            maskedIntervals = allBadIntervals & integrationInterval
-            effectiveIntTimes[iRow,iCol] = integrationTime - utils.intervalSize(maskedIntervals)
-    
-    return effectiveIntTimes
-
-
-def getHotPixels(hotPixDict,integrationTime=-1,firstSec=0):
-    '''
-    Return a boolean array indicating which pixels went bad at any point
-    during the specified integration time.
-    
-    INPUTS:
-        hotPixDict -  a hot pixels dictionary as returned by hotPixels.readHotPixels()
-        firstSec - Start time (sec) to start calculations from, starting from
-                    the beginning of the exposure to which timeMask refers.
-        integrationTime - Length of integration time (sec) from firstSec to include
-                    in the calculation. NOTE - currently does not (always)
-                    have direct access to the total exposure time, so if you set 
-                    integrationTime=-1, it'll hopefully give results good to the
-                    end of the exposure, assuming that the measured hot pixel time mask
-                    doesn't somehow extend over the end of the exposure. But that's not
-                    totally 100% guaranteed at this point (at least as far as I can think right now).
-                    
-    RETURNS:
-        A 2D Boolean array matching the size/shape of the detector image. True indicates
-        a pixel that went bad between firstSec and firstSec+integrationTime, and False 
-        indicates that the pixel was okay during that time.
-    '''
-    
-    if integrationTime == -1:
-        intTimeInternal = np.Inf
-    else:
-        intTimeInternal = integrationTime
-    lastSec = firstSec + intTimeInternal
-    
-    #outsideIntegration = interval([-np.inf, firstSec], [lastSec, np.inf])
-    integrationInterval = interval([firstSec, lastSec])
-    badPix = np.zeros((hotPixDict['nRow'],hotPixDict['nCol']),dtype=bool)
-    badPix.fill(False)
-    
-    for iRow in np.arange(hotPixDict['nRow']):
-        for iCol in np.arange(hotPixDict['nCol']):
-            #Get the unioned (possibly multi-component) bad interval for this pixel.
-            #(As in ObsFile.getPixelBadTimes)
-            allBadIntervals = interval.union(hotPixDict['intervals'][iRow, iCol])
-            #Get intersection of integration time interval and the bad time intervals.
-            maskedIntervals = allBadIntervals & integrationInterval
-            #Figure out if there were any bad intervals during the integration time or not.
-            if len(maskedIntervals) != 0:
-                badPix[iRow,iCol]=True
-    
-    return badPix
 
 
 

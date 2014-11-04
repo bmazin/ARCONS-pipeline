@@ -13,7 +13,7 @@ import numpy as np
 import tables
 import matplotlib.pyplot as mpl
 import pyfits
-import hotpix.hotPixels as hp
+#import hotpix.hotPixels as hp
 from util import utils
 import photonlist.photlist as pl
 from photonlist import boxer
@@ -439,8 +439,9 @@ class RADecImage(object):
             #Get array of effective exposure times for each detector pixel based on the hot pixel time mask
             #Multiply by the bad pixel mask and the flatcal mask so that non-functioning pixels have zero exposure time.
             #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
-            detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
-                                                 firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
+            #detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
+            #                                     firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
+            detExpTimes = (photList.hotPixTimeMask.getEffIntTimeImage(firstSec=tStartFrames[iFrame], integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame]) * detPixMask).flatten()
                      
             #Loop over the detector pixels.... (should be faster than looping over virtual pixels)
             for iDPix in np.arange(nDPixRow * nDPixCol):

@@ -1,3 +1,7 @@
+"""
+Definition of enumerated types for time masking reasons. Used in hotpixel code and cosmic ray masking.
+"""
+
 import tables
 
 timeMaskReasonList = []
@@ -16,6 +20,8 @@ timeMaskReasonList.append("poofing");
 timeMaskReasonList.append("hot pixel")
 timeMaskReasonList.append("cold pixel")
 timeMaskReasonList.append("dead pixel")
+timeMaskReasonList.append("laser not on")       #Used in flashing wavecals
+timeMaskReasonList.append("laser not off")      #Used in flashing wavecals
 timeMaskReasonList.append("none")   #To be used for photon lists where the photon is NOT time-masked.
 
 timeMaskReason = tables.Enum(timeMaskReasonList)

@@ -68,6 +68,7 @@ from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
 import hotpix.hotPixels as hp
+from hotpix.flashMask import *
 import smooth
 from fitFunctions import *
 import mpfit
@@ -289,19 +290,27 @@ class waveCal:
         self.calFN=calFN
         self.run=calFN.run
         self.laserCalFile=ObsFile(calFN.cal())
-        '''
-        timeAdjustFileName=FileName(run=self.run).timeAdjustments()
-        try:
-            self.laserCalFile.loadTimeAdjustmentFile(timeAdjustFileName,verbose=verbose)
-        except:
-            pass
+        
+        #timeAdjustFileName=FileName(run=self.run).timeAdjustments()
+        #try:
+        #    self.laserCalFile.loadTimeAdjustmentFile(timeAdjustFileName,verbose=verbose)
+        #except:
+        #    pass
+
+        #if not os.path.exists(self.calFN.timeMask()):
+        #    print 'Running hotpix for ',self.calFN.cal()
+        #    hp.findHotPixels(self.calFN.cal(),None,self.calFN.timeMask(),fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
+        #    print "Laser cal file pixel mask saved to %s"%(self.calFN.timeMask())
+        #self.laserCalFile.loadHotPixCalFile(self.calFN.timeMask())
+
         if not os.path.exists(self.calFN.timeMask()):
-            print 'Running hotpix for ',self.calFN.cal()
-            hp.findHotPixels(self.calFN.cal(),None,self.calFN.timeMask(),fwhm=np.inf,useLocalStdDev=True,nSigmaHot=3.0,maxIter=10)
-            print "Laser cal file pixel mask saved to %s"%(self.calFN.timeMask())
-        self.laserCalFile.loadHotPixCalFile(self.calFN.timeMask())
-        '''
-        #self.laserCalFile.loadBeammapFile('/Scratch/LABTEST/20140910/beammap_SCI6_B140731-Force_20140910.h5')
+            masker = flashMask(self.calFN.cal(),endTime=-1,outputFileName = self.calFN.timeMask(),verbose=True)
+            masker.findFlashingTimes()
+            masker.findHotPixels()
+            masker.writeHotPixMasks()
+            del masker
+        self.laserCalFile.loadHotPixCalFile(self.calFN.timeMask(),reasons=['laser not on','hot pixel','dead pixel'])
+        
         if not debug:
             self.setupOutDirs(calFN)
 
@@ -536,9 +545,14 @@ class waveCal:
         last_ind = np.argmax(n_inbin_total)
         if first_ind+50>=last_ind:
             raise RuntimeError("No Blue Peak, try lowering 'min_amp'")
+        if self.debug:
+            plt.plot(phase_bins_total,smoothed_data,'g--')
+            plt.plot([phase_bins_total[first_ind]]*2,[0,30],'k--')
+            plt.plot([phase_bins_total[last_ind]]*2,[0,30],'k--')
         smoothed_data=smoothed_data[first_ind:last_ind]
         phase_bins=phase_bins_total[first_ind:last_ind]
         n_inbin=n_inbin_total[first_ind:last_ind]
+        
         
         gradients=np.diff(smoothed_data)>0
         min_Ind=[]
@@ -989,8 +1003,8 @@ class waveCal:
         print 'Starting file ', self.calFN.cal(), ' at time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         for i in range(self.n_rows):
             for j in range(self.n_cols):
-#        for i in [11]:
-#            for j in [25]:
+#        for i in [21]:
+#            for j in [41]:
 
 #        for i in [12]:
 #            for j in [15,16]:
@@ -1291,7 +1305,7 @@ class waveCal:
 
         plt.subplot(self.n_plots_y,self.n_plots_x,self.plotcounter%self.n_plots_per_page+1)
         plt.plot(phase_bins,n_inbin, label=str(failFlag))                    
-        titlestring = '('+str(iRow)+', '+str(iCol)+') --> '+self.laserCalFile.beamImage[iRow][iCol]
+        titlestring = '('+str(iCol)+', '+str(iRow)+') --> '+self.laserCalFile.beamImage[iRow][iCol]
         plt.title(titlestring)
         if fit_params!=None:
             plt.xlim(fit_params[1]-2.5*fit_params[0],phase_bins[-1])
@@ -1363,7 +1377,7 @@ if __name__ == '__main__':
     try:
         paramFile = sys.argv[1]
     except IndexError:
-        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'params/waveCal.dict'
+        paramFile=os.getenv('PYTHONPATH',default=os.path.expanduser('~')+'/ARCONS-pipeline').split(':')[0]+'/params/waveCal.dict'
         #paramFile = '/home/abwalter/ARCONS-pipeline/params/waveCal.dict'
         print "Loading parameters from: "+paramFile
     calFNs, params = getCalFileNames(paramFile)
@@ -1374,6 +1388,8 @@ if __name__ == '__main__':
     verbose=False
     for calFN in calFNs:
         waveCalObject=waveCal(calFN,params,verbose=verbose,debug=debug)
+        #del waveCalObject
+        #continue
         try:
             waveCalObject.findWaveLengthSoln()
         except:
