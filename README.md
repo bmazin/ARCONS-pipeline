@@ -97,6 +97,23 @@ sudo python setup.py install
 The tests in cosmic/TestTimeMask.py uses the class Cosmic which uses
 this, and it will also be used to locate times to mask hot pixels.
 
+- NOTE - Had to reinstall this recently, and had little trouble - think
+I just did 'pip install pyinterval', or 'easy_install pyinterval',
+and it went just fine (on MacOS Mavericks). JvE, 11/5/2014. 
+
+
+***
+Note that in the photonlist package/directory you will need to compile
+the fortran routine 'boxer.f'. This should do the trick:
+
+f2py -c -m boxer boxer.f
+
+... After running that, you can check it works in python by trying 
+to import with 'import boxer' at the python command line. See the
+readme.txt file in photonlist/ for (possibly) more info.
+
+
+
 
 Recommended external software components:
 ---------------------

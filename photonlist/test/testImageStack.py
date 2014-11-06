@@ -22,7 +22,7 @@ from util import utils
 def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', default="/Scratch")+'/photonLists/20121211',
                    detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
                    wvlMax=None, doWeighted=True, medCombine=False, vPlateScale=0.2,
-                   nPixRA=250,nPixDec=250):
+                   nPixRA=250,nPixDec=250,maxBadPixTimeFrac=0.5):
     '''
     Create an image stack
     INPUTS:
@@ -43,6 +43,10 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
         vPlateScale - (arcsec/virtual pixel) - to set the plate scale of the virtual
                      pixels in the outputs image.
         nPixRA,nPixDec - size of virtual pixel grid in output image.
+        maxBadPixTimeFrac - Maximum fraction of time which a pixel is allowed to be 
+                     flagged as bad (e.g., hot) for before it is written off as
+                     permanently bad for the duration of a given image load (i.e., a
+                     given obs file).
     
     OUTPUTS:
         Returns a stacked image object, saves the same out to a pickle file, and
@@ -85,7 +89,8 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
             else:
                 imSaveName=baseSaveName+'.tif'
                 virtualImage.loadImage(phList,doStack=not medCombine,savePreStackImage=imSaveName,
-                                       wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted)
+                                       wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted,
+                                       maxBadPixTimeFrac=maxBadPixTimeFrac)
                 imageStack.append(virtualImage.image*virtualImage.expTimeWeights)       #Only makes sense if medCombine==True, otherwise will be ignored
                 if medCombine==True:
                     medComImage = scipy.stats.nanmedian(np.array(imageStack), axis=0)
