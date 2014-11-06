@@ -10,7 +10,7 @@ class TestHg(unittest.TestCase):
     """
     def testCompare(self):
         """
-        Demonstrate that np.bincounts is 40 times faster than np.histogram
+        Demonstrate that np.bincounts is at least 10 times faster than np.histogram
         """
         nPixels = 100
         values = []
@@ -24,7 +24,6 @@ class TestHg(unittest.TestCase):
             hg = np.histogram(values[i], 1000000, range=(0,1000000)) # 3.8 sec
         end = time.time()
         deltaHg = end - begin
-        #print "np.histogram elapsed time is",deltaHg
 
         # measure time for np.bincount
         begin = time.time()        
@@ -32,9 +31,11 @@ class TestHg(unittest.TestCase):
             hg = np.bincount(values[i],minlength=1000000) # 0.097 sec/100
         end = time.time()
         deltaBc = end - begin
-        # print "np.bincount elapsed time is",deltaBc
-        self.assertTrue(deltaBc*20 < deltaHg)
+        if deltaBc*10 > deltaHg:
+            print "np.histogram elapsed time is",deltaHg
+            print "np.bincount elapsed time is",deltaBc
 
+        self.assertTrue(deltaBc*10 < deltaHg)
     def testHgPlot1(self):
         xmax = 5
         hg = np.histogram([0,1,1,1,1,1,2,2],bins=xmax, range=(-0.5,xmax-0.5))
@@ -57,6 +58,8 @@ class TestHg(unittest.TestCase):
     def testHgPlot3(self):
         hg = [10000,0.1,0,1]
         x,y = hgPlot.getPlotValues(hg, ylog=False)
+        #for i in range(len(x)):
+        #    print i, x[i],y[i]
         plt.clf()
         plt.plot(x,y)
         plt.margins(0.1, 0.1)

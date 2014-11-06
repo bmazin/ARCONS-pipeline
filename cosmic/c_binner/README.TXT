@@ -4,6 +4,8 @@ from cosmic import c_binner
 
 you need to do the following in this directory, after checking out from git
 
+export CXXFLAGS=-lpython  # On Mac, using ENTHOUGHT python, this line helps
+
 cd build
 cmake ..
 make
