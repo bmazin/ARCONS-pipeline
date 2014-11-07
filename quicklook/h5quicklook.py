@@ -72,7 +72,10 @@ class StartQt4(QMainWindow):
 		self.darkfile = ""
 		self.skyfile = ""
 
-		self.beammapfile = os.environ['MKID_BEAMMAP_PATH']#"beamimage.h5"
+		try:
+			self.beammapfile = os.environ['MKID_BEAMMAP_PATH']#"beamimage.h5"
+		except KeyError:
+			self.beammapfile = ""
 		#load beam map from default beammap directory
 		if bmapFromFile == True:
                     self.loadbeammap()
