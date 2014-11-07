@@ -12,7 +12,7 @@ def makeShortImageSlice(vImage=None,
                         firstSec1=0, integrationTime1=30,
                         firstSec2=0, integrationTime2=30,
                         doWeighted=True, pcliplo=1.0, pcliphi = 98.,
-                        wvlMin=3500, wvlMax=12000):
+                        wvlMin=3500, wvlMax=12000, maxBadPixTimeFrac=0.2):
     '''
     Creates a figure used in the ARCONS pipeline paper. Make two versions of a
     coadded pair of short (30s) image slices of the Crab
@@ -42,10 +42,10 @@ def makeShortImageSlice(vImage=None,
         virtualImage = rdi.RADecImage(phList1,nPixRA=400,nPixDec=400,cenRA=1.4596725441339724,
                                       cenDec=0.38422539085925933,firstSec=firstSec1,
                                       integrationTime=integrationTime1,doWeighted=doWeighted, 
-                                      wvlMin=wvlMin, wvlMax=wvlMax)
+                                      wvlMin=wvlMin, wvlMax=wvlMax, maxBadPixTimeFrac=maxBadPixTimeFrac)
         virtualImage.loadImage(phList2,firstSec=firstSec2,integrationTime=integrationTime2,
                           doWeighted=doWeighted,wvlMin=wvlMin,wvlMax=wvlMax,
-                          doStack=True)
+                          doStack=True,maxBadPixTimeFrac=maxBadPixTimeFrac)
     else:
         virtualImage = vImage
     

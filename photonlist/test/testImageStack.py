@@ -19,10 +19,11 @@ from util.FileName import FileName
 from util import utils
 
 
-def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', default="/Scratch")+'/photonLists/20121211',
-                   detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
-                   wvlMax=None, doWeighted=True, medCombine=False, vPlateScale=0.2,
-                   nPixRA=250,nPixDec=250,maxBadPixTimeFrac=0.5):
+def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', 
+                   default="/Scratch")+'/photonLists/20121211',
+                   detImage=False, saveFileName='stackedImage.pkl', wvlMin=3500,
+                   wvlMax=12000, doWeighted=True, medCombine=False, vPlateScale=0.2,
+                   nPixRA=250,nPixDec=250,maxBadPixTimeFrac=0.2,integrationTime=-1):
     '''
     Create an image stack
     INPUTS:
@@ -47,7 +48,8 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
                      flagged as bad (e.g., hot) for before it is written off as
                      permanently bad for the duration of a given image load (i.e., a
                      given obs file).
-    
+        integrationTime - the integration time to use from each input obs file (from 
+                     start of file).
     OUTPUTS:
         Returns a stacked image object, saves the same out to a pickle file, and
         (depending whether it's still set to or not) saves out the individual non-
@@ -90,18 +92,15 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
                 imSaveName=baseSaveName+'.tif'
                 virtualImage.loadImage(phList,doStack=not medCombine,savePreStackImage=imSaveName,
                                        wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted,
-                                       maxBadPixTimeFrac=maxBadPixTimeFrac)
+                                       maxBadPixTimeFrac=maxBadPixTimeFrac, integrationTime=integrationTime)
                 imageStack.append(virtualImage.image*virtualImage.expTimeWeights)       #Only makes sense if medCombine==True, otherwise will be ignored
                 if medCombine==True:
                     medComImage = scipy.stats.nanmedian(np.array(imageStack), axis=0)
-                    normMin = np.percentile(medComImage[np.isfinite(medComImage)],q=0.1)
-                    normMax = np.percentile(medComImage[np.isfinite(medComImage)],q=99.9)
                     toDisplay = np.copy(medComImage)
                     toDisplay[~np.isfinite(toDisplay)] = 0
-                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax,colormap=mpl.cm.gray,
-                                    cbar=True)
+                    utils.plotArray(toDisplay,pclip=0.1,cbar=True,colormap=mpl.cm.gray)
                 else:
-                    virtualImage.display(pclip=0.1)
+                    virtualImage.display(pclip=0.5,colormap=mpl.cm.gray)
                     medComImage = None
 
             mpl.draw() 

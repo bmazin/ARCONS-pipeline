@@ -59,7 +59,8 @@ class RADecImage(object):
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
                  vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1,
-                 doWeighted=True,wvlMin=None,wvlMax=None,maxBadPixTimeFrac=0.5):
+                 doWeighted=True,wvlMin=None,wvlMax=None,maxBadPixTimeFrac=0.5,
+                 savePreStackImage=None):
                  #expWeightTimeStep=1.0):
         '''
         Initialise a (possibly empty) RA-dec coordinate frame image.
@@ -81,7 +82,7 @@ class RADecImage(object):
                         begin integration 
             integrationTime: float, length of time to integrate for in seconds. If
                         -1, integrate to end of photon list.
-            doWeighted,wvlMin,wvlMax,maxBadPixTimeFrac - passed on to loadImage() if 
+            doWeighted,wvlMin,wvlMax,maxBadPixTimeFrac,savePreStackImage - passed on to loadImage() if 
                         'photList' keyword is provided. Otherwise ignored.
             #### REMOVED ##### 
             expWeightTimeStep: float, time step to use when calculating exposure
@@ -126,7 +127,7 @@ class RADecImage(object):
         if photList is not None:
             self.loadImage(photList,firstSec=firstSec,integrationTime=integrationTime,
                            doWeighted=doWeighted,wvlMin=wvlMin,wvlMax=wvlMax,
-                           maxBadPixTimeFrac=0.5)     
+                           maxBadPixTimeFrac=maxBadPixTimeFrac,savePreStackImage=savePreStackImage)     
     
     
     def setCoordGrid(self):
@@ -232,7 +233,7 @@ class RADecImage(object):
         #First on the basis of the wavelength cals:
         wvlCalFlagImage = photList.getBadWvlCalFlags()
         deadPixMask = np.where(wvlCalFlagImage == pipelineFlags.waveCal['good'], 1, 0)   #1.0 where flag is good; 0.0 otherwise. (Straight boolean mask would work, but not guaranteed for Python 4....)
-
+        print '# Dead detector pixels to reject on basis of wavelength cal: ', np.sum(deadPixMask==0)
         
         #Next a mask on the basis of the flat cals (or all ones if weighting not requested)
         if doWeighted:
@@ -252,6 +253,7 @@ class RADecImage(object):
                 #If this never complains, then can switch to the second form.
 
             flatCalMask = np.where(np.all(flatCalFlagArray[:,:,inRange]==False, axis=2), 1, 0) # Should be zero where any pixel has a bad flag at any wavelength within the requested range; one otherwise. Spot checked, seems to work.
+            print '# Detector pixels to reject on basis of flatcals: ',np.sum(flatCalMask==0)
         else:
             flatCalMask = np.ones((nDPixRow,nDPixCol))
         
@@ -260,19 +262,20 @@ class RADecImage(object):
         #if a given pixel is bad more than a fraction maxBadTimeFrac of the time,
         #then write it off as permanently bad for the duration of the requested 
         #integration.
-        print 'Rejecting pixels with more than ',100*maxBadPixTimeFrac,'% bad-flagged time'
         if maxBadPixTimeFrac is not None:
+            print 'Rejecting pixels with more than ',100*maxBadPixTimeFrac,'% bad-flagged time'
             detGoodIntTimes = photList.hotPixTimeMask.getEffIntTimeImage(firstSec=firstSec, 
                             integrationTime=lastSec-firstSec)
             badPixMask = np.where(detGoodIntTimes/(lastSec-firstSec) > (1.-maxBadPixTimeFrac), 1, 0) #Again, 1 if okay, 0 bad. Use lastSec-firstSec instead of integrationTime in case integrationTime is -1.
+            print '# pixels to reject: ',np.sum(badPixMask==0)
+            print '# pixels to reject with eff. int. time > 0: ',np.sum((badPixMask==0) & (detGoodIntTimes>0))
         else: badPixMask = np.ones((nDPixRow,nDPixCol))        
         
         
         #Finally combine all the masks together into one detector pixel mask:
-        detPixMask = deadPixMask * flatCalMask * badPixMask      #Combine wave cal pixel mask and flat cal mask (should be the same in an ideal world, but not 
+        detPixMask = deadPixMask * flatCalMask * badPixMask     #Combine masks 
+        print 'Total detector pixels to reject: ',np.sum(detPixMask),  "(may not equal sum of the above since theres overlap!)"
     
-        
-                    
         #Now get the photons
         print 'Getting photon coords'
         print 'wvlMin, wvlMax: ',wvlMin,wvlMax
@@ -296,7 +299,7 @@ class RADecImage(object):
             photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec) & (wavelength>=wvlMin) & (wavelength<=wvlMax)')
         
         #And filter out photons to be masked out on the basis of the detector pixel mask 
-        print 'Finding photons in bad detector pixels...'
+        print 'Finding photons in masked detector pixels...'
         whereBad = np.where(detPixMask == 0)
         badXY = pl.xyPack(whereBad[0],whereBad[1])   #Array of packed x-y values for bad pixels (CHECK X,Y THE RIGHT WAY ROUND!)
         allPhotXY = photons['xyPix']                 #Array of packed x-y values for all photons           
@@ -354,10 +357,7 @@ class RADecImage(object):
         #Time masking
         #------------
 
-        #If hot pixels time-mask data not already parsed in, then parse it.
-        #if photList.hotPixTimeMask is None:
-        #    photList.parseHotPixTimeMask()      #Loads time mask dictionary into photList.hotPixTimeMask
-         
+        
         #And start figuring out the exposure time weights....            
         print 'Calculating effective exposure times'
         
@@ -479,6 +479,9 @@ class RADecImage(object):
                     
                     for overlapLocRA in maybeOverlappingRA:
                         for overlapLocDec in maybeOverlappingDec:
+                            #NB Boxer needs its input coordinates in *clockwise* direction; otherwise output behaviour is unspecified
+                            #(though looks like it just gives -ve results. Could put an 'abs' in front of it to save bother, but 
+                            #not sure I'd want to guarantee that's safe)
                             overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
                             expTimeToAdd = overlapFrac*detExpTimes[iDPix]
                             vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
@@ -550,7 +553,6 @@ class RADecImage(object):
         showCoordsOnAxes = False    #For now, don't try, since it looks like image flip/rotation assumed by CalculateRaDec may be wrong.
      
         assert np.all(self.image[self.effIntTimes==0] == 0)
-        print '... Aaaand passed that assertion too...'
      
         if expWeight:
             toDisplay = np.copy(self.image*self.expTimeWeights)
