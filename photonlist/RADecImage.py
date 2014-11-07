@@ -59,7 +59,8 @@ class RADecImage(object):
     
     def __init__(self,photList=None,nPixRA=None,nPixDec=None,cenRA=None,cenDec=None,
                  vPlateScale=0.1, detPlateScale=None, firstSec=0, integrationTime=-1,
-                 doWeighted=True,wvlMin=None,wvlMax=None):
+                 doWeighted=True,wvlMin=None,wvlMax=None,maxBadPixTimeFrac=0.5,
+                 savePreStackImage=None):
                  #expWeightTimeStep=1.0):
         '''
         Initialise a (possibly empty) RA-dec coordinate frame image.
@@ -81,10 +82,9 @@ class RADecImage(object):
                         begin integration 
             integrationTime: float, length of time to integrate for in seconds. If
                         -1, integrate to end of photon list.
-            doWeighted,wvlMin,wvlMax - passed on to loadImage() if 'photList' keyword
-                        is provided. Otherwise ignored.
-            
-            #### DEPRECATED ##### 
+            doWeighted,wvlMin,wvlMax,maxBadPixTimeFrac,savePreStackImage - passed on to loadImage() if 
+                        'photList' keyword is provided. Otherwise ignored.
+            #### REMOVED ##### 
             expWeightTimeStep: float, time step to use when calculating exposure
                         time weights for the virtual pixels (seconds).
             #####################
@@ -126,7 +126,8 @@ class RADecImage(object):
             self.setCoordGrid()            
         if photList is not None:
             self.loadImage(photList,firstSec=firstSec,integrationTime=integrationTime,
-                           doWeighted=doWeighted,wvlMin=wvlMin,wvlMax=wvlMax)     
+                           doWeighted=doWeighted,wvlMin=wvlMin,wvlMax=wvlMax,
+                           maxBadPixTimeFrac=maxBadPixTimeFrac,savePreStackImage=savePreStackImage)     
     
     
     def setCoordGrid(self):
@@ -147,8 +148,8 @@ class RADecImage(object):
     
    
     def loadImage(self,photList,firstSec=0,integrationTime=-1,wvlMin=None,wvlMax=None,
-                  doStack=False,        #expWeightTimeStep=None, 
-                  savePreStackImage=None, doWeighted=True):  #savePreStackImage is temporary for test purposes
+                  doStack=False, savePreStackImage=None, doWeighted=True,
+                  maxBadPixTimeFrac=0.5):  #savePreStackImage is sort of temporary for test purposes
         '''
         
         Build a de-rotated stacked image from a photon list (PhotList) object.
@@ -156,24 +157,26 @@ class RADecImage(object):
         
         INPUTS:
             photList - a PhotList object from which to construct the image.
-            firstSec - time from start of exposure to start the 'integration' for the image (seconds)
-            integrationTime - duration of integration time to include in the image (in seconds; -1 or NaN => to end of exposure)
-            wvlMin, wvlMax - min and max wavelengths of photons to include in the image (Angstroms).
-            doStack - boolean; if True, then stack the image to be loaded on top of any image data already present.
             
-            #### DEPRECATED - NOW GETS TIME STEPS STRAIGHT FROM CENTROID LIST FILES #####
-            expWeightTimeStep - see __init__. If set here, overrides any value already set in the RADecImage object.
-                                If the new image is being stacked on top of a current image, a new value can be
-                                supplied that is different from the current image's value; but only the last value used
-                                (i.e. the one supplied) will be stored in the class attribute.
-            ################################
+            firstSec - time from start of exposure to start the 'integration' for the image (seconds)
+            
+            integrationTime - duration of integration time to include in the image (in seconds; -1 or NaN => to end of exposure)
+            
+            wvlMin, wvlMax - min and max wavelengths of photons to include in the image (Angstroms).
+            
+            doStack - boolean; if True, then stack the image to be loaded on top of any image data already present.          
             
             wvlMin, wvlMax - set min and max wavelength cutoffs for photons to be loaded in.
+            
             savePreStackImage - temporary fudge, set to a file-name to save the image out to a file prior to stacking.
+            
             doWeighted - if True, includes flat and flux weighting (i.e. flatfielding and spectral response) factors from photons,
                                 and rejects photons from pixels where the flatfield is bad at any wavelength within the requested
                                 wavelength range (all if wvlMin/wvl Max not specified).
                                 ****NOTE - FLUX WEIGHTING NOT FULLY TESTED -- but looks probably okay.****
+            
+            maxBadPixTimeFrac - Maximum fraction of time for which a pixel is allowed to be flagged as hot (or otherwise bad)
+                                before it is written off as bad for the entire duration of the requested integration time.
         '''
         
         #posErr = 0.8    #Approx. position error in arcsec (just a fixed estimate for now, will improve later)
@@ -184,6 +187,10 @@ class RADecImage(object):
         photTable = photList.file.root.photons.photons   #Shortcut to table
         #if expWeightTimeStep is not None:
         #    self.expWeightTimeStep=expWeightTimeStep
+        
+        #If hot pixels time-mask data not already parsed in (presumably not), then parse it.
+        if photList.hotPixTimeMask is None:
+            photList.parseHotPixTimeMask()      #Loads time mask dictionary into photList.hotPixTimeMask
         
         if wvlMin is not None and wvlMax is None: wvlMax = np.inf
         if wvlMin is None and wvlMax is not None: wvlMin = 0.0
@@ -220,13 +227,15 @@ class RADecImage(object):
         #Calculate ratio of virtual pixel area to detector pixel area
         vdPixAreaRatio = (self.vPlateScale/self.detPlateScale)**2
         
+        
         #Make a boolean mask of dead (non functioning for whatever reason) pixels
         #True (1) = good; False (0) = dead 
         #First on the basis of the wavelength cals:
         wvlCalFlagImage = photList.getBadWvlCalFlags()
         deadPixMask = np.where(wvlCalFlagImage == pipelineFlags.waveCal['good'], 1, 0)   #1.0 where flag is good; 0.0 otherwise. (Straight boolean mask would work, but not guaranteed for Python 4....)
-
-        #Next on the basis of the flat cals (or all ones if weighting not requested)
+        print '# Dead detector pixels to reject on basis of wavelength cal: ', np.sum(deadPixMask==0)
+        
+        #Next a mask on the basis of the flat cals (or all ones if weighting not requested)
         if doWeighted:
             flatCalFlagArray = photList.file.root.flatcal.flags.read()       # 3D array - nRow * nCol * nWavelength Bins.
             flatWvlBinEdges = photList.file.root.flatcal.wavelengthBins.read()   # 1D array of wavelength bin edges for the flat cal.
@@ -244,10 +253,30 @@ class RADecImage(object):
                 #If this never complains, then can switch to the second form.
 
             flatCalMask = np.where(np.all(flatCalFlagArray[:,:,inRange]==False, axis=2), 1, 0) # Should be zero where any pixel has a bad flag at any wavelength within the requested range; one otherwise. Spot checked, seems to work.
+            print '# Detector pixels to reject on basis of flatcals: ',np.sum(flatCalMask==0)
         else:
             flatCalMask = np.ones((nDPixRow,nDPixCol))
         
-        #Get the photons
+        
+        #And now a mask based on how much hot pixel behaviour each pixel exhibits:
+        #if a given pixel is bad more than a fraction maxBadTimeFrac of the time,
+        #then write it off as permanently bad for the duration of the requested 
+        #integration.
+        if maxBadPixTimeFrac is not None:
+            print 'Rejecting pixels with more than ',100*maxBadPixTimeFrac,'% bad-flagged time'
+            detGoodIntTimes = photList.hotPixTimeMask.getEffIntTimeImage(firstSec=firstSec, 
+                            integrationTime=lastSec-firstSec)
+            badPixMask = np.where(detGoodIntTimes/(lastSec-firstSec) > (1.-maxBadPixTimeFrac), 1, 0) #Again, 1 if okay, 0 bad. Use lastSec-firstSec instead of integrationTime in case integrationTime is -1.
+            print '# pixels to reject: ',np.sum(badPixMask==0)
+            print '# pixels to reject with eff. int. time > 0: ',np.sum((badPixMask==0) & (detGoodIntTimes>0))
+        else: badPixMask = np.ones((nDPixRow,nDPixCol))        
+        
+        
+        #Finally combine all the masks together into one detector pixel mask:
+        detPixMask = deadPixMask * flatCalMask * badPixMask     #Combine masks 
+        print 'Total detector pixels to reject: ',np.sum(detPixMask),  "(may not equal sum of the above since theres overlap!)"
+    
+        #Now get the photons
         print 'Getting photon coords'
         print 'wvlMin, wvlMax: ',wvlMin,wvlMax
         if wvlMin is None:
@@ -269,14 +298,13 @@ class RADecImage(object):
             print '(trimming wavelength range) '
             photons = photTable.readWhere('(arrivalTime>=firstSec) & (arrivalTime<=lastSec) & (wavelength>=wvlMin) & (wavelength<=wvlMax)')
         
-        #Filter out photons to be masked out on the basis of detector pixel######
-        print 'Finding bad detector pixels...'
-        detPixMask = deadPixMask * flatCalMask      #Combine wave cal pixel mask and flat cal mask (should be the same in an ideal world, but not 
+        #And filter out photons to be masked out on the basis of the detector pixel mask 
+        print 'Finding photons in masked detector pixels...'
         whereBad = np.where(detPixMask == 0)
         badXY = pl.xyPack(whereBad[0],whereBad[1])   #Array of packed x-y values for bad pixels (CHECK X,Y THE RIGHT WAY ROUND!)
         allPhotXY = photons['xyPix']                 #Array of packed x-y values for all photons           
         #Get a boolean array indicating photons whose packed x-y coordinate value is in the 'bad' list.
-        toReject = np.where(np.in1d(allPhotXY,badXY))[0]      #Zero to take index array out of the returned 1-element tuple.
+        toReject = np.where(np.in1d(allPhotXY,badXY))[0]      #[0] to take index array out of the returned 1-element tuple.
         #Chuck out the bad photons
         print 'Rejecting photons from bad pixels...'
         photons = np.delete(photons,toReject)
@@ -329,10 +357,7 @@ class RADecImage(object):
         #Time masking
         #------------
 
-        #If hot pixels time-mask data not already parsed in, then parse it.
-        if photList.hotPixTimeMask is None:
-            photList.parseHotPixTimeMask()      #Loads time mask dictionary into photList.hotPixTimeMask
-         
+        
         #And start figuring out the exposure time weights....            
         print 'Calculating effective exposure times'
         
@@ -441,7 +466,10 @@ class RADecImage(object):
             #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
             #detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
             #                                     firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
-            detExpTimes = (photList.hotPixTimeMask.getEffIntTimeImage(firstSec=tStartFrames[iFrame], integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame]) * detPixMask).flatten()
+            detExpTimes = (photList.hotPixTimeMask.getEffIntTimeImage(firstSec=tStartFrames[iFrame], 
+                            integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame]) * detPixMask).flatten()
+                        
+            
                      
             #Loop over the detector pixels.... (should be faster than looping over virtual pixels)
             for iDPix in np.arange(nDPixRow * nDPixCol):
@@ -451,6 +479,9 @@ class RADecImage(object):
                     
                     for overlapLocRA in maybeOverlappingRA:
                         for overlapLocDec in maybeOverlappingDec:
+                            #NB Boxer needs its input coordinates in *clockwise* direction; otherwise output behaviour is unspecified
+                            #(though looks like it just gives -ve results. Could put an 'abs' in front of it to save bother, but 
+                            #not sure I'd want to guarantee that's safe)
                             overlapFrac = boxer.boxer(overlapLocDec,overlapLocRA,dPixCornersDec[:,iDPix],dPixCornersRA[:,iDPix])
                             expTimeToAdd = overlapFrac*detExpTimes[iDPix]
                             vExpTimesStack[overlapLocDec,overlapLocRA,iFrame] += expTimeToAdd
@@ -463,8 +494,7 @@ class RADecImage(object):
         
         #Check that wherever the exposure time is zero, there are no photons that have not been rejected
         assert np.all(thisImage[vExpTimes==0] == 0)
-        print 'Dunno why, but it passed the assertion...'
-        #assert 1==0
+        #print 'Dunno why, but it passed the assertion...'
         
         if savePreStackImage is not None:
             print 'Saving exp.time weighted pre-stacked image to '+savePreStackImage
@@ -523,7 +553,6 @@ class RADecImage(object):
         showCoordsOnAxes = False    #For now, don't try, since it looks like image flip/rotation assumed by CalculateRaDec may be wrong.
      
         assert np.all(self.image[self.effIntTimes==0] == 0)
-        print '... Aaaand passed that assertion too...'
      
         if expWeight:
             toDisplay = np.copy(self.image*self.expTimeWeights)
