@@ -721,8 +721,9 @@ def printObsFileDescriptions( dir_path ):
     """
     Prints the 'description' and 'target' header values for all observation
     files in the specified directory
+    Added sorting to returned list - JvE Nov 7 2014
     """
-    for obs in glob.glob(os.path.join(dir_path,'obs*.h5')):
+    for obs in sorted(glob.glob(os.path.join(dir_path,'obs*.h5'))):
         f=tables.openFile(obs,'r')
 	try:
             hdr=f.root.header.header.read()
