@@ -471,6 +471,13 @@ def fitRigidRotation(x,y,ra,dec,x0=0,y0=0):
          dx = x-x0 and dy = y-y0
 
     ra,dec are input in decimal degrees
+
+    The scale and rotation of the transform are recovered from the cd matrix;
+      rm = w.wcs.cd
+      wScale = math.sqrt(rm[0,0]**2+rm[0,1]**2) # degrees per pixel
+      wTheta = math.atan2(rm[1,0],rm[0,0])      # degrees
+
+
     """
     assert(len(x)==len(y)==len(ra)==len(dec)), "all inputs must be same length"
     assert(len(x) > 1), "need at least two points"

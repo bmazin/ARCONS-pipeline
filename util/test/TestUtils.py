@@ -9,6 +9,7 @@ import math
 from astropy import wcs
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.coordinates.angles import Angle as Angle
 class TestUtils(unittest.TestCase):
     """
     Test functions in utils.py
@@ -94,7 +95,8 @@ class TestUtils(unittest.TestCase):
 
         use these mathes to calculate the WCS transformation
 
-        test that the WCS transform works to 1e-9 degrees
+        test that the WCS transform works to 1e-9 degrees and
+        that the CD matrix returns the rotation and scale expected.
         """
         nx = 3
         ny = 3
@@ -115,8 +117,16 @@ class TestUtils(unittest.TestCase):
                 ras  = scale*(xs*ct - ys*st) + dra
                 decs = scale*(xs*st + ys*ct) + ddec
                 w = utils.fitRigidRotation(xs,ys,ras,decs)
+                rm = w.wcs.cd
+                wScale = math.sqrt(rm[0,0]**2+rm[0,1]**2)
+                wTheta = math.atan2(rm[1,0],rm[0,0])
 
-                wras,wdecs = w.wcs_pix2world(xs,ys,1)
+                self.assertAlmostEqual(scale,wScale)
+                self.assertAlmostEqual(Angle(theta,'degree').
+                                       wrap_at('180d').degree,
+                                       Angle(wTheta,'radian').
+                                       wrap_at('180d').degree)
+                wras,wdecs = w.wcs_pix2world(xs,ys,1)                
                 for x,y,wra,wdec,ra,dec in zip(xs,ys,wras,wdecs,ras,decs):
                     cTrue = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
                     cReco = SkyCoord(ra=wra*u.degree, dec=wdec*u.degree)
@@ -124,5 +134,6 @@ class TestUtils(unittest.TestCase):
                     dra = (ra-wra)*3600
                     ddec = (dec-wdec)*3600
                     self.assertTrue(sep.degree < 1e-9 )
-if __name__ == '__main__':
-    unittest.main()
+
+                
+if __name__ == '__main__':    unittest.main()
