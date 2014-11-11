@@ -475,7 +475,7 @@ def fitRigidRotation(x,y,ra,dec,x0=0,y0=0):
     The scale and rotation of the transform are recovered from the cd matrix;
       rm = w.wcs.cd
       wScale = math.sqrt(rm[0,0]**2+rm[0,1]**2) # degrees per pixel
-      wTheta = math.atan2(rm[1,0],rm[0,0])      # degrees
+      wTheta = math.atan2(rm[1,0],rm[0,0])      # radians
 
 
     """
