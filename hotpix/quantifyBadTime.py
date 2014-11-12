@@ -12,7 +12,8 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
                     defaultTimeMaskFileName='./testTimeMask.h5',
                     timeStep=1, fwhm=3.0, boxSize=5, nSigmaHot=3.0,
                     nSigmaCold=2.5,maxIter=5,binWidth=3,
-                    dispToPickle=False, showHist=False):
+                    dispToPickle=False, showHist=False, bkgdPercentile=50,
+                    weighted=False,fluxWeighted=False, useRawCounts=True):
     '''
     Function to calculate various metrics for the degree of bad pixel behaviour in a raw 
     raw obs file. Calculates the mean total hot/cold/dead time per good pixel (i.e., per 
@@ -36,7 +37,8 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
     
     INPUTS:
     
-        inputFileName - either a raw obs. file or a time mask file.
+        inputFileName - either a raw obs. filename or a time mask file. If the former, 
+                        runs a hot pixel search; otherwise uses time mask file instead.
         
         startTime, endTime - start and end times within the obs file to
                         calculate the hot pixels for. (endTime =-1 means to end of file).
@@ -80,6 +82,7 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
     
         maxIter         #Max num. of iterations for the bad pixel detection algorithm.
         
+        bkdgPercentile, weighted, fluxWeighted    - See findHotPixels() in hotpix.hotpixels.py
 
 
     OUTPUTS:
@@ -126,25 +129,25 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
                                  timeStep=timeStep, fwhm=fwhm,
                                  boxSize=boxSize, nSigmaHot=nSigmaHot, nSigmaCold=nSigmaCold,
                                  display=True, dispToPickle=dispToPickle,
-                                 weighted=False, maxIter=maxIter)
+                                 maxIter=maxIter, bkgdPercentile=bkgdPercentile,
+                                 weighted=weighted,fluxWeighted=fluxWeighted,useRawCounts=useRawCounts)
     
     
-    print "This code needs to be updated to use hotPixelMasker class which wraps the hotpixel code"
     #Read in the time mask file and calculate hot, cold, and 'other' bad time per pixel.
     timeMask = hp.readHotPixels(timeMaskFileName)
-    hotTime = np.zeros((timeMask['nRow'],timeMask['nCol']))
-    coldTime = np.zeros((timeMask['nRow'],timeMask['nCol']))
-    deadTime = np.zeros((timeMask['nRow'],timeMask['nCol']))
-    otherTime = np.zeros((timeMask['nRow'],timeMask['nCol']))
+    hotTime = np.zeros((timeMask.nRow,timeMask.nCol))
+    coldTime = np.zeros((timeMask.nRow,timeMask.nCol))
+    deadTime = np.zeros((timeMask.nRow,timeMask.nCol))
+    otherTime = np.zeros((timeMask.nRow,timeMask.nCol))
     hotIntervals = np.array([])
     coldIntervals = np.array([])
     deadIntervals = np.array([])
     otherIntervals = np.array([])
 
-    reasonStringMap = timeMask['reasonEnum']
-    for iRow in range(timeMask['nRow']):
-        for iCol in range(timeMask['nCol']):
-            for eachInterval,eachReasonCode in zip(timeMask['intervals'][iRow,iCol], timeMask['reasons'][iRow,iCol]):
+    reasonStringMap = timeMask.reasonEnum
+    for iRow in range(timeMask.nRow):
+        for iCol in range(timeMask.nCol):
+            for eachInterval,eachReasonCode in zip(timeMask.intervals[iRow,iCol], timeMask.reasons[iRow,iCol]):
                 eachReasonString = reasonStringMap(eachReasonCode)   #Convert integer code to human readable string
                 intSize = utils.intervalSize(eachInterval)
                 if eachReasonString == 'hot pixel':
@@ -168,10 +171,10 @@ def quantifyBadTime(inputFileName, startTime=0, endTime=-1,
         
     totBadTime = hotTime+coldTime+deadTime+otherTime
     
-    maskDuration = timeMask['endTime']-timeMask['startTime']
+    maskDuration = timeMask.endTime-timeMask.startTime
     
     #Figure out which pixels are hot, cold, permanently hot, temporarily cold, etc. etc.
-    nPix = timeMask['nRow'] * timeMask['nCol']
+    nPix = timeMask.nRow * timeMask.nCol
     hotPix = hotTime > 0.1
     coldPix = coldTime > 0.1
     deadPix = deadTime > 0.1
