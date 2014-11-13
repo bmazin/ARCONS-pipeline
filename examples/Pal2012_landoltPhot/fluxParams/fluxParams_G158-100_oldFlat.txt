@@ -1,11 +1,11 @@
 datadir=/ScienceData/PAL2012/20121211
-flatdir=/Scratch/flatCalSolnFiles/PAL2012/20121211
-wvldir=/Scratch/waveCalSolnFiles/PAL2012/20121211
+flatdir=/Scratch/flatCalSolnFiles/20121211
+wvldir=/Scratch/waveCalSolnFiles/20121211
 fluxfile=obs_20121212-021727.h5
 skyfile=None
-flatfile=illumsol_20121211.h5
+flatfile=flatsol_20121211.h5
 wvlfile=calsol_20121212-023031.h5
-fluxdir=/Scratch/fluxCalSolnFiles/PAL2012/20121211
+fluxdir=/Scratch/fluxCalSolnFiles/20121211
 fluxoutfile=fluxsol_20121212-021727.h5
 objectName=G158-100
 xpix = 13

@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2014/20141020
+flatdir=/Scratch/flatCalSolnFiles/PAL2014/20141020
+wvldir=/Scratch/waveCalSolnFiles/PAL2014/20141020
+fluxfile=obs_20141021-053603.h5
+skyfile=None
+flatfile=illumsol_20141020.h5
+wvlfile=calsol_20141021-052251.h5
+fluxdir=/Scratch/fluxCalSolnFiles/PAL2014/20141020
+fluxoutfile=fluxsol_20141020-053603.h5
+objectName=sdssj001414+345018
+xpix = 18
+ypix = 11
+rad = 6
+starttime = 0
+endtime = -1

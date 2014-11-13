@@ -32,10 +32,6 @@ def aperture(startpx,startpy,radius=7):
 #utils.plotArray(testy,cbar=True)
 
 param = readDict()
-#param.read_from_file('G158-100params.dict')
-#param.read_from_file('pg0220params.dict')
-#param.read_from_file('landolt9542params.dict')
-#param.read_from_file('corot18params.dict')
 if len(sys.argv)<2:
     print "Provide file name to fit.  Syntax >>python fitPsf.py objectparams.dict [filenumber]"
     sys.exit(1)
@@ -112,28 +108,23 @@ for iFrame in range(0,np.shape(stack)[0]):
     entireMask = (err==np.inf)
     maFrame = np.ma.masked_array(frame,entireMask)
     '''
-    apertureMask = aperture(guessX,guessY,radius=7)
+    apertureMask = aperture(guessX,guessY,radius=5)
     
     #if iFrame < 19:
     #    err = np.ones(np.shape(frame))*10.0
     #else:
     #    err = np.zeros(np.shape(frame))
-    err = np.ones(np.shape(frame))*10.0
-    #err = (frame)**(0.5)
-    err[apertureMask==1] = np.inf #weight points closer to the expected psf higher
+    err = np.ones(np.shape(frame))*1.0
+    #err = np.sqrt(frame)
+    #err[apertureMask==1] = np.inf #weight points closer to the expected psf higher
     #err[frame>100] = np.inf
     frame[nanMask]=0#set to finite value that will be ignored
     err[nanMask] = np.inf#ignore these data points
-    nearDeadCutoff=1#100/15 cps for 4000-6000 angstroms
+    nearDeadCutoff=0#100/15 cps for 4000-6000 angstroms
     err[frame<nearDeadCutoff] = np.inf
     entireMask = (err==np.inf)
     maFrame = np.ma.masked_array(frame,entireMask)
-    
 
-    #try to make smart guesses about initial parameters
-    #guessAmp = np.max(frame[frame!=np.nan])
-    #guessHeight = np.median(frame)
-    #guessWidth = 1.5
     guessAmp = 30.
     guessHeight = 5.
     guessWidth = 1.3
