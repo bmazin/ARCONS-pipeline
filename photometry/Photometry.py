@@ -1,6 +1,7 @@
 
 #Photometry Super class
 import os
+from util.FileName import FileName
 from util.readDict import readDict
 
 
