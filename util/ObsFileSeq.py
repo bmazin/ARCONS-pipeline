@@ -8,12 +8,15 @@ import pyfits
 import matplotlib.pyplot as plt
 class ObsFileSeq():
     """
-    Deal with a sequence of obsFiles
+    Deal with a sequence of obsFiles, and present data as a set of
+    frames.  Each frame has the telescope pointing at the same location,
+    as calculated by the TCS log file written by the data acquisition
+    system.
 
     For a given run and date, consider the list of timeStamps as one
     continuous observation, with the given name.  Divide the observations
     into a set of frames, with the maximum amount of seconds in one frame given
-    by dt.
+    by dt.  
 
     If the data acquisition system was doing a mosaic at the time, each
     frame will contain data only for one telescope position.  Two seconds after
@@ -49,11 +52,13 @@ class ObsFileSeq():
         self.timeStamps.sort()
         self.obsFiles = []
         self.fileNames = []
+        self.obsFileUnixTimes = []
         for timeStamp in self.timeStamps:
             fn = FileName.FileName(run,date,timeStamp)
             self.fileNames.append(fn)
             of = ObsFile.ObsFile(fn.obs()) 
             self.obsFiles.append(of)
+            self.obsFileUnixTimes.append(of.getFromHeader('unixtime'))
         self.tcs = TCS.TCS(run,date)
         self.tcsDict = self.tcs.select(self.obsFiles[0],self.obsFiles[-1])
 
@@ -120,6 +125,21 @@ class ObsFileSeq():
                     frameObsInfo.append(obsInfo)
             self.frameObsInfos.append(frameObsInfo)
 
+    def getTimeBySeq(self,iSeq):
+        """
+        get the mean time of the frame
+        """
+        foi = self.frameObsInfos[iSeq]
+        wtSum = 0
+        wSum = 0
+        for oi in foi:
+            w = oi['integrationTime']
+            t = self.obsFileUnixTimes[oi['iObs']]+oi['firstSec'] + 0.5*oi['integrationTime']
+            wtSum += w*t
+            wSum += w
+        meanTime = wtSum/float(wSum)
+        return meanTime
+
     def getTargetList(self,printLines=True):
         """
         get list of information:  the timstamp + target description in header
@@ -135,6 +155,7 @@ class ObsFileSeq():
                 print line
             retval.append(line)
         return retval
+
     def getFrameList(self,printLines=True):
         """
         returns a list of lines which describes the frames.
@@ -192,6 +213,19 @@ class ObsFileSeq():
                 
                 retval.append(spectralCube)
         return retval
+
+    def getCountsCube(self,wvMin,wvMax):
+        """
+        return dictionary of
+          'counts' = counts[iFrame][row][col], number of photons detectedt for this frame, in row,col
+          'effIntTime' = effIntTime[iFrame][row][col], effective exposure time
+        """
+        fn = name+"-countsCube.pkl"
+        retval = pickle.load(open(fn,"rb"))
+        
+        for iFrame in range(len(self.frameIntervals)):
+            print "iFrame in getCountsCuge"
+
     def makePngFileByInterval(self,thisInterval,wvMin,wvMax,maxRate):
         fn = "%s-%03d-%05d-%05d.png"%(self.name,thisInterval,int(wvMin),int(wvMax))
         print "now make fn=",fn
@@ -292,5 +326,8 @@ if __name__ == "__main__":
     print "Now call getFrameList"
     ofs.getFrameList()
     ofs.plotLocations(name+".png")
+    print "now get time of first frame"
+    for i in range(66):
+        print "i="," time=",ofs.getTimeBySeq(i)
     #apci = ofs.getAllPixelCountImages(getRawCount=True)
     del ofs

@@ -7,6 +7,7 @@ from util.ObsFile import ObsFile
 from util import MKIDStd
 from util.rebin import rebin
 import matplotlib
+from mpltools	import style
 from scipy import interpolate
 from scipy.optimize.minpack import curve_fit
 from numpy import exp
@@ -144,6 +145,8 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         new_flux = interpolate.splev(new_wl,f,der=0)
         return new_wl, new_flux
 
+# try new plotting style for pipeline paper
+style.use('ggplot')
 
 c=3.00E10 #cm/s
 h=6.626E-27 #erg*s

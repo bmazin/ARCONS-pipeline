@@ -15,9 +15,9 @@ ObjPosFile=[[1,14,8]] #Dec8
 
 ######################## For fitpsf.py ########################
 
-npzLoadFile = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/AllImageStack_20121208_30s_3000-6000_hp.npz'
-npzfitpsf = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/FitsComp_20121208-all_30s_3000-6000_hp.npz'
-giffitpsf = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/FitsComp_20121208-all_30s_3000-6000_hp.gif'
+npzLoadFile = '/Scratch/DisplayStack/PAL2012/Corot18b/wvlCal_2/ImageStacks/30s/AllImageStack_20121208_30s_3000-6000_hp.npz'
+npzfitpsf = '/Scratch/DisplayStack/PAL2012/Corot18b/wvlCal_2/ImageStacks/30s/FitsComp_20121208-all_30s_3000-6000_hp.npz'
+giffitpsf = '/Scratch/DisplayStack/PAL2012/Corot18b/wvlCal_2/ImageStacks/30s/FitsComp_20121208-all_30s_3000-6000_hp.gif'
 
 #Dec8 
 #seq0:13
@@ -47,6 +47,6 @@ guessY = [32]
 
 ######################## For lightcurve.py ########################
 
-npzLoadFitFile = '/Scratch/DisplayStack/PAL2012/Corot18b/ImageStacks/30s/FitsComp_20121208-all_30s_3000-6000_hp.npz'
+npzLoadFitFile = '/Scratch/DisplayStack/PAL2012/Corot18b/wvlCal_2/ImageStacks/30s/FitsComp_20121208-all_30s_3000-6000_hp.npz'
 TotalNumFiles = 1
 
