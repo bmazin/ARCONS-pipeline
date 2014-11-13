@@ -12,6 +12,7 @@ import glob
 import scipy.stats
 import numpy as np
 #from astropy import coordinates as coord
+import pyfits
 import matplotlib.pylab as mpl
 import photonlist.photlist as pl
 import photonlist.RADecImage as rdi
@@ -19,10 +20,47 @@ from util.FileName import FileName
 from util import utils
 
 
-def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', default="/Scratch")+'/photonLists/20121211',
-                   detImage=False, saveFileName='stackedImage.pkl', wvlMin=None,
-                   wvlMax=None, doWeighted=True, medCombine=False, vPlateScale=0.2,
-                   nPixRA=250,nPixDec=250):
+def makeRGBset(inputFiles='*.pkl',medIm=True):
+    '''
+    For now, just turns output virtual image pickle files from makeImageStack into fits files.
+    Also, masks wherever there is not valid data in all three images (so that you don't get
+    weird coloured pixels popping out).
+    All happens in the current working directory.
+    '''
+
+    filenames = glob.glob(inputFiles)
+    if len(filenames) != 3:
+        print 'There should be three input files (R,G,B)...'
+        return
+    
+    nrow,ncol = np.shape(np.load(filenames[0])['vim'].image)
+    imstack = np.zeros((nrow,ncol,3))
+    for i,eachFilename in enumerate(filenames):
+        vim = np.load(eachFilename)
+        if medIm is True:
+            imstack[:,:,i] = vim['medim']
+        else:
+            imstack[:,:,i] = vim['vim'].image * vim['vim'].expTimeWeights
+    
+    #Set any non-finite values to zero
+    imstack[~np.isfinite(imstack)]=0    
+    mask3d = np.where(imstack>0, 1, 0)    #1 where there's flux, 0 where nothing.
+    mask2d = np.prod(mask3d,axis=2)    #Multiply the masks across all three images.
+    for i,eachFilename in enumerate(filenames):
+        basename,ext = os.path.splitext(os.path.basename(eachFilename))
+        outputfile = basename+'.fits'
+        print eachFilename + ' -> '+outputfile
+        hdu = pyfits.PrimaryHDU(imstack[:,:,i] * mask2d)    #Should zero out anything that doesn't exist in all 3 bands.
+        hdu.writeto(outputfile)
+
+
+
+def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', 
+                   default="/Scratch")+'/photonLists/20121211',
+                   detImage=False, saveFileName='stackedImage.pkl', wvlMin=3500,
+                   wvlMax=12000, doWeighted=True, medCombine=False, vPlateScale=0.2,
+                   nPixRA=250,nPixDec=250,maxBadPixTimeFrac=0.2,integrationTime=-1,
+                   outputdir=''):
     '''
     Create an image stack
     INPUTS:
@@ -43,7 +81,12 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
         vPlateScale - (arcsec/virtual pixel) - to set the plate scale of the virtual
                      pixels in the outputs image.
         nPixRA,nPixDec - size of virtual pixel grid in output image.
-    
+        maxBadPixTimeFrac - Maximum fraction of time which a pixel is allowed to be 
+                     flagged as bad (e.g., hot) for before it is written off as
+                     permanently bad for the duration of a given image load (i.e., a
+                     given obs file).
+        integrationTime - the integration time to use from each input obs file (from 
+                     start of file).
     OUTPUTS:
         Returns a stacked image object, saves the same out to a pickle file, and
         (depending whether it's still set to or not) saves out the individual non-
@@ -74,7 +117,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
             baseSaveName,ext=os.path.splitext(os.path.basename(eachFile))
             
             if detImage is True:
-                imSaveName=baseSaveName+'det.tif'
+                imSaveName=os.path.join(outputdir,baseSaveName+'det.tif')
                 im = phList.getImageDet(wvlMin=wvlMin,wvlMax=wvlMax)
                 utils.plotArray(im)
                 mpl.imsave(fname=imSaveName,arr=im,colormap=mpl.cm.gnuplot2,origin='lower')
@@ -83,23 +126,21 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
                 else:
                     virtualImage+=im
             else:
-                imSaveName=baseSaveName+'.tif'
+                imSaveName=os.path.join(outputdir,baseSaveName+'.tif')
                 virtualImage.loadImage(phList,doStack=not medCombine,savePreStackImage=imSaveName,
-                                       wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted)
+                                       wvlMin=wvlMin, wvlMax=wvlMax, doWeighted=doWeighted,
+                                       maxBadPixTimeFrac=maxBadPixTimeFrac, integrationTime=integrationTime)
                 imageStack.append(virtualImage.image*virtualImage.expTimeWeights)       #Only makes sense if medCombine==True, otherwise will be ignored
                 if medCombine==True:
                     medComImage = scipy.stats.nanmedian(np.array(imageStack), axis=0)
-                    normMin = np.percentile(medComImage[np.isfinite(medComImage)],q=0.1)
-                    normMax = np.percentile(medComImage[np.isfinite(medComImage)],q=99.9)
                     toDisplay = np.copy(medComImage)
                     toDisplay[~np.isfinite(toDisplay)] = 0
-                    utils.plotArray(toDisplay,normMin=normMin,normMax=normMax,colormap=mpl.cm.gray,
-                                    cbar=True)
+                    utils.plotArray(toDisplay,pclip=0.1,cbar=True,colormap=mpl.cm.gray)
                 else:
-                    virtualImage.display(pclip=0.1)
+                    virtualImage.display(pclip=0.5,colormap=mpl.cm.gray)
                     medComImage = None
 
-            mpl.draw() 
+            mpl.show() 
 
 
         else:
@@ -110,7 +151,7 @@ def makeImageStack(fileNames='photons_*.h5', dir=os.getenv('MKID_PROC_PATH', def
     results = {'vim':virtualImage,'imstack':imageStack,'medim':medComImage}
 
     try:
-        output = open(saveFileName,'wb')
+        output = open(os.path(outputdir,saveFileName),'wb')
         pickle.dump(results,output,-1)
         output.close()
             

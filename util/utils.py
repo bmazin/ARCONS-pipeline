@@ -16,7 +16,8 @@ import scipy.ndimage
 import scipy.stats
 import astropy.stats
 import ds9
-
+from numpy import linalg
+from astropy import wcs
 
 #from interval import interval
 
@@ -457,6 +458,59 @@ def linearFit( x, y, err=None ):
     solution, residuals, rank, s = scipy.linalg.lstsq(A, y)
     return solution
 
+def fitRigidRotation(x,y,ra,dec,x0=0,y0=0):
+    """
+    calculate the rigid rotation from row,col positions to ra,dec positions
+
+    return dictionary of theta,tx,ty, such that
+
+    ra  = c*dx - s*dx + dra
+    dec = s*dy + c*dy + ddec
+    
+    with c = scale*cos(theta) and s = scale*sin(theta)
+         dx = x-x0 and dy = y-y0
+
+    ra,dec are input in decimal degrees
+
+    The scale and rotation of the transform are recovered from the cd matrix;
+      rm = w.wcs.cd
+      wScale = math.sqrt(rm[0,0]**2+rm[0,1]**2) # degrees per pixel
+      wTheta = math.atan2(rm[1,0],rm[0,0])      # radians
+
+
+    """
+    assert(len(x)==len(y)==len(ra)==len(dec)), "all inputs must be same length"
+    assert(len(x) > 1), "need at least two points"
+
+    dx = x-x0
+    dy = y-y0
+    a = numpy.zeros((2*len(x),4))
+    b = numpy.zeros(2*len(x))
+    for i in range(len(x)):
+        a[2*i,0] = -dy[i]
+        a[2*i,1] = dx[i]
+        a[2*i,2] = 1
+        b[2*i]   = ra[i]
+
+        a[2*i+1,0] = dx[i]
+        a[2*i+1,1] = dy[i]
+        a[2*i+1,3] = 1
+        b[2*i+1] = dec[i]
+    answer,residuals,rank,s = linalg.lstsq(a,b)
+    
+    # put the fit parameters into the WCS structure
+    sst = answer[0] # scaled sin theta
+    sct = answer[1] # scaled cos theta
+    dra = answer[2]
+    ddec = answer[3]
+    scale = math.sqrt(sst**2+sct**2)
+    theta = math.degrees(math.atan2(sst,sct))
+    w = wcs.WCS(naxis=2)
+    w.wcs.crpix = [x0,y0]     # reference pixel position
+    w.wcs.crval = [dra,ddec]  # reference sky position
+    w.wcs.cd = [[sct,-sst],[sst,sct]] # scaled rotation matrix
+    w.wcs.ctype = ["RA---TAN","DEC--TAN"]
+    return w
 
 def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
               delay=0.1, listOfPixelsToMark=None, pixelMarkColor='red',
@@ -599,7 +653,7 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
                plotFileName='arrayPlot.png',
                plotTitle='', sigma=None, 
                pixelsToMark=[], pixelMarkColor='red',
-               fignum=1):
+               fignum=1, pclip=None):
     """
     Plots the 2D array to screen or if showMe is set to False, to
     file.  If normMin and normMax are None, the norm is just set to
@@ -637,16 +691,22 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
              Default is 1. If None, automatically selects a new figure number.
             Added 2013/7/19 2013, JvE
     
+    pclip - set to percentile level (in percent) for setting the upper and
+            lower colour stretch limits (overrides sigma).
+    
     """
     if sigma != None:
        # Chris S. does not know what accumulatePositive is supposed to do
        # so he changed the next two lines.
        #meanVal = numpy.mean(accumulatePositive(xyarray))
        #stdVal = numpy.std(accumulatePositive(xyarray))
-       meanVal = numpy.mean(xyarray)
-       stdVal = numpy.std(xyarray)
+       meanVal = numpy.nanmean(xyarray)
+       stdVal = numpy.nanstd(xyarray)
        normMin = meanVal - sigma*stdVal
        normMax = meanVal + sigma*stdVal
+    if pclip != None:
+        normMin = numpy.percentile(xyarray[numpy.isfinite(xyarray)], pclip)
+        normMax = numpy.percentile(xyarray[numpy.isfinite(xyarray)], 100.-pclip)
     if normMin == None:
        normMin = xyarray.min()
     if normMax == None:
@@ -715,8 +775,9 @@ def printObsFileDescriptions( dir_path ):
     """
     Prints the 'description' and 'target' header values for all observation
     files in the specified directory
+    Added sorting to returned list - JvE Nov 7 2014
     """
-    for obs in glob.glob(os.path.join(dir_path,'obs*.h5')):
+    for obs in sorted(glob.glob(os.path.join(dir_path,'obs*.h5'))):
         f=tables.openFile(obs,'r')
 	try:
             hdr=f.root.header.header.read()

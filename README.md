@@ -25,8 +25,9 @@ PyGuide (http://www.astro.washington.edu/users/rowen/PyGuide/Manual.html)
 
 gittle -- represents the state of the git repository in python (easy_install gittle)
 
-ds9 -- need to download pyds9 and install.  Instructions here:
-http://hea-www.harvard.edu/saord/ds9/pyds9/
+ds9 -- need to download pyds9 and install. Download the package from the
+   download/pyds9 section of the ds9 web page: http://ds9.si.edu
+   See instructions at: http://hea-www.harvard.edu/RD/pyds9/
 
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
@@ -95,6 +96,23 @@ sudo python setup.py install
 
 The tests in cosmic/TestTimeMask.py uses the class Cosmic which uses
 this, and it will also be used to locate times to mask hot pixels.
+
+- NOTE - Had to reinstall this recently, and had little trouble - think
+I just did 'pip install pyinterval', or 'easy_install pyinterval',
+and it went just fine (on MacOS Mavericks). JvE, 11/5/2014. 
+
+
+***
+Note that in the photonlist package/directory you will need to compile
+the fortran routine 'boxer.f'. This should do the trick:
+
+f2py -c -m boxer boxer.f
+
+... After running that, you can check it works in python by trying 
+to import with 'import boxer' at the python command line. See the
+readme.txt file in photonlist/ for (possibly) more info.
+
+
 
 
 Recommended external software components:

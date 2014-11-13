@@ -5,7 +5,11 @@ import unittest
 import os
 import inspect
 from util.readDict import readDict
-
+import math
+from astropy import wcs
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+from astropy.coordinates.angles import Angle as Angle
 class TestUtils(unittest.TestCase):
     """
     Test functions in utils.py
@@ -85,5 +89,51 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(params['needHotPix'])
         self.assertEqual(26, len(params['obsSequence']))
 
-if __name__ == '__main__':
-    unittest.main()
+    def testFitRigidRotation(self):
+        """
+        calculate ra,dec from a grid of x,y points
+
+        use these mathes to calculate the WCS transformation
+
+        test that the WCS transform works to 1e-9 degrees and
+        that the CD matrix returns the rotation and scale expected.
+        """
+        nx = 3
+        ny = 3
+        xs = np.zeros(nx*ny,dtype=np.float)
+        ys = np.zeros(nx*ny,dtype=np.float)
+        ipt = 0
+        for ix in range(nx):
+            for iy in range(ny):
+                xs[ipt] = ix*15 + 10
+                ys[ipt] = iy*15 + 20
+                ipt += 1
+        for scale in [0.1/3600, 0.23/3600]: # degrees per pixel
+            for theta in [10,123.4, -88, 196]: # rotation in degree
+                ct = math.cos(math.radians(theta))
+                st = math.sin(math.radians(theta))
+                dra =  4.0/3600
+                ddec = 5.0/3600
+                ras  = scale*(xs*ct - ys*st) + dra
+                decs = scale*(xs*st + ys*ct) + ddec
+                w = utils.fitRigidRotation(xs,ys,ras,decs)
+                rm = w.wcs.cd
+                wScale = math.sqrt(rm[0,0]**2+rm[0,1]**2)
+                wTheta = math.atan2(rm[1,0],rm[0,0])
+
+                self.assertAlmostEqual(scale,wScale)
+                self.assertAlmostEqual(Angle(theta,'degree').
+                                       wrap_at('180d').degree,
+                                       Angle(wTheta,'radian').
+                                       wrap_at('180d').degree)
+                wras,wdecs = w.wcs_pix2world(xs,ys,1)                
+                for x,y,wra,wdec,ra,dec in zip(xs,ys,wras,wdecs,ras,decs):
+                    cTrue = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+                    cReco = SkyCoord(ra=wra*u.degree, dec=wdec*u.degree)
+                    sep = cTrue.separation(cReco)
+                    dra = (ra-wra)*3600
+                    ddec = (dec-wdec)*3600
+                    self.assertTrue(sep.degree < 1e-9 )
+
+                
+if __name__ == '__main__':    unittest.main()

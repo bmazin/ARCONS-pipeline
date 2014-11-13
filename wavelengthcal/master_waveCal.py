@@ -36,6 +36,8 @@ class master_waveCal:
         """
         self.drift = drift_object
         self.times_to_combine = [[strpdate2num("%Y%m%d-%H%M%S")(tstamp1),strpdate2num("%Y%m%d-%H%M%S")(tstamp2)] for [tstamp1,tstamp2] in times_to_combine_str]
+
+        
         self.drift.mastercalFNs, self.params = getCalFileNames(self.drift.params,'mastercal_','_drift')
         self.save_plots=save_plots
 
@@ -77,7 +79,6 @@ class master_waveCal:
         for i in range(len(self.times_to_combine)):
         #for i in [0]:
             indices_of_wavecals = (np.where((np.asarray(self.drift.timeArray) >= self.times_to_combine[i][0]) * (np.asarray(self.drift.timeArray) <= self.times_to_combine[i][1])))[0]
-            #print indices_of_wavecals
 
 
             std_blue = np.zeros(self.drift.beammap.shape)
@@ -406,13 +407,17 @@ if __name__ == "__main__":
     #times_to_combine_str = [['20131209-093153','20131209-132225']]
     
     #PAL2014
-    times_to_combine_str = [['20140924-060135', '20140924-062552'],         # Sep 23
-                            ['20140924-065308', '20140924-090204'],         # Sep 23, retuned array
-                            ['20140924-091428', '20140924-123225'],         # Sep 23, retuned
-                            ['20140925-023427', '20140925-103219'],         # Sep 24
-                            ['20140925-105736', '20140925-132004'],         # Sep 24, retuned
-                            ['20140926-024539', '20130926-071937'],         # Sep 25
-                            ['20140926-074653', '20140927-121859']]         # Sep 25, retuned
+    #times_to_combine_str = [['20140924-060135', '20140924-062552'],         # Sep 23
+    #                        ['20140924-065308', '20140924-090204'],         # Sep 23, retuned array
+    #                        ['20140924-091428', '20140924-123225'],         # Sep 23, retuned
+    #                        ['20140925-023427', '20140925-103219'],         # Sep 24
+    #                        ['20140925-105736', '20140925-132004'],         # Sep 24, retuned
+    #                        ['20140926-024539', '20140926-071937'],         # Sep 25
+    #                        ['20140926-074653', '20140927-121859']]         # Sep 25, retuned
+    times_to_combine_str = [['20141020-173438', '20141021-125225'],         # Oct 20
+                            ['20141022-022216', '20141022-124933'],         # Oct 21
+                            ['20141023-021954', '20141023-125750']]         # Oct 22
+                            
 
     master = master_waveCal(drift_object, times_to_combine_str)
     master.create_master_peak_data()
@@ -420,8 +425,8 @@ if __name__ == "__main__":
     master.write_master()
     drift_object.plot_laser_xOffset()
     drift_object.plot_numSols_map()
-    drift.populate_drift_fluctuations()
-    drift_object.hist_fluct(save=True)
+    #drift.populate_drift_fluctuations()
+    #drift_object.hist_fluct(save=True)
     #drift.populate_drift_fluctuations()
     #drift.plot_fluct_map()
     #drift.hist_fluct()
