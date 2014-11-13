@@ -12,12 +12,14 @@ import matplotlib.pylab as plt
 import binascii
 import math
 from scipy.signal import convolve
+from scipy.interpolate import griddata
 import scipy.ndimage
 import scipy.stats
 import astropy.stats
 import ds9
 from numpy import linalg
 from astropy import wcs
+
 
 #from interval import interval
 
@@ -1090,6 +1092,34 @@ def nearestNRobustMeanFilter(inputArray,n=24,nSigmaClip=3.,iters=None):
         for iCol in numpy.arange(nCol):
             outputArray[iRow,iCol] = numpy.ma.mean(astropy.stats.sigma_clip(inputArray[findNearestFinite(inputArray,iRow,iCol,n=n)],sig=nSigmaClip,iters=None))
     return outputArray
+
+
+def interpolateImage(inputArray, method='linear'):
+    '''
+    Seth 11/13/14
+    2D interpolation to smooth over missing pixels using built-in scipy methods
+
+    INPUTS:
+        inputArray - 2D input array of values
+        method - method of interpolation. Options are scipy.interpolate.griddata methods:
+                 'linear' (default), 'cubic', or 'nearest'
+
+    OUTPUTS:
+        the interpolated image with same shape as input array
+    '''
+
+    finalshape = numpy.shape(inputArray)
+
+    dataPoints = numpy.where(inputArray!=0) #data points for interp are only pixels with counts
+    dataPoints = numpy.array((dataPoints[0],dataPoints[1]),dtype=numpy.int).transpose() #griddata expects them in this order
+
+    interpPoints = numpy.where(inputArray!=numpy.nan) #final image is full array. NANs still excluded
+    interpPoints = numpy.array((interpPoints[0],interpPoints[1]),dtype=numpy.int).transpose()
+
+    interpolatedFrame = griddata(dataPoints, inputArray[numpy.where(inputArray!=0)], interpPoints, 'linear')
+    interpolatedFrame = numpy.reshape(interpolatedFrame, finalshape) #reshape interpolated frame into original shape
+    
+    return interpolatedFrame
 
 
 def showzcoord():
