@@ -1,7 +1,4 @@
-
 #This code will perform PSF fitting photometry on a target and one guide star
-import os
-
 from Photometry import Photometry
 from plot3DImage import *
 
@@ -12,16 +9,19 @@ from util.fitFunctions import model_list
 
 
 
-def fitData2D(data,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,verbose=False):
+def fitData2D(data,errs,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,verbose=False):
     """
-        Runs mpfit.py
+        Runs mpfit.py. Gets all the parameters in the right format, calls mpfit, parses output
         
         Inputs:
-            data - 2d array of poisson counts
+            data - 2d array of data (0 for dead pixel)
+            errs - 2d array of errors (np.inf for dead pixel, 1 for pixel with no counts)
             parameter_guess - Best guess for parameters
             parameter_lowerlimit - Strict lower limit in parameter space
             parameter_upperlimit - Strict upper limit in parameter space
-            model - [String] model used to fit data. Must be contained in model_list below. See /util/fitFunctions.py
+                - None means no limit
+                - If lower and upper limits are the same then the parameter is fixed
+            model - [String] model used to fit data. Must be contained in model_list. See /util/fitFunctions.py
             verbose - Show runtime comments
             
         Outputs:
@@ -42,8 +42,8 @@ def fitData2D(data,parameter_guess,parameter_lowerlimit,parameter_upperlimit,mod
         par = {'n':k,'value':parameter_guess[k],'limits':[parameter_lowerlimit[k], parameter_upperlimit[k]],'limited':[lowLimit,highLimit],'fixed':fix_guess,'error':0}
         parinfo.append(par)
 
-    errs = np.sqrt(z_Arr)                         # Poisson counts 
-    errs[np.where(np.invert(errs > 0.))] = 1.
+    #errs = np.sqrt(z_Arr)                         # Poisson counts 
+    #errs[np.where(np.invert(errs > 0.))] = 1.
     fa = {'data':data,'err':errs}
     quiet=True
 
@@ -56,7 +56,7 @@ def fitData2D(data,parameter_guess,parameter_lowerlimit,parameter_upperlimit,mod
     mpp = m.params                                #The fit params
     mpperr = m.perror
     chi2gauss = m.fnorm
-    redchi2gauss2 = 1.0*chi2gauss/len(x_Arr)
+    redchi2gauss2 = 1.0*chi2gauss/np.sum(np.invert(np.isnan(data)))
 
     if verbose:
         print "Status: "+str(m.status)+" after "+str(m.niter)+" iterations"
@@ -88,7 +88,7 @@ def print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, p
 
 class PSFphotometry(Photometry):
 
-    def __init__(self,path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',scienceDataPath = '/ScienceData',run = 'PAL2014',verbose=False,showPlot=False):
+    def __init__(self,path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',verbose=False,showPlot=False):
         '''
         Inputs:
             path - path to the display stack target info
@@ -98,29 +98,44 @@ class PSFphotometry(Photometry):
         self.verbose=verbose
         self.showPlot=showPlot
         
-        super(PSFphotometry,self).__init__(path,scienceDataPath,run)
+        super(PSFphotometry,self).__init__(path)
 
 
-
-    def PSFfit(self,obs_name,firstSec=0,integrationTime=10):
+    def getImage(self):
+        '''
+        This code needs to be implemented
+        '''
+        return self.testImage()
+        
+    def testImage(self):
+        n = 10
         deadTime = deadTime=100.e-6
-    
-        obs = ObsFile(obs_name)
+        firstSec = 0
+        integrationTime = 10
+        
+        print self.obsFNs[10].obs()
+        obs = ObsFile(self.obsFNs[10].obs())
         obs.loadBestWvlCalFile()
         obs.setWvlCutoffs(wvlLowerLimit=3500, wvlUpperLimit=8000)
         obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
-        obs.loadHotPixCalFile(FileName(obsFile=obs).timeMask())
-        #obs.loadFluxCalFile(FileName(obsFile=obs).fluxSoln())
-    
+        obs.loadHotPixCalFile(self.obsFNs[10].timeMask())
+        
         im_dict = obs.getPixelCountImage(firstSec=firstSec, integrationTime=integrationTime,weighted=True, fluxWeighted=False, getRawCount=False)
         im = im_dict['image']
         #Correct for dead time
         w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
         im = im/w_deadTime
-
-
         
-        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,im))
+        return im,im_dict['effIntTimes']
+
+    def PSFfit(self,image,expTime,target_centroid,*arg):
+        '''
+        Inputs:
+            image - 2D array of data
+            expTime - 2d array of effective exposure times (same size as image)
+        '''
+        
+        print len(arg)
 
 
 
@@ -136,8 +151,9 @@ if __name__ == '__main__':
     showPlot=True
     
     phot = PSFphotometry(path=path,verbose=verbose,showPlot=showPlot)
-    print phot.obs_name_list[10]
-    phot.PSFfit(phot.obs_name_list[10])
+    image,expTime = phot.getImage()
+    pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,image))
+    phot.PSFfit(image,expTime,(0.0,0.0),(0.0,1.0))
 
 
 

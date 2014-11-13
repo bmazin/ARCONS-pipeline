@@ -301,7 +301,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
             #Note - 'reflect' mode looks like it would repeat the edge row/column in the 'reflection';
             #'mirror' does not, and makes more sense for this application.
             #Do the median filter on a NaN-fixed version of im.
-            nanFixedImage = utils.replaceNaN(im, mode='nearestNmedian', boxsize=boxSize**2-1)
+            nanFixedImage = utils.replaceNaN(im, mode='mean', boxsize=boxSize)      #Using 'mean' here seems slightly risky, but in practice seems to work better than 'median' or 'nearestNmedian'
             assert np.all(np.isfinite(nanFixedImage))  #Just make sure there's nothing weird still in there.
             medFiltImage = spfilters.median_filter(nanFixedImage, boxSize, mode='mirror')
             #medFiltImage = utils.median_filterNaN(im, boxSize, mode='mirror')  #Original version without interpolating the NaNs
@@ -387,7 +387,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
                 #Display a histogram of fluxes by pixel
                 mpl.figure()
                 imnonnan = im[~np.isnan(im)]
-                mpl.hist(imnonnan,bins=200,range=(np.percentile(imnonnan,0.1),np.percentile(imnonnan,98.5)))
+                mpl.hist(imnonnan,bins=100,range=(np.percentile(imnonnan,0.1),np.percentile(imnonnan,98.5)))
                                                 #(np.nanmax(im)-np.nanmin(im)/np.median(im[~np.isnan(im)]))*10.)
                                                  #np.sqrt(np.sum(~np.isnan(im))))
                 mpl.xlabel('Photon counts')
@@ -474,14 +474,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
             output = open(pklFileName, 'wb')
             pickle.dump(pDict,output)
             output.close()
-
+        
         #Show diagnostic images (not in ds9).
         if diagnosticPlots is True:
-            #fig = mpl.figure(figsize=(5,5))
-            #mpl.matshow(cleanImForDisplay, vmax=np.percentile(imForDisplay, 98.0),
-            #            cmap=mpl.cm.hot, fignum=False, origin='lower')
-            #mpl.colorbar()
-            #mpl.title('Cleaned image')
 
             print 'Max ratio: ', maxRatio
 
@@ -495,6 +490,16 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
             X, Y = np.meshgrid(X,Y)
             surf = ax.plot_surface(X,Y,imForDisplay,rstride=1,cstride=1,cmap=None)
             fig.show()
+
+            fig = mpl.figure(figsize=(5,5))
+            imToPlot = np.copy(nanFixedImage)
+            imToPlot[np.isnan(imToPlot)] = 0
+            mpl.matshow(imToPlot, vmax=np.percentile(imToPlot[np.isfinite(imToPlot)], 100.0),
+                        fignum=False, origin='lower', cmap=diagPlotCmap)
+            mpl.colorbar()
+            mpl.title('NaN-fixed image')
+            mpl.suptitle(plotTitle)
+            utils.showzcoord()
 
             fig = mpl.figure(figsize=(5,5))
             imToPlot = np.copy(medFiltImage)
@@ -770,7 +775,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
         print 'Processing time slice: ', str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
         displayThisOne = (display or diagnosticPlots) and (i==0 or i==len(stepStarts)-1)
         ds9ThisOne = ds9display and (i==0 or i==len(stepStarts)-1)
-        dispToPickleThisOne = dispToPickle and (i==0 or i==len(stepStarts)-1)
+        dispToPickleThisOne = dispToPickle if (i==0 or i==len(stepStarts)-1) else False
         masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
                                      nSigmaCold=nSigmaCold, display=displayThisOne, ds9display=ds9ThisOne, 
