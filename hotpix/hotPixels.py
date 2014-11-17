@@ -121,7 +121,7 @@ class headerDescription(tables.IsDescription):
     endTime = tables.Float64Col(dflt=np.nan)
  
 def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.0,
-                  nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None,
+                  nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None, deadMask=None,
                   display=False, ds9display=False, dispToPickle=None, weighted=False,
                   fluxWeighted=False, maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, 
                   diagnosticPlots=False, useLocalStdDev=False, useRawCounts=True,
@@ -148,6 +148,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
         
         Other:-
         
+        deadMask: Mask of dead pixels, if not specified then it's created from the image
         firstSec: Scalar integer - start time in seconds within obs. file from 
                     which to integrate when looking for hot pixels.
         intTime: Scalar integer - integration time for hot pixel search 
@@ -196,6 +197,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
                          however, there is often a gradient across the field, in which case it's sensible to use
                          something lower than 50%. Added JvE 8/1/2014.
                          ***SHOULD BE ADDED AS A PARAMETER TO THE PARAMETER FILE...!!****
+        deadTime - Apply a deadTime correction to the image. Set to 0 if you don't want to correct.
         diagPlotCmap - matplotlib color map instance - use to set the color map for any image plots requested.
         
 
@@ -239,6 +241,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
 
     if image is not None:
         im = np.copy(image)      #So that we pass by value instead of by reference (since we will change 'im').
+
     else:
         im = None
     
@@ -262,19 +265,21 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
                                            weighted=weighted, fluxWeighted=fluxWeighted, 
                                            getRawCount=useRawCounts)
         im = im_dict['image']
+        effIntTimes = im_dict['effIntTimes']
         #Correct for dead time
-        w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
+        w_deadTime = 1.0-im_dict['rawCounts']*deadTime/effIntTimes
         im = im/w_deadTime
         #plotArray(image=im)
         print 'Done'
+
     
     #Now im definitely exists, make a copy for display purposes later (before we change im).
     imOriginal = np.copy(im)
         
-    #For now, assume 0 counts in a pixel means the pixel is dead.
-    #Turn such pixel values into NaNs.
-    deadMask = (im<0.01)
-    im[im < 0.01] = np.nan
+    #Turn dead pixel values into NaNs.
+    if deadMask==None:
+        deadMask = im<0.01     #Assume everything with 0 counts is a dead pixel
+    im[deadMask] = np.nan
     
     oldHotMask = np.zeros(shape=np.shape(im), dtype=bool)   #Initialise a mask for hot pixels (all False) for comparison on each iteration.
     oldColdMask = np.zeros(shape=np.shape(im), dtype=bool)  #Same for cold pixels
@@ -292,7 +297,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
     #Ditto for number of iterations
     iIter=-1 
     
-    if not np.all(deadMask):  #Check to make sure not *all* the pixels are dead before doing further masking.
+    if np.sum(im[np.where(np.isfinite(im))]) > 0:  #Check to make sure not *all* the pixels are dead before doing further masking.
         for iIter in range(maxIter):
             print 'Iteration: ',iIter
             #Calculate median filtered image
@@ -318,7 +323,9 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
             #if doColdFlagging is True or useLocalStdDev is True:
             stdFiltImage = utils.nearestNrobustSigmaFilter(im, n=boxSize**2-1)
             overallBkgdSigma = np.median(stdFiltImage[np.isfinite(stdFiltImage)])    #Hopefully reasonably robust estimate of the background std. dev.   
-    
+            stdFiltImage[np.where(stdFiltImage<1.)]=1.
+            if overallBkgdSigma < 0.01: overallBkgdSigma=0.01       #Just so it's not 0
+
             
             #-------------- Cold flagging switched off for now, May 6 2014-----------------    
             if doColdFlagging is True:
@@ -578,7 +585,7 @@ def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.
 
 
 def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
-                  paramFile=None, timeStep=1, startTime=0, endTime= -1, fwhm=2.5,
+                  paramFile=None, timeStep=1, startTime=0, endTime= -1, badTimeBuffer = 0., fwhm=2.5,
                   boxSize=5, nSigmaHot=4.0, nSigmaCold=2.5, display=False,
                   ds9display=False, dispToPickle=False, weighted=False, fluxWeighted=False,
                   maxIter=5, dispMinPerc=0.0, dispMaxPerc=98.0, diagnosticPlots=False,
@@ -596,8 +603,6 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
     bothering to try to account for real astrophysical PSFs. Should be a bit more
     aggressive. Can also set useLocalStdDev=True in this case, which may also help.
     
-    NB - AT THE MOMENT, I THINK THIS WILL OVERWRITE PRE-EXISTING HOT PIXEL FILES
-    WITHOUT WARNING (should update this behaviour....)
     
     INPUTS:
         inputFileName - string, pathname of input observation file.
@@ -614,7 +619,10 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                     searching for hot pixels (default is 0, start of exposure).
         endTime - integer (for now), number of seconds into exposure to end at.
                   If endTime=-1, will continue to end of exposure.
+        badTimeBuffer - Double. Number of timeSteps on either side of a masked
+                        pixel to also mask.
         
+        Should probably make the following into **kwargs
         The following are as for checkInterval() and are passed on to that function:
         
         fwhm: Scalar float. Estimated full-width-half-max of the PSF (in 
@@ -664,6 +672,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
                          Added JvE 8/1/2014
                          ***SHOULD BE ADDED AS A PARAMETER TO THE PARAMETER FILE...!!****
         diagPlotCmap - matplotlib color map instance - use to set the color map for any image plots requested.
+        deadTime - Apply a deadTime correction to the image. Set to 0 if you don't want to correct.
 
         
     OUTPUTS:
@@ -771,19 +780,22 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
     masks = np.zeros([obsFile.nRow, obsFile.nCol, nSteps], dtype=np.int8)
 
     #Get the mask for each time step
+    im_dict = obsFile.getPixelCountImage(firstSec=0, integrationTime=-1,weighted=False,fluxWeighted=False,getRawCount=False)
+    deadMask = im_dict['image']<expTime/10.
     for i, eachTime in enumerate(stepStarts):
         print 'Processing time slice: ', str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
         displayThisOne = (display or diagnosticPlots) and (i==0 or i==len(stepStarts)-1)
         ds9ThisOne = ds9display and (i==0 or i==len(stepStarts)-1)
         dispToPickleThisOne = dispToPickle if (i==0 or i==len(stepStarts)-1) else False
-        masks[:, :, i] = checkInterval(obsFile=obsFile, firstSec=eachTime, intTime=timeStep,
+
+        masks[:, :, i] = checkInterval(obsFile=obsFile, deadMask=deadMask ,firstSec=eachTime, intTime=timeStep,
                                      fwhm=fwhm, boxSize=boxSize, nSigmaHot=nSigmaHot,
                                      nSigmaCold=nSigmaCold, display=displayThisOne, ds9display=ds9ThisOne, 
                                      dispToPickle=dispToPickleThisOne, weighted=weighted, fluxWeighted=fluxWeighted,
                                      maxIter=maxIter, dispMinPerc=dispMinPerc, dispMaxPerc=dispMaxPerc,
                                      useLocalStdDev=useLocalStdDev, diagnosticPlots=diagnosticPlots 
                                      and displayThisOne, useRawCounts=useRawCounts, bkgdPercentile=bkgdPercentile,
-                                     diagPlotCmap=diagPlotCmap)['mask']
+                                     deadTime = deadTime,diagPlotCmap=diagPlotCmap)['mask']
                                      #Note checkInterval call should automatically clip at end of obsFile,
                                      #so don't need to worry about endTime.
     
@@ -803,7 +815,11 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
             
             for eachFlag in uniqueFlags:
                 #Make a list of intervals for each bad timestep - e.g. one interval for every second if timestep is seconds and the pixel is always bad.
-                badStepIntervals = [interval([stepStartsTicks[i], stepEndsTicks[i]]) 
+                #start = np.amax([stepStartsTicks[i]-badTimeBuffer,stepStartsTicks[0]])
+                #end   = np.amin([stepEndsTicks[i]+badTimeBuffer,stepEndsTicks[-1]])
+                #badStepIntervals = [interval([stepStartsTicks[i], stepEndsTicks[i]]) 
+                #                    for i in range(nSteps) if flagSequence[i] == eachFlag]  #In units of ticks (not seconds).
+                badStepIntervals = [interval([np.amax([stepStartsTicks[i]-badTimeBuffer,stepStartsTicks[0]]), np.amin([stepEndsTicks[i]+badTimeBuffer,stepEndsTicks[-1]])]) 
                                     for i in range(nSteps) if flagSequence[i] == eachFlag]  #In units of ticks (not seconds).
                 #Find the union of those intervals (concatenate adjacent intervals)
                 badIntervals = interval().union(badStepIntervals)
