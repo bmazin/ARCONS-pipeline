@@ -104,10 +104,10 @@ def print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, p
 
 class PSFphotometry(Photometry):
 
-    def __init__(self,path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',model = 'multiple_2d_circ_gauss_func', verbose=False,showPlot=False):
+    def __init__(self,image,centroid,expTime=None,model = 'multiple_2d_circ_gauss_func', verbose=False,showPlot=False):
         '''
         Inputs:
-            path - path to the display stack target info
+            
             verbose - show error messages
             showPlot - show and pause after each PSF fit
         '''
@@ -115,65 +115,16 @@ class PSFphotometry(Photometry):
         self.showPlot=showPlot
         self.model=model
         
-        super(PSFphotometry,self).__init__(path)
+        super(PSFphotometry,self).__init__(image=image,centroid=centroid,expTime=expTime)
 
 
-    def getImage(self):
-        '''
-        This code needs to be implemented
-        '''
-        return self.testImage()
         
-    def testImage(self):
-        n = 10
-        deadTime = deadTime=100.e-6
-        firstSec = 0
-        integrationTime = 30
-        
-        print self.obsFNs[10].obs()
-        obs = ObsFile(self.obsFNs[10].obs())
-        obs.loadBestWvlCalFile()
-        obs.setWvlCutoffs(wvlLowerLimit=3500, wvlUpperLimit=8000)
-        obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
-        #obs.loadHotPixCalFile(self.obsFNs[10].timeMask(),reasons=['hot pixel','cold pixel','dead pixel'])
-        
-        im_dict = obs.getPixelCountImage(firstSec=firstSec, integrationTime=integrationTime,weighted=True, fluxWeighted=False, getRawCount=False)
-        im = im_dict['image']
-        #Correct for dead time
-        w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
-        im = im/w_deadTime
-        #Correct for exposure time
-        im = im*integrationTime/im_dict['effIntTimes']
-        #Remove any funny values
-        im[np.invert(np.isfinite(im))]=0.
-
-        
-        return im,im_dict['effIntTimes']
-        
-    def getCentroid(self):
-        '''
-        Should return a list of (col,row) tuples indicating the location of the stars in the field.
-        The first location should be the target star. The rest are reference stars.
-        
-        Needs to be implemented to grab info from centroid file in /Scratch/DisplayStack/
-        '''
-
-        return self.testCentroid()
-        
-    def testCentroid(self):
-        target = (6.,30.)
-        ref = (31.,26.)
-        
-        #return [target]
-        return [target,ref]
-        
-    def guess_parameters(self, image, centroid, aper_radius):
+    def guess_parameters(self, aper_radius=-1):
         '''
         Inputs:
-            image - 2D image of data (0 for dead pixel, shouldn't be any nan's or infs)
-            centroid - list of (col,row) tuples. The first tuple is the target location. The next are reference stars in the field
-            radius - double or list of doubles of the same length as centroid. Number of pixels around the star to be used in estimating parameters. -1 for the whole array.
+            aper_radius - double or list of doubles of the same length as self.centroid. Number of pixels around the star to be used in estimating parameters. -1 for the whole array.
         '''
+
         if self.model=='multiple_2d_circ_gauss_func':
             #p[0] = background
             #p[1] = amplitude
@@ -184,41 +135,42 @@ class PSFphotometry(Photometry):
             #A+Be^-((x-xo)^2+(y-y0)^2)/2s^2 + Ce^-((x-x1)^2+(y-y1)^2)/2d^2 + ...
             
             bkgdPercentile = 30.0
-            #overallBkgd = np.percentile(image[np.where(np.isfinite(image))],bkgdPercentile)
+            overallBkgd = np.percentile(self.image[np.where(np.isfinite(self.image))],bkgdPercentile)
+            print 'bkgd ',overallBkgd
             overallBkgd=1.
             parameter_guess = [overallBkgd]
             parameter_lowerlimit = [0.0]
-            parameter_upperlimit = [np.mean(image[np.where(np.isfinite(image))])]
+            parameter_upperlimit = [np.mean(self.image[np.where(np.isfinite(self.image))])]
             
-            for star_i in range(len(centroid)):
-                #p_guess = [1.,centroid[star_i][0],centroid[star_i][1],0.01]
+            for star_i in range(len(self.centroid)):
+                #p_guess = [1.,self.centroid[star_i][0],self.centroid[star_i][1],0.01]
                 
                 try:
                     radius=aper_radius[star_i]
                 except TypeError:
                     radius=aper_radius
                 
-                x_guess = centroid[star_i][0]
+                x_guess = self.centroid[star_i][0]
                 x_ll = 0.
-                x_ul = len(image[0])    #number of columns
-                y_guess = centroid[star_i][1]
+                x_ul = len(self.image[0])    #number of columns
+                y_guess = self.centroid[star_i][1]
                 y_ll = 0.
-                y_ul = len(image)       #number of rows
+                y_ul = len(self.image)       #number of rows
                 if radius > 0.:
-                    x_ll = max(centroid[star_i][0] - radius, x_ll)
-                    x_ul = min(centroid[star_i][0] + radius, x_ul)
-                    y_ll = max(centroid[star_i][1] - radius, y_ll)
-                    y_ul = min(centroid[star_i][1] + radius, y_ul)
+                    x_ll = max(self.centroid[star_i][0] - radius, x_ll)
+                    x_ul = min(self.centroid[star_i][0] + radius, x_ul)
+                    y_ll = max(self.centroid[star_i][1] - radius, y_ll)
+                    y_ul = min(self.centroid[star_i][1] + radius, y_ul)
                     
-                pixLoc = np.where(np.isfinite(image))
+                pixLoc = np.where(np.isfinite(self.image))
                 if radius > 0.:
-                    x_arr=np.tile(range(len(image[0])),(len(image),1))
-                    y_arr=np.tile(range(len(image)),(len(image[0]),1)).transpose()
+                    x_arr=np.tile(range(len(self.image[0])),(len(self.image),1))
+                    y_arr=np.tile(range(len(self.image)),(len(self.image[0]),1)).transpose()
                     d_arr = np.sqrt((x_arr - x_guess)**2 + (y_arr - y_guess)**2)
                     
-                    pixLoc = np.where(np.isfinite(image) * d_arr<=radius)
+                    pixLoc = np.where(np.isfinite(self.image) * d_arr<=radius)
                     
-                amp_guess = np.amax(image[pixLoc]) - overallBkgd
+                amp_guess = np.amax(self.image[pixLoc]) - overallBkgd
                 #amp_guess = 10000.
                 #amp_ul = amp_guess + 5.*np.sqrt(amp_guess)
                 #amp_ul = 2.*amp_guess
@@ -242,61 +194,52 @@ class PSFphotometry(Photometry):
         #print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, parameter_guess)
         return parameter_guess,parameter_lowerlimit,parameter_upperlimit
 
-    def PSFfit(self,image,expTime,centroid,aper_radius):
+    def PSFfit(self,aper_radius=-1):
         '''
         Inputs:
             image - 2D array of data (0 for dead pixel, shouldn't be any nan's or infs)
                   - Should be fully calibrated, dead time corrected, and scaled up to the effective integration time
             expTime - 2d array of effective exposure times (same size as image)
         '''
-        image[np.invert(np.isfinite(image))]=0.
-        errs = np.sqrt(image)
-        #errs[np.where(image==0.)]=1.
+        self.image[np.invert(np.isfinite(self.image))]=0.
+        errs = np.sqrt(self.image)
+        #errs[np.where(self.image==0.)]=1.
         #errs[np.where(expTime==0.)]=np.inf
-        errs[np.where(image==0.)]=np.inf
+        errs[np.where(self.image==0.)]=np.inf
         #errs[0:25,:] = np.inf
         #errs[:,11:] = np.inf
         
         
-        parameter_guess,parameter_lowerlimit,parameter_upperlimit = self.guess_parameters(image,centroid,aper_radius)
+        parameter_guess,parameter_lowerlimit,parameter_upperlimit = self.guess_parameters(aper_radius)
         
-        models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=image,return_models=True)
+        models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
         guess = models[0]
         for m in models[1:]:
             guess+=m
-        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,image,errs=errs,fit=guess),title="Guess")
+        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess),title="Guess")
 
         #p_guess = np.ones(len(parameter_guess))
         #p_ll = np.asarray(parameter_lowerlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
         #p_ul = np.asarray(parameter_upperlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
-        parameter_fit, redchi2gauss2, mpperr = fitData2D(np.copy(image),np.copy(errs),parameter_guess,parameter_lowerlimit,parameter_upperlimit,self.model,verbose=self.verbose)
+        parameter_fit, redchi2gauss2, mpperr = fitData2D(np.copy(self.image),np.copy(errs),parameter_guess,parameter_lowerlimit,parameter_upperlimit,self.model,verbose=self.verbose)
 
-        models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=image,return_models=True)
+        models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
         guess2 = models2[0]
         for m in models2[1:]:
             guess2+=m
-        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,image,errs=errs,fit=guess2),title="Fitted")
+        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess2),title="Fitted")
+        
+        return self.getFlux(parameter_fit)
 
 
-
-
-
-
-if __name__ == '__main__':
-    path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
-    verbose=True
-    showPlot=True
-    
-    phot = PSFphotometry(path=path,verbose=verbose,showPlot=showPlot)
-    image,expTime = phot.getImage()
-    centroid = phot.getCentroid()
-    
-    
-    phot.PSFfit(image,expTime,centroid,5.)
-
-
-
-
+    def getFlux(self,parameter_fit):
+        #return the flux from the fit
+        flux=[]
+        for i in range(len(parameter_fit[1:])/4):
+            #just get the amplitudes for now...
+            flux.append(parameter_fit[1+4*i])
+            
+        return np.asarray(flux)
 
 
 

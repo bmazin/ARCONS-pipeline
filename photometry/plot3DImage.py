@@ -1,12 +1,13 @@
 #This code uses Popup to plot a 3D image
 
+import warnings
 from functools import partial
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from util.popup import *
 
 
-def plot3DImage(fig,ax,data,fit=None,surface=False,countour=False):
+def plot3DImage(fig,ax,data,errs=None,fit=None,surface=False,countour=False):
     data[np.where(np.invert(data>0.))]=0.
 
     x=np.tile(range(len(data[0])),(len(data),1))
@@ -16,7 +17,11 @@ def plot3DImage(fig,ax,data,fit=None,surface=False,countour=False):
     if surface:
         ax.plot_surface(x, y, data, rstride=1, cstride=1, color='black',alpha=0.1)
     else:
-        ax.bar3d(x.flatten(),y.flatten(),x.flatten()*0,1,1,data.flatten(),color='cyan',alpha=0.9)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
+            ax.bar3d(x.flatten(),y.flatten(),x.flatten()*0,1,1,data.flatten(),color='cyan',alpha=0.9)
+        if errs!=None:
+            ax.bar3d(x[np.where(np.invert(np.isfinite(errs)))].flatten(),y[np.where(np.invert(np.isfinite(errs)))].flatten(),x[np.where(np.invert(np.isfinite(errs)))].flatten()*0,1,1,data[np.where(np.invert(np.isfinite(errs)))].flatten(),color='red',alpha=0.9)
     
     if countour:
         #cset = ax.contourf(x, y, data, zdir='z', offset=0, cmap=cm.coolwarm)
