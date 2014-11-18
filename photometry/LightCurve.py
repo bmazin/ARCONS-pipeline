@@ -8,6 +8,7 @@ import numpy as np
 from util.FileName import FileName
 from util.ObsFile import ObsFile
 from util.readDict import readDict
+from util.getImages import *
 from PSFphotometry import PSFphotometry
 
 
@@ -31,7 +32,7 @@ class LightCurve():
         self.PSF = PSF
         self.aper = aper
         self.kwargs = kwargs
-        run = os.path.basename(os.path.dirname(path))
+
         
         for f in os.listdir(path):
             if f.endswith(".dict"):
@@ -39,11 +40,7 @@ class LightCurve():
                 self.params = readDict(path+os.sep+f)
                 self.params.readFromFile(path+os.sep+f)
                 
-        self.obsFNs = []
-        for i in range(len(self.params['sunsetDates'])):
-            for j in range(len(self.params['obsTimes'][i])):
-                obsFN = FileName(run=run, date=self.params['sunsetDates'][i], tstamp=self.params['utcDates'][i]+'-'+self.params['obsTimes'][i][j])
-                self.obsFNs.append(obsFN)
+
                 
     def performPhotometry(self,image,centroid,expTime=None):
         '''
@@ -72,12 +69,23 @@ class LightCurve():
     
     
                 
-    def getImages(self):
+    def getFNs(self,fromObs = True, fromImageStack=False):
         '''
-        Should loop through obs files. Return list of images and exposure times
+        Should loop through obs files. Return list of file names
         '''
-        image,expTime = self.getImage()
-        return [image],[expTime]
+        if fromObs:
+            obsFNs = []
+            run = os.path.basename(os.path.dirname(self.path))
+            for i in range(len(self.params['sunsetDates'])):
+                for j in range(len(self.params['obsTimes'][i])):
+                    obsFN = FileName(run=run, date=self.params['sunsetDates'][i], tstamp=self.params['utcDates'][i]+'-'+self.params['obsTimes'][i][j])
+                    obsFNs.append(obsFN)
+                    
+            return obsFNs
+        elif fromImageStack:
+            pass
+        
+        return None
 
 
     def getImage(self):
@@ -142,7 +150,14 @@ if __name__ == '__main__':
     showPlot=True
     
     LC = LightCurve(path,verbose=verbose,showPlot=showPlot)
-    images,expTimes = LC.getImages()
+    obsFNs = LC.getFNs(fromObs = True, fromImageStack=False)
+    print obsFNs[10:11][0].obs()
+    obsFiles = generateObsObjectList(obsFNs[10:11],wvlLowerLimit=3500, wvlUpperLimit=8000,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=False)
+    print len(obsFiles)
+    im_dict = getImages(fromObsFile=True,fromPhotonList=False,fromImageStack=False,obsFiles=obsFiles, integrationTime=100,weighted=True, fluxWeighted=False, getRawCount=False)
+    images=im_dict['images']
+    expTimes=im_dict['expTimes']
+    print len(images)
     
     for i in range(len(images)):
         im = images[i]
