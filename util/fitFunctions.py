@@ -2,7 +2,7 @@ import numpy as np
 
 
 
-def multiple_2d_circ_gauss_func(p_guess):
+def multiple_2d_circ_gauss_func(p_guess,errs=None):
 
     def f(p, fjac=None, data=None, err=None,return_models=False):
         #p[0] = background
@@ -12,18 +12,21 @@ def multiple_2d_circ_gauss_func(p_guess):
         #p[4] = sigma for both x and y
         #And so on for the 2nd and 3rd gaussians etc...
         #A+Be^-((x-xo)^2+(y-y0)^2)/2s^2 + Ce^-((x-x1)^2+(y-y1)^2)/2d^2 + ...
+        #print p_guess
+        #print p
+        #print range(len(p[1:])%4)
         
         models=[p[0]*p_guess[0]*np.ones(np.asarray(data).shape)]
         x=np.tile(range(len(data[0])),(len(data),1))
         y=np.tile(range(len(data)),(len(data[0]),1)).transpose()
-        for i in range(len(p[1:])%4):
+        for i in range(len(p[1:])/4):
             m = p[1+4*i]*p_guess[1+4*i] * np.exp( - (pow(x-p[2+i*4]*p_guess[2+i*4],2)+pow(y-p[3+i*4]*p_guess[3+i*4],2)) / (2 * pow(p[4+i*4]*p_guess[4+i*4],2)) )
             models.append(m)
         if return_models: return models
         model = models[0]
         for m in models[1:]: model+=m
         status = 0
-        return([status,np.ravel((z-model)/err)])
+        return([status,np.ravel((data-model)/err)])
 
     return f
 

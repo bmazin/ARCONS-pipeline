@@ -7,7 +7,7 @@ from matplotlib import cm
 from util.popup import *
 
 
-def plot3DImage(fig,ax,data,errs=None,fit=None,surface=False,countour=False):
+def plot3DImage(fig,ax,data,errs=None,fit=None,surface=True,countour=False):
     data[np.where(np.invert(data>0.))]=0.
 
     x=np.tile(range(len(data[0])),(len(data),1))

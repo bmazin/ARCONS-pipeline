@@ -8,6 +8,7 @@ from util.ObsFile import ObsFile
 from util.FileName import FileName
 from util.fitFunctions import model_list
 from util.mpfit import mpfit
+from util.popup import *
 
 
 
@@ -212,22 +213,24 @@ class PSFphotometry(Photometry):
         
         parameter_guess,parameter_lowerlimit,parameter_upperlimit = self.guess_parameters(aper_radius)
         
-        models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
-        guess = models[0]
-        for m in models[1:]:
-            guess+=m
-        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess),title="Guess")
+        if self.showPlot:
+            models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
+            guess = models[0]
+            for m in models[1:]:
+                guess+=m
+            pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess),title="Guess")
 
         #p_guess = np.ones(len(parameter_guess))
         #p_ll = np.asarray(parameter_lowerlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
         #p_ul = np.asarray(parameter_upperlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
         parameter_fit, redchi2gauss2, mpperr = fitData2D(np.copy(self.image),np.copy(errs),parameter_guess,parameter_lowerlimit,parameter_upperlimit,self.model,verbose=self.verbose)
 
-        models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
-        guess2 = models2[0]
-        for m in models2[1:]:
-            guess2+=m
-        pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess2),title="Fitted")
+        if self.showPlot:
+            models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
+            guess2 = models2[0]
+            for m in models2[1:]:
+                guess2+=m
+            pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess2),title="Fitted")
         
         return self.getFlux(parameter_fit)
 
@@ -236,8 +239,8 @@ class PSFphotometry(Photometry):
         #return the flux from the fit
         flux=[]
         for i in range(len(parameter_fit[1:])/4):
-            #just get the amplitudes for now...
-            flux.append(parameter_fit[1+4*i])
+            star_flux = 2.*np.pi*parameter_fit[1+4*i]*(parameter_fit[4+4*i])**2
+            flux.append(star_flux)
             
         return np.asarray(flux)
 

@@ -9,6 +9,7 @@ from util.FileName import FileName
 from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.getImages import *
+from util.popup import *
 from PSFphotometry import PSFphotometry
 
 
@@ -41,6 +42,14 @@ class LightCurve():
                 self.params.readFromFile(path+os.sep+f)
                 
 
+    def makeLightCurve(self,images,centroids,expTimes=None):
+        if expTimes==None:
+            expTimes = [None]*len(images)
+        flux_list = []
+        for i in range(len(images)):
+            flux=self.performPhotometry(images[i],centroids[i],expTimes[i])
+            flux_list.append(flux)
+        return flux_list
                 
     def performPhotometry(self,image,centroid,expTime=None):
         '''
@@ -87,44 +96,8 @@ class LightCurve():
         
         return None
 
-
-    def getImage(self):
-        '''
-        This code needs to be implemented
-        '''
-        return self.testImage()
         
-    def testImage(self):
-        n = 10
-        deadTime = deadTime=100.e-6
-        firstSec = 0
-        integrationTime = 30
-        
-        print self.obsFNs[10].obs()
-        obs = ObsFile(self.obsFNs[10].obs())
-        obs.loadBestWvlCalFile()
-        obs.setWvlCutoffs(wvlLowerLimit=3500, wvlUpperLimit=8000)
-        obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
-        obs.loadHotPixCalFile(self.obsFNs[10].timeMask(),reasons=['hot pixel','dead pixel'])
-        
-        im_dict = obs.getPixelCountImage(firstSec=firstSec, integrationTime=integrationTime,weighted=True, fluxWeighted=False, getRawCount=False)
-        im = im_dict['image']
-        #Correct for dead time
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
-            #warnings.simplefilter("ignore",RuntimeWarning)
-            #warnings.simplefilter("ignore",FutureWarning)
-            w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
-        im = im/w_deadTime
-        #Correct for exposure time
-        im = im*integrationTime/im_dict['effIntTimes']
-        #Remove any funny values
-        im[np.invert(np.isfinite(im))]=0.
-
-        
-        return im,im_dict['effIntTimes']
-        
-    def getCentroid(self):
+    def getCentroids(self):
         '''
         Should return a list of (col,row) tuples indicating the location of the stars in the field.
         The first location should be the target star. The rest are reference stars.
@@ -135,11 +108,22 @@ class LightCurve():
         return self.testCentroid()
         
     def testCentroid(self):
-        target = (6.,30.)
-        ref = (31.,26.)
-        
-        #return [target]
-        return [target,ref]
+        target_fn = self.path+os.sep+'CentroidLists'+os.sep+'target'+os.sep+'Centroid_0.h5'
+        centroidFile = tables.openFile(target_fn, mode='r')
+        xPos = np.array(centroidFile.root.centroidlist.xPositions.read())
+        yPos = np.array(centroidFile.root.centroidlist.yPositions.read())
+        target_centroids = zip(xPos,yPos)
+        centroidFile.close()
+    
+        ref0_fn = self.path+os.sep+'CentroidLists'+os.sep+'ref0'+os.sep+'Centroid_0.h5'
+        centroidFile = tables.openFile(ref0_fn, mode='r')
+        xPos = np.array(centroidFile.root.centroidlist.xPositions.read())
+        yPos = np.array(centroidFile.root.centroidlist.yPositions.read())
+        ref0_centroids = zip(xPos,yPos)
+        centroidFile.close()
+
+        centroids = np.asarray(zip(target_centroids,ref0_centroids))
+        return centroids
 
 
 
@@ -150,21 +134,33 @@ if __name__ == '__main__':
     showPlot=True
     
     LC = LightCurve(path,verbose=verbose,showPlot=showPlot)
-    obsFNs = LC.getFNs(fromObs = True, fromImageStack=False)
-    print obsFNs[10:11][0].obs()
-    obsFiles = generateObsObjectList(obsFNs[10:11],wvlLowerLimit=3500, wvlUpperLimit=8000,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=False)
-    print len(obsFiles)
-    im_dict = getImages(fromObsFile=True,fromPhotonList=False,fromImageStack=False,obsFiles=obsFiles, integrationTime=100,weighted=True, fluxWeighted=False, getRawCount=False)
-    images=im_dict['images']
-    expTimes=im_dict['expTimes']
-    print len(images)
+    #obsFNs = LC.getFNs(fromObs = True, fromImageStack=False)
+    ##print 'obs[10]: ',obsFNs[10:11][0].obs()
+    #obsFiles = generateObsObjectList(obsFNs,wvlLowerLimit=3500, wvlUpperLimit=5000,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=False)
+    #print 'numObs: ',len(obsFiles)
+    #im_dict = getImages(fromObsFile=True,fromPhotonList=False,fromImageStack=False,obsFiles=obsFiles, integrationTime=10,weighted=True, fluxWeighted=False, getRawCount=False)
+    #images=im_dict['images']
+    #pixIntTimes=im_dict['pixIntTimes']
+    #print 'numImages: ',len(images)
     
-    for i in range(len(images)):
-        im = images[i]
-        centroid=LC.getCentroid()
-        expTime = expTimes[i]
-        flux=LC.performPhotometry(im,centroid,expTime)
-        print 'flux ',flux
+    #writeImageStack(images=images, pixIntTimes=pixIntTimes, startTimes=im_dict['startTimes'], intTimes=im_dict['intTimes'], path=path, outputFilename='ImageStack_1.h5')
+    im_dict = getImages(fromObsFile=False,fromPhotonList=False,fromImageStack=True,fullFilename=path+os.sep+'ImageStacks'+os.sep+'ImageStack_0.h5')
+    images = im_dict['images']
+    pixIntTimes=im_dict['pixIntTimes']
+    print 'numLoadedImages: ',len(images)
+    centroids = LC.getCentroids()
+    print 'numLoadedCentroids: ',len(centroids)
+    flux_list=LC.makeLightCurve(images,centroids,pixIntTimes)
+    print flux_list
+    
+    pop(plotFunc=lambda fig,axes: axes.plot(flux_list),title="Flux")
+    
+    #for i in range(len(images)):
+    #    im = images[i]
+    #    centroid=LC.getCentroid()
+    #    expTime = pixIntTimes[i]
+    #    flux=LC.performPhotometry(im,centroid,expTime)
+    #    print 'flux ',flux
  
 
 
