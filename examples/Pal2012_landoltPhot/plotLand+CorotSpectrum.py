@@ -13,6 +13,7 @@ from scipy import interpolate
 from scipy import integrate
 from scipy.optimize.minpack import curve_fit
 from math import exp
+import figureHeader
 
 def cleanSpectrum(x,y,objectName, wvlBinEdges):
         #locations and widths of absorption features in Angstroms
@@ -264,9 +265,10 @@ curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 #SETUP EPS PLOTTING
 #matplotlib.rcParams.update({'font.size':12, 'font.family': 'sans-serif','sans-serif':['Helvetica']})
-plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-plt.rc('text',usetex=True)
+#plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+#plt.rc('text',usetex=True)
 
+'''
 fname = 'throughput_high.txt'
 fdata = np.loadtxt(fname,dtype=float)
 xh = np.array(fdata[:,0])
@@ -276,9 +278,15 @@ fname = 'throughput.txt'
 fdata = np.loadtxt(fname,dtype=float)
 x = np.array(fdata[:,0])
 tp = np.array(fdata[:,1])
+'''
 
+scratchdir = '/home/srmeeker/scratch/standards/'
+fname = 'G158-100_throughput.npz'
+fdata = np.load(scratchdir+fname)
+x = fdata['wvls']
+tp = fdata['throughput']
 
-#add points for crab photometry
+#add points for  photometry
 # bands are [U,B,V,R,I,J]
 mags = [14.28,15.391,15.606,15.725,15.905,16.130] #noao.edu
 centers = [3600,4400,5500,6400,7900,12500]
@@ -303,7 +311,7 @@ percents = counterrors/counts * 100
 print "percents (errors/counts * 100) = ", percents
 
 #plt.show()
-plotDir = "/home/srmeeker/scratch/standards"
+plotDir = "."#"/home/srmeeker/scratch/standards"
 #plotFileName = "Land+CorotSpec.pdf"
 plotFileName = "Land+CorotSpec.eps"
 fullFluxPlotFileName = os.path.join(plotDir,plotFileName)
@@ -338,7 +346,7 @@ plt.errorbar(centers,counts,yerr=counterrors,fmt='o')
 #ax.set_title("Crab Pulsar")
 ax.set_xlabel("Wavelength [$\AA$]")
 #ax.set_ylabel("Flux [photons/s/cm$^{2}$/$\AA$]")
-plt.legend(["ARCONS Spectrum of Landolt 95-42","BVRI Fluxes"],numpoints=1)
+plt.legend(["ARCONS Spectrum of Landolt 95-42","BVRI Fluxes"],numpoints=1,prop={'size':8})
 
 
 FileName = '/home/srmeeker/scratch/standards/corot18_fit_0.npz'
@@ -396,24 +404,21 @@ corotMagCounts *= (h*c/np.array(centers))*1e15
 counterrors *= (h*c/np.array(centers))*1e15
 
 plt.errorbar(centers,corotMagCounts,yerr=counterrors,fmt='o')
-
 ax.set_ylim(min((curve/tp)[wvls>3800])/2.0,max((curve/tp)[wvls>3800])*1.4)
 ax.set_xlim(4000,11000)
 #ax.set_title("Corot 18")
-plt.legend(["ARCONS Spectrum of Corot 18","BVRI Fluxes"],numpoints=1)
+plt.legend(["ARCONS Spectrum of CoRoT-18","BVRI Fluxes"],numpoints=1,prop={'size':8})
 
 #ax.set_xscale("log")
 
-xl = plt.xlabel(ur"Wavelength [$\AA$]")
-yl = plt.ylabel("F$_\lambda$ [$10^{-15}$ ergs/sec/cm$^{2}$/$\AA$]")
+xl = plt.xlabel(ur"Wavelength (\r{A})")
+yl = plt.ylabel(ur"Flux (10$^{-15}$ ergs s$^{-1}$ cm$^{-2}$ \r{A}$^{-1}$)")
 yl.set_y(1)
 ax.yaxis.labelpad = 15
-ax.xaxis.labelpad = 10
+ax.xaxis.labelpad = 8
 ax.tick_params(axis='x',which='minor',bottom='on',labelbottom='on')
 ax.xaxis.set_minor_formatter(plt.FormatStrFormatter('%d'))
 ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%d'))
-
-#plt.show()
 
 plt.savefig(fullFluxPlotFileName,format='eps')
 

@@ -207,7 +207,8 @@ class PhotList(object):
         if showHotPix is True:
             if self.hotPixTimeMask is None:
                 self.parseHotPixTimeMask()
-            badPix = hp.getHotPixels(self.hotPixTimeMask, firstSec=firstSec, integrationTime=integrationTime)
+            #badPix = hp.getHotPixels(self.hotPixTimeMask, firstSec=firstSec, integrationTime=integrationTime)
+            badPix = self.hotPixTimeMask.getHotPixels(firstSec=firstSec, integrationTime=integrationTime)
             x = np.arange(self.nCol)
             y = np.arange(self.nRow)
             xx, yy = np.meshgrid(x, y)

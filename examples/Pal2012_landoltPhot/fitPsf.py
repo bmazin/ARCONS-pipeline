@@ -119,15 +119,21 @@ for iFrame in range(0,np.shape(stack)[0]):
     #else:
     #    err = np.zeros(np.shape(frame))
     err = np.ones(np.shape(frame))*10.0
+    #err = (frame)**(0.5)
     err[apertureMask==1] = np.inf #weight points closer to the expected psf higher
-    err[frame>100] = np.inf
+    #err[frame>100] = np.inf
     frame[nanMask]=0#set to finite value that will be ignored
     err[nanMask] = np.inf#ignore these data points
     nearDeadCutoff=1#100/15 cps for 4000-6000 angstroms
     err[frame<nearDeadCutoff] = np.inf
     entireMask = (err==np.inf)
     maFrame = np.ma.masked_array(frame,entireMask)
+    
 
+    #try to make smart guesses about initial parameters
+    #guessAmp = np.max(frame[frame!=np.nan])
+    #guessHeight = np.median(frame)
+    #guessWidth = 1.5
     guessAmp = 30.
     guessHeight = 5.
     guessWidth = 1.3

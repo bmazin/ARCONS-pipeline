@@ -32,8 +32,8 @@ def aperture(startpx,startpy,radius=3):
 #utils.plotArray(testy,cbar=True)
 
 param = readDict()
-#param.read_from_file('corot18Compparams.dict')
-param.read_from_file('corot18bparams.dict')
+param.read_from_file('corot18Compparams.dict')
+#param.read_from_file('corot18bparams.dict')
 
 npzLoadFile = param['npzLoadFile']
 npzfitpsf = param['npzfitpsf']
@@ -95,7 +95,7 @@ for iFrame in xrange(len(stack[:,0,0])):
     limitedmin = 5*[True] 
     limitedmax = 5*[True]
     minpars = [0,0,0,0,.1]
-    maxpars = [5000,10000,43,45,10]
+    maxpars = [10000,20000,43,45,10]
     usemoments=[True,True,True,True,True] #doesn't use our guess values
     
     

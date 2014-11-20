@@ -23,7 +23,7 @@ Calculate expected power by multiplying standard spectrum by our V filter transm
 and by the photodiode absolute response function.
 """
 
-def loadFilter(fname):
+def loadFilter(fname, stdWvls):
     #load filter transmission
     try:
         fdata = np.loadtxt(fname,dtype=float)
@@ -39,14 +39,20 @@ def loadFilter(fname):
     #print (filty)
 
     if fname == 'Rfilter.txt':
-        filty = filty/max(filty)*0.8218 #normalize to our Johnson R filter max Transmission
+        filty = filty/max(filty)*0.8218 #normalize to our Johnson R filter max Transmission. Different from Astrodon filters
     if fname == 'Vfilter.txt':
-        filty = filty/max(filty)*0.8623 #normalize to our Johnson V filter max transmission
+        filty = filty/max(filty)*0.8623 #normalize to our Johnson V filter max transmission. Different from Astrodon Filters.
 
     if (filtx[-1] < filtx[0]): #if array goes high to low, reverse the order so the integration does not get a negative
         filtx = filtx[::-1]
         filty = filty[::-1]
+    
+    filtTrans = interpolate.griddata(filtx,filty,stdWvls,"linear",fill_value=0)#interpolate filter curve to spectrum wvl spacing
 
+    filtx = stdWvls
+    filty = filtTrans
+
+    print "Max filter transmission = ", max(filty)
     filtWidth = filtx[-1]-filtx[0]
     print "filter width = ",filtWidth
     filtCorrection = integrate.simps(filty,x=filtx)/filtWidth #calculate correction factor for filter width
@@ -77,8 +83,10 @@ except:
     print "Invalid standard given. Exiting."
     sys.exit()
 stdWvls = np.array(a[:,0],dtype=float) # wavelengths in angstroms
+#print stdWvls
 stdFlux = np.array(a[:,1],dtype=float) # flux in counts/s/cm^2/Angs
-stdFlux *= (h*c*1E10/stdWvls) #flux in J/s/cm^2/Angs or W/cm^2/Angs
+#print stdFlux
+stdFlux *= (h*c*1E10/stdWvls)*1.2 #flux in J/s/cm^2/Angs or W/cm^2/Angs. Multiply by small factor to make it match our expected magnitude after putting it through the filter curves.
 
 
 #cut spectrum arrays to our wavelength region
@@ -98,7 +106,7 @@ plt.show()
 #multiply by area of Palomar 200" pupil to get watts/Angstrom
 # From Sivaramakrishnan et al 2001, D = 5.08m, Ds/D = 0.33
 Diam = 508 #cm
-Ds = 0.33 * Diam
+Ds = 183
 radp = Diam/2.0
 rads = Ds/2.0
 
@@ -113,22 +121,26 @@ print "Total collecting area = ", area, " cm^2"
 stdFlux*=area #flux in W/Angs
 
 #multiply standard spectrum by V-filter transmission
-if filt == ("b" or "B"):
+if (filt == "b") or (filt == "B"):
     fname = os.environ['ARCONS_PIPELINE_PATH']+'/util/data/AstrodonB.txt'
-if filt == ("v" or "V"):
+    vegaZero = 632.0E-11
+if (filt == "v") or (filt == "V"):
     fname = os.environ['ARCONS_PIPELINE_PATH']+'/util/data/AstrodonV.txt'
-if filt == ("r" or "R"):
+    vegaZero = 363.1E-11
+if (filt == "r") or (filt == "R"):
     fname = os.environ['ARCONS_PIPELINE_PATH']+'/util/data/AstrodonR.txt'
+    vegaZero = 217.7E-11
 
-filtWvls, filtTrans, filtWidth, filtCorrection = loadFilter(fname) #load filter file
-filtTransInterp = interpolate.griddata(filtWvls,filtTrans,stdWvls,"linear",fill_value=0)#interpolate filter curve to spectrum wvl spacing
-filteredFlux = stdFlux*filtTransInterp
+filtWvls, filtTrans, filtWidth, filtCorrection = loadFilter(fname, stdWvls) #load filter file
 
-#check total filtered flux matches a v=0 star
+#print filtTrans
+filteredFlux = stdFlux*filtTrans
+
+#check total filtered flux matches a v=0 star, should return 0 if using Vega
 checkFlux = filteredFlux/area #W/Angs/cm^2
 checkFlux *= 1.0E7 #ergs/s/Angs/cm^2
 totalCheckFlux = integrate.simps(checkFlux,x=stdWvls)/filtWidth #ergs/s/cm^2/Angs Vband flux estimated from Vega spectrum
-mag = -2.5*np.log10(totalCheckFlux/filtCorrection)-21.1
+mag = -2.5*np.log10(totalCheckFlux/filtCorrection/vegaZero)
 print "magnitude of %s-filtered spectrum = "%filt, mag
 
 
@@ -137,7 +149,7 @@ ax2 = plt.subplot(1,1,1)
 ax2.set_xlabel("Wavelength in $\AA$")
 ax2.set_ylabel("%s Filter Transmission"%filt)
 plt.plot(filtWvls,filtTrans)
-plt.plot(stdWvls,filtTransInterp)
+plt.plot(stdWvls,filtTrans)
 ax2.set_xlim(3000,13000)
 plt.show()
 #-------------------------------#
@@ -168,7 +180,7 @@ ax3.set_ylabel("Optometer Response (A/W)")
 plt.plot(respx,respy)
 plt.plot(stdWvls,respInterp)
 ax3.set_xlim(3000,13000)
-plt.show()
+#plt.show()
 #-------------------------------#
 #--------test plots-------------#
 ax4 = plt.subplot(1,1,1)
@@ -176,13 +188,13 @@ ax4.set_xlabel("Wavelength in $\AA$")
 ax4.set_ylabel("Converted Spectrum (Amps/$\AA$)")
 plt.plot(stdWvls,ampsCurve)
 ax3.set_xlim(3000,13000)
-plt.show()
+#plt.show()
 #-------------------------------#
 
 
 #integrate final A/Angs curve to get total Amps expected when viewing Vega through our V filter
 totalAmps = integrate.simps(ampsCurve,x=stdWvls)
-print "Total Amps expected from Vega %s-band = "%filt, totalAmps
+print "Total Amps expected from standard star %s-band = "%filt, totalAmps
 print "Measured Amps from optometer given as ", AmpsMeas
 
 #print measured optometer Amps / expected Amps for Vega

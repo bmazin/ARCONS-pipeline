@@ -88,7 +88,7 @@ class PopUp(QtGui.QMainWindow):
             col = int(round(event.xdata))
             row = int(round(event.ydata))
             if row < np.shape(self.image)[0] and col < np.shape(self.image)[1]:
-                self.status_text.setText('({:d},{:d}) {}'.format(row,col,self.image[row,col]))
+                self.status_text.setText('({:d},{:d}) {}'.format(col,row,self.image[row,col]))
             
 
     def create_status_bar(self):

@@ -4,7 +4,7 @@ Hot pixel time-masking (and probably other types of masking soon too)
 1) To create a hot pixel time-mask file, use findHotPixels. E.g.:
 
 		import hotPixels as hp
-        hp.findHotPixels('obs_20121211-024511.h5', 'testOutput.h5', 
+        hotpix.findHotPixels('obs_20121211-024511.h5', 'testOutput.h5', 
                       'hotPixels.dict', startTime=0, endTime=5)
         
         - Writes time-mask data for 'obs_2012...' to file 'testOutput.h5', 
@@ -55,7 +55,20 @@ Hot pixel time-masking (and probably other types of masking soon too)
                 exposure.
                 
 
-                
+4) Useful routines for diagnosing hot pixels:
+
+    - hotpix/quantifyBadTime.py - spits out diagnostics on the occurence of hot 
+                            pixels for a raw obs file.
+    - In util/ObsFile.py:
+        . plotPixelLightCurve() - (*NEW*) plots a light curve for a given pixel, marking
+                            intervals where the pixel is flagged as bad (assuming
+                            a hot pixel mask is already loaded).
+    - Note that hotpix.findHotPixels() also has a bunch of options for displaying what
+                            it's doing as it runs.
+
+
+
 More documentation is included in the source files themselves.
 
-JvE 3/1/2013.
+
+- Updated, JvE 10/28/2014.

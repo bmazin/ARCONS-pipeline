@@ -70,8 +70,9 @@ def main(testRun=False):
     052917
     053419
     053922
-    054424
     """
+    # 054424 - repointed mid-exposure, leave out for now.    
+    
 
     obsSequence3="""
     054926

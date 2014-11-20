@@ -13,7 +13,7 @@ import numpy as np
 import tables
 import matplotlib.pyplot as mpl
 import pyfits
-import hotpix.hotPixels as hp
+#import hotpix.hotPixels as hp
 from util import utils
 from util.popup import PopUp, plotArray
 import photonlist.photlist as pl
@@ -543,8 +543,9 @@ class RADecImage(object):
             #Get array of effective exposure times for each detector pixel based on the hot pixel time mask
             #Multiply by the bad pixel mask and the flatcal mask so that non-functioning pixels have zero exposure time.
             #Flatten the array in the same way as the previous arrays (1D array, nRow*nCol elements).
-            detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
-                                                 firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
+            #detExpTimes = (hp.getEffIntTimeImage(photList.hotPixTimeMask, integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame],
+            #                                     firstSec=tStartFrames[iFrame]) * detPixMask).flatten()
+            detExpTimes = (photList.hotPixTimeMask.getEffIntTimeImage(firstSec=tStartFrames[iFrame], integrationTime=tEndFrames[iFrame]-tStartFrames[iFrame]) * detPixMask).flatten()
                      
             #Loop over the detector pixels.... (should be faster than looping over virtual pixels)
             for iDPix in np.arange(nDPixRow * nDPixCol):
@@ -651,12 +652,7 @@ class RADecImage(object):
             logScale: if True, display the intensities on a log scale.
             fileName: if a string, save the plot to this filename. If anything else (inc. None),
                       display to screen.
-           
-
-            Added by Neil - 9/1/14
-
-            DDArr - If the histogrammed virtual Image has more than two spacial dimensions, set DDArr = True and the image will be displayed as in 2D space.
-            showColorBar - set True for an adjustable color bar on the display. 
+            
         '''
         
         if expWeight:
@@ -838,7 +834,7 @@ class RADecImage(object):
         
         hdu.writeto(fileName)
         
-    def getApertureSpectrum(self, cenRA, cenDec, nPixRA, nPixDec, radius1, radius2=None, degrees=False, error = False, offSet = False, radRA = None, radDec = None,  radius3 = None, phase = False, crab = False)                                                                         
+    def getApertureSpectrum(self, cenRA, cenDec, nPixRA, nPixDec, radius1, radius2=None, degrees=False, error = False, offSet = False, radRA = None, radDec = None,  radius3 = None, phase = False, crab = False):                                                                         
         
         '''
         Added by Neil - 9/1/14
@@ -908,6 +904,10 @@ class RADecImage(object):
         y_sky, x_sky = np.where(skyMask==0) #This gathers the pixel locations contained in the annulus. 
         self.display(image = skyMask) #quick look to see how the sky anulus looks
        
+
+        pixArea = .0400 #arcsec^2        
+        apArea = pixArea*len(x1_values)
+        anArea = pixArea*len(x_sky)
         #print y1_values, np.shape(y1_values)
         #print x1_values, np.shape(x1_values)
         #print y_sky, np.shape(y_sky)
@@ -916,43 +916,186 @@ class RADecImage(object):
 
 
         print '----gathering virtual image information----'
-        print '---finding wavelngth bins---'        
-        wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
-        if phase is not False:
-            print '---finding phase bins---'
-            phaseBinEdges = self.phaseEdges #gets phase binning information generated when making the image
         
-        print '---making image---'
+        print '---retrieving image cube---'
         self.scaledSpectrum = self.image*self.expTimeWeights #this is the virtual image Cube(counts/pixel location) scaled by the exposure time weightings!!.
                                                           #the units of self.scaledSpectrum are counts/pixel
                                                           #There may be a significant amount of NANS here so be careful.
         
         print 'self.scaledSpectrum', np.shape(self.scaledSpectrum), self.scaledSpectrum
 
+        '''
+        print '---finding wavelngth bins---'        
+        wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
+        if phase is not False:
+            print '---finding phase bins---'
+            phaseBinEdges = self.phaseEdges #gets phase binning information generated when making the image
+        '''
+        
         print '---finding dimensions of image---'
         #this is to make sure that the information we are trying to pull out of the image is consistant with the # of dimensions of the virtual image cube. 
         if phase is False: #image could have a phase dimension or not, but if it does and we have chosen not to pull it out, the image is summed along this dimension.
-            if np.shape(self.scaledSpectrum) == 4:
-                self.scaledSpectrum = np.sum(self.scaledSpectrum, axis = 3)
+            if len(np.shape(self.scaledSpectrum)) == 4:
+                self.scaledSpectrum = np.sum(self.scaledSpectrum, axis = 3) #sum across phase binsnp.shape
             else:
-                assert np.shape(self.scaledSpectrum) == 3   #This is because if phase is not true all we will pull out is spectra which is the 3rd dimension. (#pixelsX,#pixelsY,#wavelength bins)       
-        
-        
-        if error is not False:  #initialize error analysis
-            self.err = np.sqrt(self.image) #the error on counting events is sqrt(N).
-            self.spectrumErr = self.err/self.effIntTimes #scale error by integration times. There may be NANS here as well. 
+                assert len(np.shape(self.scaledSpectrum)) == 3   #This is because if phase is not true all we will pull out is spectra which is the 3rd dimension. (#pixelsX,#pixelsY,#wavelength bins)       
             
-        
-            print 'self.spectrumErr', self.spectrumErr, np.shape(self.spectrumErr)
-        
+
+            print '---finding wavelength bins---'
+            wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
+            
+            skyspectrum = np.zeros((len(x_sky), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]))) #initializes array that has dimensions of (#pixels,#wavelength bins)
+                                                                                                  #This is a (#of pixels in annulus, #wavelenth bin per pixel) array. 
+                                                                                                  #Note that len(x_sky)=len(y_sky)= #pixels
+            print '---finding skyspectrum---'
+
+      
+            for i in range(len(x_sky)):     
+                for j in range(len(self.scaledSpectrum[x_sky[i]][y_sky[i]][:])):
+                    skyspectrum[i][j] = self.scaledSpectrum[x_sky[i]][y_sky[i]][j]   #iterates through x_sky and builds new array that has spectra corresponding to number of pixels in
+                #print skyspectrum[i][j]                                             #in annulus on virtual grid. Array has dimensions (#of pixels in annulus, #wavelength bin per pixel)
+
+            #print 'skyspectrum', skyspectrum, np.shape(skyspectrum)
+
+            sky_array = np.zeros(len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]))    #initialize array to be used for sky subtraction with dimensions of (#wavelength bins)
         
 
+            skyspectrum = skyspectrum.transpose()  #transpose skyspectrum so that dimensions are now (#wavelenth bin per pixel, #of pixels in annulus) -IF SPECTRUM ONLY IS USED
+                                               #this makes it easier to take the median with NANs values. Now medians will be taken across a single wavelength bin.
+                                               #IF INCLUDING PHASE INFORMATION!!!! ----this array will now be (#phasebins, #wvlbins, #pixels) where again the medians are taken for the pixels
+                                               # across a wavelength bin.
+
+            print '---finding median sky count for sky subtrction---'
+            for i in range(len(skyspectrum)):
+                nanNot = ~np.isnan(skyspectrum[i])  #finds where the NANS are NOT.
+                sky_array[i] = np.median(skyspectrum[i][nanNot]) #takes median of counts across all positions in sky annulus per wavelength bin, excluding NANS. 
+                                                                 #has dimensions (#wavelength bins per pixel) where each element contains the median count of all pixels.
+
+            print 'skyspectrum', skyspectrum, np.shape(skyspectrum)
+            print 'sky_array', sky_array, np.shape(sky_array)   
+                
+            spectrumIn = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]))) #Initializes array of dimension (#pixels in aperture,#wavelength bin per pixel)
+            
+            print '---gathering aperture spectrum---'
+
+            for i in range(len(x1_values)):  #iterates through each pixel contained in the aperture
+                specIn = np.zeros(len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:])) #initializes array of dimensions (#wavelength bins per pixel)
+                for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):   #iterates through all wavelength bins for a single pixel
+                    specIn[j] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j]        #contains the counts per wavelength bin per pixel with dimensions (#wavelength bins per pixel)
+                #print specIn
+                #print 'specIn', specIn, np.shape(specIn)
+                spectrumIn[i] = specIn - sky_array  #subtracts the median sky counts from the counts per wavelength bin for a single pixel
+                                                #Note that spctrum in will have dimensions (#pixels in aperture, #wavelength bins per pixel)
+            
+            print '---summing spectra for all pixels in aperture---'
+
+            spectrum = np.sum(spectrumIn, axis = 0) #sums across all the pixels the number of counts per wavelength bin
+                                                      #this array has dimension (#wavelength bins) where each element contains the total count of all positions for that bin
+                                                      # If phase is True then this will have dimensions (#wavelengthbins,#phasebins)
+        
+
+            print 'spectrum', spectrum, np.shape(spectrum)
+
+            
+            for i in range(len(spectrum)):
+                spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])  #divides the counts at each wavelength bin by the binwidth => units are now counts/A
+                sky_array[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
+            '''
+            if error is not False:
+                self.err = np.sqrt(self.image) #the error on counting events is sqrt(N).
+                self.spectrumErr = self.err*self.expTimeWeights #scale error by integration times. There may be NANS here as well.
+                sky_arrayErr = np.zeros(len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:])) #initialize array of errors for count values per wavelength bin.
+                                                                                   #has dimensions of (#wavelength bins per pixel)
+                sky_arrayErr[i] = np.std(skyspectrum[i][nanNot])  #takes the standard deviation of the values that went into finding the medium sky value for a wavelength bin
+                                                                #and sets that as the error for that median count for that bin. 
+            '''
+    
+            return spectrum, sky_array, innerAp, wvlBinEdges, apArea, anArea 
+                
+        else:
+            assert len(np.shape(self.scaledSpectrum)) == 4
+            print '---finding wavelength bins---'
+            wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
+            print '---finding phase bins---'
+            phaseBinEdges = self.phaseEdges #gets phase binning information generated when making the image
+            
+            skyspectrum = np.zeros((len(x_sky), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][0][:]))) #initializes array with dimension (#pixels,#wavelengthbins,#phaseBins)
+            
+            print '---finding skyspectrum---'
+
+            for i in range(len(x_sky)):     
+                for j in range(len(self.scaledSpectrum[x_sky[i]][y_sky[i]][:])):
+                    for k in range(len(self.scaledSpectrum[x_sky[i]][y_sky[i]][j][:])):
+                        skyspectrum[i][j][k] = self.scaledSpectrum[x_sky[i]][y_sky[i]][j][k] #iterates through x_sky and builds new array that has spectra and phase corresponding to 
+                                                                                             #number of pixels in annulus. dimensions (#pixels in ann, #wvlBins, #phasebins)
+            #print 'skyspectrum', skyspectrum, np.shape(skyspectrum)   
+
+            sky_array = np.zeros((len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]),len(self.scaledSpectrum[x_sky[0]][y_sky[0]][0][:]))) #initializes array for skysubtraction (#wvlbins, #phasebins)
+
+            skyspectrum = skyspectrum.transpose()  #transpose skyspectrum so that dimensions are now (#wavelenth bin per pixel, #of pixels in annulus) -IF SPECTRUM ONLY IS USED
+                                               #this makes it easier to take the median with NANs values. Now medians will be taken across a single wavelength bin.
+                                               #IF INCLUDING PHASE INFORMATION!!!! ----this array will now be (#phasebins, #wvlbins, #pixels) where again the medians are taken for the pixels
+                                               # across a wavelength bin.
+
+
+            print '---finding median sky count for sky subtrction---'
+            for i in range(len(skyspectrum)):
+                for j in range(len(skyspectrum[j])):
+                    nanNot = ~np.isnan(skyspectrum[i][j]) #finds where the NANS are NOT.
+                    sky_array[j][i] = np.median(skyspectrum[i][j][nanNot]) #takes median of counts across all positions in sky annulus per wavelength bin, excluding NANS. 
+                                                                           #has dimensions (#wvlnbins, #phasebins) where each element contains the median count of all pixels. 
+
+
+            print 'skyspectrum', skyspectrum, np.shape(skyspectrum)
+            print 'sky_array', sky_array, np.shape(sky_array) 
+
+            spectrumIn = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
+            
+            
+            print '---gathering aperture spectrum---'
+        #if phase is not False:
+            for i in range(len(x1_values)):
+                specIn = np.zeros((len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]), len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:]))) #array is (#wvlbins, #phasebins)
+                for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):
+                    for k in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][j][:])):
+                        specIn[j][k] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j][k]  # fills in the array (#wvlbins, #phase bins)
+                spectrumIn[i] = specIn - sky_array  #subtracts the median sky counts from the counts per wavelength bin for a single pixel
+                                                #Note that spectrum in will have dimensions (#pixels in aperture, #wavelength bins per pixel, #phasebins)
+            print '---summing spectra for all pixels in aperture---'
+
+            phaseSpectrum = np.sum(spectrumIn, axis = 0) #sums across all the pixels the number of counts per wavelength bin
+                                                      #this array has dimension (#wavelength bins) where each element contains the total count of all positions for that bin
+                                                      # If phase is True then this will have dimensions (#wavelengthbins,#phasebins)
+            
+            #note that here we do not divide the spectrum by the wavelength bins. this will be done in getPhaseSpectrum
+            print 'phaseSpectrum', phaseSpectrum, np.shape(phaseSpectrum)       
+               
+            for i in range(len(sky_array)):
+                sky_array[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])     
+
+            return phaseSpectrum, sky_array, innerAp, wvlBinEdges, phaseBinEdges, apArea, anArea #this will be sky subtracted. Feed this to getPhaseSpectrum. (#wavelengthbins, #phaseBins)  
+       
+        
+
+
+
+        #if error is not False:  #initialize error analysis
+         #   self.err = np.sqrt(self.image) #the error on counting events is sqrt(N).
+         #   self.spectrumErr = self.err/self.effIntTimes #scale error by integration times. There may be NANS here as well. 
+            
+        
+          #  print 'self.spectrumErr', self.spectrumErr, np.shape(self.spectrumErr)
+        
+        
+        '''
         if phase is not False:
             skyspectrum = np.zeros((len(x_sky), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][0][:]))) #initializes array with dimensions (#pixels,#wavelengthbins,#phaseBins)
         else:
             skyspectrum = np.zeros((len(x_sky), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]))) #initializes array that has dimensions of (#pixels,#wavelength bins)
-                                                                                                  #This is a (#of pixels in annulus, #wavelenth bin per pixel) array. 
+        '''                                                                                          #This is a (#of pixels in annulus, #wavelenth bin per pixel) array. 
                                                                                                   #Note that len(x_sky)=len(y_sky)= #pixels
+
+        '''
         print '---finding skyspectrum---'
         for i in range(len(x_sky)):     
             for j in range(len(self.scaledSpectrum[x_sky[i]][y_sky[i]][:])):
@@ -963,17 +1106,19 @@ class RADecImage(object):
                 else:
                     skyspectrum[i][j] = self.scaledSpectrum[x_sky[i]][y_sky[i]][j]   #iterates through x_sky and builds new array that has spectra corresponding to number of pixels in
                 #print skyspectrum[i][j]                                             #in annulus on virtual grid. Array has dimensions (#of pixels in annulus, #wavelength bin per pixel)
-
+        '''
+        '''
         #print 'skyspectrum', skyspectrum, np.shape(skyspectrum)       
         if phase is not False:
             sky_array = np.zeros((len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]),len(self.scaledSpectrum[x_sky[0]][y_sky[0]][0][:]))) #initializes array for skysubtraction (#wvlbins, #phasebins)
         else: 
             sky_array = np.zeros(len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]))    #initialize array to be used for sky subtraction with dimensions of (#wavelength bins)
+        '''
 
-        if error is not False:
-            sky_arrayErr = np.zeros(len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:])) #initialize array of errors for count values per wavelength bin.
+       # if error is not False:
+        #    sky_arrayErr = np.zeros(len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:])) #initialize array of errors for count values per wavelength bin.
                                                                                    #has dimensions of (#wavelength bins per pixel)
-        
+        '''
         skyspectrum = skyspectrum.transpose()  #transpose skyspectrum so that dimensions are now (#wavelenth bin per pixel, #of pixels in annulus) -IF SPECTRUM ONLY IS USED
                                                #this makes it easier to take the median with NANs values. Now medians will be taken across a single wavelength bin.
                                                #IF INCLUDING PHASE INFORMATION!!!! ----this array will now be (#phasebins, #wvlbins, #pixels) where again the medians are taken for the pixels
@@ -990,14 +1135,14 @@ class RADecImage(object):
             else:
                 nanNot = ~np.isnan(skyspectrum[i])  #finds where the NANS are NOT.
                 sky_array[i] = np.median(skyspectrum[i][nanNot]) #takes median of counts across all positions in sky annulus per wavelength bin, excluding NANS. 
-                                                                 #has dimensions (#wavelength bins per pixel) where each element contains the median count of all pixels.     
-            if error is not False:
-                sky_arrayErr[i] = np.std(skyspectrum[i][nanNot])  #takes the standard deviation of the values that went into finding the medium sky value for a wavelength bin
+        '''                                                         #has dimensions (#wavelength bins per pixel) where each element contains the median count of all pixels.     
+           # if error is not False:
+            #    sky_arrayErr[i] = np.std(skyspectrum[i][nanNot])  #takes the standard deviation of the values that went into finding the medium sky value for a wavelength bin
                                                                 #and sets that as the error for that median count for that bin. 
                         
 
-        print 'skyspectrum', skyspectrum, np.shape(skyspectrum)
-        print 'sky_array', sky_array, np.shape(sky_array)
+        #print 'skyspectrum', skyspectrum, np.shape(skyspectrum)
+        #print 'sky_array', sky_array, np.shape(sky_array)
 
         #print 'creating sky subtracted spectrum'
         '''
@@ -1016,12 +1161,14 @@ class RADecImage(object):
                 sky_arrayErr[i] = np.median(skyspectrumErr[i][nanNot])    #takes median
         '''
         #print 'sky_arrayErr', sky_arrayErr, np.shape(sky_arrayErr)
-
+        '''
         if phase is not False:
             spectrumIn = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
         else:
             spectrumIn = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]))) #Initializes array of dimension (#pixels in aperture,#wavelength bin per pixel)
-        
+        '''
+
+        '''
         print '---gathering aperture spectrum---'
         if phase is not False:
             for i in range(len(x1_values)):
@@ -1043,7 +1190,8 @@ class RADecImage(object):
                 #print 'specIn', specIn, np.shape(specIn)
                 spectrumIn[i] = specIn - sky_array  #subtracts the median sky counts from the counts per wavelength bin for a single pixel
                                                 #Note that spctrum in will have dimensions (#pixels in aperture, #wavelength bins per pixel)
-        
+        '''
+        '''
         #print 'spectrumIn', spectrumIn, np.shape(spectrumIn)           
         print '---summing spectra for all pixels in aperture---'
 
@@ -1059,8 +1207,8 @@ class RADecImage(object):
         
             print 'summed_arrayInErr', summed_arrayInErr, np.shape(summed_arrayInErr)
         
-        
-
+        '''
+        '''
         if phase is not False:
             spectrum = np.sum(summed_arrayIn, axis = 1)   #this takes the (#wvlbin,#phasebin) array and sums it along the phase dimension to get the spectrum
             phaseprofile = np.sum(summed_arrayIn,axis = 0) # this sums across the wavlength bins to get the phase profile
@@ -1109,7 +1257,7 @@ class RADecImage(object):
             spectrum = summed_arrayIn
             for i in range(len(spectrum)):
                 spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])  #divides the counts at each wavelength bin by the binwidth => units are now counts/A
-                
+       '''         
                 #summed_arrayInErr[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
         #area = len(x1_values)*.02**2  #radius of aperture in cm
         #r = (len(x1_values)/2)*.02
@@ -1117,7 +1265,7 @@ class RADecImage(object):
 
         #summed_arrayIn = summed_arrayIn/area  #now in counts/second/angstrom/area
 
-
+        '''
         print '----completing aperture spectroscopy----'
         #print np.shape(wvlBinEdges)
         if phase is not False:
@@ -1127,24 +1275,275 @@ class RADecImage(object):
                 
                     return spectrum, spectrumP, spectrumIP, phaseprofile, wvlBinEdges, phaseBinEdges, summed_arrayInErr, innerAp 
                 else:
-                    return spectrum, spectrumP, spectrumIP,  phaseprofile, wvlBinEdges, phaseBinEdges, innerAp
+                    return spectrum, spectrumP, spectrumIP,  phaseprofile, wvlBinEdges, phaseBinEdges, innerAp, sky_array
             
             elif error is not False:
 
                 return spectrum, phaseprofile, wvlBinEdges, phaseBinEdges, summed_arrayInErr, innerAp 
             
             else:
-                return spectrum, phaseprofile, wvlBinEdges, phaseBinEdges, innerAp 
+                return spectrum, phaseprofile, wvlBinEdges, phaseBinEdges, innerAp, sky_array 
             
         elif error is not False:
     
             return spectrum, wvlBinEdges, summed_arrayInErr, innerAp 
         else:
             return spectrum, wvlBinEdges, innerAp
+        '''
+
+    def getAperturePhase(self, cenRA, cenDec, nPixRA, nPixDec, radius1, radius2=None, degrees=False, spectrum = False, error = False ):#, error = False, offSet = False, radRA = None, radDec = None,  radius3 = None, phase = False, crab = False, spectrum = False):
+        '''
+        ADDED by Neil - 9/25/14
+
+        this codes is designed to gather information about counts per phase bin of a given object located within some aperture. If the spectrum option is used\
+        then the specral distribution of the photons will be carried through so that the final array will have counts pere wavelength bin bper phase bin. This can then
+        be fed into getPhasespectrum to pull out the spectra of the desired phases.
+
+        This code is good for generating raw phase profile of aperture.        
+        
+        There is no sky subtraction done here. If sky subtracted spectra is desired us getApertureSpectrum.
+        
+        cenRA/cenDec - location of the centere of the aperture
+        nPixRA/nPixDec - the number of pixels in the virtual image
+        radius1 - the radius of the aperture
+        degrees -
+        spectrum - 
+ 
+        spectrum??
+        '''
+
+
+        limits = [self.gridRA[0], self.gridRA[-1], self.gridDec[0], self.gridDec[-1]] #these are the limits of the grid in RA/Dec. They are in radians as is.
+                                                                                      #RADecImage._init_ returns these in radians inherintly.
+        
+        print '----aperture----'
+        aperture = utils.aperture(cenRA=cenRA,cenDec=cenDec,nPixRA=nPixRA,nPixDec=nPixDec,limits=limits,radius=radius1,degrees=degrees) #see utils.aperture
+        innerAp = aperture
+
+        print '----locating pixel positions within aperture----'
+        y1_values, x1_values = np.where(innerAp==0) #This gathers the pixel locations contained in the aperture
+
+        print '---determining area of aperture in arcesconds---'
+        #pixArea = 0.189225 #this is in (arcsec)^2
+        pixArea = .0400 #arcsec^2        
+        apArea = pixArea*len(x1_values)
+        
+        self.display(image = innerAp) #quick check to see how the aperture position looks
+        
+        mpl.show()
+
+        print '----gathering virtual image information----'
+        
+                
+        if spectrum is not False:
+            print '---finding wavelngth bins---'
+            wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
+
+        print '---finding phase bins---'
+        phaseBinEdges = self.phaseEdges #gets phase binning information generated when making the image
+        
+        print '---making image---'
+        self.scaledSpectrum = self.image*self.expTimeWeights #this is the virtual image Cube(counts/pixel location) scaled by the exposure time weightings!!.
+                                                          #the units of self.scaledSpectrum are counts/pixel
+                                                          #There may be a significant amount of NANS here so be careful.
+        
+        print 'self.scaledSpectrum', np.shape(self.scaledSpectrum), self.scaledSpectrum
+
+        print '---finding dimensions of image---'
+        #this is to make sure that the information we are trying to pull out of the image is consistant with the # of dimensions of the virtual image cube. 
+        #if spectrum is False: #image could have a spectrum dimension or not, but if it does and we have chosen not to pull it out, the image is summed along this dimension.
+            
+        #right now self.scaledSpectrum is (250,250,30,50)
+        if spectrum is False:
+            if len(np.shape(self.scaledSpectrum)) == 4:
+                self.scaledSpectrum = np.sum(self.scaledSpectrum, axis = 2)
+            else:
+                assert len(np.shape(self.scaledSpectrum)) == 3
+                #assert len(self.scaledSpectrum[0][0]) == phaseBinEdges   #This is because if spectrum is not true all we will pull out is phase which is the 3rd dimension. (#pixelsX,#pixelsY,#phase bins)       
+        else:
+            assert len(np.shape(self.scaledSpectrum)) == 4
+            #assert len(self.scaledSpectrum[0][0]) == wvlBinEdges
+            #assert len(self.scaledSpectrum[0][0][0]) == phaseBinEdges        
+
+        print '---gathering aperture phase---'
+        
+        if spectrum is not False:
+            phaseSpec = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
+            
+            for i in range(len(x1_values)):
+                specIn = np.zeros((len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]), len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:]))) #array is (#wvlbins, #phasebins)
+                for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):
+                    
+                    for k in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][j][:])):
+                        specIn[j][k] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j][k]  # fills in the array (#wvlbins, #phase bins)
+                #spectrumIn[i] = specIn
+                phaseSpec[i] = specIn
+        else:
+            phaseSpec = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]))) #Initializes array of dimension (#pixels in aperture,#phasebins)
+            
+            for i in range(len(x1_values)):  #iterates through each pixel contained in the aperture
+                specIn = np.zeros(len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:])) #initializes array of dimensions (#phasebins bins per pixel)
+                for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):   #iterates through all phase bins for a single pixel
+                    specIn[j] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j]        #contains the counts per phase bin per pixel with dimensions (#phase bins per pixel)
+                #print specIn
+                #print 'specIn', specIn, np.shape(specIn)
+                #spectrumIn[i] = specIn  
+                phaseSpec[i] = specIn
+
+        #summed_arrayIn = np.sum(spectrumIn, axis = 0)
+        summed_arrayIn = np.sum(phaseSpec,axis = 0)
+
+        if error is not False:
+            imErr = np.sqrt(self.image)
+            countErr = imErr*self.expTimeWeights
+            #if spectrum is False:
+                #countErr = np.sqrt(np.sum((countErr**2), axis = 
+            
+            phaseSpecErr = np.zeros((len(x1_values),len(countErr[x1_values[0]][y1_values[0]][:]),len(countErr[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
+            
+            for i in range(len(x1_values)):
+                specInErr = np.zeros((len(countErr[x1_values[0]][y1_values[0]][:]), len(countErr[x1_values[0]][y1_values[0]][0][:]))) #array is (#wvlbins, #phasebins)
+                for j in range(len(countErr[x1_values[i]][y1_values[i]][:])):
+                    
+                    for k in range(len(countErr[x1_values[i]][y1_values[i]][j][:])):
+                        specInErr[j][k] = countErr[x1_values[i]][y1_values[i]][j][k]  # fills in the array (#wvlbins, #phase bins)
+                #spectrumIn[i] = specIn
+                phaseSpecErr[i] = specInErr
+            
+            summed_arrayInErr = np.sqrt(np.sum((phaseSpecErr**2), axis = 0))
+        #if spectrum is not False:
+            #.....................................................
+        
+        return summed_arrayIn, wvlBinEdges, phaseBinEdges, innerAp, summed_arrayInErr, apArea
+        '''
+        if spectrum is not False:
+            spectrum = np.sum(summed_arrayIn, axis = 1)   #this takes the (#wvlbin,#phasebin) array and sums it along the phase dimension to get the spectrum
+            phaseprofile = np.sum(summed_arrayIn,axis = 0) # this sums across the wavlength bins to get the phase profile
+
+            if crab is not False:   #specific for crab, may need changing         
+        #this finds the center of the phase bins. This is done to specify the phase ranges for the pulse and interpulse.
+                nphaseBins = len(phaseBinEdges) - 1
+   
+                phases = np.empty((nphaseBins), dtype = float)
+                for n in xrange(nphaseBins):                              
+                    pbinsize = phaseBinEdges[n+1]-phaseBinEdges[n]
+                    phases[n] = (phaseBinEdges[n] + (pbinsize/2.0))
+                
+                print '---determining spectrum of mainPulse and interpulse----'
+                spectrumP = np.zeros((len(summed_arrayIn), len(np.where(np.logical_and(.60 <= phases,.72>=phases))[0])))   #initializes array of counts for the specified phase range             
+                spectrumIP = np.zeros((len(summed_arrayIn), len(np.where(np.logical_and(.02 <= phases,.14>=phases))[0])))  #these arrays should have dimension (#wvlbins, #phasebins in phase range)            
+                spectrumBG = np.zeros((len(summed_arrayIn), len(np.where(np.logical_and(.38 <= phases,.50>=phases))[0])))            
+                print 'whereP: ', np.where(np.logical_and(.60 <= phases,.72>=phases))[0]
+                print 'whereIP: ', np.where(np.logical_and(.02 <= phases,.14>=phases))[0]                
+                
+                for i in range(len(summed_arrayIn)):
+
+                    spectrumP[i][:] = summed_arrayIn[i][np.where(np.logical_and(.6 <= phases,.72>=phases))[0]]   #these srrays contain only the spectral information for the specified phase ranges.
+                    spectrumIP[i][:] = summed_arrayIn[i][np.where(np.logical_and(.02 <= phases,.14>=phases))[0]] #arrays should have dimension (#wvlbins, #phasebins in phase range)
+                
+                    spectrumBG[i][:] = summed_arrayIn[i][np.where(np.logical_and(.38 <= phases,.50 >=phases))[0]]
+                    #print 'spectrumP[i] = ', spectrumP[i]
+                    #print 'spectrumIP[i] = ', spectrumIP[i]
+
+                print 'spectrumP before summing: ', np.shape(spectrumP), spectrumP
+                print 'spectrumIP before summing: ', np.shape(spectrumIP), spectrumIP
+                
+                spectrumP = np.sum(spectrumP, axis = 1)  #sums across the phase bins to get the spectrum of the pulse in counts. dimensions (#wavlength bins)
+                spectrumIP = np.sum(spectrumIP, axis = 1)
+                spectrumBG = np.sum(spectrumBG, axis = 1)
+            
+                spectrum = spectrum - spectrumBG
+                spectrumP = spectrumP - spectrumBG
+                spectrumIP = spectrumIP - spectrumBG
+                phaseprofile = phaseprofile - np.median(spectrumBG, axis = 0)
+                print 'spectrumP', np.shape(spectrumP), spectrumP
+                print 'spectrumIP', np.shape(spectrumIP), spectrumIP
+                
+                for i in range(len(spectrumP)):
+                    spectrumP[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])  #divides the counts at each wavelength bin by the binwidth => units are now counts/A
+                    spectrumIP[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
+                    spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
+            else: #if Crab is false
+    
+                for i in range(len(spectrum)):
+                    spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])  #divides the counts at each wavelength bin by the binwidth => units are now counts/A
+                                    
+                
+        else: #if phase is False
+            spectrum = summed_arrayIn
+            for i in range(len(spectrum)):
+                spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i]) 
 
 
 
+        if phase is not False:
+            if crab is not False:
+            
+                return spectrum, spectrumP, spectrumIP,  phaseprofile, wvlBinEdges, phaseBinEdges, innerAp
+        
+    '''
 
+    def getPhaseSpectrum(self, countArray = None, countErr = None, lowLim=None, highLim=None, error = False):
+        """
+        This is only used inside of getAperture phase if the spectrum option is used.
+
+        countArray - should have dimensions of (#wavelength bins, #phase bins)
+        """
+        
+           
+        phaseBinEdges = self.phaseEdges
+        wvlBinEdges = self.wvlEdges        
+
+        
+         
+        nphaseBins = len(phaseBinEdges) - 1
+   
+        phases = np.empty((nphaseBins), dtype = float)
+        for n in xrange(nphaseBins):                              
+            pbinsize = phaseBinEdges[n+1]-phaseBinEdges[n]
+            phases[n] = (phaseBinEdges[n] + (pbinsize/2.0))
+
+        spectrum = np.zeros((len(countArray),len(np.where(np.logical_and(lowLim<=phases,highLim>=phases))[0]))) 
+        
+        
+        print 'where = ', np.where(np.logical_and(lowLim<=phases,highLim>=phases))[0]
+                
+        
+        for i in range(len(countArray)):
+            spectrum[i][:] = countArray[i][np.where(np.logical_and(lowLim<=phases,highLim>=phases))[0]]
+        
+        #print 'spectrum before summing = ', spectrum, np.shape(spectrum)
+        
+        spectrum = np.sum(spectrum, axis = 1)
+
+        #print 'spectrum = ', spectrum, np.shape(spectrum)
+
+        print '--- divideing spectrum by respective wavelength bin centers---'
+
+        for i in range(len(spectrum)):
+            spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
+
+        print '---determining uncertainties of spectrum---'
+
+        if error is not False:
+            spectrumErr = np.zeros((len(countErr),len(np.where(np.logical_and(lowLim<=phases,highLim>=phases))[0])))
+            
+            for i in range(len(countArray)):
+                spectrumErr[i][:] = countErr[i][np.where(np.logical_and(lowLim<=phases,highLim>=phases))[0]]
+        
+            #print 'spectrumErr before summing = ', spectrumErr, np.shape(spectrumErr)
+        
+            spectrumErr = np.sqrt(np.sum((spectrumErr**2), axis = 1))
+
+            #print 'spectrumErr = ', spectrumErr, np.shape(spectrumErr)
+
+            print '--- divideing spectrum errors by respective wavelength bin centers---'
+
+            for i in range(len(spectrumErr)):
+                spectrumErr[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
+        
+        return spectrum, spectrumErr
+        
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=11000):
         """

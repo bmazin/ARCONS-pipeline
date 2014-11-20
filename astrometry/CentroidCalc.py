@@ -188,15 +188,17 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     print 'Creating saturation mask...'
     nFrames = int(np.ceil(float(exptime)/float(integrationTime)))
     saturatedMask = np.zeros(((nFrames,gridWidth,gridHeight)))
-    hotPixInfo = ob.hotPixTimeMask   #hp.readHotPixels(hotPixFn)
-    intervalsMatrix = hotPixInfo['intervals']
+    #hotPixInfo = ob.hotPixTimeMask   #hp.readHotPixels(hotPixFn)
+    #intervalsMatrix = hotPixInfo['intervals']
     for t in range(nFrames):
-        for x in range(gridHeight):
-            for y in range(gridWidth):
-                if intervalsMatrix[y][x] == []:
-                    pass
-                else:
-                    saturatedMask[t][y][x]=1
+        badPixels = ob.hotPixTimeMask.getHotPixels(firstSec=int(t*integrationTime), integrationTime=int(integrationTime))
+        saturatedMask[t] = badPixels
+        #for x in range(gridHeight):
+        #    for y in range(gridWidth):
+        #        if intervalsMatrix[y][x] == []:
+        #            pass
+        #        else:
+        #            saturatedMask[t][y][x]=1
     
     # Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
     print 'Creating dead mask...'    

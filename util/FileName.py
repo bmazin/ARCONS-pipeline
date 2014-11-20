@@ -93,6 +93,13 @@ class FileName:
             self.date + os.sep + \
             "flat_" + self.tstamp + '.h5'
 
+    def tcslog(self):
+        return self.mkidDataDir + os.sep + \
+            self.run + os.sep + \
+            self.date + os.sep + \
+            "logs" + os.sep + \
+            "tcs.log"
+
     def timeMask(self):
         return self.intermDir + os.sep + \
             'timeMasks' + os.sep + \

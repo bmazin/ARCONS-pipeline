@@ -12,10 +12,14 @@ import matplotlib.pylab as plt
 import binascii
 import math
 from scipy.signal import convolve
+from scipy.interpolate import griddata
+from scipy.optimize.minpack import curve_fit
 import scipy.ndimage
 import scipy.stats
 import astropy.stats
 import ds9
+from numpy import linalg
+from astropy import wcs
 
 
 #from interval import interval
@@ -47,6 +51,7 @@ getGitStatus()
 findNearestFinite(im,i,j,n=10)
 nearestNstdDevFilter(inputArray,n=24)
 nearestNmedFilter(inputArray,n=24)
+interpolateImage(inputArray,method='linear')
 showzcoord()
 """
 
@@ -457,6 +462,59 @@ def linearFit( x, y, err=None ):
     solution, residuals, rank, s = scipy.linalg.lstsq(A, y)
     return solution
 
+def fitRigidRotation(x,y,ra,dec,x0=0,y0=0):
+    """
+    calculate the rigid rotation from row,col positions to ra,dec positions
+
+    return dictionary of theta,tx,ty, such that
+
+    ra  = c*dx - s*dx + dra
+    dec = s*dy + c*dy + ddec
+    
+    with c = scale*cos(theta) and s = scale*sin(theta)
+         dx = x-x0 and dy = y-y0
+
+    ra,dec are input in decimal degrees
+
+    The scale and rotation of the transform are recovered from the cd matrix;
+      rm = w.wcs.cd
+      wScale = math.sqrt(rm[0,0]**2+rm[0,1]**2) # degrees per pixel
+      wTheta = math.atan2(rm[1,0],rm[0,0])      # radians
+
+
+    """
+    assert(len(x)==len(y)==len(ra)==len(dec)), "all inputs must be same length"
+    assert(len(x) > 1), "need at least two points"
+
+    dx = x-x0
+    dy = y-y0
+    a = numpy.zeros((2*len(x),4))
+    b = numpy.zeros(2*len(x))
+    for i in range(len(x)):
+        a[2*i,0] = -dy[i]
+        a[2*i,1] = dx[i]
+        a[2*i,2] = 1
+        b[2*i]   = ra[i]
+
+        a[2*i+1,0] = dx[i]
+        a[2*i+1,1] = dy[i]
+        a[2*i+1,3] = 1
+        b[2*i+1] = dec[i]
+    answer,residuals,rank,s = linalg.lstsq(a,b)
+    
+    # put the fit parameters into the WCS structure
+    sst = answer[0] # scaled sin theta
+    sct = answer[1] # scaled cos theta
+    dra = answer[2]
+    ddec = answer[3]
+    scale = math.sqrt(sst**2+sct**2)
+    theta = math.degrees(math.atan2(sst,sct))
+    w = wcs.WCS(naxis=2)
+    w.wcs.crpix = [x0,y0]     # reference pixel position
+    w.wcs.crval = [dra,ddec]  # reference sky position
+    w.wcs.cd = [[sct,-sst],[sst,sct]] # scaled rotation matrix
+    w.wcs.ctype = ["RA---TAN","DEC--TAN"]
+    return w
 
 def makeMovie( listOfFrameObj, frameTitles=None, outName='Test_movie',
               delay=0.1, listOfPixelsToMark=None, pixelMarkColor='red',
@@ -599,7 +657,7 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
                plotFileName='arrayPlot.png',
                plotTitle='', sigma=None, 
                pixelsToMark=[], pixelMarkColor='red',
-               fignum=1):
+               fignum=1, pclip=None):
     """
     Plots the 2D array to screen or if showMe is set to False, to
     file.  If normMin and normMax are None, the norm is just set to
@@ -637,16 +695,22 @@ def plotArray( xyarray, colormap=mpl.cm.gnuplot2,
              Default is 1. If None, automatically selects a new figure number.
             Added 2013/7/19 2013, JvE
     
+    pclip - set to percentile level (in percent) for setting the upper and
+            lower colour stretch limits (overrides sigma).
+    
     """
     if sigma != None:
        # Chris S. does not know what accumulatePositive is supposed to do
        # so he changed the next two lines.
        #meanVal = numpy.mean(accumulatePositive(xyarray))
        #stdVal = numpy.std(accumulatePositive(xyarray))
-       meanVal = numpy.mean(xyarray)
-       stdVal = numpy.std(xyarray)
+       meanVal = numpy.nanmean(xyarray)
+       stdVal = numpy.nanstd(xyarray)
        normMin = meanVal - sigma*stdVal
        normMax = meanVal + sigma*stdVal
+    if pclip != None:
+        normMin = numpy.percentile(xyarray[numpy.isfinite(xyarray)], pclip)
+        normMax = numpy.percentile(xyarray[numpy.isfinite(xyarray)], 100.-pclip)
     if normMin == None:
        normMin = xyarray.min()
     if normMax == None:
@@ -715,8 +779,9 @@ def printObsFileDescriptions( dir_path ):
     """
     Prints the 'description' and 'target' header values for all observation
     files in the specified directory
+    Added sorting to returned list - JvE Nov 7 2014
     """
-    for obs in glob.glob(os.path.join(dir_path,'obs*.h5')):
+    for obs in sorted(glob.glob(os.path.join(dir_path,'obs*.h5'))):
         f=tables.openFile(obs,'r')
 	try:
             hdr=f.root.header.header.read()
@@ -1031,6 +1096,34 @@ def nearestNRobustMeanFilter(inputArray,n=24,nSigmaClip=3.,iters=None):
     return outputArray
 
 
+def interpolateImage(inputArray, method='linear'):
+    '''
+    Seth 11/13/14
+    2D interpolation to smooth over missing pixels using built-in scipy methods
+
+    INPUTS:
+        inputArray - 2D input array of values
+        method - method of interpolation. Options are scipy.interpolate.griddata methods:
+                 'linear' (default), 'cubic', or 'nearest'
+
+    OUTPUTS:
+        the interpolated image with same shape as input array
+    '''
+
+    finalshape = numpy.shape(inputArray)
+
+    dataPoints = numpy.where(inputArray!=0) #data points for interp are only pixels with counts
+    dataPoints = numpy.array((dataPoints[0],dataPoints[1]),dtype=numpy.int).transpose() #griddata expects them in this order
+
+    interpPoints = numpy.where(inputArray!=numpy.nan) #final image is full array. NANs still excluded
+    interpPoints = numpy.array((interpPoints[0],interpPoints[1]),dtype=numpy.int).transpose()
+
+    interpolatedFrame = griddata(dataPoints, inputArray[numpy.where(inputArray!=0)], interpPoints, 'linear')
+    interpolatedFrame = numpy.reshape(interpolatedFrame, finalshape) #reshape interpolated frame into original shape
+    
+    return interpolatedFrame
+
+
 def showzcoord():
     '''
     For arrays displayed using 'matshow', hack to set the cursor location
@@ -1059,5 +1152,64 @@ def showzcoord():
     
     ax = plt.gca()
     ax.format_coord = format_coord
+
+
+def fitBlackbody(wvls,flux,fraction=1.0,newWvls=None,tempGuess=6000):
+    '''
+    Seth 11/13/14
+    Simple blackbody fitting function that returns BB temperature and fluxes if requested.
+
+    INPUTS:
+        wvls - wavelengths of data points (in Angstroms!)
+        flux - fluxes of data points (in ergs/s/cm^2/Angstrom!)
+        fraction - what fraction of spectrum's red end to use for fit. Default is 1.0 (use whole spectrum).
+                   for example, fraction=1.0/5.0 only fits BB to last 20% of spectrum.
+        newWvls - 1D array of wavelengths in angstroms. If given, function returns blackbody fit at requested points
+        tempGuess - manually adjust guess of BB temperature (in Kelvin) that fit starts with
+
+    OUTPUTS:
+        T - temperature in Kelvin of blackbody fit
+        newFlux - fluxes calculated at newWvls using the BB equation generated by the fit
+        
+    '''
+    c=3.00E10 #cm/s
+    h=6.626E-27 #erg*s
+    k=1.3806488E-16 #erg/K
+    
+    x=wvls
+    norm = flux.max()
+    y= flux/norm
+
+    print "BBfit using last ", fraction*100, "% of spectrum only"
+    fitx = x[(1.0-fraction)*len(x)::]
+    fity = y[(1.0-fraction)*len(x)::]
+
+    guess_a, guess_b = 1/(2*h*c**2/1e-9), tempGuess #Constant, Temp
+    guess = [guess_a, guess_b]
+
+    blackbody = lambda fx, N, T: N * 2*h*c**2 / (fx)**5 * (numpy.exp(h*c/(k*T*(fx))) - 1)**-1 # Planck Law
+    #blackbody = lambda fx, N, T: N*2*c*k*T/(fx)**4 #Rayleigh Jeans tail
+    #blackbody = lambda fx, N, T: N*2*h*c**2/(fx**5) * exp(-h*c/(k*T*fx)) #Wein Approx
+
+    params, cov = curve_fit(blackbody, fitx*1.0e-8, fity, p0=guess, maxfev=2000)
+    N, T= params
+    print "BBFit:\nN = %s\nT = %s\n"%(N, T)
+
+    if newWvls !=None:
+        best_fit = lambda fx: N * 2*h*c**2 / (fx)**5 * (numpy.exp(h*c/(k*T*(fx))) - 1)**-1 #Planck Law
+        #best_fit = lambda fx: N*2*c*k*T/(fx)**4 # Rayleigh Jeans Tail
+        #best_fit = lambda fx: N*2*h*c**2/(fx**5) * exp(-h*c/(k*T*fx)) #Wein Approx
+
+        calcx = numpy.array(newWvls,dtype=float)
+        newFlux = best_fit(calcx*1.0E-8)
+        newFlux*=norm
+        return T, newFlux
+    else:
+        return T
+
+
+    
+
+
 
 

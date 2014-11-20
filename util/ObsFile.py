@@ -41,10 +41,11 @@ loadWvlCalFile(self, wvlCalFileName)
 makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000)
 parsePhotonPackets(self, packets, inter=interval(),doParabolaFitPeaks=True, doBaselines=True)
 plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False)getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1)
+plotPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,**kwargs)
 plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000, firstSec=0,integrationTime=-1)
 setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000)
 switchOffHotPixTimeMask(self)
-switchOnHotPixTimeMask(self)
+switchOnHotPixTimeMask(self, reasons=[])
 writePhotonList(self)
 
 calculateSlices_old(inter, timestamps)
@@ -342,7 +343,8 @@ class ObsFile:
         
     def displaySec(self, firstSec=0, integrationTime= -1, weighted=False,
                    fluxWeighted=False, plotTitle='', nSdevMax=2,
-                   scaleByEffInt=False, getRawCount=False, fignum=None, ds9=False):
+                   scaleByEffInt=False, getRawCount=False, fignum=None, ds9=False,
+                   pclip=1.0, **kw):
         """
         plots a time-flattened image of the counts integrated from firstSec to firstSec+integrationTime
         if integrationTime is -1, All time after firstSec is used.  
@@ -357,14 +359,22 @@ class ObsFile:
         fignum - as for utils.plotArray (None = new window; False/0 = current window; or 
                  specify target window number).
         ds9 - boolean, if True, display in DS9 instead of regular plot window.
+        pclip - set to percentile level (in percent) to set the upper and lower bounds
+                of the colour scale.
+        **kw - any other keywords passed directly to utils.plotArray()
+        
         """
         secImg = self.getPixelCountImage(firstSec, integrationTime, weighted, fluxWeighted,
                                          getRawCount=getRawCount,scaleByEffInt=scaleByEffInt)['image']
+        toPlot = np.copy(secImg)
+        vmin = np.percentile(toPlot[np.isfinite(toPlot)],pclip)
+        vmax = np.percentile(toPlot[np.isfinite(toPlot)],100.-pclip)
+        toPlot[np.isnan(toPlot)] = 0    #Just looks nicer when you plot it.
         if ds9 is True:
             utils.ds9Array(secImg)
         else:
             utils.plotArray(secImg, cbar=True, normMax=np.mean(secImg) + nSdevMax * np.std(secImg),
-                        plotTitle=plotTitle, fignum=fignum)
+                        plotTitle=plotTitle, fignum=fignum, **kw)
 
             
     def getFromHeader(self, name):
@@ -450,13 +460,9 @@ class ObsFile:
         #    
         #else:
         
-        #************TEST********
-        #dither = False
-        #*************************
-        
         x = self.getTimedPacketList(iRow, iCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
-        timestamps, parabolaPeaks, baselines, effIntTime = \
-            x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime']
+        timestamps, parabolaPeaks, baselines, effIntTime, rawCounts = \
+            x['timestamps'], x['peakHeights'], x['baselines'], x['effIntTime'], x['rawCounts']
         parabolaPeaks = np.array(parabolaPeaks,dtype=np.double)
         baselines = np.array(baselines,dtype=np.double)
         if dither==True:
@@ -492,7 +498,7 @@ class ObsFile:
             timestamps = timestamps[goodMask]
 
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
-                'effIntTime':effIntTime}
+                'effIntTime':effIntTime, 'rawCounts':rawCounts}
             
     
     def getPixelCount(self, iRow, iCol, firstSec=0, integrationTime= -1,
@@ -511,12 +517,14 @@ class ObsFile:
         *Note getRawCount overrides weighted and fluxWeighted.
         
         Updated to return effective exp. times; see below. -- JvE 3/2013. 
+        Updated to return rawCounts; see below           -- ABW Oct 7, 2014
         
         OUTPUTS:
         Return value is a dictionary with tags:
             'counts':int, number of photon counts
             'effIntTime':float, effective integration time after time-masking is 
                      accounted for.
+            'rawCounts': int, total number of photon triggers (including noise)
         """
         
         if getRawCount is True:
@@ -526,20 +534,24 @@ class ObsFile:
             #assert np.array_equal(x['effIntTime'],x2['effIntTime'])
             #assert np.array_equal(x['peakHeights'],x2['peakHeights'])
             #assert np.array_equal(x['baselines'],x2['baselines'])
-            timestamps, effIntTime = x['timestamps'], x['effIntTime']
+            timestamps, effIntTime, rawCounts = x['timestamps'], x['effIntTime'], x['rawCounts']
             counts = len(timestamps)
-            return {'counts':counts, 'effIntTime':effIntTime}
+            return {'counts':counts, 'effIntTime':effIntTime, 'rawCounts':rawCounts}
 
         else:
             pspec = self.getPixelSpectrum(iRow, iCol, firstSec, integrationTime,weighted=weighted, fluxWeighted=fluxWeighted, timeSpacingCut=timeSpacingCut)
             counts = sum(pspec['spectrum'])
-            return {'counts':counts, 'effIntTime':pspec['effIntTime']}
+            
+            ### If it's weighted then deadtime should be corrected in getPixelSpectrum(), otherwise not ###
+            
+            
+            return {'counts':counts, 'effIntTime':pspec['effIntTime'], 'rawCounts':pspec['rawCounts']}
 
 
     def getPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,
                            **kwargs):
         """
-        Get a simple light curve for a pixel (basically a wrapper for getPixelCount)
+        Get a simple light curve for a pixel (basically a wrapper for getPixelCount).
         
         INPUTS:
             iRow,iCol - Row and column of pixel
@@ -556,18 +568,48 @@ class ObsFile:
             between firstSec and lastSec. Note if step is non-integer may return inconsistent
             number of values depending on rounding of last value in time step sequence (see
             documentation for numpy.arange() ).
+            
+            If hot pixel masking is turned on, then returns 0 for any time that is masked out.
+            (Maybe should update this to NaN at some point in getPixelCount?)
         """
         if lastSec==-1:lSec = self.getFromHeader('exptime')
         else: lSec = lastSec
         return np.array([self.getPixelCount(iRow,iCol,firstSec=x,integrationTime=cadence,**kwargs)['counts']
                        for x in np.arange(firstSec,lSec,cadence)])
+    
+    
+    def plotPixelLightCurve(self,iRow,iCol,firstSec=0,lastSec=-1,cadence=1,**kwargs):
+        """
+        Plot a simple light curve for a given pixel. Just a wrapper for getPixelLightCurve.
+        Also marks intervals flagged as bad with gray shaded regions if a hot pixel mask is
+        loaded.
+        """
+        
+        lc = self.getPixelLightCurve(iRow=iRow,iCol=iCol,firstSec=firstSec,lastSec=lastSec,
+                                     cadence=cadence,**kwargs)
+        if lastSec==-1: realLastSec = self.getFromHeader('exptime')
+        else: realLastSec = lastSec
+        
+        #Plot the lightcurve
+        x = np.arange(firstSec+cadence/2.,realLastSec)
+        assert len(x)==len(lc)      #In case there are issues with arange being inconsistent on the number of values it returns
+        plt.plot(x,lc)
+        plt.xlabel('Time since start of file (s)')
+        plt.ylabel('Counts')
+        plt.title(self.fileName+' - pixel x,y = '+str(iCol)+','+str(iRow))
+        
+        #Get bad times in time range of interest (hot pixels etc.)
+        badTimes = self.getPixelBadTimes(iRow,iCol) & interval([firstSec,realLastSec])   #Returns an 'interval' instance
+        lcRange = np.nanmax(lc)-np.nanmin(lc)
+        for eachInterval in badTimes:
+            plt.fill_betweenx([np.nanmin(lc)-0.5*lcRange,np.nanmax(lc)+0.5*lcRange], eachInterval[0],eachInterval[1],
+                              alpha=0.5,color='gray')
         
     
     def getPixelPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         returns a numpy array of 64-bit photon packets for a given pixel, integrated from firstSec to firstSec+integrationTime.
         if integrationTime is -1, All time after firstSec is used.  
-        if weighted is True, flat cal weights are applied
         """
 #        getPixelOutput = self.getPixel(iRow, iCol, firstSec, integrationTime)
 #        pixelData = getPixelOutput['pixelData']
@@ -575,74 +617,6 @@ class ObsFile:
         packetList = np.concatenate(pixelData)
         return packetList
 
-    def getTimedPacketList_old(self, iRow, iCol, firstSec=0, integrationTime= -1):
-        """
-        DEPRECATED VERSION. JvE 3/13/2013
-        
-        Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
-        inter is an interval of time values to mask out [missing?? To be implented? JvE 2/18/13]
-        returns a list of timestamps,parabolaFitPeaks,baselines,effectiveIntTime (effective
-        integration time after accounting for time-masking.)
-        parses packets from firstSec to firstSec+integrationTime.
-        if integrationTime is -1, all time after firstSec is used.  
-        
-        Now updated to take advantage of masking capabilities in parsePhotonPackets
-        to allow for correct application of non-integer values in firstSec and
-        integrationTime. JvE Feb 27 2013.
-        
-        CHANGED RETURN VALUES - now returns a dictionary including effective integration
-        time (allowing for bad pixel masking), with keys:
-        
-            'timestamps'
-            'peakHeights'
-            'baselines'
-            'effIntTime'
-         
-         - JvE 3/5/2013.
-        """
-        pixelData = self.getPixel(iRow, iCol)
-        lastSec = firstSec + integrationTime
-        if integrationTime == -1 or lastSec > len(pixelData):
-            lastSec = len(pixelData)
-        pixelData = pixelData[int(np.floor(firstSec)):int(np.ceil(lastSec))]
-
-        if self.hotPixIsApplied:
-            inter = self.getPixelBadTimes(iRow, iCol)
-        else:
-            inter = interval()
-        
-        if (type(firstSec) is not int) or (type(integrationTime) is not int):
-            #Also exclude times outside firstSec to lastSec. Allows for sub-second
-            #(floating point) values in firstSec and integrationTime
-            inter = inter | interval([-np.inf, firstSec], [lastSec, np.inf])   #Union the exclusion interval with the excluded time range limits
-
-        #Inter now contains a single 'interval' instance, which contains a list of
-        #times to exclude, in seconds, including all times outside the requested
-        #integration if necessary.
-
-        #Calculate the total effective time for the integration after removing
-        #any 'intervals':
-        integrationInterval = interval([firstSec, lastSec])
-        maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel.
-        effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
-
-        timestamps = []
-        baselines = []
-        peakHeights = []
-
-        for t in range(len(pixelData)):
-            interTicks = (inter - np.floor(firstSec) - t) * self.ticksPerSec
-            times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
-            times = np.floor(firstSec) + self.tickDuration * times + t
-            timestamps.append(times)
-            baselines.append(bases)
-            peakHeights.append(peaks)
-            
-        timestamps = np.concatenate(timestamps)
-        baselines = np.concatenate(baselines)
-        peakHeights = np.concatenate(peakHeights)
-        return {'timestamps':timestamps, 'peakHeights':peakHeights,
-                'baselines':baselines, 'effIntTime':effectiveIntTime}
 
     def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1, timeSpacingCut=None,expTailTimescale=None):
         """
@@ -670,8 +644,10 @@ class ObsFile:
             'peakHeights'
             'baselines'
             'effIntTime'
+            'rawCounts'
          
          - JvE 3/5/2013.
+         - ABW Oct 7, 2014. Added rawCounts for calculating dead time correction
          
          **Modified to increase speed for integrations shorter than the full exposure
          length. JvE 3/13/2013**
@@ -736,6 +712,8 @@ class ObsFile:
                 timestamps = np.array([])
                 baselines = np.array([])
                 peakHeights = np.array([])
+            
+            rawCounts = len(timestamps)
 
             if expTailTimescale != None and len(timestamps) > 0:
                 #find the time between peaks
@@ -789,9 +767,10 @@ class ObsFile:
             peakHeights = np.array([])
             baselines = np.array([])
             effectiveIntTime = 0.
+            rawCounts = 0.
 
         return {'timestamps':timestamps, 'peakHeights':peakHeights,
-                'baselines':baselines, 'effIntTime':effectiveIntTime}
+                'baselines':baselines, 'effIntTime':effectiveIntTime, 'rawCounts':rawCounts}
 
 
     def getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,
@@ -813,24 +792,30 @@ class ObsFile:
                 'image' - a 2D array representing the image
                 'effIntTimes' - a 2D array containing effective integration 
                                 times for each pixel.
+                'rawCounts' - a 2D array containing the raw number of counts
+                                for each pixel. 
         """
         secImg = np.zeros((self.nRow, self.nCol))
         effIntTimes = np.zeros((self.nRow, self.nCol), dtype=np.float64)
         effIntTimes.fill(np.nan)   #Just in case an element doesn't get filled for some reason.
+        rawCounts = np.zeros((self.nRow, self.nCol), dtype=np.float64)
+        rawCounts.fill(np.nan)   #Just in case an element doesn't get filled for some reason.
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 pcount = self.getPixelCount(iRow, iCol, firstSec, integrationTime,
                                           weighted, fluxWeighted, getRawCount)
                 secImg[iRow, iCol] = pcount['counts']
                 effIntTimes[iRow, iCol] = pcount['effIntTime']
+                rawCounts[iRow,iCol] = pcount['rawCounts']
         if scaleByEffInt is True:
             if integrationTime == -1:
                 totInt = self.getFromHeader('exptime')
             else:
                 totInt = integrationTime
             secImg *= (totInt / effIntTimes)                    
+
         #if getEffInt is True:
-        return{'image':secImg, 'effIntTimes':effIntTimes}
+        return{'image':secImg, 'effIntTimes':effIntTimes, 'rawCounts':rawCounts}
         #else:
         #    return secImg
 
@@ -885,30 +870,33 @@ class ObsFile:
         #else:
         #    return secImg
     
-    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None,timeSpacingCut=None):
+    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,fluxWeighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None,timeSpacingCut=None):
         """
         Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
         If integration time is -1, all time after firstSec is used.
         If weighted is True, flat cal weights are applied.
+        If fluxWeighted is True, spectral shape weights are applied.
         """
         cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
         effIntTime = np.zeros((self.nRow,self.nCol))
+        rawCounts = np.zeros((self.nRow,self.nCol))
 
         for iRow in xrange(self.nRow):
             for iCol in xrange(self.nCol):
                 x = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
                                   firstSec=firstSec,integrationTime=integrationTime,
-                                  weighted=weighted,wvlStart=wvlStart,wvlStop=wvlStop,
+                                  weighted=weighted,fluxWeighted=fluxWeighted,wvlStart=wvlStart,wvlStop=wvlStop,
                                   wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
                                   wvlBinEdges=wvlBinEdges,timeSpacingCut=timeSpacingCut)
                 cube[iRow][iCol] = x['spectrum']
                 effIntTime[iRow][iCol] = x['effIntTime']
+                rawCounts[iRow][iCol] = x['rawCounts']
                 wvlBinEdges = x['wvlBinEdges']
         cube = np.array(cube)
-        return {'cube':cube,'wvlBinEdges':wvlBinEdges,'effIntTime':effIntTime}
+        return {'cube':cube,'wvlBinEdges':wvlBinEdges,'effIntTime':effIntTime, 'rawCounts':rawCounts}
 
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
-                         weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
+                         weighted=False, fluxWeighted=False, wvlStart=None, wvlStop=None,
                          wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None,timeSpacingCut=None):
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime,
@@ -921,6 +909,9 @@ class ObsFile:
         If wvlBinWidth is specified, the wavelength bins use fixed wavelength bin widths
         If neither is specified and/or if weighted is True, the flat cal wvlBinEdges is used
         
+        wvlStart defaults to self.wvlLowerLimit or 3000
+        wvlStop defaults to self.wvlUpperLimit or 13000
+        
         ----
         Updated to return effective integration time for the pixel
         Returns dictionary with keys:
@@ -928,11 +919,18 @@ class ObsFile:
             'wvlBinEdges' - edges of wavelength bins
             'effIntTime' - the effective integration time for the given pixel 
                            after accounting for hot-pixel time-masking.
+            'rawCounts' - The total number of photon triggers (including from
+                            the noise tail) during the effective exposure.
         JvE 3/5/2013
+        ABW Oct 7, 2014. Added rawCounts to dictionary
         ----
         """
+        wvlStart=wvlStart if (wvlStart!=None and wvlStart>0.) else (self.wvlLowerLimit if (self.wvlLowerLimit!=None and self.wvlLowerLimit>0.) else 3000)
+        wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 13000)
+
+        
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
-        wvlList, effIntTime = x['wavelengths'], x['effIntTime']
+        wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
         
         if self.flatCalFile != None and ((wvlBinEdges == None and energyBinWidth == None and wvlBinWidth == None) or weighted == True):
         #We've loaded a flat cal already, which has wvlBinEdges defined, and no other bin edges parameters are specified to override it.
@@ -954,11 +952,14 @@ class ObsFile:
                     spectrum, wvlBinEdges = np.histogram(wvlList, bins=nWvlBins, range=(wvlStart, wvlStop))
                 else:
                     raise ValueError('getPixelSpectrum needs either wvlBinWidth,wvlBinEnergy, or wvlBinEdges')
+                #else:
+                #    nWvlBins = 1
+                #    spectrum, wvlBinEdges = np.histogram(wvlList, bins=nWvlBins, range=(wvlStart, wvlStop))
             else:#We are given wvlBinEdges array
                 spectrum, wvlBinEdges = np.histogram(wvlList, bins=wvlBinEdges)
        
         #if getEffInt is True:
-        return {'spectrum':spectrum, 'wvlBinEdges':wvlBinEdges, 'effIntTime':effIntTime}
+        return {'spectrum':spectrum, 'wvlBinEdges':wvlBinEdges, 'effIntTime':effIntTime, 'rawCounts':rawCounts}
         #else:
         #    return spectrum,wvlBinEdges
     
@@ -1037,7 +1038,7 @@ class ObsFile:
     	    summed_array[i] /= (wvlBinEdges[i + 1] - wvlBinEdges[i])
     	return summed_array, wvlBinEdges
     
-    def getPixelBadTimes(self, pixelRow, pixelCol):
+    def getPixelBadTimes(self, pixelRow, pixelCol, reasons=[]):
         """
         Get the time interval(s) for which a given pixel is bad (hot/cold,
         whatever, from the hot pixel cal file).
@@ -1046,8 +1047,8 @@ class ObsFile:
         """
         if self.hotPixTimeMask is None:
             raise RuntimeError, 'No hot pixel file loaded'
-        inter = interval.union(self.hotPixTimeMask['intervals'][pixelRow, pixelCol])
-        return inter
+
+        return self.hotPixTimeMask.get_intervals(pixelRow,pixelCol,reasons)
 
     def getDeadPixels(self, showMe=False, weighted=True, getRawCount=False):
         """
@@ -1133,6 +1134,9 @@ class ObsFile:
           timestamps
           other fields requested
         """
+        
+        warnings.warn('Does anyone use this function?? If not, we should get rid of it')
+        
         parse = {'peakHeights': True, 'baselines': True}
         for key in parse.keys():
             try:
@@ -1421,7 +1425,7 @@ class ObsFile:
         fullFluxCalFileName = os.path.join(fluxCalPath, fluxCalFileName)
         if (not os.path.exists(fullFluxCalFileName)):
             print 'flux cal file does not exist: ', fullFluxCalFileName
-            return
+            raise IOError
         self.fluxCalFile = tables.openFile(fullFluxCalFileName, mode='r')
         self.fluxCalFileName = fullFluxCalFileName
         self.fluxWeights = self.fluxCalFile.root.fluxcal.weights.read()
@@ -1429,23 +1433,7 @@ class ObsFile:
         self.fluxCalWvlBins = self.fluxCalFile.root.fluxcal.wavelengthBins.read()
         self.nFluxCalWvlBins = self.nFlatCalWvlBins
 
-    def loadFlashingTimeMask(self, flashingTimeMaskFileName, flashOn=True, switchOnMask=True):
-        """
-        load hot pixel time mask for flashing wavecal file. 
-        By default it masks hot times and laser off times for each pixel.
-        Also, switches mask on by default
-        """
-        fullFileName = FileName(obsFile=self).timeMask()
-        if (not os.path.exists(fullFileName)):
-            print 'Hot pixel cal file does not exist: ', fullFileName
-            return
-
-        self.hotPixFile = tables.openFile(fullFileName)
-        self.hotPixFileName = fullFileName
-
-        if switchOnMask: self.switchOnHotPixTimeMask()
-
-    def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True):
+    def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True,reasons=[]):
         """
         Load a hot pixel time mask from the given file, in a similar way to
         loadWvlCalFile, loadFlatCalFile, etc. Switches on hot pixel
@@ -1459,27 +1447,20 @@ class ObsFile:
         fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
         if (not os.path.exists(fullHotPixCalFileName)):
             print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
-            return
+            raise IOError
 
         self.hotPixFile = tables.openFile(fullHotPixCalFileName)
-        self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile)
+        self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile, reasons=reasons)
         self.hotPixFileName = fullHotPixCalFileName
         
-        if (os.path.basename(self.hotPixTimeMask['obsFileName'])
+        if (os.path.basename(self.hotPixTimeMask.obsFileName)
             != os.path.basename(self.fileName)):
             warnings.warn('Mismatch between hot pixel time mask file and obs file. Not loading/applying mask!')
             self.hotPixTimeMask = None
+            raise ValueError
         else:
-            if switchOnMask: self.switchOnHotPixTimeMask()
+            if switchOnMask: self.switchOnHotPixTimeMask(reasons=reasons)
 
-        #print "end of loadHotPixCalFile.  keys=",self.hotPixTimeMask.keys()
-        #print "intervals.shape=",self.hotPixTimeMask['intervals'].shape
-        #print "one interval"
-        #for iRow in range(self.nRow):
-            #for iCol in range(self.nCol):
-                #print "iRow=",iRow," iCol=",iCol
-                #for interval in self.hotPixTimeMask['intervals'][iRow][iCol]:
-                    #print "   interval=",interval
 
     def loadStandardCosmicMask(self, switchOnCosmicMask=True):
         """
@@ -1582,6 +1563,7 @@ class ObsFile:
                     self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
         except IOError:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
+            raise
             
 
     @staticmethod
@@ -1698,7 +1680,7 @@ class ObsFile:
         """
         self.hotPixIsApplied = False
 
-    def switchOnHotPixTimeMask(self):
+    def switchOnHotPixTimeMask(self,reasons=[]):
         """
         Switch on hot pixel time masking. Subsequent calls to getPixelCountImage
         etc. will have bad pixel times removed.
@@ -1706,6 +1688,9 @@ class ObsFile:
         if self.hotPixTimeMask is None:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
+        if len(reasons)>0:
+            self.hotPixTimeMask.mask = [self.hotPixTimeMask.reasonEnum[reason] for reason in reasons]
+        
 
     def switchOffCosmicTimeMask(self):
         """
@@ -1929,35 +1914,7 @@ class ObsFile:
 #
 
 
-            
 
-def calculateSlices_old(inter, timestamps):
-    """
-    return a list of strings, with format i0:i1 for a python array slice
-    inter is the interval of values in timestamps to mask out.
-    The resulting list of strings indicate elements that are not masked out
-    
-    Renamed to calculateSlices_old and deprecated - JvE 3/8/2013
-    """
-    slices = []
-    prevInclude = not (timestamps[0] in inter)
-    if prevInclude:
-        slce = "0:"
-    nIncluded = 0
-    for i in range(len(timestamps)):
-        include = not (timestamps[i] in inter)
-        if include:
-            nIncluded += 1
-        if (prevInclude and not include):
-            slce += str(i) # end the current range
-            slices.append(slce)
-        elif (include and not prevInclude):
-            slce = "%d:" % i # begin a new range
-        prevInclude = include
-    if (prevInclude):
-        slce += str(i + 1) # end the last range if it is included
-        slices.append(slce)
-    return slices
 
 def calculateSlices(inter, timestamps):
     '''
