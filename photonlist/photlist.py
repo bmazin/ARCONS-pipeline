@@ -343,9 +343,11 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
             plFile.copyNode(obsFile.centroidListFile.root, newparent=plFile.root, newname='centroidList', recursive=True)
         if obsFile.timeAdjustFile is not None:
             #If there's any time adjustment file associated, store that too in the photon list 
-            #file, and also correct the exptime in the output header info (which is generally not updated in the original obs file).
+            #file, and also correct the exptime and unixtime in the output header info 
+            #(which is generally not updated in the original obs file).
             plFile.copyNode(obsFile.timeAdjustFile.root,newparent=plFile.root,newname='timeAdjust',recursive=True)
             plFile.root.header.header.cols.exptime[0] = obsFile.getFromHeader('exptime')
+            plFile.root.header.header.cols.unixtime[0] = obsFile.getFromHeader('unixtime')
         if pixRemapFileName is not None:
             pixRemapFile = tables.openFile(pixRemapFileName, 'r')
             try:
