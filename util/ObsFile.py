@@ -474,6 +474,8 @@ class ObsFile:
         #yOffset = self.wvlCalTable[iRow, iCol, 1]
         #amplitude = self.wvlCalTable[iRow, iCol, 2]
         #energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
+        if not hasattr(self,"vlCalTable"):
+            self.loadBestWvlCalFile()
         const = self.wvlCalTable[iRow, iCol, 0]
         lin_term = self.wvlCalTable[iRow, iCol, 1]
         quad_term = self.wvlCalTable[iRow, iCol, 2]
@@ -923,7 +925,7 @@ class ObsFile:
         """
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
-        
+
         if self.flatCalFile != None and ((wvlBinEdges == None and energyBinWidth == None and wvlBinWidth == None) or weighted == True):
         #We've loaded a flat cal already, which has wvlBinEdges defined, and no other bin edges parameters are specified to override it.
             spectrum, wvlBinEdges = np.histogram(wvlList, bins=self.flatCalWvlBins)
@@ -1522,7 +1524,6 @@ class ObsFile:
                 print "Searched "+wvlDir+" but no appropriate wavecal solution found"
                 raise IOError
         else:
-            print "Loading wavelength calibration from: "+wvlCalFileName
             self.loadWvlCalFile(wvlCalFileName)
                 
     def loadWvlCalFile(self, wvlCalFileName):
@@ -1537,9 +1538,12 @@ class ObsFile:
             wvlDir = os.path.dirname(os.path.dirname(FileName(obsFile=self).mastercalSoln()))
             fullWvlCalFileName = os.path.join(wvlDir, str(wvlCalFileName))
         try:
+            # If the file has already been loaded for this ObsFile then just return
+            if hasattr(self,"wvlCalFileName") and (self.wvlCalFileName == fullWvlCalFileName):
+                return
             self.wvlCalFile = tables.openFile(fullWvlCalFileName, mode='r')
+            self.wvlCalFileName = fullWvlCalFileName
             wvlCalData = self.wvlCalFile.root.wavecal.calsoln
-            self.wvlCalFileName = fullWvlCalFileName 
             self.wvlCalTable = np.zeros([self.nRow, self.nCol, ObsFile.nCalCoeffs])
             self.wvlErrorTable = np.zeros([self.nRow, self.nCol])
             self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
