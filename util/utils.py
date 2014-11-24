@@ -458,7 +458,7 @@ def linearFit( x, y, err=None ):
     solution, residuals, rank, s = scipy.linalg.lstsq(A, y)
     return solution
 
-def fitRigidRotation(x,y,ra,dec,x0=0,y0=0):
+def fitRigidRotation(x,y,ra,dec,x0=0,y0=0,chatter=False):
     """
     calculate the rigid rotation from row,col positions to ra,dec positions
 
@@ -471,6 +471,8 @@ def fitRigidRotation(x,y,ra,dec,x0=0,y0=0):
          dx = x-x0 and dy = y-y0
 
     ra,dec are input in decimal degrees
+
+    if chatter is True print some things to stdout
 
     The scale and rotation of the transform are recovered from the cd matrix;
       rm = w.wcs.cd
