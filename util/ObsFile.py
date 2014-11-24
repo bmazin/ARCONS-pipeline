@@ -474,7 +474,7 @@ class ObsFile:
         #yOffset = self.wvlCalTable[iRow, iCol, 1]
         #amplitude = self.wvlCalTable[iRow, iCol, 2]
         #energies = amplitude * (pulseHeights - xOffset) ** 2 + yOffset
-        if not hasattr(self,"vlCalTable"):
+        if not hasattr(self,"wvlCalTable"):
             self.loadBestWvlCalFile()
         const = self.wvlCalTable[iRow, iCol, 0]
         lin_term = self.wvlCalTable[iRow, iCol, 1]
