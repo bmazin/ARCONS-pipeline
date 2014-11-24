@@ -1,6 +1,35 @@
 import numpy as np
 
 
+
+def multiple_2d_circ_gauss_func(p_guess,errs=None):
+
+    def f(p, fjac=None, data=None, err=None,return_models=False):
+        #p[0] = background
+        #p[1] = amplitude
+        #p[2] = x_offset
+        #p[3] = y_offset
+        #p[4] = sigma for both x and y
+        #And so on for the 2nd and 3rd gaussians etc...
+        #A+Be^-((x-xo)^2+(y-y0)^2)/2s^2 + Ce^-((x-x1)^2+(y-y1)^2)/2d^2 + ...
+        #print p_guess
+        #print p
+        #print range(len(p[1:])%4)
+        
+        models=[p[0]*p_guess[0]*np.ones(np.asarray(data).shape)]
+        x=np.tile(range(len(data[0])),(len(data),1))
+        y=np.tile(range(len(data)),(len(data[0]),1)).transpose()
+        for i in range(len(p[1:])/4):
+            m = p[1+4*i]*p_guess[1+4*i] * np.exp( - (pow(x-p[2+i*4]*p_guess[2+i*4],2)+pow(y-p[3+i*4]*p_guess[3+i*4],2)) / (2 * pow(p[4+i*4]*p_guess[4+i*4],2)) )
+            models.append(m)
+        if return_models: return models
+        model = models[0]
+        for m in models[1:]: model+=m
+        status = 0
+        return([status,np.ravel((data-model)/err)])
+
+    return f
+
 def benitez2(p, fjac=None, x=None, y=None, err=None):
     model = pow(x,p[0]) * np.exp( -(pow(x/p[1]),p[2]))
     status = 0
@@ -249,4 +278,15 @@ def threegaussian_lorentzian(p, fjac=None, x=None, y=None, err=None,return_model
         return [gauss1, gauss2, gauss3, lorentz]
     status = 0
     return([status, (y-model)/err])
+    
+model_list = {
+    'parabola': parabola,
+    'gaussian': gaussian,
+    'fourgaussian': fourgaussian,
+    'threegaussian_exp': threegaussian_exp,
+    'threegaussian_exppow': threegaussian_exppow,
+    'threegaussian_moyal': threegaussian_moyal,
+    'threegaussian_power': threegaussian_power,
+    'threegaussian_lorentzian': threegaussian_lorentzian,
+    'multiple_2d_circ_gauss_func': multiple_2d_circ_gauss_func}
 

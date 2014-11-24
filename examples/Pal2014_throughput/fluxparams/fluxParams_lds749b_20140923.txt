@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2014/20140923
+flatdir=/Scratch/flatCalSolnFiles/PAL2014/20140923
+wvldir=/Scratch/waveCalSolnFiles/PAL2014/20140923
+fluxfile=obs_20140924-061330.h5
+skyfile=None
+flatfile=illumsol_20140923.h5
+wvlfile=calsol_20140924-060135.h5
+fluxdir=/Scratch/fluxCalSolnFiles/PAL2014/20140923
+fluxoutfile=fluxsol_20140923.h5
+objectName=lds749b
+xpix = 24
+ypix = 31
+rad = 15
+starttime = 0
+endtime = -1

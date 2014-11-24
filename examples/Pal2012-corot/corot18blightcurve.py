@@ -3,7 +3,11 @@ import matplotlib.pyplot as plt
 from util import utils
 from util.readDict import readDict
 from scipy import pi
+from mpltools	import style
+import figureHeader
 
+# try new plotting style for pipeline paper
+#style.use('ggplot')
 
 ####LOAD COROT18 LIGHTCURVE######
 param = readDict()
@@ -27,11 +31,11 @@ xpos = params[:,2]
 ypos = params[:,3]
 #jd2 = (jd/FoldPeriod)%1.
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.plot(jd, xpos,'k.')
-ax.plot(jd, ypos,'k.',color='red')
-plt.show()
+#fig = plt.figure()
+#ax = fig.add_subplot(111)
+#ax.plot(jd, xpos,'k.')
+#ax.plot(jd, ypos,'k.',color='red')
+#plt.show()
 
 Corotcurve = 2*pi*amps*widths**2
 #need to convert to Jy: curve*wvlrange*aveE/(1Hz*intTime*Area)
@@ -71,14 +75,16 @@ xpos = params[:,2]
 ypos = params[:,3]
 #jd2 = (jd/FoldPeriod)%1.
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.plot(jd, xpos,'k.')
-ax.plot(jd, ypos,'k.',color='red')
-plt.show()
+#fig = plt.figure()
+#ax = fig.add_subplot(111)
+#ax.plot(jd, xpos,'k.')
+#ax.plot(jd, ypos,'k.',color='red')
+#plt.show()
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
+
+#fig = plt.figure()
+#ax = fig.add_subplot(111)
+
 Compcurve = 2*pi*amps*widths**2
 #need to convert to Jy: curve*wvlrange*aveE/(1Hz*intTime*Area)
 
@@ -94,24 +100,29 @@ CompmeanYpos = utils.mean_filterNaN(ypos,size=7)
 #jd = jd[curve>=100]
 #curve = curve[curve>=100]
 
-ax.plot(jd, corotWidths,'k.',color='black')
-ax.plot(jd, compWidths,'k.',color='red')
-plt.show()
+
+#ax.plot(jd, corotWidths,'k.',color='black')
+#ax.plot(jd, compWidths,'k.',color='red')
+#plt.show()
+
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
+
 #curve/=np.median(curve)
 #fwhm/=np.median(fwhm)
-ax.plot(jd[jd<np.median(jd)]-2456269,Corotcurve[jd<np.median(jd)],'k.',color='black',markersize=10)
-#ax.plot(jd[0:len(jd)/2]-2456269,Compcurve,'k.',color='red')
-ax.set_xlabel("JD-2456269",fontsize=20)
-ax.set_ylabel("Counts",fontsize=20)
+ax.plot(jd[jd<np.median(jd)]-2456269,Corotcurve[jd<np.median(jd)],'k.',color='black',markersize=8)
+#ax.plot(jd[jd<np.median(jd)]-2456269,Compcurve[jd<np.median(jd)],'k.',color='red')
+ax.set_xlabel("JD-2456269")#,fontsize=20)
+ax.set_ylabel("Counts")#,fontsize=20)
+#ax.patch.set_visible(False)
 #ax.set_title("Uncorrected Corot-18 Lightcurve")
-ax.tick_params(axis='both', which='major', labelsize=14)
+#ax.tick_params(axis='both', which='major', labelsize=14)
 #plt.ylim([80000/180000,1])
-plt.ylim([80000,180000])
+#plt.ylim([80000/3.0,180000/3.0])
 #plt.yscale('log')
-plt.show()
+plt.savefig("Corot_all.eps",format='eps',bbox_inches='tight')
+#plt.show()
 
 subCounts = Corotcurve[(jd>2456269.8077) & (jd<2456269.8141)]
 subJD = jd[(jd>2456269.8077) & (jd<2456269.8141)]
@@ -127,15 +138,18 @@ print "stdev = %f"%stdev
 print "percent = %f %%"%(stdev/meanVal *100)
 
 fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.set_xlabel("JD-2456269",fontsize=20)
-ax.set_ylabel("Counts-mean",fontsize=20)
-ax.tick_params(axis='both', which='major', labelsize=14)
-ax.plot(subJD-2456269,subCounts,'k.',markersize=10)
-ax.plot(subJD-2456269,meanCounts,color='grey',linewidth=2)
-plt.axhspan(-stdev,stdev,facecolor='b',alpha=0.2)
-plt.xlim([.808,.814])
-plt.show()
+ax2 = fig.add_subplot(111)
+
+#ax2 = plt.axes([.4,.15,.5,.5])
+#ax2.set_xlabel("JD-2456269",fontsize=20)
+ax2.set_ylabel("Counts-mean",fontsize=20)
+ax2.tick_params(axis='both', which='major', labelsize=12)
+ax2.plot(subJD-2456269,subCounts,'k.',markersize=12)
+ax2.plot(subJD-2456269,meanCounts,color='grey',linewidth=2)
+ax2.axhspan(-stdev,stdev,facecolor='PowderBlue',alpha=0.2)
+ax2.set_xlim([.808,.814])
+plt.savefig("Corot_zoom.eps",format='eps')
+#plt.show()
 
 
 ratio = Corotcurve/Compcurve
@@ -146,8 +160,8 @@ ratio = ratio[ratio!=np.nan]
 jd = jd[ratio<=1000]
 ratio = ratio[ratio<=1000]
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.plot(jd,ratio,'k.')
-plt.show()
+#fig = plt.figure()
+#ax = fig.add_subplot(111)
+#ax.plot(jd,ratio,'k.')
+#plt.show()
 

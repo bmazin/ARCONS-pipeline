@@ -5,11 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from util import MKIDStd
+from headers import pipelineFlags
 from util.rebin import rebin
 import matplotlib
+from mpltools	import style
 from scipy import interpolate
 from scipy.optimize.minpack import curve_fit
 from math import exp
+import figureHeader
 
 def cleanSpectrum(x,y,objectName, wvlBinEdges):
         #locations and widths of absorption features in Angstroms
@@ -205,20 +208,69 @@ y = newa[:,1]
 
 #print x
 #print y
-
+fig = plt.figure()
+ax = fig.add_subplot(111)
 ax.plot(wvls,curve)
 ax.plot(x,y)
 ax.set_title('Absolute Spectrum of  '+FileName.split('/')[-1].split('_')[0])
-#ax.set_yscale('log')
-
+ax.set_yscale('log')
 plt.show()
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
 ax.plot(wvls,curve/y)
-ax.set_ylim(0,0.06)
+ax.set_ylim(0,0.02)
 ax.set_xlim(3750,12500)
+ax.set_title('Throughput')
 plt.show()
 
-np.savez('%s_throughput.npz'%(objectName.strip()),throughput=curve/y,wvls=wvls)
+# try new plotting style for pipeline paper
+#style.use('ggplot')
+fig = plt.figure()
+ax = fig.add_subplot(111)
+#Plot 2012 measured throughput data inverse: flux cal correction curve
+ax.plot(wvls,1/(curve/y),'black',linewidth=3)#, label='On-sky Total Throughput (2012)')
+ax.set_xlim(4000,11000)
+ax.set_ylim(0,250)
+plt.xlabel(ur"Wavelength [$\AA$]")
+plt.ylabel(ur"Spectral Calibration Curve")
+plt.savefig("FluxCal_SensitivityCurve.eps",format='eps')
+outdir = '/home/srmeeker/scratch/junk/'
+np.savez(outdir+'%s_throughput.npz'%(objectName.strip()),throughput=curve/y,wvls=wvls)
+
+#MAKE FLUXSOL FILE WITH ABSOLUTE FLUX CALIBRATION
+'''
+fluxCalFileName = "fluxsol_absolute_021727.h5"
+if os.path.isabs(fluxCalFileName) == True:
+    fullFluxCalFileName = fluxCalFileName
+else:
+    scratchDir = os.getenv('INTERM_PATH')
+    fluxDir = os.path.join(scratchDir,'fluxCalSolnFiles/PAL2012/20121211/')
+    fullFluxCalFileName = os.path.join(fluxDir,fluxCalFileName)
+
+try:
+    fluxCalFile = tables.openFile(fullFluxCalFileName,mode='w')
+except:
+    print 'Error: Couldn\'t create flux cal file, ',fullFluxCalFileName
+
+fluxFactors = y/curve
+fluxFlags = np.empty(np.shape(fluxFactors),dtype='int')
+fluxFlags.fill(pipelineFlags.fluxCal['good'])   #Initialise flag array filled with 'good' flags. JvE 5/1/2013.
+#set factors that will cause trouble to 1
+#self.fluxFlags[self.fluxFactors == np.inf] = 1
+fluxFlags[fluxFactors == np.inf] = pipelineFlags.fluxCal['infWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+fluxFactors[fluxFactors == np.inf]=1.0
+fluxFactors[np.isnan(fluxFactors)]=1.0
+fluxFlags[np.isnan(fluxFactors)] = pipelineFlags.fluxCal['nanWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+fluxFlags[fluxFactors <= 0]=pipelineFlags.fluxCal['LEzeroWeight']   #Modified to use flag dictionary - JvE 5/1/2013
+fluxFactors[fluxFactors <= 0]=1.0
+
+calgroup = fluxCalFile.createGroup(fluxCalFile.root,'fluxcal','Table of flux calibration weights by wavelength')
+caltable = tables.Array(calgroup,'weights',object=fluxFactors,title='Flux calibration Weights indexed by wavelengthBin')
+flagtable = tables.Array(calgroup,'flags',object=fluxFlags,title='Flux cal flags indexed by wavelengthBin. 0 is Good')
+bintable = tables.Array(calgroup,'wavelengthBins',object=wvlBinEdges,title='Wavelength bin edges corresponding to third dimension of weights array')
+fluxCalFile.flush()
+fluxCalFile.close()
+print "Finished Flux Cal, written to %s"%(fullFluxCalFileName)
+'''
 

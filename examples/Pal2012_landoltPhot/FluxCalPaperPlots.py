@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from util import utils
 import sys,os
 import tables
@@ -7,9 +8,12 @@ from util.ObsFile import ObsFile
 from util import MKIDStd
 from util.rebin import rebin
 import matplotlib
+from mpltools	import style
 from scipy import interpolate
 from scipy.optimize.minpack import curve_fit
+from matplotlib.ticker import ScalarFormatter 
 from numpy import exp
+import figureHeader
 
 def cleanSpectrum(x,y,objectName, wvlBinEdges):
         #locations and widths of absorption features in Angstroms
@@ -87,7 +91,7 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
 
         #new method, rebin data to grid of wavelengths generated from a grid of evenly spaced energy bins
         #R=7.0 at 4500
-        #R=E/dE -> dE = R/E
+        #R=E/dE -> dE = E/R
         dE = 0.3936 #eV
         start = 1000 #Angs
         stop = 25000 #Angs
@@ -95,7 +99,7 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         rebinned = rebin(wl,flux,enBins)
         re_wl = rebinned[:,0]
         re_flux = rebinned[:,1]
-        plt.plot(re_wl,re_flux*1E15,linestyle="o", marker="o",markersize=6) #plot rebinned spectrum with exp tail
+        plt.plot(re_wl,re_flux*1E15,linestyle="o", marker="o",markersize=10, color="blue") #plot rebinned spectrum with exp tail
         
         re_wl = re_wl[np.isnan(re_flux)==False]
         re_flux = re_flux[np.isnan(re_flux)==False]
@@ -144,6 +148,8 @@ def cleanSpectrum(x,y,objectName, wvlBinEdges):
         new_flux = interpolate.splev(new_wl,f,der=0)
         return new_wl, new_flux
 
+# try new plotting style for pipeline paper
+#style.use('ggplot')
 
 c=3.00E10 #cm/s
 h=6.626E-27 #erg*s
@@ -182,8 +188,10 @@ curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 #SETUP PLOTTING
 #matplotlib.rcParams.update({'font.size':12, 'font.family': 'sans-serif','sans-serif':['Helvetica']})
-plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-plt.rc('text',usetex=True)
+
+#ignore these parameters for Julian's figureHeader params
+#plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+#plt.rc('text',usetex=True)
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
@@ -252,16 +260,18 @@ curve*=h*(c*1E8)/x
 #plt.title("Spectrophotometric Standard Spectrum")
 #plt.legend(['Original Std Spectrum','BB Fit','Rebinned Std Spectrum','Resampled Std Spectrum','ARCONS Measured Spectrum'],'right', numpoints=1)
 plt.legend(['G158-100 Spectrum','BB Fit','Rebinned Std Spectrum','Resampled Std Spectrum'],'upper right', numpoints=1)
-plt.xlabel(ur"Wavelength [\AA]")
-plt.ylabel(ur"Flux [10$^{-15}$ ergs/s/cm$^{2}$/\AA]")
-plt.ylim(1,4.5)
+plt.xlabel(ur"Wavelength (\r{A})")
+plt.ylabel(ur"Flux (10$^{-15}$ ergs s$^{-1}$ cm$^{-2}$ \r{A}$^{-1}$)")
+plt.ylim(1,5)
 plt.savefig('FluxCal_StdSpectrum.eps',format='eps')
 #plt.show()
 
 bvrwvls = [4450, 5510, 6580]#center wvls for b v and r Johnson filters
 widths = [940/2.0, 880/2.0,1380/2.0] #filter FWHMs
-bvrthru = [.23,.24,.35] #as calculated by Pal2013 throughput code
-errors = [.04,.04,.04] #as calculated by Pal2013 throughput code (need to get real numbers, these are fake now)
+#bvrthru = [.237,.258,.35] #as calculated by Pal2013 throughput code
+#Readjusted standard star intensity by factor of 1.2 to get it to match known magnitudes better when multiplied through our filters
+bvrthru = [.199, .215, .273]
+errors = [.03,.05,.045] #as calculated by Pal2013 throughput code
 
 #load QE file for plotting
 QEFileName = "avgQE_20131125-202654.txt"
@@ -272,25 +282,92 @@ QEcurve = np.array(fdata[:,1])
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
-plt.errorbar(bvrwvls, np.array(bvrthru)*100, xerr = widths, yerr=np.array(errors)*100, fmt='o',color='black')
-ax.plot(qewvls, QEcurve*100,linestyle="--",color='black')
-ax.plot(wvls,curve/y*100,'black')
-#ax.set_ylim(4E-3,0.04)
-ax.set_ylim(4e-3*100,.42*100)
-ax.set_xlim(4000,11000)
-plt.xlabel(ur"Wavelength [\AA]")
-plt.ylabel(ur"Throughput [\%]")
 
+####Plot telescope throughput as measured with photo diode
+plt.errorbar(bvrwvls, np.array(bvrthru)*100, xerr = widths, yerr=np.array(errors)*100, fmt='o',color='black',markersize=8)#,label='Telescope BVR Throughput (2013)')
+
+####Plot ARCONS LAB QE 2013
+ax.plot(qewvls, QEcurve*100,linestyle="--",color='black')#, label='ARCONS QE (2013)')
+plt.fill_between(qewvls,QEcurve*100+1,QEcurve*100-1,color='LightSteelBlue',alpha=0.2)
+
+####plot calculated total throughput as telescope tp * arcons lab QE
 multqewvls = [4500, 5500, 6500]
-multqe = [QEcurve[qewvls==4500][0]*bvrthru[0], QEcurve[qewvls==5500][0]*bvrthru[1], QEcurve[qewvls==6500][0]*bvrthru[2]]
-plt.errorbar(multqewvls, np.array(multqe)*100, color='blue',fmt='o')
+QEcurvePoints = [QEcurve[qewvls==4500][0], QEcurve[qewvls==5500][0], QEcurve[qewvls==6500][0]]
+multqe = np.array(QEcurvePoints) * np.array(bvrthru)
+
+#estimate errors for QE data just as 1% for now. Don't save that info in the measurement, but QE alignment could make up 2% alone.
+#sig^2 = df/da^2*sig_a^2 where f is QEcurvePoints*bvrthru and sig_a is errors
+multqeErrs = np.sqrt(np.array(errors)**2*np.array(QEcurvePoints)**2 + .01**2*np.array(bvrthru)**2) 
+
+plt.errorbar(multqewvls, np.array(multqe)*100, xerr = widths, yerr=multqeErrs*100, color='blue',fmt='o',markersize=8)
 print multqe
 
-#plt.title("Sensitivity Curve")
-#plt.legend(['Telescope BVR Throughput','ARCONS QE', 'Total QE (Telescope + ARCONS)'],'upper right', numpoints=1)
+
+####Load and average On-sky 2013 throughput, plot up to where data gets messy
+path2013 = '/home/srmeeker/ARCONS-pipeline/examples/Pal2013_throughput/'
+files = ['115553/hz21_throughput.npz','120100/hz21_throughput.npz','121634/hz21_throughput.npz','122152/hz21_throughput.npz']
+fnum=0
+allthruput = []
+for filename in files:
+    t = np.load(path2013+filename)
+    wvls2013 = t['wvls']
+    thruput = t['throughput']
+    if fnum == 0:
+        curve2013=thruput
+    else:
+        curve2013+=thruput
+    allthruput.append(thruput)
+    fnum+=1
+curve2013/=len(files) #get average of each throughput file at each wavelength
+#get standard deviation of each file at each wavelength
+allthruput = np.array(allthruput)
+print allthruput
+thruputErrs = np.zeros((len(wvls2013)),dtype=float)
+print thruputErrs
+for i in xrange(len(wvls2013)):
+    thruputErrs[i] = np.std(allthruput[:,i])
+print "2013 Thruput errs = ", thruputErrs
+#plot 2013 throughput
+ax.plot(wvls2013[:-4],curve2013[:-4]*100,linestyle="-.",color='black')#, label=On-sky Total Throughput (2012)')
+plt.fill_between(wvls2013[:-4],(curve2013[:-4]-np.abs(thruputErrs[:-4]))*100,(curve2013[:-4]+np.abs(thruputErrs[:-4]))*100,color='PaleGreen',alpha=0.2)
+
+#automatic legend generation
+#leg=plt.legend(['Telescope BVR Throughput (2013)','ARCONS QE (2013)', 'On-sky Total Throughput (2013)', 'On-sky Total Throughput (2012)'],'upper right', numpoints=1)
+leg=plt.legend(['Telescope BVR\nThroughput','ARCONS QE', "(Telescope TP) *\n(ARCONS QE)", 'Measured Total\nThroughput'],'upper right', numpoints=1,prop={'size':8})
+
+#generate legend manually with right justified text
+#vp = leg._legend_box._children[-1]._children[0] 
+#for c in vp._children: 
+#   c._children.reverse() 
+#vp.align="right"
+
+#ax.set_ylim(4E-3,0.04)
+ax.set_ylim(4e-3*100,60)
+ax.set_xlim(4000,10500)
+plt.xlabel(ur"Wavelength (\r{A})")
+plt.ylabel(ur"Throughput (\%)")
+#set y axis to log scale
 ax.set_yscale('log')
+
+# force y-axis formatting to non-sci notation
+yax = plt.gca().yaxis 
+yax.set_major_formatter(ScalarFormatter()) 
+#plt.ticklabel_format(style='plain',useOffset=False)
+
+plt.savefig("FluxCal_LightAccounting.eps",format='eps')
+
+#MAKE THROUGHPUT CURVE FROM absSpectrumG158.py
+fig = plt.figure()
+ax = fig.add_subplot(111)
+#Plot 2012 measured throughput data inverse: flux cal correction curve
+ax.plot(wvls,1/(curve/y),'black',linewidth=3)#, label='On-sky Total Throughput (2012)')
+ax.set_xlim(4000,11000)
+ax.set_ylim(0,250)
+plt.xlabel(ur"Wavelength (\r{A})")
+plt.ylabel(ur"Spectral Calibration Curve")
 plt.savefig("FluxCal_SensitivityCurve.eps",format='eps')
+
 #plt.show()
 
-np.savez('%s_throughput.npz'%(objectName.strip()),throughput=curve/y,wvls=wvls)
+#np.savez('%s_throughput.npz'%(objectName.strip()),throughput=curve/y,wvls=wvls)
 

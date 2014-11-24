@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2014/20140925
+flatdir=/Scratch/flatCalSolnFiles/PAL2014/20140925
+wvldir=/Scratch/waveCalSolnFiles/PAL2014/20140925
+fluxfile=obs_20140926-025509.h5
+skyfile=None
+flatfile=illumsol_20140925.h5
+wvlfile=calsol_20140926-024539.h5
+fluxdir=/Scratch/fluxCalSolnFiles/PAL2014/20140925
+fluxoutfile=fluxsol_20140925.h5
+objectName=g24-9
+xpix = 26
+ypix = 21
+rad = 10
+starttime = 0
+endtime = -1

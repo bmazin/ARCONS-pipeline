@@ -872,11 +872,12 @@ class ObsFile:
         #else:
         #    return secImg
     
-    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None,timeSpacingCut=None):
+    def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,fluxWeighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None,timeSpacingCut=None):
         """
         Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
         If integration time is -1, all time after firstSec is used.
         If weighted is True, flat cal weights are applied.
+        If fluxWeighted is True, spectral shape weights are applied.
         """
         cube = [[[] for iCol in range(self.nCol)] for iRow in range(self.nRow)]
         effIntTime = np.zeros((self.nRow,self.nCol))
@@ -886,7 +887,7 @@ class ObsFile:
             for iCol in xrange(self.nCol):
                 x = self.getPixelSpectrum(pixelRow=iRow,pixelCol=iCol,
                                   firstSec=firstSec,integrationTime=integrationTime,
-                                  weighted=weighted,wvlStart=wvlStart,wvlStop=wvlStop,
+                                  weighted=weighted,fluxWeighted=fluxWeighted,wvlStart=wvlStart,wvlStop=wvlStop,
                                   wvlBinWidth=wvlBinWidth,energyBinWidth=energyBinWidth,
                                   wvlBinEdges=wvlBinEdges,timeSpacingCut=timeSpacingCut)
                 cube[iRow][iCol] = x['spectrum']
@@ -897,7 +898,7 @@ class ObsFile:
         return {'cube':cube,'wvlBinEdges':wvlBinEdges,'effIntTime':effIntTime, 'rawCounts':rawCounts}
 
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
-                         weighted=False, fluxWeighted=False, wvlStart=3000, wvlStop=13000,
+                         weighted=False, fluxWeighted=False, wvlStart=None, wvlStop=None,
                          wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None,timeSpacingCut=None):
         """
         returns a spectral histogram of a given pixel integrated from firstSec to firstSec+integrationTime,
@@ -909,6 +910,9 @@ class ObsFile:
         If energyBinWidth is specified, the wavelength bins use fixed energy bin widths
         If wvlBinWidth is specified, the wavelength bins use fixed wavelength bin widths
         If neither is specified and/or if weighted is True, the flat cal wvlBinEdges is used
+        
+        wvlStart defaults to self.wvlLowerLimit or 3000
+        wvlStop defaults to self.wvlUpperLimit or 13000
         
         ----
         Updated to return effective integration time for the pixel
@@ -923,6 +927,10 @@ class ObsFile:
         ABW Oct 7, 2014. Added rawCounts to dictionary
         ----
         """
+        wvlStart=wvlStart if (wvlStart!=None and wvlStart>0.) else (self.wvlLowerLimit if (self.wvlLowerLimit!=None and self.wvlLowerLimit>0.) else 3000)
+        wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 13000)
+
+        
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
 
@@ -946,6 +954,9 @@ class ObsFile:
                     spectrum, wvlBinEdges = np.histogram(wvlList, bins=nWvlBins, range=(wvlStart, wvlStop))
                 else:
                     raise ValueError('getPixelSpectrum needs either wvlBinWidth,wvlBinEnergy, or wvlBinEdges')
+                #else:
+                #    nWvlBins = 1
+                #    spectrum, wvlBinEdges = np.histogram(wvlList, bins=nWvlBins, range=(wvlStart, wvlStop))
             else:#We are given wvlBinEdges array
                 spectrum, wvlBinEdges = np.histogram(wvlList, bins=wvlBinEdges)
        
@@ -1416,7 +1427,7 @@ class ObsFile:
         fullFluxCalFileName = os.path.join(fluxCalPath, fluxCalFileName)
         if (not os.path.exists(fullFluxCalFileName)):
             print 'flux cal file does not exist: ', fullFluxCalFileName
-            return
+            raise IOError
         self.fluxCalFile = tables.openFile(fullFluxCalFileName, mode='r')
         self.fluxCalFileName = fullFluxCalFileName
         self.fluxWeights = self.fluxCalFile.root.fluxcal.weights.read()

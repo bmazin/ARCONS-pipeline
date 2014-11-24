@@ -66,7 +66,7 @@ class DisplayStack(QMainWindow):
     def initializeVariables(self):
         # Define path names
         self.displayStackPath = '/Scratch/DisplayStack/'
-        self.defaultWavelengthPath = '/Scratch/waveCalSolnFiles/'
+        self.defaultWavelengthPath = '/Scratch/waveCalSolnFiles/PAL2012/master_cals/'
         self.defaultFlatPath = '/Scratch/flatCalSolnFiles/'
        
         # Load and display list of run names from /Scratch/DisplayStack/runList.dict
@@ -212,7 +212,9 @@ class DisplayStack(QMainWindow):
                     self.validSettings = False
                 else:
                     self.selectedWvlCal = self.ui.wavelengthList.currentItem().text()
-                    self.wvlCalFilename = str(FileName(run=self.run,date=self.currentSunsetDate,tstamp=self.selectedWvlCal).calSoln())
+                    print "Chose wvl cal: ", str(self.defaultWavelengthPath+self.selectedWvlCal)
+                    self.wvlCalFilename = str(self.defaultWavelengthPath+self.selectedWvlCal)
+                    #self.wvlCalFilename = str(FileName(run=self.run,date=self.currentSunsetDate,tstamp=self.selectedWvlCal).calSoln())
 
             if self.useFlatCalibration:
                 if self.ui.flatList.currentItem() == None:
