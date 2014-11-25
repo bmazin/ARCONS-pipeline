@@ -766,14 +766,14 @@ iRow= 44  iCol= 43
         ts = '20141021-035035'
         fn = FileName.FileName(run,date,ts)
         obs = ObsFile.ObsFile(fn.obs())
-        #obs.loadBestWvlCalFile()
         fn.tstamp=""
         flatCalFileName = fn.flatSoln()
-        obs.loadBestWvlCalFile()
         obs.loadFlatCalFile(flatCalFileName)
+        #fluxCalFileName = fn.fluxSoln()
+        #obs.loadFluxCalFile(fluxCalFileName)
+        obs.loadBestWvlCalFile()
         sc = obs.getSpectralCube(integrationTime=2,
-                                 weighted=False,
-                                 wvlBinWidth=100)
+                                 weighted=False)
         print "sc.keys=",sc.keys()
 def npEquals(a,b):
     if (len(a) != len(b)):
