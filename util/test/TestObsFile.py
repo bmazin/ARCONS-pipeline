@@ -769,6 +769,7 @@ iRow= 44  iCol= 43
         #obs.loadBestWvlCalFile()
         fn.tstamp=""
         flatCalFileName = fn.flatSoln()
+        obs.loadBestWvlCalFile()
         obs.loadFlatCalFile(flatCalFileName)
         sc = obs.getSpectralCube(integrationTime=2,
                                  weighted=False,
