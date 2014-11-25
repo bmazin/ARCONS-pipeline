@@ -759,6 +759,21 @@ iRow= 44  iCol= 43
         self.assertEquals(inverted[1][0],2)
         self.assertEquals(inverted[1][1],4)
 
+    def testGetSpectralCube(self):
+        name = 'ring-20141020'
+        run = "PAL2014"
+        date = "20141020"
+        ts = '20141021-035035'
+        fn = FileName.FileName(run,date,ts)
+        obs = ObsFile.ObsFile(fn.obs())
+        #obs.loadBestWvlCalFile()
+        fn.tstamp=""
+        flatCalFileName = fn.flatSoln()
+        obs.loadFlatCalFile(flatCalFileName)
+        sc = obs.getSpectralCube(integrationTime=2,
+                                 weighted=False,
+                                 wvlBinWidth=100)
+        print "sc.keys=",sc.keys()
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False
@@ -768,7 +783,6 @@ def npEquals(a,b):
             return False
 
     return True
-
 
 if __name__ == '__main__':
     unittest.main()
