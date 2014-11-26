@@ -775,6 +775,62 @@ iRow= 44  iCol= 43
         sc = obs.getSpectralCube(integrationTime=2,
                                  weighted=False)
         print "sc.keys=",sc.keys()
+
+    def testGetSpectralCubeTwice(self):
+        name = 'ring-20141020'
+        run = "PAL2014"
+        date = "20141020"
+        ts = '20141021-035035'
+        fn = FileName.FileName(run,date,ts)
+        obs = ObsFile.ObsFile(fn.obs())
+        fn.tstamp=""
+        flatCalFileName = fn.flatSoln()
+        obs.loadFlatCalFile(flatCalFileName)
+        #fluxCalFileName = fn.fluxSoln()
+        #obs.loadFluxCalFile(fluxCalFileName)
+        obs.loadBestWvlCalFile()
+        obs.setWvlCutoffs(wvlLowerLimit=None, wvlUpperLimit=None)
+
+        print "first call"
+        sca = obs.getSpectralCube(firstSec=2.0, 
+                                  integrationTime=25.2070000172,
+                                  weighted=True, fluxWeighted=False)
+        print "second call"
+        scb = obs.getSpectralCube(firstSec=29.2070000172,
+                                  integrationTime=28.56399989,
+                                  weighted=True, fluxWeighted=False)
+        print "done"
+
+    def testGetPixelWvlListTwice(self):
+        name = 'ring-20141020'
+        run = "PAL2014"
+        date = "20141020"
+        ts = '20141021-035035'
+        fn = FileName.FileName(run,date,ts)
+        obs = ObsFile.ObsFile(fn.obs())
+        fn.tstamp=""
+        flatCalFileName = fn.flatSoln()
+        obs.loadFlatCalFile(flatCalFileName)
+        #fluxCalFileName = fn.fluxSoln()
+        #obs.loadFluxCalFile(fluxCalFileName)
+        obs.loadBestWvlCalFile()
+        obs.setWvlCutoffs(wvlLowerLimit=None, wvlUpperLimit=None)
+
+        print "first call"
+        pixelRow = 19
+        pixelCol = 11
+        sca = obs.getPixelWvlList(pixelRow, pixelCol,
+                                  2.0, 
+                                  25.2070000172,
+                                  timeSpacingCut=None)
+        print "second call"
+        scb = obs.getPixelWvlList(pixelRow, pixelCol,
+                                  29.2070000172,
+                                  28.56399989,
+                                  timeSpacingCut=None)
+
+        print "done"
+        
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False
