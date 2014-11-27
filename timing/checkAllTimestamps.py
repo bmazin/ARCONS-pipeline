@@ -2,7 +2,6 @@
 '''
 Author: Matt Strader        Date: March 6,2013
 
-This program opens a series of observations of the crab pulsar.  It calculates the period, and calcluates the phase for every photon in the series of observations, It then plots a light curve, and a histogram of counts per period
 '''
 from flatcal.flatCal import FlatCal
 from util.ObsFile import ObsFile
@@ -32,16 +31,17 @@ class firmwareDelayDescription(tables.IsDescription):
 
 def main():
 
-    run = 'LICK2012'
-    year = '2012'
-    initialPath = '/ScienceData'
+    run = 'PAL2014'
+    year = '2014'
+    initialPath = '/Scratch'
+    packetMasterLogDir = '/LABTEST/PacketMasterLogs/'
     initialPath = os.path.join(initialPath,run)
-    outPath = FileName(run=run).timeAdjustments()
+    outPath = FileName(run=run,mkidDataDir='/Scratch/').timeAdjustments()
     outFile = tables.openFile(outPath,'w')
     timeAdjustGroup = outFile.createGroup('/','timeAdjust','Times to add to timestamps')
     firmwareDelayTable = outFile.createTable(timeAdjustGroup,'firmwareDelay',firmwareDelayDescription,'Times to add to all timestamps taken with a firmware bof')
     newFirmwareEntry = firmwareDelayTable.row
-    newFirmwareEntry['firmwareName']='chan_snap_v3_2012_Oct_30_1216.bof'
+    newFirmwareEntry['firmwareName']='chan_svf_2014_Aug_06_1839.bof'
     newFirmwareEntry['firmwareDelay']=-41e-6 #s, subtract 41 us from timestamps
     newFirmwareEntry.append()
     firmwareDelayTable.flush()
@@ -57,11 +57,12 @@ def main():
             print obsFileName
         
 
-            obsFN = FileName(run=run,date=sunsetDate,tstamp=obsTStamp)
+            obsFN = FileName(run=run,date=sunsetDate,tstamp=obsTStamp,packetMasterLogDir=packetMasterLogDir)
             pmLogFileName = obsFN.packetMasterLog()
             try:
                 ob = ObsFile(fullObsPath)
             except:
+                print 'can\'t open file'
                 continue
                 
             try:
@@ -112,16 +113,15 @@ def main():
                 
 
             roachSecDelays =np.array(np.floor(lastTstampLines+firstPacketDelay-ob.getFromHeader('exptime')),dtype=np.int)
+            print 'roach delays',roachSecDelays
             if np.all(roachSecDelays >= 0):
                 newEntry = roachDelayTable.row
                 newEntry['obsFileName'] = os.path.basename(fullObsPath)
                 newEntry['roachDelays'] = roachSecDelays
                 newEntry.append()
                 roachDelayTable.flush()
-                print os.path.basename(fullObsPath),
-                for i in range(8):
-                    print roachSecDelays[i],
-                print ''
+            else:
+                print 'obs was aborted midway, delays cannot be calculated'
     roachDelayTable.close()
     outFile.close()
 
