@@ -432,6 +432,21 @@ ax2.yaxis.get_major_ticks()[-1].label1.set_visible(False)
 fig.text(.175,.55,'(b)',size=16)
 #ax2.legend(loc='lower left')
 
+fig = plt.figure(figsize=(8.,6.))
+#ax = fig.add_subplot(211)
+ax = fig.add_subplot(111)
+ax.errorbar(radioPhaseBinCenters,percentEnhancements,yerr=percentEnhancementErrors,linestyle='.',color='k')
+ax.plot(radioPhaseBins,np.append(percentEnhancements,percentEnhancements[-1]),'k',drawstyle='steps-post',label='enhancement relative to surrounding nonGRP')
+ax.axhline(0.,linewidth=1.,c='k')
+ax.axvline(opticalPeakPhase,c='gray',linestyle='--')
+
+ax.set_xlabel('GRP Arrival Phase')
+ax.set_ylabel('Optical Enhancement of\nGRP-Accompanied Pulses (%)')
+ax.set_ylim((-1.,16))
+ax.set_xlim((.991,1.005))
+ax.set_xlim((.991,1.005))
+ax.yaxis.get_major_ticks()[-1].label1.set_visible(False)
+
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
