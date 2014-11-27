@@ -84,7 +84,7 @@ def fitGauss(dataList,nBins=201):
 
     return {'gaussFit':gaussFit,'resolution':resolution,'sigma':sigma,'x_offset':x_offset,'amplitude':amplitude,'y_offset':y_offset,'hist':hist,'histBinEdges':histBinEdges,'gaussFitFunc':gaussFitFunc,'histBinCenters':histBinCenters,'parinfo':parinfo}
 
-flatTstamp = '20140924'
+flatTstamp = '20121211'
 flatType = 'flat'
 #flatTstamp = '20121212-074700' #Geminga sky flat
 folder = '/Scratch/dataProcessing/flatTests/'
@@ -116,40 +116,24 @@ if bCoolMask:
     afterImg[~mask] = 0
     print 'masked effIntTime fraction >{}'.format(effIntThreshold)
 
-deadBeforeImg = beforeImg == 0
-deadAfterImg = afterImg == 0
-
-
 nRows,nCols = np.shape(beforeImg)
 
-beforeList = beforeImg[beforeImg != 0]
+clippedBeforeImg = sigma_clip(beforeImg,sig=3)
+clipMask = clippedBeforeImg.mask
+beforeImg[clipMask] = 0
+afterImg[clipMask] = 0
 
-#clippedBeforeImg,clipMask = sigma_clip(beforeImg,sig=3,maout=True)
-#
-#beforeImg[clipMask] = 0
-#afterImg[clipMask] = 0
-
-hotSigmaCutoff = 2.
-
-hotBefore = beforeImg > np.mean(beforeList)+hotSigmaCutoff*np.std(beforeList)
-beforeImg[hotBefore] = 0.
-afterImg[hotBefore] = 0.
-
-#cut out pixels that the flatcal made hot
-afterList = afterImg[afterImg != 0]
-hotCutoff = np.percentile(afterList,97.)
-hotAfter = afterImg > np.mean(afterList)+hotCutoff
-
-beforeImg[hotAfter] = 0.
-afterImg[hotAfter] = 0.
+deadBeforeImg = (beforeImg == 0)
+deadAfterImg = (afterImg == 0)
 
 beforeList = beforeImg[beforeImg != 0]
 afterList = afterImg[afterImg != 0]
 
+afterImg[deadAfterImg] = np.nan
+beforeImg[deadBeforeImg] = np.nan
 
 plotArray(title='without flatcal',image=beforeImg)
 #plotArray(title='with flatcal',image=afterImg)
-
 
 def plotFunc(fig,axes):
     axes.plot(beforeHistEdges[0:-1],beforeHist,label='without flatcal')
@@ -160,9 +144,7 @@ def plotFunc(fig,axes):
     axes.legend()
 #pop(plotFunc=plotFunc)
 
-
 print 'before count',len(beforeList)
-
 print 'after count',len(afterList)
 
 # Fit a 3rd order, 2d polynomial to the non-flatcal image
@@ -202,20 +184,18 @@ plotArray(afterImgFit,vmin=0,title='poly fit to flatcal\'d image')
 
 #afterImgSub = afterImg / np.mean(afterList)
 afterImgSub = np.array(afterImg)
-afterImgSub[deadAfterImg] = 0
+#afterImgSub[deadAfterImg] = 0
 
 beforeImgSub = beforeImg * np.mean(beforeImgFit) / beforeImgFit
-beforeImgSub[deadBeforeImg] = 0
+#beforeImgSub[deadBeforeImg] = 0
 
 plotArray(beforeImgSub,title='unflatcal\'d, scaled by gray illumination')
 plotArray(afterImgSub,title='flatcal\'d')
 
-afterImgSub[deadAfterImg] = np.nan
-beforeImgSub[deadBeforeImg] = np.nan
 
 subAfterList = afterImgSub[~np.isnan(afterImgSub)]
 subBeforeList = beforeImgSub[~np.isnan(beforeImgSub)]
-nBins = int(len(afterList)/3.)
+nBins = int(len(afterList)/6.)
 subBeforeHist,subBeforeHistEdges = np.histogram(subBeforeList,bins=nBins)
 subAfterHist,subAfterHistEdges = np.histogram(subAfterList,bins=subBeforeHistEdges)
 beforeHist,beforeHistEdges = np.histogram(beforeList,bins=nBins)
@@ -248,6 +228,9 @@ pop(plotFunc=plotFunc)
 
 plotDict = {'rawHistEdges':beforeHistEdges,'rawHist':beforeHist,'illumHistEdges':subBeforeHistEdges,'illumHist':subBeforeHist,'flatHistEdges':subAfterHistEdges,'flatHist':subAfterHist}
 pickle.dump(plotDict,open( 'flatHist.pickle', 'wb' ))
+print plotDict['rawHist']
+print plotDict['illumHist']
+print plotDict['flatHist']
 
 #subBeforeGaussFitDict = fitGauss(subBeforeList)
 #histBinEdges = subBeforeGaussFitDict['histBinEdges']
