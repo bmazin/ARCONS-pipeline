@@ -19,19 +19,20 @@ if __name__=='__main__':
     np.seterr(all='ignore')
     outFolder = '/Scratch/dataProcessing/flatTests/'
     #open the sky file for hr9087
-    run = 'PAL2014'
+    run = 'PAL2012'
     wvlCal = '' #'20121211-052230'
 
-    #flatCalDate = '20121211'
-    flatCalDate = '20140924'
+    flatCalDate = '20121211'
+    #flatCalDate = '20140924'
     #flatCalTstamp = '20140925dome'
     #flatCalTstamp = '20121212-074700'
     flatCalTstamp = ''
     flatOutputLabel = flatCalDate
-    lowerWvlCut = 7000
-    upperWvlCut = 9000
+    lowerWvlCut = 4000
+    upperWvlCut = 8000
 
     #date = '20121210'
+    #obsTimestamp = '20121211-051650' #hr9087
     #obsTimestamp = '20121211-124809' #J0926
     #obsTimestamp = '20121211-125312' #J0926
     #obsTimestamp = '20121211-125814' #J0926
@@ -54,7 +55,7 @@ if __name__=='__main__':
     #obsTimestamp = '20121211-135730' #late twilight
 
 
-    #date = '20121211'
+    date = '20121211'
     #obsTimestamp = '20121212-085730' #geminga
     #obsTimestamp = '20121212-090233' #geminga
     #obsTimestamp = '20121212-090735' #geminga
@@ -70,7 +71,7 @@ if __name__=='__main__':
     #obsTimestamp = '20121212-104035' #geminga
     #obsTimestamp = '20121212-105326' #geminga
     #obsTimestamp = '20121212-110330' #geminga
-    #obsTimestamp = '20121212-111334' #geminga
+    obsTimestamp = '20121212-111334' #geminga
 
     #obsTimestamp = '20121212-112709' #J0926
     #obsTimestamp = '20121212-113212' #J0926
@@ -130,8 +131,8 @@ if __name__=='__main__':
     #obsTimestamp = '20140924-123738' #early twilight
 
 
-    date = '20140924'
-    obsTimestamp ='20140925-030054' #G24-9 sky, faint objects on array
+    #date = '20140924'
+    #obsTimestamp ='20140925-030054' #G24-9 sky, faint objects on array
     #obsTimestamp ='20140925-052248' #V407 Vul
     #obsTimestamp ='20140925-052804' #V407 Vul
     #obsTimestamp ='20140925-053307' #V407 Vul
@@ -245,7 +246,7 @@ if __name__=='__main__':
 
     #print 'raw sdev',np.std(rawImg[rawImg!=0])
     #print 'flat sdev',np.std(flatImg[flatImg!=0])
-    print 'illum sdev',np.std(illumImg[illumImg!=0])
+    #print 'illum sdev',np.std(illumImg[illumImg!=0])
 
     np.savez(os.path.join(outFolder,'flattenedCubes_obs{}_flat{}_wvl{}-{}.npz'.format(obsTimestamp,flatOutputLabel,lowerWvlCut,upperWvlCut)),rawImg=rawImg,flatImg=flatImg,illumImg=illumImg,rawCube=rawCube,flatCube=flatCube,illumCube=illumCube,exptime=exptime)
     
