@@ -49,8 +49,8 @@ class PhotonList(IsDescription):
     #QualityFlag = UInt8Col(dflt=255)           # Photon quality flag.  0=good, 1=pixel has incomplete wavelength coverage, 2=...; 255 indicates undetermined.
     timeMaskFlag = BoolCol(dflt=False)         # Set if photon is time-masked. True=bad, False=good.
     timeMaskReason = EnumCol(TimeMask.timeMaskReason, 'none', base='uint8')     # Time-mask reason ('none' if not time-masked)
-    jd = Float64Col(dflt=0) #Modified Julian Date
-    bjd = Float64Col(dflt=0) #Barycentered Modified Julian Date
+    mjd = Float64Col(dflt=0) #Modified Julian Date
+    baryMjd = Float64Col(dflt=0) #Barycentered Modified Julian Date
 
 class PulsarPhotonList(IsDescription):
     """The pytables derived class that stored reduced photons on disk for pulsar data.  The same as PhotonList, but with two additional 
@@ -80,8 +80,8 @@ class PulsarPhotonList(IsDescription):
     #QualityFlag = UInt8Col(dflt=255)           # Photon quality flag.  0=good, 1=pixel has incomplete wavelength coverage, 2=...; 255 indicates undetermined.
     timeMaskFlag = BoolCol(dflt=False)         # Set if photon is time-masked. True=bad, False=good.
     timeMaskReason = EnumCol(TimeMask.timeMaskReason, 'none', base='uint8')     # Time-mask reason ('none' if not time-masked)
-    jd = Float64Col(dflt=0) #Modified Julian Date
-    bjd = Float64Col(dflt=0) #Barycentered Modified Julian Date
+    mjd = Float64Col(dflt=0) #Modified Julian Date
+    baryMjd = Float64Col(dflt=0) #Barycentered Modified Julian Date
 
     pulseNumber = UInt32Col(dflt=0) # which pulsar period a photon occured in
-    phase = Float64Col(dflt=0) # The fraction of a pulse period at which the photon occured
+    pulsePhase = Float64Col(dflt=0) # The fraction of a pulse period at which the photon occured
