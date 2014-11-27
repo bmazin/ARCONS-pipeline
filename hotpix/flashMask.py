@@ -56,15 +56,19 @@ def checkHot(avg_on, std_on, avg_off, std_off,onfirst,n_sqrt=2.,n_std=3.,n_photo
     hotmask_on = np.zeros(len(avg_on))
     hotmask_off = np.zeros(len(avg_off))
     
+    #print avg_off[0:18]
+    #print std_off[0:18]
+    
     
     #Check if std is consistent with sqrt
     hotmask_on += std_on > n_sqrt*np.sqrt(avg_on)                   #Should be roughly equal for poison noise
     hotmask_on += std_on == 0                                       #If no standard deviation then flag as hot
-    hotmask_off += std_off > n_sqrt*np.sqrt(avg_off)
+    #hotmask_off += std_off > n_sqrt*np.sqrt(avg_off)
+    hotmask_off[np.where(avg_off>1)] += std_off[np.where(avg_off>1)] > n_sqrt*np.sqrt(avg_off[np.where(avg_off>1)])
     std_off[np.where(std_off==0)]=np.sqrt(avg_off)[np.where(std_off==0)]    #Sometimes only 1 bin for off times which makes the std=0
     std_off[np.where(std_off==0)]=1                                         #Sometimes threshold is set high enough that there are no off counts.
     #hotmask_off += std_off == 0
-    
+    #print np.where(hotmask_off > 0)[0]
     
     #Check if neighboring flashes are consistent
     neighbor_mask = np.abs(avg_on[1:]-avg_on[:-1]) > n_std*np.maximum(std_on[1:],std_on[:-1])       #Should be within error bars
@@ -73,7 +77,7 @@ def checkHot(avg_on, std_on, avg_off, std_off,onfirst,n_sqrt=2.,n_std=3.,n_photo
     neighbor_mask = np.abs(avg_off[1:]-avg_off[:-1]) > n_std*np.maximum(std_off[1:],std_off[:-1])
     hotmask_off += np.concatenate(([0],neighbor_mask))
     hotmask_off += np.concatenate((neighbor_mask,[0]))
-    
+    #print np.where(hotmask_off > 0)[0]
 
     #Check if flash goes on and off. Have to be careful about if lasers start out being on or off
     length = min(len(avg_on),len(avg_off))                                          #Number of total flashes 
@@ -85,6 +89,7 @@ def checkHot(avg_on, std_on, avg_off, std_off,onfirst,n_sqrt=2.,n_std=3.,n_photo
     mask_off2on = (avg_on[onfirst:length+onfirst] - avg_off[not onfirst:length+(not onfirst)]) < n_photons
     hotmask_on[onfirst:length+onfirst]+=mask_off2on
     hotmask_off[not onfirst:length+(not onfirst)]+=mask_off2on
+    #print np.where(hotmask_off > 0)[0], '\n'
     
     #Check if time period immediately surrounded by hot periods. 
     #(If the two surrounding off states appear hot then the on state between should be flagged too, & viceversa)
@@ -111,7 +116,7 @@ class flashMask:
     outputFileName - where to save the h5 file
     """
     def __init__(self, flashingFileName = None, obsFile = None, 
-                 binSize = 0.1, flashBuffer = 0.3, 
+                 binSize = 0.1, flashBuffer = 0.2, 
                  n_sqrt = 2., n_std = 3., n_photons = 1.,startTime=0, endTime= -1,
                  outputFileName = None, verbose=False):
 
@@ -223,9 +228,10 @@ class flashMask:
         for row in range(self.flashingFile.nRow):
             for col in range(self.flashingFile.nCol):
                 r=int(self.flashingFile.beamImage[row,col].split('r')[1][0])
+                #if r!=1: continue
                 p=int(self.flashingFile.beamImage[row,col].split('p')[1].split('/')[0])
                 temp_times = (self.flashingFile.getTimedPacketList(row,col,firstSec=self.startTime, integrationTime= self.endTime-self.startTime))['timestamps']
-                temp_timestream,bins = np.histogram(temp_times,self.nBins)
+                temp_timestream,bins = np.histogram(temp_times,self.nBins,range=(self.startTime,self.endTime))
 
                 if len(temp_times)==0:
                     continue
@@ -236,6 +242,7 @@ class flashMask:
                     pixelNumber_r.append([p])
                 else:
                     timestream_r[np.where(np.asarray(r_list)==r)[0]]+=temp_timestream
+                    #if row!=28 or col!=19: continue
                     pixelNumber_r[np.where(np.asarray(r_list)==r)[0]].append(p)
 
         flashMaskOn_r = []
@@ -333,8 +340,9 @@ class flashMask:
             for p in range(len(self.pixelNumber_r[k])):
                 pixelLabel = '/r'+str(self.r_list[k])+'/p'+str(self.pixelNumber_r[k][p])+'/t'+str(t)
                 [[row],[col]] = np.where(self.flashingFile.beamImage==pixelLabel)
+                #print '('+str(col)+', '+str(row)+') --> ',pixelLabel
                 temp_times = (self.flashingFile.getTimedPacketList(row,col,firstSec=self.startTime, integrationTime= self.endTime-self.startTime))['timestamps']
-                temp_timestream,bins = np.histogram(temp_times,self.nBins)
+                temp_timestream,bins = np.histogram(temp_times,self.nBins,range=(self.startTime,self.endTime))
 
                 #Find list of average count rates for each period the laser is on
                 split = np.array_split(temp_timestream,startsOn)[1:]  #The first array in split never contains a laser on period. (It's either a time buffer, off period, or empty)
@@ -365,8 +373,9 @@ class flashMask:
                 #If there are two on states in a row then there will be an avg=0, std=0 filler between for the off state
                 avg_off = np.ma.array([np.ma.mean(np.ma.array(split[i],mask=split_mask[i]*-1+1)) for i in range(len(split))]).filled(0)
                 std_off = np.ma.array([np.ma.std(np.ma.array(split[i],mask=split_mask[i]*-1+1)) for i in range(len(split))]).filled(0)
-                
-                
+                #print '#17 off: ','\n',split_mask[17], '\n', split[17], '\n',split_mask[17]*split[17],'\n'
+                #plt.plot(temp_timestream[0:600])
+                #plt.show()
                 #####Check if hot#####
                 onfirst = startsOn[0]<startsOff[0]
                 hotmask_on, hotmask_off = checkHot(avg_on, std_on, avg_off, std_off,onfirst=onfirst, n_sqrt=self.n_sqrt,n_std=self.n_std,n_photons=self.n_photons)
@@ -403,12 +412,12 @@ class flashMask:
 
 if __name__ == '__main__':
     from util.FileName import FileName
-    filename = "/ScienceData/PAL2014/20141020/cal_20141021-052251.h5"
+    filename = "/ScienceData/PAL2014/20140924/cal_20140925-023427.h5"
     outputFileName = FileName(obsFile=ObsFile(filename)).timeMask()
     #outputFileName = None
     masker = flashMask(filename,startTime = 0,endTime=-1,outputFileName = outputFileName,verbose=True)
-    masker.findFlashingTimes(showPlot=False)
-    masker.findHotPixels()
-    masker.writeHotPixMasks()
+    masker.findFlashingTimes(showPlot=True)
+    #masker.findHotPixels()
+    #masker.writeHotPixMasks()
 
 

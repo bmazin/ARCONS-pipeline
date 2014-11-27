@@ -123,9 +123,10 @@ if __name__ == '__main__':
     print 'Loading hotpix file'
     laserFlashFile.loadHotPixCalFile(FileName(obsFile=laserFlashFile).timeMask(), reasons=['hot pixel','laser not on'])
     print 'Making image'
-    result = laserFlashFile.getPixelCountImage(integrationTime= 2,getRawCount=True)
-    image = result['image']
-    #image = np.asarray([[1,2],[3,4]])
+    #result = laserFlashFile.getPixelCountImage(integrationTime= 2,getRawCount=True)
+    #image = result['image']
+    #image = result['effIntTimes']
+    image = laserFlashFile.hotPixTimeMask.getEffIntTimeImage()
     print 'Making plot'
     plotArray(image,button_press_event=partial(clickCanvas,laserFlashFile))
 

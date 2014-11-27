@@ -780,7 +780,7 @@ def findHotPixels(inputFileName=None, obsFile=None, outputFileName=None,
     masks = np.zeros([obsFile.nRow, obsFile.nCol, nSteps], dtype=np.int8)
 
     #Get the mask for each time step
-    im_dict = obsFile.getPixelCountImage(firstSec=0, integrationTime=-1,weighted=False,fluxWeighted=False,getRawCount=False)
+    im_dict = obsFile.getPixelCountImage(firstSec=0, integrationTime=-1,weighted=False,fluxWeighted=False,getRawCount=useRawCounts)
     deadMask = im_dict['image']<expTime/10.
     for i, eachTime in enumerate(stepStarts):
         print 'Processing time slice: ', str(eachTime) + ' - ' + str(eachTime + timeStep) + 's'
