@@ -349,6 +349,7 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
             plFile.copyNode(obsFile.timeAdjustFile.root,newparent=plFile.root,newname='timeAdjust',recursive=True)
             plFile.root.header.header.cols.exptime[0] = obsFile.getFromHeader('exptime')
             plFile.root.header.header.cols.unixtime[0] = obsFile.getFromHeader('unixtime')
+            plFile.root.header.header.cols.jd[0] = obsFile.getFromHeader('jd')
         if pixRemapFileName is not None:
             pixRemapFile = tables.openFile(pixRemapFileName, 'r')
             try:
