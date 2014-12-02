@@ -27,9 +27,10 @@ class PhotList(object):
     library of operations similar to the ObsFile class.
     '''
     
-    def __init__(self, fileName):
+    def __init__(self, fileName,mode='r'):
         '''
         Initialise by loading a photon list file.
+        mode determines whether to open for reading and/or writing
         '''
         self.file = None           #To contain the photon list file object
         self.fileName = None       #Name of the photon list file
@@ -39,7 +40,7 @@ class PhotList(object):
         self.startTime = None      #To be implemented!
         self.photTable = None      #To reference the photon list table node within self.file (just a shortcut)
         self.hotPixTimeMask = None      #To store the hot pixel info dictionary after a hot (or bad) pixel file is loaded.
-        self.loadFile(fileName)
+        self.loadFile(fileName,mode=mode)
     
     def __del__(self):
         '''
@@ -48,7 +49,7 @@ class PhotList(object):
         self.file.close()
         
     
-    def loadFile(self,fileName,doParseHotPixTimeMask=False):
+    def loadFile(self,fileName,doParseHotPixTimeMask=False,mode='r'):
         '''
         Open up the .h5 photon list file for reading.
         INPUTS:
@@ -56,6 +57,7 @@ class PhotList(object):
             parseHotPixTimeMask - if True, parse the hotpixel time mask data
                         right away, and store the resulting dictionary
                         in self.hotPixTimeMask (as output by hotPixels.readHotPixels()).
+            mode - passed to openFile.  'w' mode is not allowed.
         '''
         
         self.fileName = os.path.basename(fileName)
@@ -67,8 +69,10 @@ class PhotList(object):
             #    print msg
             raise Exception(msg)
 
+        if mode == 'w':
+            raise Exception('mode is \'w\'. Do not load a PhotonList with mode=\'w\'. This will delete the file')
         #open the hdf5 file
-        self.file = tables.openFile(self.fullFileName, mode='r')
+        self.file = tables.openFile(self.fullFileName, mode=mode)
 
         #Figure out the number of rows and columns in the detector array.
         self.nRow, self.nCol = self.file.root.beammap.beamimage.shape
@@ -225,15 +229,18 @@ class PhotList(object):
 
 
         
-def createEmptyPhotonListFile(obsFile,fileName=None):
-     """
-     creates a photonList h5 file 
-     using header in headers.ArconsHeaders
-     
-     INPUTS:
-         fileName - string, name of file to write to. If not supplied, default is used
+def createEmptyPhotonListFile(obsFile,fileName=None,photListDescription=ArconsHeaders.PhotonList):
+    """
+    creates a photonList h5 file 
+    using header in headers.ArconsHeaders
+    
+    INPUTS:
+        fileName - string, name of file to write to. If not supplied, default is used
                     based on name of original obs. file and standard directories etc.
                     (see usil.FileName). Added 4/29/2013, JvE
+        photListDescription - a pytables description class that lays out the column structure of the photon table
+                for a normal photon list, leave as ArconsHeaders.PhotonList.  For analyzing pulsars, use
+                ArconsHeaders.PulsarPhotonList, which has a couple extra pulsar-specfic columns
      """
      
      if fileName is None:    
@@ -254,7 +261,7 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
      plFile = tables.openFile(fullPhotonListFileName, mode='w')
      try:
          plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
-         plTable = plFile.createTable(plGroup, 'photons', ArconsHeaders.PhotonList, 'Photon List Data', 
+         plTable = plFile.createTable(plGroup, 'photons', photListDescription, 'Photon List Data', 
                                       filters=bloscFilter) 
                                       #expectedrows=300000)
      except:
@@ -266,7 +273,8 @@ def createEmptyPhotonListFile(obsFile,fileName=None):
 
 
 def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1, 
-                    doIndex=True, pixRemapFileName=None):
+                    doIndex=True, pixRemapFileName=None,
+                    photListDescription = ArconsHeaders.PhotonList):
     """
     writes out the photon list for this obs file at $MKID_PROC_PATH/photonListFileName
     currently cuts out photons outside the valid wavelength ranges from the wavecal
@@ -329,7 +337,8 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
         filename=FileName(obsFile=obsFile).photonList()
     
     print 'Initialising empty photon list file'
-    plFile = createEmptyPhotonListFile(obsFile,filename)
+    plFile = createEmptyPhotonListFile(obsFile,filename,photListDescription=photListDescription)
+
     plTable = plFile.root.photons.photons
     
     #Copy all the various cal files used into the photon list file.        
@@ -384,11 +393,11 @@ def writePhotonList(obsFile, filename=None, firstSec=0, integrationTime=-1,
             pixMap = None
     
         #Make a numpy structured array dtype from the photon-list description header.
-        #Currently uses somewhat undocumented hack in order to easily get a numpy 'dtype' from the headers.ArconsHeaders.PhotonList description.
+        #Currently uses somewhat undocumented hack in order to easily get a numpy 'dtype' from the photListDescription  class.
         #See http://pytables.github.io/usersguide/libref/declarative_classes.html?highlight=isdescription#tables.IsDescription
         # and specifically http://pytables.github.io/_modules/tables/description.html#dtype_from_descr
         #Newer versions of pytables (some time after v2.3.1?) should have a dtype_from_descr() function to pull this out directly....
-        photListDescription = ArconsHeaders.PhotonList()
+        photListDescriptionObject = photListDescription()
         photListDtype = tables.Description(photListDescription.columns)._v_dtype
 
         wvlGoodFlag = pipelineFlags.waveCal['good']     #Just to avoid the dictionary lookup within the loop.
