@@ -105,15 +105,19 @@ def aperture(startpx=None, startpy=None, cenRA=None, cenDec=None, nPixRA=None, n
             #print limits
             
             if degrees == True:   #If cenRA/cenDec are given in degrees.
-                cenRA = ((cenRA-limits[0])/stepRA)   #sets the center of the aperature by converting its location to pixel location on virtual grid.
+                
+                cenRA = ((limits[1]-cenRA)/stepRA)
+
+                #cenRA = ((cenRA-limits[0])/stepRA)   #sets the center of the aperature by converting its location to pixel location on virtual grid.
                 cenDec = ((cenDec-limits[2])/stepDec) #both RA and Dec ^^^^
                 #print cenRA
                 #print cenDec
             else:                   #if cenRA/cenDec are given in radians.
 
                 cenRA = ((limits[1] - (cenRA*(180./numpy.pi)))/stepRA)  #converts the RA/Dec to degrees and converts to pixel location on virtual grid.
-                cenDec = ((limits[3] - (cenDec*(180./numpy.pi)))/stepDec)  
-            
+                #cenDec = ((limits[3] - (cenDec*(180./numpy.pi)))/stepDec)  
+                cenDec = (((cenDec*(180./numpy.pi))-limits[2])/stepDec)            
+
             if numpy.allclose(stepRA, stepDec) == True:  #this ensures that the RA and Declination are being incremented by the same step values on the virtual grid.
                 r = r/stepRA   #converts radius to a radius in the virtual image.
                 length = length/stepRA
