@@ -52,6 +52,9 @@ def timePhotonList(photonListPath,parFile,bPulsarTiming=False,nPhotonsPerProcess
         nProcesses - The number of processors the calculation should be split amongst.
         kwargs - other arguments passed to processTimestamps or saveResultsWorker.  See processTimestamps().
     '''
+    if not os.path.exists(parFile):
+        print 'ERROR: par file not found!'
+        raise Exception('Par file {} does not exist'.format(parFile))
     #open the file
     photonList = PhotList(photonListPath,mode='r+')
     #assume the JD in the photon list header is correct
@@ -65,8 +68,8 @@ def timePhotonList(photonListPath,parFile,bPulsarTiming=False,nPhotonsPerProcess
 
     if nProcesses > 1: #Split the work over multiple processes
 
-        #We will split the work into chunks of nPhotonsPerProcess.
-        #For each chunk, we'll start a process which will call processTimestamps to barycenter it's chunk
+        #We will split the work into chunks of size nPhotonsPerProcess.
+        #For each chunk, we'll start a process which will call processTimestamps, to barycenter its chunk
         #we'll also start a thread which will take the barycentered timestamps and other values and stuff them
         #back into the photonList.
 
@@ -89,7 +92,7 @@ def timePhotonList(photonListPath,parFile,bPulsarTiming=False,nPhotonsPerProcess
             timingWorkerKwargs = kwargs.copy()
             timingWorkerKwargs['parFile'] = parFile
             timingWorkerKwargs['verbose'] = verbose
-            timingWorker = multiprocessing.Process(target=__processTimestampsWorker,args=(inputQueue,resultsQueue),kwargs=kwargs)
+            timingWorker = multiprocessing.Process(target=__processTimestampsWorker,args=(inputQueue,resultsQueue),kwargs=timingWorkerKwargs)
             timingWorker.start()#start so it will be waiting for something in the inputQueue
             timingWorkers.append(timingWorker)#add to list of active processes
 
@@ -179,18 +182,18 @@ def timePhotonList(photonListPath,parFile,bPulsarTiming=False,nPhotonsPerProcess
             colsToIndex = ['mjd','baryMjd']
             
         for colName in colsToIndex:
-            if photonList.colinstances[colName].is_indexed:
+            if photonList.photTable.colinstances[colName].is_indexed:
                 warnings.warn('Column is already indexed: '+colName+' - skipping.')
             else:
                 if verbose:
                     print 'Indexing column: '+colName
-                photonList.colinstances[colName].createCSIndex()
+                photonList.photTable.colinstances[colName].createCSIndex()
     finally:
         photonList.file.flush()
     del photonList
 
 
-def __processTimestampsWorker(inputQueue,resultsQueue,**kwargs):
+def __processTimestampsWorker(inputQueue,resultsQueue,parFile,**kwargs):
     '''
     This function will be invoked as a separate process.  It takes a dict with mjdTimestamp values from inputQueue,
     sends them through processTimestamps, then packages the results into a dict to be stuffed in resultsQueue
@@ -203,7 +206,7 @@ def __processTimestampsWorker(inputQueue,resultsQueue,**kwargs):
     inputDict = inputQueue.get()
     if kwargs.get('verbose',False):
         print 'new data in queue, start timing program'
-    resultsDict = processTimestamps(mjdTimestamps=inputDict['mjdTimestamps'],**kwargs)
+    resultsDict = processTimestamps(mjdTimestamps=inputDict['mjdTimestamps'],parFile=parFile,**kwargs)
     resultsDict.update(inputDict)#stuff mjdTimestamps,iPhotonStart,iPhotonEnd into results 
     #to be passed along
     resultsQueue.put(resultsDict)
@@ -249,6 +252,7 @@ def processTimestamps(mjdTimestamps,parFile,workingDir=os.getcwd(),timingProgram
         timingProgram - 'tempo2' to run TEMPO2 and 'tempo' to run TEMPO.  This determines whether the output is in TCB (tempo2) or TDB (tempo) standard format as well as what pulsar binary models are allowed
         bCleanTempDir - when finished, the temporary directory created for inputs and outputs is deleted
         verbose - if True, will print debugging information
+        timingProgramLog - a filename to which the text output of tempo/tempo2 should be written.
 
     OUPUTS:
         Return value is a dictionary with tags:
@@ -258,121 +262,118 @@ def processTimestamps(mjdTimestamps,parFile,workingDir=os.getcwd(),timingProgram
             'pulseNumbers' - which pulses each timestamp corresponds to relative to the TZR reference time from the
                 par file
     '''
-    print 'workingDir',workingDir,os.path.exists(parFile)
-    print 'parFile',parFile,os.path.exists(parFile)
-    print 'abs',os.path.abspath(workingDir)
+    if not os.path.exists(parFile):
+        print 'ERROR: par file not found!'
+        raise Exception('Par file {} does not exist'.format(parFile))
     nTimestamps = len(mjdTimestamps)
-    workingTime = '{:.4f}'.format(time.time())
+    workingTime = '{:.5f}'.format(time.time())
     tempDir = os.path.join(workingDir,'dir'+workingTime)
-    print 'tempDir',tempDir
     parPath = os.path.abspath(parFile)
     parFilename = os.path.basename(parPath)
-    print 'parPath',parPath,parFilename
 
     
     #make a temporary directory and switch to it, so the various output files will all be here
     priorCwd = os.getcwd()
+    while os.path.exists(tempDir):
+        #just in case this process was started at the same time as another, let's check that the 
+        #tempDir name isn't already used, and adjust it if needed.
+        tempDir = tempDir + '0'
     os.mkdir(tempDir)
-    os.chdir(tempDir)
-    #make a copy of the par file in the new temp directory, so tempo won't change the original file
+    try:
+        os.chdir(tempDir)
+        #make a copy of the par file in the new temp directory, so tempo won't change the original file
 
-    print 'newDir',os.getcwd(),os.path.exists(os.getcwd())
-    shutil.copy(parPath,parFilename)
-    print 'parPath',parPath,os.path.exists(parPath)
-    if timingProgram == 'tempo2':
-        tempJDPath = 'temp_toa.txt' #input file
-        tempBJDPath = 'temp_bary_toa.txt' #output file
+        shutil.copy(parPath,parFilename)
+        if timingProgram == 'tempo2':
+            tempJDPath = 'temp_toa.txt' #input file
+            tempBJDPath = 'temp_bary_toa.txt' #output file
 
-        #save the timestamps to the tempo2 input file
-        np.savetxt(tempJDPath,mjdTimestamps)
-    
-        #form the tempo2 command using the arcons plugin
-        strCommand = 'tempo2 -gr arcons -f {} -a {} -o {} > {}'.format(parFilename,tempJDPath,tempBJDPath,timingProgramLog)
-
-        #run tempo2
-        if verbose:
-            print 'running timing program',strCommand
-        proc = subprocess.Popen(strCommand,shell=True)
-        proc.wait()
-
-        if verbose:
-            print 'parsing results'
+            #save the timestamps to the tempo2 input file
+            np.savetxt(tempJDPath,mjdTimestamps)
         
-        #parse the results
-        tempoOutput = np.loadtxt(tempBJDPath,usecols=[1,2])
-        nBaryTimestamps = len(tempoOutput)
-        if nBaryTimestamps != nTimestamps:
-            raise Exception('number of photons sent to tempo2 does not match number of photons returned')
-        baryMjdTimestamps = tempoOutput[:,0]
-        phases = tempoOutput[:,1]
-        pulseNumbers = np.array(phases,dtype=np.uint32)
-        pulsePhases = numexpr.evaluate('phases%1.')
+            #form the tempo2 command using the arcons plugin
+            strCommand = 'tempo2 -gr arcons -f {} -a {} -o {} > {}'.format(parFilename,tempJDPath,tempBJDPath,timingProgramLog)
+
+            #run tempo2
+            if verbose:
+                print 'running timing program',strCommand
+            proc = subprocess.Popen(strCommand,shell=True)
+            proc.wait()
+
+            if verbose:
+                print 'parsing results'
+            
+            #parse the results
+            tempoOutput = np.loadtxt(tempBJDPath,usecols=[1,2])
+            nBaryTimestamps = len(tempoOutput)
+            if nBaryTimestamps != nTimestamps:
+                raise Exception('number of photons sent to tempo2 does not match number of photons returned')
+            baryMjdTimestamps = tempoOutput[:,0]
+            phases = tempoOutput[:,1]
+            pulseNumbers = np.array(phases,dtype=np.uint32)
+            pulsePhases = numexpr.evaluate('phases%1.')
+            
+        elif timingProgram == 'tempo':
+            tempJDPath = 'temp_toa.tim' #input file
+            tempPulseNumbersPath = 'pulseNumbers.txt' #optional output file
+
+            #.tim format
+            ##first line indicates using tempo2 style TOA's with keyword FORMAT
+            #following lines follow the format:
+            #photonLabel observing_frequency toa_mjd(utc) error observatory_site_code
+            #the first toa line will be the reference time TZR, which defines phase 0
+
+            #Example:
+            #FORMAT 1 
+            #TZR 0.000000000000 56273.164314974114 0.0 GB
+            #arcons 0.0 56273.163858501241 0.0 PL
+
+            formatLine = b'FORMAT 1\n'
+            #read reference point TZR from par file
+            parDict = readParFile(parFilename)
+            tzrMjd = parDict['TZRMJD'][0]
+            tzrFreq  = parDict['TZRFRQ'][0]
+            tzrSite = parDict['TZRSITE'][0]
+            tzrError = 0.
+            tzrLine = b'TZR {} {} {:.1f} {}\n'.format(tzrFreq,tzrMjd,tzrError,tzrSite)
+
+            #create the tempo .tim input file
+            with open(tempJDPath,'wb') as tempJDFile:
+                tempJDFile.write(formatLine)
+                tempJDFile.write(tzrLine)
+                toaLine = 'arcons 0.0 %.12f 0.0 PL' #PL for Palomar, frequency=0, label=arcons, error=0
+                np.savetxt(tempJDFile,mjdTimestamps,fmt=toaLine)
+
+            paramsToFit = 1
+            #form the tempo command
+            nToasToAllocate = nTimestamps+1
+            strCommand = 'tempo -f {} -no {} -m{} -l{} {} > {}'.format(parFilename,tempPulseNumbersPath,nToasToAllocate,paramsToFit,tempJDPath,timingProgramLog)
+
+            #Run tempo
+            if verbose:
+                print 'running timing program',strCommand
+            proc = subprocess.Popen(strCommand,shell=True)
+            proc.wait()
+
+            if verbose:
+                print 'parsing results'
         
-    elif timingProgram == 'tempo':
-        tempJDPath = 'temp_toa.tim' #input file
-        tempPulseNumbersPath = 'pulseNumbers.txt' #optional output file
-
-        #.tim format
-        ##first line indicates using tempo2 style TOA's with keyword FORMAT
-        #following lines follow the format:
-        #photonLabel observing_frequency toa_mjd(utc) error observatory_site_code
-        #the first toa line will be the reference time TZR, which defines phase 0
-
-        #Example:
-        #FORMAT 1 
-        #TZR 0.000000000000 56273.164314974114 0.0 GB
-        #arcons 0.0 56273.163858501241 0.0 PL
-
-        formatLine = b'FORMAT 1\n'
-        #read reference point TZR from par file
-        parDict = readParFile(parFilename)
-        tzrMjd = parDict['TZRMJD'][0]
-        tzrFreq  = parDict['TZRFRQ'][0]
-        tzrSite = parDict['TZRSITE'][0]
-        tzrError = 0.
-        tzrLine = b'TZR {} {} {:.1f} {}\n'.format(tzrFreq,tzrMjd,tzrError,tzrSite)
-
-        #create the tempo .tim input file
-        with open(tempJDPath,'wb') as tempJDFile:
-            tempJDFile.write(formatLine)
-            tempJDFile.write(tzrLine)
-            toaLine = 'arcons 0.0 %.12f 0.0 PL' #PL for Palomar, frequency=0, label=arcons, error=0
-            np.savetxt(tempJDFile,mjdTimestamps,fmt=toaLine)
-
-        paramsToFit = 1
-        #form the tempo command
-        nToasToAllocate = nTimestamps+1
-        strCommand = 'tempo -f {} -no {} -m{} -l{} {} > {}'.format(parFilename,tempPulseNumbersPath,nToasToAllocate,paramsToFit,tempJDPath,timingProgramLog)
-
-        #Run tempo
-        if verbose:
-            print 'running timing program',strCommand
-        proc = subprocess.Popen(strCommand,shell=True)
-        proc.wait()
-
-        if verbose:
-            print 'parsing results'
-    
-        #parse barycentered timestamps, pulseNumbers, phases from output files
-        residuals = read_residuals()
-        #the reference TZR is the first photon, remove it
-        baryMjdTimestamps = residuals.bary_TOA[1:] 
-        pulsePhases = residuals.prefit_phs[1:]
-        pulseNumbers = np.loadtxt(tempPulseNumbersPath)[1:]
-        #some phases may be reported as negative, positive value would be 1+(-phase)
-        pulsePhases[pulsePhases<0.] = pulsePhases[pulsePhases<0.]+1.
-        if len(baryMjdTimestamps) != nTimestamps or len(pulseNumbers) != nTimestamps or len(pulsePhases) != nTimestamps:
-            print 'number of pulseNumbers doesn\'t match input',nTimestamps,len(pulseNumbers)
-            print tempPulseNumbersPath,os.getcwd()
-            print pulseNumbers
-            raise Exception('number of photons sent to tempo ({}) does not match number of photons returned ({})'.format(nTimestamps,len(pulseNumbers)))
-        print 'results parsed'
-
-        
-    if bCleanTempDir:
-        print 'removing tempDir'
-        shutil.rmtree(tempDir)
-        print 'tempDir',tempDir,os.path.exists(tempDir)
+            #parse barycentered timestamps, pulseNumbers, phases from output files
+            residuals = read_residuals()
+            #the reference TZR is the first photon, remove it
+            baryMjdTimestamps = residuals.bary_TOA[1:] 
+            pulsePhases = residuals.prefit_phs[1:]
+            pulseNumbers = np.loadtxt(tempPulseNumbersPath)[1:]
+            #some phases may be reported as negative, positive value would be 1+(-phase)
+            pulsePhases[pulsePhases<0.] = pulsePhases[pulsePhases<0.]+1.
+            if len(baryMjdTimestamps) != nTimestamps or len(pulseNumbers) != nTimestamps or len(pulsePhases) != nTimestamps:
+                print 'number of results doesn\'t match number of input timestamps',nTimestamps,len(pulseNumbers)
+                raise Exception('number of photons sent to tempo ({}) does not match number of photons returned ({})'.format(nTimestamps,len(pulseNumbers)))
+    finally:
+        if bCleanTempDir:
+            if verbose:
+                print 'removing tempDir'
+            shutil.rmtree(tempDir)
     os.chdir(priorCwd)
     return {'baryMjdTimestamps':baryMjdTimestamps,'pulsePhases':pulsePhases,'pulseNumbers':pulseNumbers}
 
