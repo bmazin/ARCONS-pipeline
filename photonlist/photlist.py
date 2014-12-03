@@ -241,33 +241,33 @@ def createEmptyPhotonListFile(obsFile,fileName=None,photListDescription=ArconsHe
         photListDescription - a pytables description class that lays out the column structure of the photon table
                 for a normal photon list, leave as ArconsHeaders.PhotonList.  For analyzing pulsars, use
                 ArconsHeaders.PulsarPhotonList, which has a couple extra pulsar-specfic columns
-     """
+    """
      
-     if fileName is None:    
-         #fileTimestamp = obsFile.fileName.split('_')[1].split('.')[0]
-         #fileDate = os.path.basename(os.path.dirname(obsFile.fullFileName))
-         #run = os.path.basename(os.path.dirname(os.path.dirname(obsFile.fullFileName)))
-         #fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
-         #fullPhotonListFileName = fn.photonList()
-         fullPhotonListFileName = FileName(obsFile=obsFile).photonList()
-     else:
+    if fileName is None:    
+    #fileTimestamp = obsFile.fileName.split('_')[1].split('.')[0]
+    #fileDate = os.path.basename(os.path.dirname(obsFile.fullFileName))
+    #run = os.path.basename(os.path.dirname(os.path.dirname(obsFile.fullFileName)))
+    #fn = FileName(run=run, date=fileDate, tstamp=fileTimestamp)
+    #fullPhotonListFileName = fn.photonList()
+        fullPhotonListFileName = FileName(obsFile=obsFile).photonList()
+    else:
          fullPhotonListFileName = fileName
-     if (os.path.exists(fullPhotonListFileName)):
-         if utils.confirm('Photon list file %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
-             warnings.warn('No photon list file created')
-             return
-     zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
-     bloscFilter = tables.Filters(complevel=9, complib='blosc', fletcher32=False)    #May be more efficient to use - needs some experimenting with compression level etc.
-     plFile = tables.openFile(fullPhotonListFileName, mode='w')
-     try:
-         plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
-         plTable = plFile.createTable(plGroup, 'photons', photListDescription, 'Photon List Data', 
+    if (os.path.exists(fullPhotonListFileName)):
+        if utils.confirm('Photon list file %s exists. Overwrite?' % fullPhotonListFileName, defaultResponse=False) == False:
+            warnings.warn('No photon list file created')
+            return
+    zlibFilter = tables.Filters(complevel=1, complib='zlib', fletcher32=False)
+    bloscFilter = tables.Filters(complevel=9, complib='blosc', fletcher32=False)    #May be more efficient to use - needs some experimenting with compression level etc.
+    plFile = tables.openFile(fullPhotonListFileName, mode='w')
+    try:
+        plGroup = plFile.createGroup('/', 'photons', 'Group containing photon list')
+        plTable = plFile.createTable(plGroup, 'photons', photListDescription, 'Photon List Data', 
                                       filters=bloscFilter) 
                                       #expectedrows=300000)
-     except:
-         plFile.close()
-         raise
-     return plFile
+    except:
+        plFile.close()
+        raise
+    return plFile
 
 
 
