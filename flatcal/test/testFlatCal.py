@@ -20,7 +20,7 @@ def main():
 #    wvlCalFileName = FileName(run=run,date='20120916',tstamp='20120917-072537').calSoln()
 
     run = 'PAL2012'
-    obsFileName = FileName(run=run,date='20121211',tstamp='20121212-140003').flat()
+    obsFileName = FileName(run=run,date='20121211',tstamp='20121212-140003').obs()
     flatCalFileName = FileName(run=run,date='20121210',tstamp='').flatSoln()
     wvlCalFileName = FileName(run=run,date='20121210',tstamp='20121211-133056').calSoln()
     flatCalPath = os.path.dirname(flatCalFileName)

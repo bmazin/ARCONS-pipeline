@@ -24,6 +24,7 @@ from util.readDict import readDict
 from util.FileName import FileName
 from util.utils import nearestNRobustMeanFilter
 import hotpix.hotPixels as hp
+from astropy.stats.funcs import sigma_clip
 
 def onscroll_cbar(fig, event):
     if event.inaxes is fig.cbar.ax:
@@ -61,6 +62,7 @@ class FlatCal:
         wvlSunsetDate = self.params['wvlSunsetDate']
         wvlTimestamp = self.params['wvlTimestamp']
         obsSequence = self.params['obsSequence']
+        needTimeAdjust = self.params['needTimeAdjust']
         self.deadtime = self.params['deadtime'] #from firmware pulse detection
         self.intTime = self.params['intTime']
         self.timeSpacingCut = self.params['timeSpacingCut']
@@ -82,7 +84,8 @@ class FlatCal:
                 obs.loadWvlCalFile(wvlCalFileName)
             else:
                 obs.loadBestWvlCalFile()
-            obs.loadTimeAdjustmentFile(timeAdjustFileName)
+            if needTimeAdjust:
+                obs.loadTimeAdjustmentFile(timeAdjustFileName)
             timeMaskFileName = timeMaskFileNames[iObs]
             print timeMaskFileName
             #Temporary step, remove old hotpix file
@@ -144,6 +147,7 @@ class FlatCal:
                 self.frames.append(frame)
                 self.spectralCubes.append(cube)
                 self.cubeEffIntTimes.append(effIntTime3d)
+            obs.file.close()
         self.spectralCubes = np.array(self.spectralCubes)
         self.cubeEffIntTimes = np.array(self.cubeEffIntTimes)
         self.countCubes = self.cubeEffIntTimes * self.spectralCubes
@@ -171,6 +175,15 @@ class FlatCal:
         for iWvl in xrange(self.nWvlBins):
             wvlSlice = self.totalCube[:,:,iWvl]
             wvlSlice[wvlSlice == 0] = np.nan
+            nanMask = np.isnan(wvlSlice)
+
+            #do a sigma-clipping on the wvlSlice and insert it back in the cube
+            maskedWvlSlice = np.ma.array(wvlSlice,mask=nanMask)
+            clippedWvlSlice = sigma_clip(wvlSlice,sig=self.nSigmaClip,iters=None,cenfunc=np.ma.median)
+            wvlSlice[clippedWvlSlice.mask] = np.nan
+            self.totalCube[:,:,iWvl] = wvlSlice
+
+            #do a smoothing over the slice
             smoothedWvlSlice = nearestNRobustMeanFilter(wvlSlice,n=self.nNearest,nSigmaClip=self.nSigmaClip)
             wvlIllumWeights = np.mean(smoothedWvlSlice)/smoothedWvlSlice
             weights.append(wvlIllumWeights)
@@ -198,7 +211,7 @@ class FlatCal:
         matplotlib.rcParams['font.size'] = 4 
         wvls = self.wvlBinEdges[0:-1]
 
-        cmap = matplotlib.cm.gnuplot2
+        cmap = matplotlib.cm.hot
         cmap.set_bad('0.15')
         for iWvl,wvl in enumerate(wvls):
             if verbose:
@@ -211,7 +224,7 @@ class FlatCal:
 
             image = self.weights[:,:,iWvl]
 
-            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=2.)
+            handleMatshow = ax.matshow(image,cmap=cmap,origin='lower',vmax=1.5,vmin=.5)
             cbar = fig.colorbar(handleMatshow)
         
             if iPlot%nPlotsPerPage == nPlotsPerPage-1:
@@ -236,6 +249,7 @@ class FlatCal:
             if iPlot%nPlotsPerPage == nPlotsPerPage-1:
                 pp.savefig(fig)
             iPlot += 1
+
 
         pp.savefig(fig)
         pp.close()

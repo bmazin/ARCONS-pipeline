@@ -382,7 +382,9 @@ class ObsFile:
         Returns a requested entry from the obs file header
         If asked for exptime (exposure time) and some roaches have a timestamp offset
         The returned exposure time will be shortened by the max offset, since ObsFile
-        will not retrieve data from seconds in which some roaches do not have data
+        will not retrieve data from seconds in which some roaches do not have data.
+        This also affects unixtime (start of observation).
+        If asked for jd, the jd is calculated from the (corrected) unixtime
         """
         entry = self.info[self.titles.index(name)]
         if name=='exptime' and self.timeAdjustFile != None:
@@ -396,6 +398,13 @@ class ObsFile:
             #so, add maxDelay to the header start time, so all times will be correct relative to it
             entry += np.max(self.roachDelays)
             entry += self.firmwareDelay
+        if name=='jd':
+            #The jd stored in the raw file header is the jd when the empty file is created
+            #but not when the observation starts.  The actual value can be derived from the stored unixtime
+            unixEpochJD = 2440587.5
+            secsPerDay = 86400
+            unixtime = self.getFromHeader('unixtime')
+            entry = 1.*unixtime/secsPerDay+unixEpochJD
         return entry
         
     def getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1):
