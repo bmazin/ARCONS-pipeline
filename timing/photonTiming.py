@@ -9,6 +9,7 @@ text files of timestamps (barycenterTimestampFile) or photonLists with timestamp
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 import time
 import subprocess
 import numexpr
@@ -131,6 +132,7 @@ def timePhotonList(photonListPath,parFile,bPulsarTiming=False,nPhotonsPerProcess
                     worker.join()
                 timingWorkers = []
                 resultsWorkers = []
+                photonList.file.flush()
 
         #wait for anything leftover to finish
         if verbose:
@@ -190,7 +192,7 @@ def timePhotonList(photonListPath,parFile,bPulsarTiming=False,nPhotonsPerProcess
                 photonList.photTable.colinstances[colName].createCSIndex()
     finally:
         photonList.file.flush()
-    del photonList
+        del photonList
 
 
 def __processTimestampsWorker(inputQueue,resultsQueue,parFile,**kwargs):
@@ -292,7 +294,7 @@ def processTimestamps(mjdTimestamps,parFile,workingDir=os.getcwd(),timingProgram
             np.savetxt(tempJDPath,mjdTimestamps)
         
             #form the tempo2 command using the arcons plugin
-            strCommand = 'tempo2 -gr arcons -f {} -a {} -o {} > {}'.format(parFilename,tempJDPath,tempBJDPath,timingProgramLog)
+            strCommand = 'tempo2 -gr arcons -f {} -a {} -o {} >> {}'.format(parFilename,tempJDPath,tempBJDPath,timingProgramLog)
 
             #run tempo2
             if verbose:
@@ -347,7 +349,7 @@ def processTimestamps(mjdTimestamps,parFile,workingDir=os.getcwd(),timingProgram
             paramsToFit = 1
             #form the tempo command
             nToasToAllocate = nTimestamps+1
-            strCommand = 'tempo -f {} -no {} -m{} -l{} {} > {}'.format(parFilename,tempPulseNumbersPath,nToasToAllocate,paramsToFit,tempJDPath,timingProgramLog)
+            strCommand = 'tempo -f {} -no {} -m{} -l{} {} >> {}'.format(parFilename,tempPulseNumbersPath,nToasToAllocate,paramsToFit,tempJDPath,timingProgramLog)
 
             #Run tempo
             if verbose:
@@ -398,12 +400,30 @@ def readParFile(parPath):
     
 
 if __name__=='__main__':
-    parFile = 'test/B0531+21.par'
-    mjd0 = 56273.163858501241
-    mjdTimestamps = np.arange(20)+mjd0
-    pDict = processTimestamps(mjdTimestamps,parFile,timingProgram='tempo2')
-    for key in pDict.keys():
-        print key,pDict[key]
+    if len(sys.argv) == 2 and (sys.argv[1] == '-h' or sys.argv[1] == '--help'):
+        print 'USAGE: {} inputMjdTxtFile outputBaryMjdTxtFile parFile [tcb|tdb]'.format(sys.argv[0])
+        print 'command line to barycenter a file of MJD timestamps.  The input file should have one MJD per line.  TCB and TDB are different time standards available.  A par file is required with the correct RA and DEC keywords.  The other keywords are required but can have arbitrary values. Observing is assumed to be at Palomar Observatory'
+    if (len(sys.argv) < 4 or len(sys.argv) > 5):
+        print 'USAGE: {} inputMjdTxtFile outputBaryMjdTxtFile parFile [tcb|tdb]'.format(sys.argv[0])
+        sys.exit(1)
+    inputTxtFile = sys.argv[1]
+    outputTxtFile = sys.argv[2]
+    parFile = sys.argv[3]
+    if len(sys.argv) == 4:
+        timingProgram = 'tempo2'
+    else:
+        if sys.argv[4] == 'tdb':
+            timingProgram = 'tempo'
+        elif sys.argv[4] == 'tcb':
+            timingProgram = 'tempo2'
+        else:
+            print 'last argument ',sys.argv[4],' not understood'
+            print 'needs to be \'tcb\' or \'tdb\''
+            print 'USAGE: {} inputMjdTxtFile outputBaryMjdTxtFile parFile [tcb|tdb]'.format(sys.argv[0])
+            sys.exit(1)
+        
+
+    barycenterTimestampFile(inputTxtFile,outputTxtFile,parFile,timingProgram=timingProgram)
     
 
 #def processTimestamps(mjdTimestamps,parFile,workingDir=os.getcwd(),timingProgram='tempo2',bCleanTempDir=True,referenceTime=None,verbose=False):
