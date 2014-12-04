@@ -1,5 +1,10 @@
+'''
+Author: Alex Walter
+Date: Dec 3, 2014
 
-#Photometry Super class
+Photometry Super class. Extended by PSFphotometry and AperPhotometry
+'''
+
 import numpy as np
 
 
