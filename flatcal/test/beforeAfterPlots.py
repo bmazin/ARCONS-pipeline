@@ -20,12 +20,13 @@ def main():
     date = '20121210'
     wvlCal = '20121211-052230'
     obsTimestamp = '20121211-051650'
-    flatCalDate = '20121210'
+    flatCalDate = '20121211'
+    flatCalTstamp = '20121212-074700'
     obsFN = FileName(run=run,date=date,tstamp=obsTimestamp)
     obsFileName = obsFN.obs()
     timeMaskFileName = obsFN.timeMask()
     wvlFileName = FileName(run=run,date=date,tstamp=wvlCal).calSoln()
-    flatFileName = FileName(run=run,date=flatCalDate,tstamp='').flatSoln()
+    flatFileName = FileName(run=run,date=flatCalDate,tstamp=flatCalTstamp).flatSoln()
     
     if not os.path.exists(timeMaskFileName):
         print 'Running hotpix for ',obsFileName
@@ -38,25 +39,42 @@ def main():
     obs.loadFlatCalFile(flatFileName)
     obs.loadHotPixCalFile(timeMaskFileName)
 
-    obs.setWvlCutoffs(4000,8000)
+    #obs.setWvlCutoffs(4000,8000)
 
     #get image before and after flat cal
     print 'getting images'
     beforeImgDict = obs.getPixelCountImage(weighted=False,fluxWeighted=False,scaleByEffInt=True)
-    beforeImg = beforeImgDict['image']
-    beforeImg[np.isnan(beforeImg)]=0
-    beforeImg[beforeImg == np.inf] = 0
+
+    rawCubeDict = obs.getSpectralCube(weighted=False)
+    rawCube = np.array(rawCubeDict['cube'],dtype=np.double)
+    effIntTime = rawCubeDict['effIntTime']
+    maxIntTime = np.max(effIntTime)
+    #add third dimension for broadcasting
+    effIntTime3d = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
+    rawCube *= maxIntTime / effIntTime3d
+    rawCube[np.isnan(rawCube)] = 0
+    rawCube[rawCube == np.inf] = 0
+    beforeImg = np.sum(rawCube,axis=-1)
+    print 'finished first cube'
+
+    flatCubeDict = obs.getSpectralCube(weighted=True)
+    flatCube = np.array(flatCubeDict['cube'],dtype=np.double)
+    effIntTime = flatCubeDict['effIntTime']
+    maxIntTime = np.max(effIntTime)
+    #add third dimension for broadcasting
+    effIntTime3d = np.reshape(effIntTime,np.shape(effIntTime)+(1,))
+    flatCube *= maxIntTime / effIntTime3d
+    flatCube[np.isnan(flatCube)] = 0
+    flatCube[flatCube == np.inf] = 0
+    afterImg = np.sum(flatCube,axis=-1)
+
     plotArray(title='before flatcal',image=beforeImg)
-    afterImg = obs.getPixelCountImage(weighted=True,fluxWeighted=False,scaleByEffInt=True)['image']
-    afterImg[np.isnan(afterImg)]=0
-    afterImg[afterImg == np.inf] = 0
-    print 'plotting images'
     plotArray(title='after flatcal',image=afterImg)
 
     print 'before sdev',np.std(beforeImg[afterImg!=0])
     print 'after sdev',np.std(afterImg[afterImg!=0])
 
-    np.savez('beforeAfterImgs.npz',beforeImg=beforeImg,afterImg=afterImg)
+    np.savez('flatCubeGem.npz',beforeImg=beforeImg,afterImg=afterImg,rawCube=rawCube,flatCube=flatCube)
     
 
 if __name__=='__main__':
