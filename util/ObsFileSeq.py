@@ -309,7 +309,7 @@ class ObsFileSeq():
                                                               energyBinWidth,
                                                               wvlBinEdges,
                                                               timeSpacingCut))
-            pickle.dump(open(cpfn,'wb',self.cubes))
+            pickle.dump(self.cubes,open(cpfn,'wb'))
     def makePngFileByInterval(self,thisInterval,wvMin,wvMax,maxRate):
         fn = "%s-%03d-%05d-%05d.png"%(self.name,thisInterval,int(wvMin),int(wvMax))
         print "now make fn=",fn
