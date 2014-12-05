@@ -21,7 +21,8 @@ class PopUp(QtGui.QMainWindow):
         self.create_main_frame(title)
         self.create_status_bar()
         if plotFunc != None:
-            plotFunc(fig=self.fig,axes=self.axes)
+            #plotFunc(fig=self.fig,axes=self.axes)
+            plotFunc(self)
         if showMe == True:
             self.show()
 

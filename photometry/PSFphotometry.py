@@ -19,6 +19,23 @@ from util.mpfit import mpfit
 from util.popup import *
 
 
+
+
+def readPhotometryFile(filename):
+    photometryFile = tables.openFile(filename, mode='r')
+    photometryTable = photometryFile.getNode(photometryFile.root,'PSFphotometry')._f_getChild('photometry')
+    startTimes = photometryTable.col('time')
+    intTimes = photometryTable.col('integration_time')
+    flux = photometryTable.col('flux')
+    parameters = photometryTable.col('parameters')
+    perrors = photometryTable.col('perrors')
+    redChi2 = photometryTable.col('redChi2')
+    flag = photometryTable.col('flag')
+    photometryFile.close()
+    
+    return {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flag': flag}
+    
+
 def writePhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
     if os.path.isfile(filename):
         warnings.warn("Overwriting photometry file: "+str(filename),UserWarning)
@@ -106,7 +123,7 @@ def fitData2D(data,errs,parameter_guess,parameter_lowerlimit,parameter_upperlimi
     #Tie some parameters together if specified
     if parameter_ties!=None and len(parameter_ties)==len(parameter_guess):
         for p_flag in np.unique(np.asarray(parameter_ties)[np.where(np.asarray(parameter_ties)>0)]):
-            p_to_tie = np.where(parameter_ties==p_flag)[0]
+            p_to_tie = np.where(np.asarray(parameter_ties)==p_flag)[0]
             if len(p_to_tie)>1:
                 for p in p_to_tie[1:]:
                     parinfo[p]['tied'] = 'p['+str(p_to_tie[0])+']'
@@ -316,8 +333,28 @@ class PSFphotometry(Photometry):
                 guess2+=m
             pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess2),title="Fitted")
         
+        
+        flag = 2.0*self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit)
         #return self.getFlux(parameter_fit)
-        return {'flux': self.getFlux(parameter_fit), 'parameters': parameter_fit, 'mpperr':mpperr,'redChi2':redchi2gauss2,'flag':0}
+        return {'flux': self.getFlux(parameter_fit), 'parameters': parameter_fit, 'mpperr':mpperr,'redChi2':redchi2gauss2,'flag':flag}
+
+    def fitHitLimit(self,parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
+        """
+            This function just checks if the fit is railed against one of its parameter limits
+            
+            Returns:
+                True if fit has a parameter that hit its upper or lower limit --> Bad fit
+                False otherwise
+        """
+        fixed_guess = (parameter_lowerlimit==parameter_upperlimit) * (parameter_lowerlimit!=np.asarray([None]*len(parameter_lowerlimit)))
+        
+        s1=np.sum((parameter_fit==parameter_lowerlimit)*(np.logical_not(fixed_guess)))
+        s2=np.sum((parameter_fit==parameter_upperlimit)*(np.logical_not(fixed_guess)))
+        s3=np.sum((parameter_fit==parameter_guess)*(np.logical_not(fixed_guess)))
+        if s1>0 or s2>0 or s3>0:
+            return True
+        else:
+            return False
 
 
     def getFlux(self,parameter_fit):
