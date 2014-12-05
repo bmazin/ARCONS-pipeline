@@ -490,8 +490,9 @@ class ObsFile:
 
         wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
         wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
-        
-        wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
+
+        with np.errstate(divide='ignore'):
+            wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
         if excludeBad == True:
             goodMask = ~np.isnan(wavelengths)
             goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
@@ -937,11 +938,10 @@ class ObsFile:
         wvlStart=wvlStart if (wvlStart!=None and wvlStart>0.) else (self.wvlLowerLimit if (self.wvlLowerLimit!=None and self.wvlLowerLimit>0.) else 3000)
         wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 13000)
 
-        
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
 
-        if self.flatCalFile != None and ((wvlBinEdges == None and energyBinWidth == None and wvlBinWidth == None) or weighted == True):
+        if (self.flatCalFile is not None) and (((wvlBinEdges is None) and (energyBinWidth is None) and (wvlBinWidth is None)) or weighted == True):
         #We've loaded a flat cal already, which has wvlBinEdges defined, and no other bin edges parameters are specified to override it.
             spectrum, wvlBinEdges = np.histogram(wvlList, bins=self.flatCalWvlBins)
             if weighted == True:#Need to apply flat weights by wavelenth
@@ -951,12 +951,12 @@ class ObsFile:
         else:
             if weighted == True:
                 raise ValueError('when weighted=True, flatCal wvl bins are used, so wvlBinEdges,wvlBinWidth,energyBinWidth,wvlStart,wvlStop should not be specified')
-            if wvlBinEdges == None:#We need to construct wvlBinEdges array
-                if energyBinWidth != None:#Fixed energy binwidth specified
+            if wvlBinEdges is None:#We need to construct wvlBinEdges array
+                if energyBinWidth is not None:#Fixed energy binwidth specified
                     #Construct array with variable wvl binwidths
                     wvlBinEdges = ObsFile.makeWvlBins(energyBinWidth=energyBinWidth, wvlStart=wvlStart, wvlStop=wvlStop)
                     spectrum, wvlBinEdges = np.histogram(wvlList, bins=wvlBinEdges)
-                elif wvlBinWidth != None:#Fixed wvl binwidth specified
+                elif wvlBinWidth is not None:#Fixed wvl binwidth specified
                     nWvlBins = int((wvlStop - wvlStart) / wvlBinWidth)
                     spectrum, wvlBinEdges = np.histogram(wvlList, bins=nWvlBins, range=(wvlStart, wvlStop))
                 else:
