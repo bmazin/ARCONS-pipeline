@@ -122,3 +122,5 @@ mosaic = ofs.makeMosaicImage(range(66))
 # the frames for three different wavelengths into a fabulous color picture!
 # But right now, let's just dump out a heat map so we something to show off.
 utils.plotArray(mosaic,cbar=True,plotTitle=ofs.name,showMe=False,plotFileName=ofs.name+"-all.png")
+
+del ofs

@@ -1,4 +1,4 @@
-import os, math
+import os, math, time
 import numpy as np
 from util import FileName
 from util import ObsFile
@@ -61,6 +61,7 @@ class ObsFileSeq():
             fn2 = FileName.FileName(run,date,"")
             of.loadBestWvlCalFile()
             of.loadFlatCalFile(fn2.flatSoln())
+            of.loadHotPixCalFile(fn.timeMask())
             self.obsFiles.append(of)
             self.obsFileUnixTimes.append(of.getFromHeader('unixtime'))
         self.tcs = TCS.TCS(run,date)
@@ -108,16 +109,33 @@ class ObsFileSeq():
         self.nRowCol[0] += self.obsFiles[0].nRow
         self.nRowCol[1] += self.obsFiles[0].nCol
         self.nRowCol = np.ceil(self.nRowCol).astype(np.int)
-    def makeMosaicImage(self,iFrameList):
+
+    def makeMosaicImage(self,iFrameList=None, wvlBinRange=None):
+        """
+        create a mosaic image of the frames listed, in the wavelength bin range
+
+        input:  iFrameList, default None uses all frames
+                wvlBinRange, default None uses all wavelength bins, otherwise (wBinMin,wBinMax)
+
+        output:  a numpy 2d of the counts/second image
+        """
         cubeSum = np.zeros((self.nRowCol[0],self.nRowCol[1]))
         effIntTimeSum = np.zeros((self.nRowCol[0],self.nRowCol[1]))
         nRowCube = self.obsFiles[0].nRow
         nColCube = self.obsFiles[0].nCol
+        if iFrameList is None:
+            iFrameList = range(len(self.frameObsInfos))
+        if wvlBinRange is None:
+            wBinMin = 0
+            wBinMax = self.cubes[0]['cube'].shape[2]
+        else:
+            wBinMin = wvlBinRange[0]
+            wBinMax = wvlBinRange[1]
         for iFrame in iFrameList:
             r0 = int(self.rc0[0,iFrame])
             c0 = int(self.rc0[1,iFrame])
             # The third index here is where you select which wavelength bins to include
-            cubeSum[r0:r0+nRowCube,c0:c0+nColCube] += self.cubes[iFrame]['cube'][:,:,:].sum(axis=2)
+            cubeSum[r0:r0+nRowCube,c0:c0+nColCube] += self.cubes[iFrame]['cube'][:,:,wBinMin:wBinMax].sum(axis=2)
             effIntTimeSum[r0:r0+nRowCube,c0:c0+nColCube] += self.cubes[iFrame]['effIntTime'][:,:]
         with np.errstate(divide='ignore'):
             cps = cubeSum/effIntTimeSum
@@ -232,7 +250,7 @@ class ObsFileSeq():
 
 
 
-    def getSpectralCubeByFrame(self,iFrame,weighted=False,
+    def getSpectralCubeByFrame(self,iFrame,weighted=False, fluxWeighted=False,
                                    wvlStart=None,wvlStop=None,
                                    wvlBinWidth=None,energyBinWidth=None,
                                    wvlBinEdges=None,timeSpacingCut=None):
@@ -256,12 +274,12 @@ class ObsFileSeq():
                 integrationTime = tEnd-tBeg
                 firstSec = tBeg - self.obsFiles[i].getFromHeader('unixtime')
                 obs = self.obsFiles[i]
-                print "wvlStart=",wvlStart," wvlStop=",wvlStop
                 obs.setWvlCutoffs(wvlLowerLimit=wvlStart, wvlUpperLimit=wvlStop)
-                print "now call getSpectralCube:  firstSec=",firstSec," integrationTime=",integrationTime, "weighted=",weighted
+                print time.strftime("%c"),"now call getSpectralCube:  firstSec=",firstSec," integrationTime=",integrationTime, "weighted=",weighted
                 spectralCube = obs.getSpectralCube(firstSec=firstSec,
                                                    integrationTime=integrationTime,
                                                    weighted=weighted,
+                                                   fluxWeighted=fluxWeighted,
                                                    wvlStart = wvlStart,
                                                    wvlStop = wvlStop,
                                                    wvlBinWidth=wvlBinWidth,
@@ -279,7 +297,7 @@ class ObsFileSeq():
                     retval['effIntTime'] += eit                
         return retval
 
-    def loadSpectralCubes(self,weighted=False,
+    def loadSpectralCubes(self,weighted=True, fluxWeighted=False,
                           wvlStart=None,wvlStop=None,
                           wvlBinWidth=None,energyBinWidth=None,
                           wvlBinEdges=None,timeSpacingCut=None):
@@ -303,6 +321,7 @@ class ObsFileSeq():
                 print "now load spectral cube for iFrame=",iFrame
                 self.cubes.append(self.getSpectralCubeByFrame(iFrame,
                                                               weighted,
+                                                              fluxWeighted,
                                                               wvlStart,
                                                               wvlStop,
                                                               wvlBinWidth,
