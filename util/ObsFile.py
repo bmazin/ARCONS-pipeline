@@ -221,6 +221,10 @@ class ObsFile:
                 print 'Can\'t access beamimage for ',self.fullFileName
             raise inst
 
+        #format for a pixelName in beamImage is /r#/p#/t# where r# is the roach number, p# is the pixel number
+        # and t# is the starting timestamp
+        self.beamImageRoaches = np.array([[int(s.split('r')[1].split('/')[0]) for s in row] for row in self.beamImage])
+        self.beamImagePixelNums = np.array([[int(s.split('p')[1].split('/')[0]) for s in row] for row in self.beamImage])
         beamShape = self.beamImage.shape
         self.nRow = beamShape[0]
         self.nCol = beamShape[1]
@@ -1385,6 +1389,9 @@ class ObsFile:
             self.beamImage = beammapFile.getNode('/beammap/beamimage').read()
             if self.beamImage[0][0].split('/')[-1]=='':
                 self.beamImage = np.core.defchararray.add(self.beamImage,old_tstamp)
+
+            self.beamImageRoaches = np.array([[int(s.split('r')[1].split('/')[0]) for s in row] for row in self.beamImage])
+            self.beamImagePixelNums = np.array([[int(s.split('p')[1].split('/')[0]) for s in row] for row in self.beamImage])
         except Exception as inst:
             print 'Can\'t access beamimage for ',self.fullFileName
 
@@ -1417,13 +1424,27 @@ class ObsFile:
         fullFlatCalFileName = os.path.join(flatCalPath, flatCalFileName)
         if (not os.path.exists(fullFlatCalFileName)):
             print 'flat cal file does not exist: ', fullFlatCalFileName
-            return
+            raise Exception('flat cal file {} does not exist'.format(fullFlatCalFileName))
         self.flatCalFile = tables.openFile(fullFlatCalFileName, mode='r')
         self.flatCalFileName = fullFlatCalFileName
-        self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
-        self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
+
         self.flatCalWvlBins = self.flatCalFile.root.flatcal.wavelengthBins.read()
-        self.nFlatCalWvlBins = self.flatWeights.shape[2]
+        self.nFlatCalWvlBins = len(self.flatCalWvlBins)-1
+        self.flatWeights = np.zeros((self.nRow,self.nCol,self.nFlatCalWvlBins),dtype=np.double)
+        self.flatFlags = np.zeros((self.nRow,self.nCol,self.nFlatCalWvlBins),dtype=np.uint16)
+
+        try:
+            flatCalSoln = self.flatCalFile.root.flatcal.caltable.read()
+            for calEntry in flatCalSoln:
+                entryRows,entryCols = np.where((calEntry['roach'] == self.beamImageRoaches & calEntry['pixelnum'] == self.beamImagePixelNums))
+                entryRow = entryRows[0]
+                entryCol = entryCols[0]
+                self.flatWeights[entryRow,entryCol,:] = calEntry['weights']
+                self.flatFlags[entryRow,entryCol,:] = calEntry['weightFlags']
+        
+        except:
+            self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
+            self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         
     def loadFluxCalFile(self, fluxCalFileName):
         """
@@ -1567,11 +1588,26 @@ class ObsFile:
             self.wvlFlagTable = np.zeros([self.nRow, self.nCol])
             self.wvlRangeTable = np.zeros([self.nRow, self.nCol, 2])
             for calPixel in wvlCalData:
-                self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
-                self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
-                if calPixel['wave_flag'] == 0:
-                    self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
-                    self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
+                #use the current loaded beammap
+                entryRows,entryCols = np.where((calPixel['roach'] == self.beamImageRoaches) & (calPixel['pixelnum'] == self.beamImagePixelNums))
+                try:
+                    entryRow = entryRows[0]
+                    entryCol = entryCols[0]
+                    
+                    self.wvlFlagTable[entryRow,entryCol] = calPixel['wave_flag']
+                    self.wvlErrorTable[entryRow,entryCol] = calPixel['sigma']
+                    if calPixel['wave_flag'] == 0:
+                        self.wvlCalTable[entryRow,entryCol] = calPixel['polyfit']
+                        self.wvlRangeTable[entryRow,entryCol] = calPixel['solnrange']
+                except IndexError: #entry for an unbeammapped pixel
+                    pass 
+#            for calPixel in wvlCalData:
+#                #rely on the beammap loaded when the cal was done
+#                self.wvlFlagTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['wave_flag']
+#                self.wvlErrorTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['sigma']
+#                if calPixel['wave_flag'] == 0:
+#                    self.wvlCalTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['polyfit']
+#                    self.wvlRangeTable[calPixel['pixelrow']][calPixel['pixelcol']] = calPixel['solnrange']
         except IOError:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
             raise
