@@ -2,7 +2,7 @@ import numpy as np
 
 
 
-def multiple_2d_circ_gauss_func(p_guess,errs=None):
+def multiple_2d_circ_gauss_func(p_guess):
 
     def f(p, fjac=None, data=None, err=None,return_models=False):
         #p[0] = background

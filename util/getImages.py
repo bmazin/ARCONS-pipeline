@@ -13,7 +13,7 @@ from headers.DisplayStackHeaders import *
 
 def writeImageStack(images, startTimes, intTimes=None, pixIntTimes=None, path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',outputFilename='ImageStack_0.h5'):
     '''
-    Saves an h5 file containing the image stacks
+    Saves an h5 file containing the image stacks. See headers.DisplayStackHeaders for variable definitions
     
     Inputs:
         images - list of images. images[number, row, col]
@@ -29,7 +29,7 @@ def writeImageStack(images, startTimes, intTimes=None, pixIntTimes=None, path='/
     if os.path.isfile(fullFilename):
         warnings.warn("Overwriting image stack file: "+str(fullFilename),UserWarning)
     fileh = tables.openFile(fullFilename, mode='w')
-    print fullFilename
+    #print fullFilename
     headerGroup = fileh.createGroup("/", headerGroupName, 'Header')
     stackGroup = fileh.createGroup("/", imagesGroupName, 'Image Stack')
 
@@ -84,7 +84,7 @@ def writeImageStack(images, startTimes, intTimes=None, pixIntTimes=None, path='/
         intTimeTable[:] = intTimes
 
     # Create an h5 table for the image cube.
-    print len(images)
+    #print len(images)
     stackTable = fileh.createCArray(stackGroup, imagesTableName, tables.Float64Atom(), (nRows,nCols, len(np.asarray(images))))
     stackTable[:] = np.rollaxis(np.asarray(images),0,3)     #Paul has a weird [row,col,number] format...
     # Create an h5 table for the image cube.
@@ -97,7 +97,7 @@ def writeImageStack(images, startTimes, intTimes=None, pixIntTimes=None, path='/
     fileh.close()
 
 
-def getImages(fromObsFile=True,fromPhotonList=False,fromImageStack=False,**kwargs):
+def getImages(fromObsFile=False,fromPhotonList=False,fromImageStack=False,**kwargs):
     '''
     Inputs:
         Specify where you want to get your image from
@@ -120,6 +120,7 @@ def getImages(fromObsFile=True,fromPhotonList=False,fromImageStack=False,**kwarg
         return loadImagesFromStack(**kwargs)
         
 def loadImagesFromStack(fullFilename=''):
+    #fullFilename=imageStackFilename
     if not os.path.isfile(fullFilename): return None
     stackFile = tables.openFile(fullFilename, mode='r')
     images = stackFile.getNode('/',imagesGroupName)._f_getChild(imagesTableName).read()
@@ -137,7 +138,7 @@ def loadImagesFromStack(fullFilename=''):
         
     stackFile.close()
         
-    return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':startTimes,'intTimes':intTimes}
+    return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':np.asarray(startTimes).flatten(),'intTimes':np.asarray(intTimes).flatten()}
         
 def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=True):
 

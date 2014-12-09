@@ -1,4 +1,4 @@
-import os
+import os, math, time
 import numpy as np
 from util import FileName
 from util import ObsFile
@@ -6,6 +6,7 @@ from util import TCS
 from interval import interval, inf, imath
 import pyfits
 import matplotlib.pyplot as plt
+import pickle
 class ObsFileSeq():
     """
     Deal with a sequence of obsFiles, and present data as a set of
@@ -57,6 +58,10 @@ class ObsFileSeq():
             fn = FileName.FileName(run,date,timeStamp)
             self.fileNames.append(fn)
             of = ObsFile.ObsFile(fn.obs()) 
+            fn2 = FileName.FileName(run,date,"")
+            of.loadBestWvlCalFile()
+            of.loadFlatCalFile(fn2.flatSoln())
+            of.loadHotPixCalFile(fn.timeMask())
             self.obsFiles.append(of)
             self.obsFileUnixTimes.append(of.getFromHeader('unixtime'))
         self.tcs = TCS.TCS(run,date)
@@ -74,13 +79,75 @@ class ObsFileSeq():
                 tEnd = tEndThis
             self.obsIntervals.append(interval[tStart,tEnd])
         self._defineFrames(dt)
+
+        # Default settings for astrometry
+        self.setRm()
+    def setRm(self,
+              degreesPerPixel = 0.4/3600,
+              thetaDeg = 0.0,
+              raArcsecPerSec = 0.0):
+        self.degreesPerPixel = degreesPerPixel
+        self.thetaDeg = thetaDeg
+        self.raArcsecPerSec = raArcsecPerSec
+        theta = math.radians(thetaDeg)
+        sct = math.cos(theta)*degreesPerPixel
+        sst = math.sin(theta)*degreesPerPixel
+        self.rmPixToEq = np.array([[sct,-sst],[sst,sct]])
+        self.rmEqToPix = np.linalg.inv(self.rmPixToEq)
+        t0 = self.getTimeBySeq(0)
+        self.rdl = []
+        for iFrame in range(len(self.frameObsInfos)):
+            t = self.getTimeBySeq(iFrame)
+            raDrift = raArcsecPerSec*(t-t0)
+            raOff = (self.tcsDict['raOffset'][iFrame]-raDrift)/3600.0
+            deOff = (self.tcsDict['decOffset'][iFrame])/3600.0
+            self.rdl.append([raOff,deOff])
+        self.rc0 = np.dot(self.rmEqToPix,np.array(self.rdl).transpose())
+        # Numpy Kung-Fu here to subtract the minimum row,col
+        self.rc0 -= self.rc0.min(axis=1)[:,None]
+        self.nRowCol = self.rc0.max(axis=1)
+        self.nRowCol[0] += self.obsFiles[0].nRow
+        self.nRowCol[1] += self.obsFiles[0].nCol
+        self.nRowCol = np.ceil(self.nRowCol).astype(np.int)
+
+    def makeMosaicImage(self,iFrameList=None, wvlBinRange=None):
+        """
+        create a mosaic image of the frames listed, in the wavelength bin range
+
+        input:  iFrameList, default None uses all frames
+                wvlBinRange, default None uses all wavelength bins, otherwise (wBinMin,wBinMax)
+
+        output:  a numpy 2d of the counts/second image
+        """
+        cubeSum = np.zeros((self.nRowCol[0],self.nRowCol[1]))
+        effIntTimeSum = np.zeros((self.nRowCol[0],self.nRowCol[1]))
+        nRowCube = self.obsFiles[0].nRow
+        nColCube = self.obsFiles[0].nCol
+        if iFrameList is None:
+            iFrameList = range(len(self.frameObsInfos))
+        if wvlBinRange is None:
+            wBinMin = 0
+            wBinMax = self.cubes[0]['cube'].shape[2]
+        else:
+            wBinMin = wvlBinRange[0]
+            wBinMax = wvlBinRange[1]
+        for iFrame in iFrameList:
+            r0 = int(self.rc0[0,iFrame])
+            c0 = int(self.rc0[1,iFrame])
+            # The third index here is where you select which wavelength bins to include
+            cubeSum[r0:r0+nRowCube,c0:c0+nColCube] += self.cubes[iFrame]['cube'][:,:,wBinMin:wBinMax].sum(axis=2)
+            effIntTimeSum[r0:r0+nRowCube,c0:c0+nColCube] += self.cubes[iFrame]['effIntTime'][:,:]
+        with np.errstate(divide='ignore'):
+            cps = cubeSum/effIntTimeSum
+        cps = np.nan_to_num(cps)
+        return cps
     def __del__(self):
         for of in self.obsFiles:
             del of
+
     def _defineFrames(self,dt):
         self.dt = dt
         mts = self.tcsDict['time']
-        print "number of moves=",len(mts)
         # make a list of times: 
         #start of first observation, each move, end of last observation
         times = np.zeros(len(mts)+2) 
@@ -182,12 +249,23 @@ class ObsFileSeq():
         return retval
 
 
-    def getSpectralCubes(self,iFrame,wvMin,wvMax):
-        thisInterval = self.frameIntervals[iFrame]
-        return self.getSpectralCubesByInterval(thisInterval,wvMin,wvMax)
 
-    def getSpectralCubesByInterval(self,thisInterval,wvMin,wvMax):
-        retval = []
+    def getSpectralCubeByFrame(self,iFrame,weighted=False, fluxWeighted=False,
+                                   wvlStart=None,wvlStop=None,
+                                   wvlBinWidth=None,energyBinWidth=None,
+                                   wvlBinEdges=None,timeSpacingCut=None):
+        """
+        return the spectral cube for this frame
+
+        call ObsFile.getSpectralCube for each ObsFile in this frame.
+        The dictionary returned copies 'wvlBinEdges' from the first ObsFile,
+        and sums the 'cube' and 'effIntTime' from all ObsFiles.
+
+        I left the print statements in to report progress, becuase this is very slow.
+
+        """
+        retval = None
+        thisInterval = self.frameIntervals[iFrame]
         for i,ofInterval in enumerate(self.obsIntervals):
             overlap = thisInterval & ofInterval
             if len(overlap) > 0:
@@ -195,37 +273,62 @@ class ObsFileSeq():
                 tEnd = overlap[0][1]
                 integrationTime = tEnd-tBeg
                 firstSec = tBeg - self.obsFiles[i].getFromHeader('unixtime')
-                print i,firstSec,integrationTime
                 obs = self.obsFiles[i]
-                obs.loadBestWvlCalFile() 
-                obs.setWvlCutoffs(wvlLowerLimit=wvMin, wvlUpperLimit=wvMax)
-                hotPixCalFileName = self.fileNames[i].timeMask()
-                obs.loadHotPixCalFile(hotPixCalFileName)
-                #obs.loadFlatCalFile(flatCalFileName)
-                #obs.loadFluxCalFile(fluxCalFileName)
-
-                # now get the scInfo: dict of cube,wvlBinEdges,effIntTime
+                obs.setWvlCutoffs(wvlLowerLimit=wvlStart, wvlUpperLimit=wvlStop)
+                print time.strftime("%c"),"now call getSpectralCube:  firstSec=",firstSec," integrationTime=",integrationTime, "weighted=",weighted
                 spectralCube = obs.getSpectralCube(firstSec=firstSec,
                                                    integrationTime=integrationTime,
-                                                   weighted=False,
-                                                   wvlBinWidth=1000
+                                                   weighted=weighted,
+                                                   fluxWeighted=fluxWeighted,
+                                                   wvlStart = wvlStart,
+                                                   wvlStop = wvlStop,
+                                                   wvlBinWidth=wvlBinWidth,
+                                                   energyBinWidth=energyBinWidth,
+                                                   wvlBinEdges=wvlBinEdges,
+                                                   timeSpacingCut=timeSpacingCut
                                                    )
-                
-                retval.append(spectralCube)
+                cube = spectralCube['cube']
+                wbe = spectralCube['wvlBinEdges']
+                eit = spectralCube['effIntTime']
+                if retval is None:
+                    retval = {'cube':cube, 'wvlBinEdges':wbe, 'effIntTime':eit}
+                else:
+                    retval['cube'] += cube
+                    retval['effIntTime'] += eit                
         return retval
 
-    def getCountsCube(self,wvMin,wvMax):
+    def loadSpectralCubes(self,weighted=True, fluxWeighted=False,
+                          wvlStart=None,wvlStop=None,
+                          wvlBinWidth=None,energyBinWidth=None,
+                          wvlBinEdges=None,timeSpacingCut=None):
         """
-        return dictionary of
-          'counts' = counts[iFrame][row][col], number of photons detectedt for this frame, in row,col
-          'effIntTime' = effIntTime[iFrame][row][col], effective exposure time
-        """
-        fn = name+"-countsCube.pkl"
-        retval = pickle.load(open(fn,"rb"))
-        
-        for iFrame in range(len(self.frameIntervals)):
-            print "iFrame in getCountsCuge"
+        calls getSpectralCubeByFrame on each iFrame, storing the
+        resuls in the list self.cubes
 
+        use a pickle file named name.pkl as a buffer.  If that file
+        exists, load the cubes from there, and save the cubes there
+        after loading.  WARNING -- the settings are not stored, so
+        they are ignored when loading from the pickle file.
+
+        """
+        cpfn = self.name+"-cubes.pkl"
+        if os.path.isfile(cpfn):
+            print "loadSpectralCubes:  load from ",cpfn
+            self.cubes = pickle.load(open(cpfn,'rb'))
+        else:
+            self.cubes = []
+            for iFrame in range(len(self.frameIntervals)):
+                print "now load spectral cube for iFrame=",iFrame
+                self.cubes.append(self.getSpectralCubeByFrame(iFrame,
+                                                              weighted,
+                                                              fluxWeighted,
+                                                              wvlStart,
+                                                              wvlStop,
+                                                              wvlBinWidth,
+                                                              energyBinWidth,
+                                                              wvlBinEdges,
+                                                              timeSpacingCut))
+            pickle.dump(self.cubes,open(cpfn,'wb'))
     def makePngFileByInterval(self,thisInterval,wvMin,wvMax,maxRate):
         fn = "%s-%03d-%05d-%05d.png"%(self.name,thisInterval,int(wvMin),int(wvMax))
         print "now make fn=",fn
@@ -268,6 +371,7 @@ class ObsFileSeq():
         except OSError:
             pass
         hdu.writeto(fn)
+
     def getPixelCountImage(self,t0,t1,weighted=False,
                            fluxWeighted=False, getRawCount=False,
                            scaleByEffInt=False):
@@ -286,6 +390,7 @@ class ObsFileSeq():
                                                           fluxWeighted,
                                                           getRawCount,
                                                           scaleByEffInt)
+                print "pic.keys=",pci.keys()
         return None
 
     def plotLocations(self,fileName=None):
