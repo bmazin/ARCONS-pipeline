@@ -23,28 +23,7 @@ from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.FileName import FileName
 import hotpix.hotPixels as hp
-
-def onscroll_cbar(fig, event):
-    if event.inaxes is fig.cbar.ax:
-        increment=0.05
-        currentClim = fig.cbar.mappable.get_clim()
-        if event.button == 'up':
-            newClim = (currentClim[0],(1.+increment)*currentClim[1])
-        if event.button == 'down':
-            newClim = (currentClim[0],(1.-increment)*currentClim[1])
-        fig.cbar.mappable.set_clim(newClim)
-        fig.canvas.draw()
-
-def onclick_cbar(fig,event):
-    if event.inaxes is fig.cbar.ax:
-        if event.button == 1:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
-        if event.button == 3:
-            fig.oldClim = fig.cbar.mappable.get_clim()
-            fig.cbar.mappable.set_clim(fig.oldClim[0],1/event.ydata*fig.oldClim[1])
-            fig.canvas.draw()
+from headers.CalHeaders import FlatCalSoln_Description
 
 class FlatCal:
     def __init__(self,paramFile):
@@ -63,18 +42,23 @@ class FlatCal:
         needTimeAdjust = self.params['needTimeAdjust']
         self.deadtime = self.params['deadtime'] #from firmware pulse detection
         self.timeSpacingCut = self.params['timeSpacingCut']
-
+        bLoadBeammap = self.params.get('bLoadBeammap',False)
+            
         obsFNs = [FileName(run=run,date=sunsetDate,tstamp=obsTstamp) for obsTstamp in obsSequence]
         self.obsFileNames = [fn.obs() for fn in obsFNs]
         self.obsList = [ObsFile(obsFileName) for obsFileName in self.obsFileNames]
         timeMaskFileNames = [fn.timeMask() for fn in obsFNs]
         timeAdjustFileName = FileName(run=run).timeAdjustments()
 
+
         print len(self.obsFileNames), 'flat files to co-add'
         self.flatCalFileName = FileName(run=run,date=sunsetDate,tstamp=flatTstamp).flatSoln()
         if wvlSunsetDate != '':
             wvlCalFileName = FileName(run=run,date=wvlSunsetDate,tstamp=wvlTimestamp).calSoln()
         for iObs,obs in enumerate(self.obsList):
+            if bLoadBeammap:
+                print 'loading beammap',os.environ['MKID_BEAMMAP_PATH']
+                obs.loadBeammapFile(os.environ['MKID_BEAMMAP_PATH'])
             if wvlSunsetDate != '':
                 obs.loadWvlCalFile(wvlCalFileName)
             else:
@@ -87,11 +71,15 @@ class FlatCal:
             #Temporary step, remove old hotpix file
             #if os.path.exists(timeMaskFileName):
             #    os.remove(timeMaskFileName)
+            obs.setWvlCutoffs(3000,13000)
             if not os.path.exists(timeMaskFileName):
                 print 'Running hotpix for ',obs
                 hp.findHotPixels(obsFile=obs,outputFileName=timeMaskFileName,fwhm=np.inf,useLocalStdDev=True)
                 print "Flux file pixel mask saved to %s"%(timeMaskFileName)
             obs.loadHotPixCalFile(timeMaskFileName)
+
+        #get beammap from first obs
+        self.beamImage = self.obsList[0].beamImage
         self.wvlFlags = self.obsList[0].wvlFlagTable
 
         self.nRow = self.obsList[0].nRow
@@ -436,9 +424,34 @@ class FlatCal:
         print 'wrote to',self.flatCalFileName
 
         calgroup = flatCalFile.createGroup(flatCalFile.root,'flatcal','Table of flat calibration weights by pixel and wavelength')
-        caltable = tables.Array(calgroup,'weights',object=self.flatWeights.data,title='Flat calibration Weights indexed by pixelRow,pixelCol,wavelengthBin')
+        calarray = tables.Array(calgroup,'weights',object=self.flatWeights.data,title='Flat calibration Weights indexed by pixelRow,pixelCol,wavelengthBin')
         flagtable = tables.Array(calgroup,'flags',object=self.flatFlags,title='Flat cal flags indexed by pixelRow,pixelCol,wavelengthBin. 0 is Good')
         bintable = tables.Array(calgroup,'wavelengthBins',object=self.wvlBinEdges,title='Wavelength bin edges corresponding to third dimension of weights array')
+
+        descriptionDict = FlatCalSoln_Description(self.nWvlBins)
+        caltable = flatCalFile.createTable(calgroup, 'calsoln', descriptionDict,title='Flat Cal Table')
+        
+        for iRow in xrange(self.nRow):
+            for iCol in xrange(self.nCol):
+                weights = self.flatWeights[iRow,iCol,:]
+                deltaWeights = self.deltaFlatWeights[iRow,iCol,:]
+                flags = self.flatFlags[iRow,iCol,:]
+                flag = np.any(self.flatFlags[iRow,iCol,:])
+                pixelName = self.beamImage[iRow,iCol]
+                roach = int(pixelName.split('r')[1].split('/')[0])
+                pixelNum = int(pixelName.split('p')[1].split('/')[0])
+
+                entry = caltable.row
+                entry['roach'] = roach
+                entry['pixelnum'] = pixelNum
+                entry['pixelrow'] = iRow
+                entry['pixelcol'] = iCol
+                entry['weights'] = weights
+                entry['weightUncertainties'] = deltaWeights
+                entry['weightFlags'] = flags
+                entry['flag'] = flag
+                entry.append()
+        
         flatCalFile.flush()
         flatCalFile.close()
 
