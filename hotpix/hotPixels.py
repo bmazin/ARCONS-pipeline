@@ -103,6 +103,7 @@ endTimeColName = 'endTime'      #Ditto for end time.
 obsFileColName = 'obsFileName' #Ditto for the column containing the name of the original obs. file.
 ticksPerSecColName = 'ticksPerSec'  #Ditto for column containing number of clock ticks per second for original obs. file.
 expTimeColName = 'expTime'  #Ditto for column containing total exposure time
+beammapColName = 'beammapfile'  #column containing beammap filename in header
 
 def constructDataTableName(x, y):
     '''Construct the name for the pytables table for a given pixel at location x,y'''
@@ -119,6 +120,7 @@ class headerDescription(tables.IsDescription):
     expTime = tables.Float64Col(dflt=np.nan)        #So that per-pixel effective exposure times can be calculated any time without having to refer to the original obs file. Added 6/21/2013, JvE, although not yet used elsewhere in the code.
     startTime = tables.Float64Col(dflt=np.nan)      #To record start and end times within the obs file for which the time masks were created.
     endTime = tables.Float64Col(dflt=np.nan)
+    beammapfile = tables.StringCol(80)  #To record beammap file name
  
 def checkInterval(firstSec=None, intTime=None, fwhm=2.5, boxSize=5, nSigmaHot=4.0,
                   nSigmaCold=3.0, obsFile=None, inputFileName=None, image=None, deadMask=None,
@@ -905,6 +907,7 @@ def writeHotPixels(timeMaskData, obsFile, outputFileName, startTime=None, endTim
                                         'Header Info')
         header = headerTable.row
         header[obsFileColName] = obsFile.fileName
+        header[beammapColName] = obsFile.beammapFileName
         #header[nColColName] = max([x[0] for x in timeMaskData]) + 1  #Assume max. x value represents number of columns
         #header[nRowColName] = max([x[1] for x in timeMaskData]) + 1  #Same for rows.
         header[nColColName] = obsFile.nCol
