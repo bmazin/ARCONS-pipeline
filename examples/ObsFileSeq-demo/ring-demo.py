@@ -3,6 +3,7 @@ import math
 import numpy as np
 from util import ObsFileSeq as ObsFileSeq
 from util import utils
+import pyfits
 
 # Define a set of observation files for this mosaic run
 name='ring-20141020'
@@ -113,6 +114,15 @@ ofs.setRm(degPerPix,
           raArcsecPerSec,
         )
 
+#
+# Make a FITS file of each frame of the cube
+for iFrame in range(66):
+    frame = ofs.cubes[iFrame]['cube'].sum(axis=2)
+    hdu = pyfits.PrimaryHDU(frame)
+    fn = "%s-%02d.fit"%(ofs.name,iFrame)
+    print "now make fn=",fn
+    hdu.writeto(fn)
+
 # Whew!  Now do the coaddition for all of the sequences.
 # This uses all wavelengths.  The first improvement will be to
 # have it use a subset of the wavelength bins.
@@ -123,4 +133,8 @@ mosaic = ofs.makeMosaicImage(range(66))
 # But right now, let's just dump out a heat map so we something to show off.
 utils.plotArray(mosaic,cbar=True,plotTitle=ofs.name,showMe=False,plotFileName=ofs.name+"-all.png")
 
+# Write it out as a FITS file, too
+hdu = pyfits.PrimaryHDU(mosaic)
+fn = "%s-all.fit"%ofs.name
+hdu.writeto(fn)
 del ofs
