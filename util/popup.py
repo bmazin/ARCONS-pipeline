@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 import matplotlib
 
 class PopUp(QtGui.QMainWindow):
-    def __init__(self, parent=None,plotFunc=None,title='',separateProcess=False, image=None,showMe=True):
+    def __init__(self, parent=None,plotFunc=None,title='', showMe=True):
         self.parent = parent
         if self.parent == None:
             self.app = QtGui.QApplication([])
