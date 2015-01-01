@@ -225,12 +225,12 @@ class PSFphotometry(Photometry):
             #A+Be^-((x-xo)^2+(y-y0)^2)/2s^2 + Ce^-((x-x1)^2+(y-y1)^2)/2d^2 + ...
             
             bkgdPercentile = 30.0
-            overallBkgd = np.percentile(self.image[np.where(np.isfinite(self.image))],bkgdPercentile)   #This doesn't seem to work for some reason...
+            overallBkgd = np.percentile(self.image[np.where(np.isfinite(self.image) & (self.image > 0.))],bkgdPercentile)   #This doesn't seem to work for some reason...
             #print 'bkgd ',overallBkgd
-            overallBkgd=1.
+            #overallBkgd=1.
             parameter_guess = [overallBkgd]
             parameter_lowerlimit = [0.0]
-            parameter_upperlimit = [np.mean(self.image[np.where(np.isfinite(self.image))])]
+            parameter_upperlimit = [np.mean(self.image[np.where(np.isfinite(self.image) & (self.image > 0.))])]
             parameter_ties=[0.]
             
             for star_i in range(len(self.centroid)):
@@ -319,7 +319,7 @@ class PSFphotometry(Photometry):
             guess = models[0]
             for m in models[1:]:
                 guess+=m
-            pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess),title="Guess")
+            pop(plotFunc=lambda popupOb: plot3DImage(popupOb.fig,popupOb.axes,self.image,errs=errs,fit=guess),title="Guess")
 
         #p_guess = np.ones(len(parameter_guess))
         #p_ll = np.asarray(parameter_lowerlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
@@ -331,7 +331,7 @@ class PSFphotometry(Photometry):
             guess2 = models2[0]
             for m in models2[1:]:
                 guess2+=m
-            pop(plotFunc=lambda fig,axes: plot3DImage(fig,axes,self.image,errs=errs,fit=guess2),title="Fitted")
+            pop(plotFunc=lambda popupOb: plot3DImage(popupOb.fig,popupOb.axes,self.image,errs=errs,fit=guess2),title="Fitted")
         
         
         flag = 2.0*self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit)
