@@ -1363,7 +1363,8 @@ class ObsFile:
     def loadBeammapFile(self,beammapFileName):
         """
         Load an external beammap file in place of the obsfile's attached beamma
-        Can be used to correct pixel location mistakes
+        Can be used to correct pixel location mistakes.
+        NB: Do not use after loadFlatCalFile
         """
         #get the beam image.
         scratchDir = os.getenv('MKID_PROC_PATH', '/')
@@ -1418,6 +1419,7 @@ class ObsFile:
     def loadFlatCalFile(self, flatCalFileName):
         """
         loads the flat cal factors from the given file
+        NB: if you are going to load a different beammap, call loadBeammapFile before this function
         """
         scratchDir = os.getenv('MKID_PROC_PATH', '/')
         flatCalPath = os.path.join(scratchDir, 'flatCalSolnFiles')
@@ -1434,15 +1436,20 @@ class ObsFile:
         self.flatFlags = np.zeros((self.nRow,self.nCol,self.nFlatCalWvlBins),dtype=np.uint16)
 
         try:
-            flatCalSoln = self.flatCalFile.root.flatcal.caltable.read()
+            flatCalSoln = self.flatCalFile.root.flatcal.calsoln.read()
             for calEntry in flatCalSoln:
-                entryRows,entryCols = np.where((calEntry['roach'] == self.beamImageRoaches & calEntry['pixelnum'] == self.beamImagePixelNums))
-                entryRow = entryRows[0]
-                entryCol = entryCols[0]
-                self.flatWeights[entryRow,entryCol,:] = calEntry['weights']
-                self.flatFlags[entryRow,entryCol,:] = calEntry['weightFlags']
+                entryRows,entryCols = np.where((calEntry['roach'] == self.beamImageRoaches) & (calEntry['pixelnum'] == self.beamImagePixelNums))
+                try:
+                    entryRow = entryRows[0]
+                    entryCol = entryCols[0]
+                    self.flatWeights[entryRow,entryCol,:] = calEntry['weights']
+                    self.flatFlags[entryRow,entryCol,:] = calEntry['weightFlags']
+                except IndexError: #entry for an unbeammapped pixel
+                    pass 
         
-        except:
+        except tables.exceptions.NoSuchNodeError:
+            #loading old (beammap-dependant) flat cal
+            print 'loading old (beammap-dependant) flat cal'
             self.flatWeights = self.flatCalFile.root.flatcal.weights.read()
             self.flatFlags = self.flatCalFile.root.flatcal.flags.read()
         

@@ -350,7 +350,7 @@ class RADecImage(object):
             if doWeighted:
                 print 'Making weighted image'
                 if spectrum is not False:
-                     #added by Neil
+                    #added by Neil
                     if phase is not False:
                         print 'Gathering phase and spectral information'
                         
@@ -387,7 +387,7 @@ class RADecImage(object):
                         print 'Gathering phase and spectral information'
                         phaseBinEdges = RADecImage.makePhaseBins()
     
-                        thisImage, edges = np.histogramdd([photDecs,photRAs,photWavelengths,photPhases],[self.gridDec,self.gridRA,wvlBinEdges, phaseBinEdges]) #spectrum nd phase
+                        thisImage, edges = np.histogramdd([photDecs,photRAs,photWavelengths,photPhases],[self.gridDec,self.gridRA,wvlBinEdges, phaseBinEdges]) #spectrum and phase
                                                 
                         self.wvlEdges = edges[2]
                         self.phaseEdges = edges[3]
@@ -652,6 +652,7 @@ class RADecImage(object):
             logScale: if True, display the intensities on a log scale.
             fileName: if a string, save the plot to this filename. If anything else (inc. None),
                       display to screen.
+            showColorBar: if True, include an adjustable color bar
             
         '''
         
@@ -992,7 +993,7 @@ class RADecImage(object):
 
             spectrum = np.sum(spectrumIn, axis = 0)   #sums across all the pixels the number of photon counts per wavelength bin
                                                       #this array has dimension (#wavelength bins) where each element contains the total count of all positions for that bin
-                                                      # If phase is True then this will have dimensions (#wavelengthbins,#phasebins)
+                                                      #If phase is True then this will have dimensions (#wavelengthbins,#phasebins)
 
             for i in range(len(spectrum)):
                 spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])  #divides the total photon counts at each wavelength bin by the binwidth => units are now counts/A
@@ -1013,9 +1014,9 @@ class RADecImage(object):
         else:
             assert len(np.shape(self.scaledSpectrum)) == 4
             print '---finding wavelength bins---'
-            wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
+            wvlBinEdges = self.wvlEdges                 #gets the wavelength binning information generated when making the image.
             print '---finding phase bins---'
-            phaseBinEdges = self.phaseEdges #gets phase binning information generated when making the image
+            phaseBinEdges = self.phaseEdges             #gets phase binning information generated when making the image
             
             skyspectrum = np.zeros((len(x_sky), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]), len(self.scaledSpectrum[x_sky[0]][y_sky[0]][0][:]))) #initializes array with dimension (#pixels,#wavelengthbins,#phaseBins)
             
@@ -1030,50 +1031,51 @@ class RADecImage(object):
 
             sky_array = np.zeros((len(self.scaledSpectrum[x_sky[0]][y_sky[0]][:]),len(self.scaledSpectrum[x_sky[0]][y_sky[0]][0][:]))) #initializes array for skysubtraction (#wvlbins, #phasebins)
 
-            skyspectrum = skyspectrum.transpose()  #transpose skyspectrum so that dimensions are now (#wavelenth bin per pixel, #of pixels in annulus) -IF SPECTRUM ONLY IS USED
-                                               #this makes it easier to take the median with NANs values. Now medians will be taken across a single wavelength bin.
-                                               #IF INCLUDING PHASE INFORMATION!!!! ----this array will now be (#phasebins, #wvlbins, #pixels) where again the medians are taken for the pixels
-                                               # across a wavelength bin.
+            skyspectrum = skyspectrum.transpose()  #transpose skyspectrum so that dimensions are now (#phasebins, #wvlbins, #pixels). 
+                                                   #this makes it easier to take the median with NANs values.
 
 
             print '---finding median sky count for sky subtrction---'
             for i in range(len(skyspectrum)):
                 for j in range(len(skyspectrum[j])):
-                    nanNot = ~np.isnan(skyspectrum[i][j]) #finds where the NANS are NOT.
-                    sky_array[j][i] = np.median(skyspectrum[i][j][nanNot]) #takes median of counts across all positions in sky annulus per wavelength bin, excluding NANS. 
-                                                                           #has dimensions (#wvlnbins, #phasebins) where each element contains the median count of all pixels. 
+                    nanNot = ~np.isnan(skyspectrum[i][j])                  #finds where the NANS are NOT.
+                    sky_array[j][i] = np.median(skyspectrum[i][j][nanNot]) #finds median photon count per phasebin per wavelength bin for all pixels in annulus, excluding NANS. 
+                                                                           #sky_array has dimensions (#wvlnbins, #phasebins). 
 
 
             #print 'skyspectrum', skyspectrum, np.shape(skyspectrum)
             #print 'sky_array', sky_array, np.shape(sky_array) 
 
-            spectrumIn = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
+            spectrumIn = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  #(#pixels,#wvlbins,#phasebins)
             
             
             print '---gathering aperture spectrum---'
-        #if phase is not False:
+        
             for i in range(len(x1_values)):
-                specIn = np.zeros((len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]), len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:]))) #array is (#wvlbins, #phasebins)
+                specIn = np.zeros((len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]), len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:]))) #(#wvlbins, #phasebins)
                 for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):
                     for k in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][j][:])):
                         specIn[j][k] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j][k]  # fills in the array (#wvlbins, #phase bins)
-                spectrumIn[i] = specIn - sky_array  #subtracts the median sky counts from the counts per wavelength bin for a single pixel
-                                                #Note that spectrum in will have dimensions (#pixels in aperture, #wavelength bins per pixel, #phasebins)
+                spectrumIn[i] = specIn - sky_array                                            #subtracts the median sky counts from the counts per wavelength bin for a single pixel
+                                                                                              #Note that spectrum in will have dimensions (#pixels in aperture, #wavelength bins per pixel, #phasebins)
             print '---summing spectra for all pixels in aperture---'
 
-            phaseSpectrum = np.sum(spectrumIn, axis = 0) #sums across all the pixels the number of counts per wavelength bin
-                                                         #this array has dimension (#wavelength bins) where each element contains the total count of all positions for that bin
-                                                         #If phase is True then this will have dimensions (#wavelengthbins,#phasebins)
-            spectrum = np.sum(phaseSpectrum, axis = 1)
-
-            #note that here we do not divide the spectrum by the wavelength bins. this will be done in getPhaseSpectrum
+            phaseSpectrum = np.sum(spectrumIn, axis = 0) #sums across all the pixels the number of photon counts per wavelength bin per phase bin
+                                                         #have dimensions (#wavelengthbins,#phasebins)
+            spectrum = np.sum(phaseSpectrum, axis = 1)   #sums across all the phase bins. array has dimensions (#wvlbins)
+            
             #print 'phaseSpectrum', phaseSpectrum, np.shape(phaseSpectrum)       
                
             for i in range(len(sky_array)):
                 spectrum[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
-                sky_array[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])     
+                sky_array[i]/=(wvlBinEdges[i+1]-wvlBinEdges[i])
+                     
+            
+            #note here everything will be skysubtracted.
+            #dimensions: spectrum - (#wvlbins) => counts/A; phaseSpectrum - (#wvlbins, #phasebins) => counts, sky_array - (#wvlbins, #phasebins) => counts/A
+            #note that the purpose of phaseSpectrum is to generate a light curve. Once this code is used sum phaseSpectrum along the first axis.
 
-            return spectrum, phaseSpectrum, sky_array, innerAp, skyMask, wvlBinEdges, phaseBinEdges, apArea, anArea #this will be sky subtracted. Feed this to getPhaseSpectrum. (#wavelengthbins, #phaseBins) #note here that everything is sky subtracted 
+            return spectrum, phaseSpectrum, sky_array, innerAp, skyMask, wvlBinEdges, phaseBinEdges, apArea, anArea 
        
     
 
@@ -1084,17 +1086,15 @@ class RADecImage(object):
         This is an alternative aperture code that can be used for on-the-fly photometry of virtual images.
         
         Other possible uses for this version could possibly include:
-            - For objects such as pulsars that blink on and off, it is possible to determine the exact spectrum of the off-pulse sky emissions and subtract
+            - For highly periodic objects such as pulsars that blink on and off, it is possible to determine the exact spectrum of the off-pulse sky emissions and subtract
               that directly from the on-pulse emissions for more accurate sky subtraction.
             - any other ideas???
 
-        this codes is designed to gather information about counts per phase bin of a given object located within some aperture. If the spectrum option is used\
-        then the specral distribution of the photons will be carried through so that the final array will have counts pere wavelength bin bper phase bin. This can then
-        be fed into getPhasespectrum to pull out the spectra of the desired phases.
-
-        This code is good for generating raw phase profile of aperture.        
+        this codes is designed to gather information about counts per phase bin of a given object located within some aperture. If the spectrum option is used
+        then the specral distribution of the photons will be carried through so that the final array will have counts per wavelength bin per phase bin. This can then
+        be fed into getPhaseSpectrum to pull out the spectra of the desired phase ranges.        
         
-        There is no sky subtraction done here. If sky subtracted spectra is desired us getApertureSpectrum.
+        There is no sky subtraction done here. If sky subtracted spectra is desired use getApertureSpectrum.
         
         Inputs:
 
@@ -1106,27 +1106,35 @@ class RADecImage(object):
             error - propegates errors. Needs more work...
  
         Outputs:
+            phaseSpec - the main output. if spectrum is true this will have dimension (#pixels, #wvlbins, #phasebins), otherwise (#pixels, #wvlbins)
+            wvlBinEdges - an array containing the wavelength bin boundaries where each element is a boundary in angstrom 
+            phaseBinEdges - an array with dimensions (#phase bins) containing the phase bin boundaries
+            innerAp - the aperture mask used to collect the flux from the object
+            apArea - the total area of the aperture mask in arcseconds^2 
+            phaseSpecErr - count errors. needs work.
 
+
+        note that pixel location is kept in tact so that sky subtraction can be done on a pixel by pixel basis after being put through getPhaseSpectrum.
 
         '''
 
 
         limits = [self.gridRA[0], self.gridRA[-1], self.gridDec[0], self.gridDec[-1]] #these are the limits of the grid in RA/Dec. They are in radians as is.
-                                                                                      #RADecImage._init_ returns these in radians inherintly.
+                                                                                      #RADecImage._init_ returns these in radians.
         
         print '----aperture----'
         aperture = utils.aperture(cenRA=cenRA,cenDec=cenDec,nPixRA=nPixRA,nPixDec=nPixDec,limits=limits,radius=radius1,degrees=degrees) #see utils.aperture
         innerAp = aperture
 
         print '----locating pixel positions within aperture----'
-        y1_values, x1_values = np.where(innerAp==0) #This gathers the pixel locations contained in the aperture
+        y1_values, x1_values = np.where(innerAp==0)                                   #This gathers the pixel locations contained in the aperture
 
         print '---determining area of aperture in arcesconds---'
         #pixArea = 0.189225 #this is in (arcsec)^2
         pixArea = .0400 #arcsec^2        
         apArea = pixArea*len(x1_values)
         
-        self.display(image = innerAp) #quick check to see how the aperture position looks
+        self.display(image = innerAp)                                                 #quick check to see how the aperture position looks
         
         mpl.show()
 
@@ -1135,15 +1143,15 @@ class RADecImage(object):
                 
         if spectrum is not False:
             print '---finding wavelngth bins---'
-            wvlBinEdges = self.wvlEdges      #gets the wavelength binning information generated when making the image.
+            wvlBinEdges = self.wvlEdges                                               #gets the wavelength binning information generated when making the image.
 
         print '---finding phase bins---'
-        phaseBinEdges = self.phaseEdges #gets phase binning information generated when making the image
+        phaseBinEdges = self.phaseEdges                                               #gets phase binning information generated when making the image
         
         print '---making image---'
-        self.scaledSpectrum = self.image*self.expTimeWeights #this is the virtual image Cube(counts/pixel location) scaled by the exposure time weightings!!.
-                                                          #the units of self.scaledSpectrum are counts/pixel
-                                                          #There may be a significant amount of NANS here so be careful.
+        self.scaledSpectrum = self.image*self.expTimeWeights                          #this is the virtual image Cube (counts/pixel location) scaled by the exposure time weightings!!.
+                                                                                      #the units of self.scaledSpectrum are counts/pixel
+                                                                                      #There may be a significant amount of NANS here so be careful.
         
         #print 'self.scaledSpectrum', np.shape(self.scaledSpectrum), self.scaledSpectrum
 
@@ -1158,25 +1166,10 @@ class RADecImage(object):
             else:
                 assert len(np.shape(self.scaledSpectrum)) == 3
                 #assert len(self.scaledSpectrum[0][0]) == phaseBinEdges   #This is because if spectrum is not true all we will pull out is phase which is the 3rd dimension. (#pixelsX,#pixelsY,#phase bins)       
-        else:
-            assert len(np.shape(self.scaledSpectrum)) == 4
-            #assert len(self.scaledSpectrum[0][0]) == wvlBinEdges
-            #assert len(self.scaledSpectrum[0][0][0]) == phaseBinEdges        
-
-        print '---gathering aperture phase---'
-        
-        if spectrum is not False:
-            phaseSpec = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
             
-            for i in range(len(x1_values)):
-                specIn = np.zeros((len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]), len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:]))) #array is (#wvlbins, #phasebins)
-                for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):
-                    
-                    for k in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][j][:])):
-                        specIn[j][k] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j][k]  # fills in the array (#wvlbins, #phase bins)
-                #spectrumIn[i] = specIn
-                phaseSpec[i] = specIn
-        else:
+
+            print '---gathering aperture phase---'
+            
             phaseSpec = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]))) #Initializes array of dimension (#pixels in aperture,#phasebins)
             
             for i in range(len(x1_values)):  #iterates through each pixel contained in the aperture
@@ -1186,12 +1179,30 @@ class RADecImage(object):
                 #print specIn
                 #print 'specIn', specIn, np.shape(specIn)
                 #spectrumIn[i] = specIn  
-                phaseSpec[i] = specIn
+                phaseSpec[i] = specIn       #array dimensions (#pixels, #phasebins)
 
-        #summed_arrayIn = np.sum(spectrumIn, axis = 0)
-        #summed_arrayIn = np.sum(phaseSpec,axis = 0)
-        summed_arrayIn = phaseSpec #note this may be the way        
+        #this is where neil tried to simplify shiite but effed it up
+        else:
+            assert len(np.shape(self.scaledSpectrum)) == 4
+            #assert len(self.scaledSpectrum[0][0]) == wvlBinEdges
+            #assert len(self.scaledSpectrum[0][0][0]) == phaseBinEdges
+            print '---gathering aperture phase---'
+            
+            phaseSpec = np.zeros((len(x1_values),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]),len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:])))  # initializes arr (#pixels,#wvlbins,#phasebins)
+            
+            for i in range(len(x1_values)):
+                specIn = np.zeros((len(self.scaledSpectrum[x1_values[0]][y1_values[0]][:]), len(self.scaledSpectrum[x1_values[0]][y1_values[0]][0][:]))) #array is (#wvlbins, #phasebins)
+                for j in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][:])):
+                    
+                    for k in range(len(self.scaledSpectrum[x1_values[i]][y1_values[i]][j][:])):
+                        specIn[j][k] = self.scaledSpectrum[x1_values[i]][y1_values[i]][j][k]  # fills in the array (#wvlbins, #phase bins)
+                #spectrumIn[i] = specIn
+                phaseSpec[i] = specIn   #array dimensions (#pixels, #wvlbins, #phasebins)
 
+        
+        print 'dimensions = ', np.shape(phaseSpec)       
+
+        #note that the error analysis needs some work
         if error is not False:
             imErr = np.sqrt(self.image)
             countErr = imErr*self.expTimeWeights
@@ -1209,14 +1220,14 @@ class RADecImage(object):
                 #spectrumIn[i] = specIn
                 phaseSpecErr[i] = specInErr
             
-            summed_arrayInErr = np.sqrt(np.sum((phaseSpecErr**2), axis = 0))
+            phaseSpecErr = np.sqrt(np.sum((phaseSpecErr**2), axis = 0))
             
-            return summed_arrayIn, wvlBinEdges, phaseBinEdges, innerAp, apArea, summed_arrayInErr 
-        #if spectrum is not False:
-            #.....................................................
+            
+            return phaseSpec, wvlBinEdges, phaseBinEdges, innerAp, apArea, phaseSpecErr
+
         else:
 
-            return summed_arrayIn, wvlBinEdges, phaseBinEdges, innerAp, apArea
+            return phaseSpec, wvlBinEdges, phaseBinEdges, innerAp, apArea
         
 
     def getPhaseSpectrum(self, countArray = None, countErr = None, lowLim=None, highLim=None, error = False, background = False, med = False):
@@ -1227,11 +1238,13 @@ class RADecImage(object):
             countArray - should have dimensions of (#pixels,#wvlbins,#phases)
             countErr - option to include errors on the counts in countArray if necessary. only used if error is True
             lowLim/highlim - the lower and upper phase limit of the desired phase interval to be used to make spectra
-            error - if True, initiates the error analysis
-            background - 
+            error - if True, initiates the error analysis. needs work
+            background - gathers the background counts
+            med - used if median background count is desired. If available however direct sky subtraction per pixel position is better.
 
 
         Outputs:
+            spectrum - outputs the spectral information for the diesired phase range (#pixels, #wvlbins)
         
         """
         
