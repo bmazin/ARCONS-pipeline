@@ -32,6 +32,7 @@ from util.FileName import FileName
 from photometry.PSFphotometry import PSFphotometry
 from util import utils
 from util.popup import PopUp
+import time
 
 
 # Converting between degrees and radians.  Inputs and numpy functions use different units.
@@ -88,7 +89,7 @@ def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionLi
     except:
         print 'Error: Couldn\'t create centroid list file, ',fullCentroidListFileName
         return
-    print 'wrote to', centroidListFileName
+    print 'writing to', fullCentroidListFileName
 
     # Set up and write h5 table with relevant parameters, centroid times and positions, hour angles, and flags.
 
@@ -163,6 +164,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     else:
         centroidListFileName=outputFileName
     print 'Saving to: ',centroidListFileName
+    centroidListFolder = os.path.dirname(centroidListFileName)
     
     #app = QApplication(sys.argv)    #Commented out for now to avoid possible issues with x-forwarding if running remotely.
     
@@ -266,31 +268,22 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
                 print 'Calculated [x,y] center = ' + str((xycenter)) + ' for frame ' + str(iFrame) +'.'
                 flag = 0
             except TypeError:
-                print 'Cannot centroid frame' + str(iFrame) + ', using guess instead'
+                print 'Cannot centroid frame' + str(iFrame) + ' by pyguide, using guess instead'
                 xycenter = xyguess
                 flag = 1
 
             if usePsfFit:
                 xycenterGuide = xycenter
-                psfPhot = PSFphotometry(image,centroid=[xyguess],verbose=True)
+                psfPhot = PSFphotometry(image,centroid=[xycenterGuide],verbose=True)
                 psfDict = psfPhot.PSFfit(aper_radius=radiusOfSearch)
-                print psfDict
                 if psfDict['flag'] == 0:
                     xycenter = [psfDict['parameters'][2],psfDict['parameters'][3]]
+                    flag = 0
                 else:
-                    print 'Cannot centroid frame' + str(iFrame) + ', mpfit returned flag ',psfDict['flag'],'using guess instead'
-                    xycenter = xyguess
+                    print 'Cannot centroid frame' + str(iFrame) + ', by psf fit, returned flag ',psfDict['flag'],'using pyguide center instead'
+                    xycenter = xycenterGuide 
                     flag = 1
 
-                print 'guess center xy',xyguess
-                print 'fit center xy',xycenter
-                print 'pyguide center xy',xycenterGuide
-                form = PopUp(showMe=False)
-                form.plotArray(image)
-                form.axes.plot(xycenter[0],xycenter[1],marker='o',color='g')
-                form.axes.plot(xyguess[0],xyguess[1],marker='x',color='g')
-                form.axes.plot(xycenterGuide[0],xycenterGuide[1],marker='d',color='darkgreen')
-                form.fig.savefig('frame{}.jpg'.format(str(iFrame)))
                     
             # Begin RA/DEC mapping
             # Calculate lst for a given frame
