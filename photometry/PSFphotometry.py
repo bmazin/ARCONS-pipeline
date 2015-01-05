@@ -270,9 +270,9 @@ class PSFphotometry(Photometry):
                 #amp_ll = amp_guess/2.
                 amp_ll = 0.
                 
-                sig_guess = 1.5
-                sig_ll = 0.5
-                sig_ul = 3.*sig_guess
+                sig_guess = 1.8
+                sig_ll = 0.8
+                sig_ul = 2.5
                 if radius > 0. and sig_ul > radius: sig_ul = radius
                 
                 p_guess = [amp_guess, x_guess, y_guess, sig_guess]
