@@ -29,6 +29,9 @@ from PyQt4.QtGui import *
 import hotpix.hotPixels as hp
 from tables import *
 from util.FileName import FileName
+from photometry.PSFphotometry import PSFphotometry
+from util import utils
+from util.popup import PopUp
 
 
 # Converting between degrees and radians.  Inputs and numpy functions use different units.
@@ -125,7 +128,7 @@ def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionLi
 
 
 def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessTime=300, integrationTime=30,
-                 secondMaxCountsForDisplay=500, HA_offset=16.0, xyapprox=None):
+                 secondMaxCountsForDisplay=500, HA_offset=16.0, xyapprox=None, usePsfFit=False):
     
     '''
     Shifted bulk of Paul's 'main' level code into this function. JvE 5/22/2013
@@ -217,6 +220,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     yPositionList=[]
     hourAngleList=[]
     flagList=[]
+    debugPlots = []
     
     flag=0
     print 'Retrieving images...'
@@ -252,7 +256,9 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
             imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
             image=imageInformation['image']        
             # Use PyGuide centroiding algorithm.
-            pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,6,ccd,0,False,
+            radiusOfSearch = 6 #pixels
+
+            pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,radiusOfSearch,ccd,0,False,
                                         verbosity=2, doDS9=True)     #Added by JvE May 31 2013
             # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
             try:
@@ -263,6 +269,29 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
                 print 'Cannot centroid frame' + str(iFrame) + ', using guess instead'
                 xycenter = xyguess
                 flag = 1
+
+            if usePsfFit:
+                xycenterGuide = xycenter
+                psfPhot = PSFphotometry(image,centroid=[xyguess],verbose=True)
+                psfDict = psfPhot.PSFfit(aper_radius=radiusOfSearch)
+                print psfDict
+                if psfDict['flag'] == 0:
+                    xycenter = [psfDict['parameters'][2],psfDict['parameters'][3]]
+                else:
+                    print 'Cannot centroid frame' + str(iFrame) + ', mpfit returned flag ',psfDict['flag'],'using guess instead'
+                    xycenter = xyguess
+                    flag = 1
+
+                print 'guess center xy',xyguess
+                print 'fit center xy',xycenter
+                print 'pyguide center xy',xycenterGuide
+                form = PopUp(showMe=False)
+                form.plotArray(image)
+                form.axes.plot(xycenter[0],xycenter[1],marker='o',color='g')
+                form.axes.plot(xyguess[0],xyguess[1],marker='x',color='g')
+                form.axes.plot(xycenterGuide[0],xycenterGuide[1],marker='d',color='darkgreen')
+                form.fig.savefig('frame{}.jpg'.format(str(iFrame)))
+                    
             # Begin RA/DEC mapping
             # Calculate lst for a given frame
             current_lst_seconds = original_lst_seconds + iFrame
@@ -279,7 +308,6 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
             flagList.append(flag)
     # Save to h5 table
     saveTable(centroidListFileName=centroidListFileName,paramsList=paramsList,timeList=timeList,xPositionList=xPositionList,yPositionList=yPositionList,hourAngleList=hourAngleList,flagList=flagList)
-    
 
 # Test Function / Example
 if __name__=='__main__':
