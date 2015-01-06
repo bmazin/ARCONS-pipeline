@@ -11,6 +11,8 @@ History:
 March 25, 2013 - Now calculates the hour angle using the right ascension of the target object as a 1st
     order approximation.  To get more exact hour angle, would need right ascension of the center of 
     rotation position, but this is unknown and non-constant.
+    
+Jan 6, 2015 -ABW- pulled functionality for getting user guess for centroid, and using PyGuide, into seperate functions
 '''
 
 
@@ -25,6 +27,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from util.ObsFile import ObsFile 
 import os
+from PyQt4 import QtGui
+from PyQt4 import QtCore
 from PyQt4.QtGui import *
 import hotpix.hotPixels as hp
 from tables import *
@@ -32,6 +36,7 @@ from util.FileName import FileName
 from photometry.PSFphotometry import PSFphotometry
 from util import utils
 from util.popup import PopUp
+
 import time
 
 
@@ -48,10 +53,33 @@ class MouseMonitor():
         pass
 
     def on_click(self,event):
-        self.xyguess = [event.xdata,event.ydata]
+        if event.inaxes is self.ax:
+            self.xyguess = [event.xdata,event.ydata]
+            print 'Clicked: ',self.xyguess
+        
+    def on_scroll_cbar(self,event):
+        if event.inaxes is self.fig.cbar.ax:
+            increment=0.05
+            currentClim = self.fig.cbar.mappable.get_clim()
+            currentRange = currentClim[1]-currentClim[0]
+            if event.button == 'up':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]+increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]+increment*currentRange)
+            if event.button == 'down':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]-increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]-increment*currentRange)
+            self.fig.cbar.mappable.set_clim(newClim)
+            self.fig.canvas.draw()
+           
    
     def connect(self):
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+        self.fig.cbar = self.fig.colorbar(self.handleMatshow)
+        cid = self.fig.canvas.mpl_connect('scroll_event', self.on_scroll_cbar)
 
 # Function for converting arcseconds to radians.
 def arcsec_to_radians(total_arcsec):
@@ -73,6 +101,16 @@ class headerDescription(tables.IsDescription):
 
 # Function that save
 def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionList,hourAngleList,flagList):
+    '''
+    Inputs:
+        centroidListFileName - name of centroid file. If not a full path automatically put it in $MKID_PROC_PATH/centroidListFiles/
+        paramsList - contains info for header
+        timeList - list of times at which centroids were calculated
+        xPositionList - list of x positions at specified times
+        yPositionList - list of y positions
+        hourAngleList - list of hour angles at specified times
+        flagList - flag corresponding to centroid. 0 --> good, 1 --> failed
+    '''
 
     # Check to see if a Centroid List File exists with name centroidListFileName.
     # If it does not exist, create a Centroid List File with that name.
@@ -128,8 +166,137 @@ def saveTable(centroidListFileName,paramsList,timeList,xPositionList,yPositionLi
     centroidListFile.close()
 
 
+def centroidImage(image,xyguess,radiusOfSearch = 6,doDS9=True,usePsfFit=False):
+    '''
+    ABW
+    This function finds the centroid of a star in the image
+    '''
+    #remove any undefined values
+    image[np.invert(np.isfinite(image))]=0.
+    #Assume anywhere with 0 counts is a dead pixel
+    deadMask = 1.0*(image==0)
+    #ignore saturated mask
+    satMask = np.zeros((len(deadMask),len(deadMask[0])))
+
+    # Specify CCDInfo (bias,readNoise,ccdGain,satLevel)
+    ccd = pg.CCDInfo(0,0.00001,1,2500)
+    
+
+    pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,radiusOfSearch,ccd,0,False,verbosity=0, doDS9=doDS9)     #Added by JvE May 31 2013
+    # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
+    try:
+        xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+        flag = 0
+    except TypeError:
+        xycenter = xyguess
+        flag = 1
+
+    if usePsfFit:
+        xycenterGuide = xycenter
+        psfPhot = PSFphotometry(image,centroid=[xycenterGuide],verbose=True)
+        psfDict = psfPhot.PSFfit(aper_radius=radiusOfSearch)
+        if psfDict['flag'] == 0:
+            xycenter = [psfDict['parameters'][2],psfDict['parameters'][3]]
+            flag = 0
+        else:
+            print 'PSF fit failed with flag: ', psfDict['flag']
+            xycenter = xycenterGuide 
+            flag = 1
+            
+    return xycenter,flag
+
+def getUserCentroidGuess(image,norm=None):
+    '''
+    ABW
+    This function asks the user to click on the star in the image.
+    '''
+
+    flag=1
+    xyguess = [0,0]
+    map = MouseMonitor()
+    map.fig = plt.figure()
+    map.ax = map.fig.add_subplot(111)
+    map.ax.set_title('Centroid Guess')
+    map.handleMatshow = map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower', norm=norm)
+    map.connect()
+    plt.show()
+    #Get user to click on approx. centroid location
+    try:
+        xyguess = map.xyguess
+        flag=0
+        print 'Guess = ' + str(xyguess)
+    except AttributeError:
+        pass
+        
+    return xyguess, flag
+    
+def quickCentroid(images, radiusOfSearch=10, maxMove = 4,usePsfFit=False):
+    '''
+    Author: Alex Walter
+    Date: Jan 6, 2015
+    This function creates centroid files automatically on a list of images (such as an image stack).
+    It asks the user for a guess on the first image. 
+    Then uses centroidImage() to find the centroid.
+    It uses the centroid of the previous image as the guess for the next image, etc.
+    If the centroiding fails or if the centroid moves too far, it asks the user for another guess
+    
+    Inputs:
+        images - list of images
+        radiusOfSearch - radius in pixels around guess to look for a centroid
+        maxMove - max distance in pixels from previous centroid before it asks the user to make a new guess (for telescope moves)
+        usePsfFit - option to use PSF fitting to get centroid (usually a bit better guess)
+        
+    Returns:
+        xPositionList
+        yPositionList
+        flagList
+    '''
+    xPositionList=np.zeros(len(images)) - 1
+    yPositionList=np.copy(xPositionList)
+    flagList = np.zeros(len(images))
+    flag = 1
+    k=-1
+    while flag>0: 
+        k+=1
+        print k,': Looking for star...'
+        xyguess, flag = getUserCentroidGuess(images[k])
+        xPositionList[k]=xyguess[0]
+        yPositionList[k]=xyguess[1]
+        flagList[k] = flag
+    for i in range(k,len(images)):
+        if flag>0:
+            xyguess, flag = getUserCentroidGuess(images[i])
+            if flag>0:
+                flagList[i] = flag
+                print i,': No star selected'
+                continue
+        xycenter,flag=centroidImage(images[i],xyguess,radiusOfSearch = radiusOfSearch,doDS9=False,usePsfFit=usePsfFit)
+        if flag==0 and np.linalg.norm(np.asarray(xycenter)-np.asarray(xyguess)) < (maxMove):
+            #centroiding successful and didn't move too far!
+            xPositionList[i]=xycenter[0]
+            yPositionList[i]=xycenter[1]
+            flagList[i] = flag
+            xyguess=xycenter
+            print i,': Success! ',xycenter
+            continue
+            
+        xyguess, flag = getUserCentroidGuess(images[i])
+        if flag>0:        
+            flagList[i] = flag
+            print i,': Failed. No star selected'
+            continue
+
+        xycenter,flag=centroidImage(images[i],xyguess,radiusOfSearch = radiusOfSearch,doDS9=False,usePsfFit=usePsfFit)
+        xPositionList[i]=xycenter[0]
+        yPositionList[i]=xycenter[1]
+        flagList[i] = flag
+        xyguess=xycenter
+        print i,': Success! Star found. ',xycenter
+        
+    return xPositionList,yPositionList,flagList
+
 def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessTime=300, integrationTime=30,
-                 secondMaxCountsForDisplay=500, HA_offset=16.0, xyapprox=None, usePsfFit=False):
+                 secondMaxCountsForDisplay=500, HA_offset=16.0, xyapprox=None, radiusOfSearch = 6, usePsfFit=False):
     
     '''
     Shifted bulk of Paul's 'main' level code into this function. JvE 5/22/2013
@@ -192,29 +359,16 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     # Create saturated pixel mask to apply to PyGuide algorithm.
     print 'Creating saturation mask...'
     nFrames = int(np.ceil(float(exptime)/float(integrationTime)))
-    saturatedMask = np.zeros(((nFrames,gridWidth,gridHeight)))
-    #hotPixInfo = ob.hotPixTimeMask   #hp.readHotPixels(hotPixFn)
-    #intervalsMatrix = hotPixInfo['intervals']
-    for t in range(nFrames):
-        badPixels = ob.hotPixTimeMask.getHotPixels(firstSec=int(t*integrationTime), integrationTime=int(integrationTime))
-        saturatedMask[t] = badPixels
-        #for x in range(gridHeight):
-        #    for y in range(gridWidth):
-        #        if intervalsMatrix[y][x] == []:
-        #            pass
-        #        else:
-        #            saturatedMask[t][y][x]=1
+
     
     # Generate dead pixel mask, invert obsFile deadMask format to put it into PyGuide format
     print 'Creating dead mask...'    
     deadMask = ob.getDeadPixels()
     deadMask = -1*deadMask + 1
     
-    # Specify CCDInfo (bias,readNoise,ccdGain,satLevel)
-    ccd = pg.CCDInfo(0,0.00001,1,2500)
+
     
-    # Set a normalization to make the matshow plot more intuitive.
-    norm = mpl.colors.Normalize(vmin=0,vmax=secondMaxCountsForDisplay*guessTime)
+
     
     # Initialize arrays that will be saved in h5 file. 1 array element per centroid frame.
     timeList=[]
@@ -233,19 +387,10 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
             imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= guessTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
             image=imageInformation['image']
             if xyapprox is None:
-                map = MouseMonitor()
-                map.fig = plt.figure()
-                map.ax = map.fig.add_subplot(111)
-                map.ax.set_title('Centroid Guess')
-                map.ax.matshow(image,cmap = plt.cm.gray, origin = 'lower',norm=norm)
-                map.connect()
-                plt.show()
                 #Get user to click on approx. centroid location
-                try:
-                    xyguess = map.xyguess
-                    print 'Guess = ' + str(xyguess)
-                except AttributeError:
-                    pass
+                # Set a normalization to make the matshow plot more intuitive.
+                norm = mpl.colors.Normalize(vmin=0,vmax=secondMaxCountsForDisplay*guessTime)
+                xyguess,flag=getUserCentroidGuess(image,norm)
             else:
                 #Use guess supplied by caller.
                 xyguess = xyapprox
@@ -254,36 +399,18 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
         # Centroid an image that has been integrated over integrationTime.
         if iFrame%integrationTime == 0:
             # Use obsFile to get integrationTime image.
-            satMask=saturatedMask[int(iFrame/integrationTime)]
             imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
             image=imageInformation['image']        
-            # Use PyGuide centroiding algorithm.
-            radiusOfSearch = 6 #pixels
 
-            pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,radiusOfSearch,ccd,0,False,
-                                        verbosity=2, doDS9=True)     #Added by JvE May 31 2013
-            # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
-            try:
-                xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+            xycenter,flag=centroidImage(image,xyguess,radiusOfSearch,doDS9=True,usePsfFit=usePsfFit)
+            if flag==0:
                 print 'Calculated [x,y] center = ' + str((xycenter)) + ' for frame ' + str(iFrame) +'.'
-                flag = 0
-            except TypeError:
-                print 'Cannot centroid frame' + str(iFrame) + ' by pyguide, using guess instead'
-                xycenter = xyguess
-                flag = 1
-
-            if usePsfFit:
-                xycenterGuide = xycenter
-                psfPhot = PSFphotometry(image,centroid=[xycenterGuide],verbose=True)
-                psfDict = psfPhot.PSFfit(aper_radius=radiusOfSearch)
-                if psfDict['flag'] == 0:
-                    xycenter = [psfDict['parameters'][2],psfDict['parameters'][3]]
-                    flag = 0
+            else:
+                if usePsfFit:
+                    print 'Cannot centroid frame ' + str(iFrame) + ' by psf fit, using pyguide center instead'
                 else:
-                    print 'Cannot centroid frame' + str(iFrame) + ', by psf fit, returned flag ',psfDict['flag'],'using pyguide center instead'
-                    xycenter = xycenterGuide 
-                    flag = 1
-
+                    print 'Cannot centroid frame ' + str(iFrame) + ' by pyguide, using guess instead'
+                
                     
             # Begin RA/DEC mapping
             # Calculate lst for a given frame
