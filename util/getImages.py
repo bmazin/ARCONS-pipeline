@@ -140,7 +140,7 @@ def loadImagesFromStack(fullFilename=''):
         
     return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':np.asarray(startTimes).flatten(),'intTimes':np.asarray(intTimes).flatten()}
         
-def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=True):
+def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,beammapFileName = None,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=True):
 
     obsFiles = []
     for obsFN in obsFNs:
@@ -148,6 +148,9 @@ def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,loadHot
             obs = ObsFile(obsFN)
         else:                           #FileName object
             obs = ObsFile(obsFN.obs())
+            
+        if beammapFileName is not None and os.path.isfile(beammapFileName):
+            obs.loadBeammapFile(beammapFileName)
             
         obs.setWvlCutoffs(wvlLowerLimit=wvlLowerLimit, wvlUpperLimit=wvlUpperLimit)
         if loadHotPix:

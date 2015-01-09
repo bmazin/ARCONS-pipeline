@@ -81,7 +81,7 @@ from waveCal_diagnostics import waveCal_diagnostic
 
 
 class drift_object:
-    def __init__(self,driftFNs,params):
+    def __init__(self,driftFNs,params,beammapFilename = ''):
 
         self.driftFNs = driftFNs
         self.params=params
@@ -97,10 +97,30 @@ class drift_object:
         #self.outpath=intermDir+outdir+driftFNs[0].run+os.sep+'drift_figs/'
         self.outpath=intermDir+outdir+os.sep+driftFNs[0].run+os.sep+'master_cals/figs/'
 
+        print intermDir
+        print self.outpath
+        print driftFNs[0].cal()
+        print driftFNs[0].calSoln()
+        print driftFNs[0].calDriftInfo()
 
+        #Get a beammap
         temp=tables.openFile(driftFNs[0].cal(), mode='r')
         self.beammap = temp.root.beammap.beamimage.read()
         temp.close()
+        if beammapFilename is not None and os.path.exists(beammapFilename):
+            beammapFile = tables.openFile(beammapFilename,'r')
+            try:
+                old_beammap = np.copy(self.beammap)
+                old_tstamp = old_beammap[0][0].split('/')[-1]
+                self.beammap = beammapFile.getNode('/beammap/beamimage').read()
+                if self.beammap[0][0].split('/')[-1]=='':
+                    self.beammap = np.core.defchararray.add(self.beammap,old_tstamp)
+            except Exception as inst:
+                print 'Can\'t access beamimage for ',beammapFilename
+                self.beammap=old_beammap
+            beammapFile.close()
+            print 'loaded beammap from: ',beammapFilename
+            
         self.roach_arr = np.zeros(self.beammap.shape)
         for i in range(self.beammap.shape[0]):
             for j in range(self.beammap.shape[1]):

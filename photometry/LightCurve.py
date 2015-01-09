@@ -8,6 +8,7 @@ This code makes a light curve using the photometry modules
 import os
 import warnings
 import numpy as np
+import inspect
 
 from util.FileName import FileName
 from util.ObsFile import ObsFile
@@ -15,6 +16,7 @@ from util.readDict import readDict
 from util.getImages import *
 from util.popup import *
 from photometry.PSFphotometry import PSFphotometry, writePhotometryFile, readPhotometryFile
+from astrometry.CentroidCalc import quickCentroid,saveTable
 
 
 
@@ -55,17 +57,50 @@ class LightCurve():
                 self.params.readFromFile(path+os.sep+f)
                 
     def getImages(self,fromObsFile=False,fromPhotonList=False,fromImageStack=False,**kwargs):
+        '''
+        Gets a list of images
+        
+        Inputs:
+        if fromObsFile:
+            You can pass keywords. These can include
+             - keywords for generateObsObjectList() in getImages
+             - keywords for getImages() in getImages
+             - 'save' keyword (default is False)
+             
+         Returns an im_dict:
+            images - [Total Photon Counts] list of images. 
+            pixIntTimes - [Seconds] list of pixel exposure times for each image. Same shape as images
+            startTimes - [Julian Date] list of startTimes for each image. 
+            intTimes - [Seconds] list of image integration times for each image. 
+        '''
         assert 1.0*fromObsFile+fromPhotonList+fromImageStack==1, "Choose whether to get images from a list of ObsFiles, from a list of PhotonLists, or from an .h5 file made by imagestack"
         
         if fromImageStack:
             imStack_fn=self.path+os.sep+'ImageStacks'+os.sep+'ImageStack_'+self.fileID+'.h5'
             im_dict=getImages(fromImageStack=fromImageStack,fullFilename = imStack_fn)
         elif fromObsFile:
-            print 'Not implemented yet!'
-            raise IOError
+
             obsFNs = self.getFNs()
-            obsFiles = generateObsObjectList(obsFNs,**kwargs)
-            im_dict = getImages(fromObsFile=fromObsFile,obsFiles=obsFiles, integrationTime=10,weighted=True, fluxWeighted=False, getRawCount=False)
+            #get keywords for generateObsObjectList()
+            arg_names = set(inspect.getargspec(generateObsObjectList)[0])
+            func_kwargs = {}
+            for arg_name in arg_names:
+                try:
+                    func_kwargs[arg_name]=kwargs.pop(arg_name)
+                except:
+                    pass
+            print 'Generating Obs objects, calibrating...'
+            obsFiles = generateObsObjectList(obsFNs,**func_kwargs)
+            save = kwargs.pop('save',False)
+            print 'Creating images...'
+            im_dict = getImages(fromObsFile=fromObsFile,obsFiles=obsFiles, **kwargs)
+            if save:
+                imStack_fn='ImageStack_'+self.fileID+'.h5'
+                writeImageStack(im_dict['images'], im_dict['startTimes'], intTimes=im_dict['intTimes'], pixIntTimes=im_dict['pixIntTimes'], path=self.path,outputFilename=imStack_fn)
+            
+        else:
+            print 'not implemented yet!'
+            raise IOError
             
         return im_dict
     
@@ -162,8 +197,17 @@ class LightCurve():
 
 
         
-    def getCentroids(self,fromFile=True,**kwargs):
+    def getCentroids(self,fromCentroidFile=True,**kwargs):
         '''
+        This function returns a tuple of centroid lists and flags
+        
+        Inputs:
+            fromCentroidFile - True if you want to grab centroids from the CentroidList directory of your object
+            if not fromCentroidFile:
+                You can pass keywords. These can include
+                 - keywords for self.getImages()
+                 - 'save' keyword (default is False)
+        
         Returns:
             centroids - a list of (col,row) tuples indicating the location of the stars in the field.
                         The first location should be the target star. The rest are reference stars.
@@ -171,7 +215,7 @@ class LightCurve():
                     Same length as number of images. If one star fails the centroiding then whole image is flagged
         '''
         
-        if fromFile:
+        if fromCentroidFile:
             names = os.listdir(self.path+os.sep+'CentroidLists')
             ref_fns = []
             for name in names:
@@ -193,11 +237,53 @@ class LightCurve():
                 centroids = np.asarray(zip(*centroid_list))
             else: centroids = target_centroid
             flags=1.0*(np.asarray(flags)>0.)
-        else:
-            #Open up image dict, use kwargs
-            print 'Not implemented!'
-            raise IOError
             
+        #Make centroids
+        else:
+            save = kwargs.pop('save',False)
+            im_dict = self.getImages(**kwargs)
+            print 'Choose target Star.'
+            xPositionList,yPositionList,flagList=quickCentroid(im_dict['images'],radiusOfSearch=10,maxMove = 4,usePsfFit=False)
+            if save:
+                target_fn = self.path+os.sep+'CentroidLists'+os.sep+'target'+os.sep+'Centroid_'+self.fileID+'.h5'
+                try:
+                    os.mkdir(self.path+os.sep+'CentroidLists'+os.sep+'target')
+                except:
+                    pass
+                paramsList = [-1]*4
+                timeList = [-1]*len(xPositionList)
+                hourAngleList = timeList
+                saveTable(target_fn,paramsList,timeList,xPositionList,yPositionList,hourAngleList,flagList)
+            
+            target_centroid = np.asarray(zip(xPositionList,yPositionList))
+            flags = np.asarray(flagList)
+            
+            ref_num = 0
+            #raw_input() for python 2.6. just use input() for python 3+
+            chooseRef = raw_input('Choose Reference Star '+str(ref_num)+'? ')
+            centroid_list = [target_centroid]
+            while chooseRef is 'yes' or chooseRef is 'Yes' or chooseRef is 'y' or chooseRef is 'Y' or chooseRef is 'true' or chooseRef is 'True' or chooseRef is '1':
+                xPositionList,yPositionList,flagList=quickCentroid(im_dict['images'],radiusOfSearch=10,maxMove = 4,usePsfFit=False)
+                if save:
+                    ref_fn = self.path+os.sep+'CentroidLists'+os.sep+'ref'+str(ref_num)+os.sep+'Centroid_'+self.fileID+'.h5'
+                    try:
+                        os.mkdir(self.path+os.sep+'CentroidLists'+os.sep+'ref'+str(ref_num))
+                    except:
+                        pass
+                    paramsList = [-1]*4
+                    timeList = [-1]*len(xPositionList)
+                    hourAngleList = timeList
+                    saveTable(ref_fn,paramsList,timeList,xPositionList,yPositionList,hourAngleList,flagList)
+                ref_centroid=np.asarray(zip(xPositionList,yPositionList))
+                ref_flags=np.asarray(flagList)
+                centroid_list.append(ref_centroid)
+                flags+=ref_flags
+                ref_num+=1
+                chooseRef = raw_input('Choose Reference Star '+str(ref_num)+'? ')
+                
+            if len(centroid_list)>1: centroids = np.asarray(zip(*centroid_list))
+            else: centroids = target_centroid
+            flags=1.0*(np.asarray(flags)>0.)
             
         return centroids, flags
         
@@ -213,64 +299,35 @@ class LightCurve():
 
 
 if __name__ == '__main__':
-    path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
-    identifier = '1'
+    path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
+    identifier = '0'
     verbose=True
     showPlot=False
     
     LC = LightCurve(path,fileID = identifier, PSF=True,verbose=verbose,showPlot=showPlot)
-    #photometryFileName=path+os.sep+'FittedStacks'+os.sep+'photometry_1.h5'
-    #imageStackFilename=path+os.sep+'ImageStacks'+os.sep+'ImageStack_1.h5'
+    #beammapFileName='/ScienceData/PAL2014/beammap_SCI6_B140731-Boba_20141118flip.h5'
+    #im_dict = LC.getImages(fromObsFile=True,save=True,
+    #             wvlLowerLimit=3000, wvlUpperLimit=8000, beammapFileName = beammapFileName, loadHotPix=False,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=False,
+    #             integrationTime=10, weighted=True, fluxWeighted=False, getRawCount=False, scaleByEffInt=False)
+    #LC.getCentroids(fromCentroidFile=False,fromImageStack=True,save=True)
+    
     photometryDict = LC.getLightCurve(fromLightCurveFile=False,fromObsFile=False,fromPhotonList=False,fromImageStack=True,save=True)
     #photometryDict = LC.getLightCurve(fromLightCurveFile=True)
     
-    def f(fig,axes):
+    def f(self):
         time = photometryDict['startTimes']
         flux=photometryDict['flux']
         tar_flux = flux[:,0]
         ref_flux = flux[:,1]
         flags = photometryDict['flag']
         
-        axes.plot(time,tar_flux,'b.-',label='target')
-        axes.plot(time,ref_flux,'g.-',label='ref')
-        axes.plot(time[np.where(flags==1.)],ref_flux[np.where(flags==1.)],'ro',label='Failed Centroid')
-        axes.plot(time[np.where(flags>1.1)],ref_flux[np.where(flags>1.1)],'ro',label='Failed Fit')
-        axes.legend()
-    pop(plotFunc=f,title='Flux')
+        self.axes.plot(time,tar_flux,'b.-',label='target')
+        self.axes.plot(time,ref_flux,'g.-',label='ref')
+        self.axes.plot(time[np.where(flags==1.)],ref_flux[np.where(flags==1.)],'ro',label='Failed Centroid')
+        self.axes.plot(time[np.where(flags>1.1)],ref_flux[np.where(flags>1.1)],'ro',label='Failed Fit')
+        self.axes.legend()
+    #pop(plotFunc=f,title='Flux')
     
-    
-
-    #LC = LightCurve(path,verbose=verbose,showPlot=showPlot)
-    #obsFNs = LC.getFNs(fromObs = True, fromImageStack=False)
-    ##print 'obs[10]: ',obsFNs[10:11][0].obs()
-    #obsFiles = generateObsObjectList(obsFNs,wvlLowerLimit=3500, wvlUpperLimit=5000,loadHotPix=True,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=False)
-    #print 'numObs: ',len(obsFiles)
-    #im_dict = getImages(fromObsFile=True,fromPhotonList=False,fromImageStack=False,obsFiles=obsFiles, integrationTime=10,weighted=True, fluxWeighted=False, getRawCount=False)
-    #images=im_dict['images']
-    #pixIntTimes=im_dict['pixIntTimes']
-    #print 'numImages: ',len(images)
-
-    #writeImageStack(images=images, pixIntTimes=pixIntTimes, startTimes=im_dict['startTimes'], intTimes=im_dict['intTimes'], path=path, outputFilename='ImageStack_1.h5')
-    #im_dict = getImages(fromObsFile=False,fromPhotonList=False,fromImageStack=True,fullFilename=path+os.sep+'ImageStacks'+os.sep+'ImageStack_1.h5')
-    #print im_dict['startTimes']
-    
-    #images = im_dict['images']
-    #pixIntTimes=im_dict['pixIntTimes']
-    #print 'numLoadedImages: ',len(images)
-    #centroids = LC.getCentroids()
-    #print 'numLoadedCentroids: ',len(centroids)
-    #flux_list=LC.makeLightCurve(images,centroids,pixIntTimes)
-    #print flux_list
-    
-    #pop(plotFunc=lambda fig,axes: axes.plot(flux_list),title="Flux")
-    
-    #for i in range(len(images)):
-    #    im = images[i]
-    #    centroid=LC.getCentroid()
-    #    expTime = pixIntTimes[i]
-    #    flux=LC.performPhotometry(im,centroid,expTime)
-    #    print 'flux ',flux
- 
 
 
 
