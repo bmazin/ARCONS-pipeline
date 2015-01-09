@@ -54,7 +54,7 @@ def polyval2d(x, y, m):
     return z
 
 #needs to be updated
-def readPhotometryFile(filename):
+def readAperPhotometryFile(filename):
     photometryFile = tables.openFile(filename, mode='r')
     photometryTable = photometryFile.getNode(photometryFile.root,'AperPhotometry')._f_getChild('photometry')
     startTimes = photometryTable.col('time')
@@ -70,7 +70,7 @@ def readPhotometryFile(filename):
     return {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'sky': sky, 'apertureRad': apertureRad, 'annulusInnerRad': annulusInnerRad, 'annulusOuterRad': annulusOuterRad, 'flag': flag}
 
 
-def writePhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
+def writeAperPhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
     if os.path.isfile(filename):
         warnings.warn("Overwriting photometry file: "+str(filename),UserWarning)
         
@@ -149,7 +149,7 @@ class AperPhotometry(Photometry):
         apRadOut = []
         annInOut = []
         annOutOut = []
-        flag = []
+        flag = 0
 
         #if sky fitting is selected for sky subtraction, do masking and produce polynomial sky image
         if sky_sub == "fit":
