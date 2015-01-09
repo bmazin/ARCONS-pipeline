@@ -10,6 +10,7 @@ import tables
 from tables import *
 import os
 from scipy.stats import nanmedian
+import itertools
 
 from photometry.Photometry import Photometry
 from photometry.plot3DImage import *
@@ -33,6 +34,24 @@ def aperture(startpx,startpy,radius):
                 if (np.abs(x-startpx))**2+(np.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
                     mask[y,x]=1.
         return mask
+#from http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
+def polyfit2d(x, y, z, order=3):
+    ncols = (order + 1)**2
+    G = np.zeros((x.size, ncols))
+    ij = itertools.product(range(order+1), range(order+1))
+    for k, (i,j) in enumerate(ij):
+        G[:,k] = x**i * y**j
+    m, _, _, _ = np.linalg.lstsq(G, z)
+    return m
+
+#from http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
+def polyval2d(x, y, m):
+    order = int(np.sqrt(len(m))) - 1
+    ij = itertools.product(range(order+1), range(order+1))
+    z = np.zeros_like(x)
+    for a, (i,j) in zip(m, ij):
+        z += a * x**i * y**j
+    return z
 
 #needs to be updated
 def readPhotometryFile(filename):
@@ -134,9 +153,8 @@ class AperPhotometry(Photometry):
 
         #if sky fitting is selected for sky subtraction, do masking and produce polynomial sky image
         if sky_sub == "fit":
-            print "not implemented yet! taking sky annulus instead"
-            sky_sub = "median"
-            #skyIm = self.fitMaskedSky(aper_radius)
+            warnings.warn("Sky fitting not well debugged. Use with extreme caution",UserWarning)
+            skyIm = self.fitMaskedSky(self.image, aper_radius)
 
         if interpolation != None:
             if self.verbose:
@@ -231,11 +249,52 @@ class AperPhotometry(Photometry):
             print "Annulus pixels = ", nAnnPix
         return [annulusCounts, nAnnPix]
 
-    def fitMaskedSky(self, im):
+    def fitMaskedSky(self, image, aper_radius):
         '''
         fit polynomial to sky background to estimate sky under aperture
         '''
-        pass
+        im = np.array(image)
+        nRows,nCols = np.shape(im)
+        nanMask = np.isnan(im)
+        xx,yy = np.meshgrid(np.arange(nCols),np.arange(nRows))
+
+        #mask out object apertures
+        apertureMask=np.zeros((np.shape(im)),dtype=int)
+        for i in range(len(self.centroid)):
+            center=self.centroid[i]
+            try: #check if different aperture radii are set for each star
+                radius=aper_radius[i]
+            except TypeError:
+                radius=aper_radius
+            startpx = int(np.round(center[0]))
+            startpy = int(np.round(center[1]))
+            apertureMask += aperture(startpx, startpy, radius)
+        
+        maskedPix = np.array(np.where(apertureMask>0))
+        im[maskedPix[0], maskedPix[1]]=0
+
+        if self.showPlot:
+            plotArray(title='Masked sky', image=im)
+
+        z = im.ravel()
+        x = xx.ravel()
+        y = yy.ravel()
+        x = x[z != 0]
+        y = y[z != 0]
+        z = z[z != 0]
+
+        try:
+            PolyFitCoeffs = polyfit2d(x,y,z)
+            # Evaluate it on a grid...
+            fitIm = polyval2d(xx, yy, PolyFitCoeffs)
+        except ValueError:
+            fitIm = np.zeros(np.shape(im),dtype=float)
+            print "Empty frame encountered on interpolation, filled with zeros"
+
+        if self.showPlot:
+            plotArray(title='Fitted sky Image', image=fitIm)
+
+        return fitIm
 
 
 
