@@ -15,14 +15,14 @@ from util.ObsFile import ObsFile
 from util.readDict import readDict
 from util.getImages import *
 from util.popup import *
-from photometry.PSFphotometry import PSFphotometry, writePhotometryFile, readPhotometryFile
+from photometry.PSFphotometry import PSFphotometry, writePsfPhotometryFile, readPsfPhotometryFile
 from astrometry.CentroidCalc import quickCentroid,saveTable
 
 
 
 class LightCurve():
 
-    def __init__(self,path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',fileID='test',PSF=True,aper=False,**kwargs):
+    def __init__(self,path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',fileID='test',verbose=False):
         '''
         Constructs a list of obs FileName objects from the dictionary in the path.
         'run' is assumed to be the second to last directory in the path
@@ -30,33 +30,144 @@ class LightCurve():
         Inputs:
             path - path to the display stack target info
             fileID - identifier in filename. eg centroid_fileID.h5 or ImageStack_fileID.h5
-            PSF - set True to do PSF fitting
-            aper - for aperture photometry
             kwargs - key words for the photometry module
 
         '''
         
         self.path = path
         self.fileID=fileID
-        self.PSF = PSF
-        self.aper = aper
-        self.kwargs = kwargs
-        
-        #if self.PSF:
-        #    from photometry.PSFphotometry import PSFphotometry, writePhotometryFile
-        #    print PSFphotometry
-        #else:
-        #    #import aperture photometry module
-        #    pass
+        self.verbose=verbose
 
-        
         for f in os.listdir(path):
             if f.endswith(".dict"):
                 #if self.verbose: print 'Loading params from ',path+os.sep+f
                 self.params = readDict(path+os.sep+f)
                 self.params.readFromFile(path+os.sep+f)
                 
-    def getImages(self,fromObsFile=False,fromPhotonList=False,fromImageStack=False,**kwargs):
+        #Get images
+        try:
+            self.im_dict = self.getImages(fromImageStack=True)
+        except:
+            print "Need to make image stack for this object"
+
+        #Get Centroids
+        try:
+            self.centroids, self.flags = self.getCentroids(fromCentroidFile=True)
+        except:
+            print "Need to make centroids for this object"
+    
+    
+    
+    def getLightCurve(self,photometryType,fromPhotometryFile=True,save=False,**kwargs):
+        '''
+        This code grabs the in lightcurve from the photometry file. (Makes a photometry file if it doesn't exist)
+        
+        Inputs:
+            photometryType - Can be 'PSF' or 'aperture'
+            fromPhotometryFile - True if you want to grab the lightcurve from the photometry file
+                                 If False, it uses self.im_dict and self.centroids to generate a photometry file
+            save - if True and not fromPhotometryFile then save the newly generated photometry file
+            kwargs - For photometry module
+        
+        Returs:
+            photometryDict - dictionary of results from photometry module
+                                'flux' - list of flux [counts/sec]
+                                'startTimes' - list of start times [julian date]
+                                'flags' - list of flags
+                                - Other diagnositcs (like fit parameters for PSF fitting)
+            
+        '''
+        
+        if fromPhotometryFile:
+            if photometryType is 'PSF':
+                photometryFileName = self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
+                photometryDict = readPsfPhotometryFile(photometryFileName)
+            elif photometryType is 'aperture':
+                print 'Not implemented yet!'
+                raise IOError
+            else:
+                print 'Choose a valid type of photometry to perform!'
+                raise ValueError
+        else:
+            #Need to make a lightcurve
+            images=self.im_dict['images']
+            pixIntTimes=self.im_dict['pixIntTimes']
+            centroids = self.centroids
+            flags=self.flags
+            fluxDict_list = self.makeLightCurve(photometryType = photometryType, images=images,centroids=centroids,flags=flags,expTimes=pixIntTimes,save=save,**kwargs)
+            
+            if photometryType is 'PSF':
+                if save:
+                    photometryFileName = self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
+                    writePsfPhotometryFile(fluxDict_list=fluxDict_list, im_dict = im_dict, filename = photometryFileName,verbose=self.verbose)
+
+                startTimes = im_dict['startTimes']
+                intTimes = im_dict['intTimes']
+                flux = np.asarray([fluxDict['flux'] for fluxDict in fluxDict_list])
+                parameters = np.asarray([fluxDict['parameters'] for fluxDict in fluxDict_list])
+                perrors = np.asarray([fluxDict['mpperr'] for fluxDict in fluxDict_list])
+                redChi2 = np.asarray([fluxDict['redChi2'] for fluxDict in fluxDict_list])
+                flags = np.asarray([fluxDict['flag'] for fluxDict in fluxDict_list])
+                photometryDict = {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flag': flags}
+                
+            elif photometryType is 'aperture':
+                print 'Not implemented yet!'
+                raise IOError
+            else:
+                print 'Choose a valid type of photometry to perform!'
+                raise ValueError
+                
+        return photometryDict
+
+    def makeLightCurve(self,photometryType, images,centroids,flags,expTimes=None,save=False,**kwargs):
+        if expTimes==None:
+            expTimes = [None]*len(images)
+        #flux_list = []
+        fluxDict_list = []
+        for i in range(len(images)):
+            fluxDict=self.performPhotometry(photometryType, images[i],centroids[i],expTimes[i],**kwargs)
+            if flags[i]>0:
+                fluxDict['flux']=np.asarray(fluxDict['flux'])*0.
+                fluxDict['flag']=flags[i]
+            fluxDict_list.append(fluxDict)
+            #flux_list.append(fluxDict['flux'])
+        return fluxDict_list
+
+    def performPhotometry(self,photometryType,image,centroid,expTime=None,**kwargs):
+        '''
+        Perform the photometry on an image. 
+        
+        Input:
+            image ----- 2D image of data (0 for dead pixel, shouldn't be any nan's or infs)
+                        Should be fully calibrated, dead time corrected, and scaled up to the effective integration time
+            centroid -- list of (col,row) tuples. The first tuple is the target location. The next are reference stars in the field
+            expTime --- 2D array of pixel exposure times (0 for dead pixels)
+                        optional. But can be used for distinguishing 0 count pixels from bad pixels
+            kwargs ---- For photometry module
+                        
+        Output:
+            fluxDict - dictionary output from photometry module. Should contain keyword 'flux'
+                     - 'flux:' array of flux values. [target_flux, ref0_flux, ...]
+        '''
+
+        if photometryType is 'PSF':
+            PSFphoto = PSFphotometry(image,centroid,expTime,**kwargs)
+            fluxDict = PSFphoto.PSFfit(aper_radius=5.)
+            del PSFphoto
+        elif photometryType is 'aperture':
+            print 'Not implemented yet!'
+            raise IOError
+        else:
+            print 'Choose a valid type of photometry to perform!'
+            raise ValueError
+            
+        return fluxDict
+    
+    
+    
+                  
+                  
+    def getImages(self,fromImageStack=False,fromObsFile=False,fromPhotonList=False,**kwargs):
         '''
         Gets a list of images
         
@@ -68,7 +179,7 @@ class LightCurve():
              - 'save' keyword (default is False)
              
          Returns an im_dict:
-            images - [Total Photon Counts] list of images. 
+            images - [Total Photon Counts] list of calibrated images. 
             pixIntTimes - [Seconds] list of pixel exposure times for each image. Same shape as images
             startTimes - [Julian Date] list of startTimes for each image. 
             intTimes - [Seconds] list of image integration times for each image. 
@@ -102,85 +213,9 @@ class LightCurve():
             print 'not implemented yet!'
             raise IOError
             
+        self.im_dict = im_dict
         return im_dict
     
-    def getLightCurve(self,fromLightCurveFile=True,fromObsFile=False,fromPhotonList=False,fromImageStack=False,save=False,**kwargs):
-        assert 1.0*fromLightCurveFile+fromObsFile+fromPhotonList+fromImageStack==1, "Choose how to get data."
-        
-        if fromLightCurveFile:
-            photometryFileName = self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
-            photometryDict = readPhotometryFile(photometryFileName)
-        else:
-            #Need to make a lightcurve
-            #imStack_fn=self.path+os.sep+'ImageStacks'+os.sep+'ImageStack_1.h5'
-            #target_fn=self.path+os.sep+'CentroidLists'+os.sep+'target'+os.sep+'Centroid_1.h5'
-            #ref0_fn = self.path+os.sep+'CentroidLists'+os.sep+'ref0'+os.sep+'Centroid_1.h5'
-
-            im_dict = self.getImages(fromObsFile=fromObsFile,fromPhotonList=fromPhotonList,fromImageStack=fromImageStack,**kwargs)
-            images=im_dict['images']
-            pixIntTimes=im_dict['pixIntTimes']
-            centroids,flags = self.getCentroids()
-            
-            fluxDict_list = self.makeLightCurve(images=images,centroids=centroids,flags=flags,expTimes=pixIntTimes,save=save)
-            
-            if save:
-                photometryFileName = self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
-                writePhotometryFile(fluxDict_list=fluxDict_list, im_dict = im_dict, filename = photometryFileName,verbose=self.kwargs['verbose'])
-
-            startTimes = im_dict['startTimes']
-            intTimes = im_dict['intTimes']
-            flux = np.asarray([fluxDict['flux'] for fluxDict in fluxDict_list])
-            parameters = np.asarray([fluxDict['parameters'] for fluxDict in fluxDict_list])
-            perrors = np.asarray([fluxDict['mpperr'] for fluxDict in fluxDict_list])
-            redChi2 = np.asarray([fluxDict['redChi2'] for fluxDict in fluxDict_list])
-            flags = np.asarray([fluxDict['flag'] for fluxDict in fluxDict_list])
-            photometryDict = {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flag': flags}
-                
-        return photometryDict
-
-    def makeLightCurve(self,images,centroids,flags,expTimes=None,save=False):
-        if expTimes==None:
-            expTimes = [None]*len(images)
-        #flux_list = []
-        fluxDict_list = []
-        for i in range(len(images)):
-            fluxDict=self.performPhotometry(images[i],centroids[i],expTimes[i])
-            if flags[i]>0:
-                fluxDict['flux']=np.asarray(fluxDict['flux'])*0.
-                fluxDict['flag']=flags[i]
-            fluxDict_list.append(fluxDict)
-            #flux_list.append(fluxDict['flux'])
-        return fluxDict_list
-                
-    def performPhotometry(self,image,centroid,expTime=None):
-        '''
-        Perform the photometry on an image. 
-        
-        Input:
-            image ----- 2D image of data (0 for dead pixel, shouldn't be any nan's or infs)
-                        Should be fully calibrated, dead time corrected, and scaled up to the effective integration time
-            centroid -- list of (col,row) tuples. The first tuple is the target location. The next are reference stars in the field
-            expTime --- 2D array of pixel exposure times (0 for dead pixels)
-                        optional. But can be used for distinguishing 0 count pixels from bad pixels
-                        
-        Output:
-            fluxDict - dictionary output from photometry module. Should contain keyword 'flux'
-                     - 'flux:' array of flux values. [target_flux, ref0_flux, ...]
-        '''
-
-        if self.PSF:
-            PSFphoto = PSFphotometry(image,centroid,expTime,**self.kwargs)
-            fluxDict = PSFphoto.PSFfit(aper_radius=5.)
-            del PSFphoto
-        elif self.aper:
-            pass
-        else:
-            print "Choose PSF fitting or aperture photometry"
-            
-        return fluxDict
-    
-    
-                
     def getFNs(self):
         '''
         Should loop through obs files. Return list of FileName objects
@@ -194,8 +229,6 @@ class LightCurve():
                 obsFNs.append(obsFN)
                 
         return obsFNs
-
-
         
     def getCentroids(self,fromCentroidFile=True,**kwargs):
         '''
@@ -284,7 +317,9 @@ class LightCurve():
             if len(centroid_list)>1: centroids = np.asarray(zip(*centroid_list))
             else: centroids = target_centroid
             flags=1.0*(np.asarray(flags)>0.)
-            
+        
+        self.centroids = centroids
+        self.flags=flags
         return centroids, flags
         
     def getCentroidFromFile(self,star_fn):
@@ -295,24 +330,21 @@ class LightCurve():
         centroids = zip(xPos,yPos)
         centroidFile.close()
         return centroids, flags
-        
-
-
+                  
 if __name__ == '__main__':
     path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
     identifier = '0'
-    verbose=True
-    showPlot=False
     
-    LC = LightCurve(path,fileID = identifier, PSF=True,verbose=verbose,showPlot=showPlot)
+    LC=LightCurve(path,identifier)
+
     #beammapFileName='/ScienceData/PAL2014/beammap_SCI6_B140731-Boba_20141118flip.h5'
     #im_dict = LC.getImages(fromObsFile=True,save=True,
     #             wvlLowerLimit=3000, wvlUpperLimit=8000, beammapFileName = beammapFileName, loadHotPix=False,loadWvlCal=True,loadFlatCal=True,loadSpectralCal=False,
     #             integrationTime=10, weighted=True, fluxWeighted=False, getRawCount=False, scaleByEffInt=False)
     #LC.getCentroids(fromCentroidFile=False,fromImageStack=True,save=True)
     
-    photometryDict = LC.getLightCurve(fromLightCurveFile=False,fromObsFile=False,fromPhotonList=False,fromImageStack=True,save=True)
-    #photometryDict = LC.getLightCurve(fromLightCurveFile=True)
+    #photometryDict = LC.getLightCurve(fromLightCurveFile=False,fromObsFile=False,fromPhotonList=False,fromImageStack=True,save=True)
+    photometryDict = LC.getLightCurve(photometryType='PSF',fromPhotometryFile=True)
     
     def f(self):
         time = photometryDict['startTimes']
@@ -326,10 +358,20 @@ if __name__ == '__main__':
         self.axes.plot(time[np.where(flags==1.)],ref_flux[np.where(flags==1.)],'ro',label='Failed Centroid')
         self.axes.plot(time[np.where(flags>1.1)],ref_flux[np.where(flags>1.1)],'ro',label='Failed Fit')
         self.axes.legend()
-    #pop(plotFunc=f,title='Flux')
+    pop(plotFunc=f,title='Flux')
     
-
-
-
-
+    def f(self):
+        time = photometryDict['startTimes']
+        flux=photometryDict['flux']
+        tar_flux = flux[:,0]
+        ref_flux = flux[:,1]
+        flags = photometryDict['flag']
+        
+        self.axes.plot(time,ref_flux/tar_flux,'b.-',label='Ratio')
+        #self.axes.plot(time,ref_flux,'g.-',label='ref')
+        self.axes.plot(time[np.where(flags==1.)],ref_flux[np.where(flags==1.)],'ro',label='Failed Centroid')
+        self.axes.plot(time[np.where(flags>1.1)],ref_flux[np.where(flags>1.1)],'ro',label='Failed Fit')
+        self.axes.legend()
+    pop(plotFunc=f,title='Flux Ratio')
+    
 

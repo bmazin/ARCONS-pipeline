@@ -21,7 +21,7 @@ from util.popup import *
 
 
 
-def readPhotometryFile(filename):
+def readPsfPhotometryFile(filename):
     photometryFile = tables.openFile(filename, mode='r')
     photometryTable = photometryFile.getNode(photometryFile.root,'PSFphotometry')._f_getChild('photometry')
     startTimes = photometryTable.col('time')
@@ -36,7 +36,7 @@ def readPhotometryFile(filename):
     return {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flag': flag}
     
 
-def writePhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
+def writePsfPhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
     if os.path.isfile(filename):
         warnings.warn("Overwriting photometry file: "+str(filename),UserWarning)
         
