@@ -16,33 +16,53 @@ from util.readDict import readDict
 from util.getImages import *
 from util.popup import *
 from photometry.PSFphotometry import PSFphotometry, writePsfPhotometryFile, readPsfPhotometryFile
+from photometry.AperPhotometry import AperPhotometry, writeAperPhotometryFile, readAperPhotometryFile
 from astrometry.CentroidCalc import quickCentroid,saveTable
 
 
 
 class LightCurve():
 
-    def __init__(self,path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',fileID='test',verbose=False):
+    def __init__(self,fileID='test',path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',targetName=None,run=None,verbose=False,showPlot=False):
         '''
         Constructs a list of obs FileName objects from the dictionary in the path.
-        'run' is assumed to be the second to last directory in the path
         
         Inputs:
-            path - path to the display stack target info
             fileID - identifier in filename. eg centroid_fileID.h5 or ImageStack_fileID.h5
+            path - path to the display stack target info
+            targetName - Name of target. Assumes there's a dictionary in path called targetName.dict
+                         If None, just searches for any .dict file in the path
+            run - name of run. eg PAL2014
+                  if None, assumes run is the second to last directory in the path
             kwargs - key words for the photometry module
 
         '''
         
         self.path = path
         self.fileID=fileID
+        self.targetName=targetName
+        self.run=run
         self.verbose=verbose
+        self.showPlot = showPlot
 
-        for f in os.listdir(path):
-            if f.endswith(".dict"):
-                #if self.verbose: print 'Loading params from ',path+os.sep+f
-                self.params = readDict(path+os.sep+f)
-                self.params.readFromFile(path+os.sep+f)
+        if self.targetName is None or not os.path.isfile(self.path+os.sep+self.targetName+'.dict'):
+            #Assumes there's only one '.dict' file in the directory
+            for f in os.listdir(path):
+                if f.endswith(".dict"):
+                    if self.verbose: print 'Loading params from ',path+os.sep+f
+                    self.targetName = f.split('.dict')[0]
+        try:
+            self.params = readDict(self.path+os.sep+self.targetName+'.dict')
+            self.params.readFromFile(self.path+os.sep+self.targetName+'.dict')
+        except:
+            print "Provide a target name that leads to a dictionary in the path!"
+            print path
+            print "target: ",self.targetName
+            raise ValueError
+            
+        if self.run is None:
+            #run is assumed to be the second to last directory in the path
+            self.run = os.path.basename(os.path.dirname(self.path))
                 
         #Get images
         try:
@@ -83,8 +103,8 @@ class LightCurve():
                 photometryFileName = self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
                 photometryDict = readPsfPhotometryFile(photometryFileName)
             elif photometryType is 'aperture':
-                print 'Not implemented yet!'
-                raise IOError
+                photometryFileName = self.path+os.sep+'ApertureStacks'+os.sep+'ApertureStack_'+self.fileID+'.h5'
+                photometryDict = readAperPhotometryFile(photometryFileName)
             else:
                 print 'Choose a valid type of photometry to perform!'
                 raise ValueError
@@ -95,24 +115,33 @@ class LightCurve():
             centroids = self.centroids
             flags=self.flags
             fluxDict_list = self.makeLightCurve(photometryType = photometryType, images=images,centroids=centroids,flags=flags,expTimes=pixIntTimes,save=save,**kwargs)
+            startTimes = self.im_dict['startTimes']
+            intTimes = self.im_dict['intTimes']
             
             if photometryType is 'PSF':
                 if save:
                     photometryFileName = self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
-                    writePsfPhotometryFile(fluxDict_list=fluxDict_list, im_dict = im_dict, filename = photometryFileName,verbose=self.verbose)
+                    writePsfPhotometryFile(fluxDict_list=fluxDict_list, im_dict = self.im_dict, filename = photometryFileName,verbose=self.verbose)
 
-                startTimes = im_dict['startTimes']
-                intTimes = im_dict['intTimes']
                 flux = np.asarray([fluxDict['flux'] for fluxDict in fluxDict_list])
                 parameters = np.asarray([fluxDict['parameters'] for fluxDict in fluxDict_list])
                 perrors = np.asarray([fluxDict['mpperr'] for fluxDict in fluxDict_list])
                 redChi2 = np.asarray([fluxDict['redChi2'] for fluxDict in fluxDict_list])
                 flags = np.asarray([fluxDict['flag'] for fluxDict in fluxDict_list])
-                photometryDict = {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flag': flags}
+                photometryDict = {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flags': flags}
                 
             elif photometryType is 'aperture':
-                print 'Not implemented yet!'
-                raise IOError
+                if save:
+                    photometryFileName = self.path+os.sep+'ApertureStacks'+os.sep+'ApertureStack_'+self.fileID+'.h5'
+                    writeAperPhotometryFile(fluxDict_list=fluxDict_list, im_dict = self.im_dict, filename = photometryFileName,verbose=self.verbose)
+                    
+                flux = np.asarray([fluxDict['flux'] for fluxDict in fluxDict_list])
+                sky = np.asarray([fluxDict['sky'] for fluxDict in fluxDict_list])
+                apertureRad = np.asarray([fluxDict['apertureRad'] for fluxDict in fluxDict_list])
+                annulusInnerRad = np.asarray([fluxDict['annulusInnerRad'] for fluxDict in fluxDict_list])
+                annulusOuterRad = np.asarray([fluxDict['annulusOuterRad'] for fluxDict in fluxDict_list])
+                flags = np.asarray([fluxDict['flag'] for fluxDict in fluxDict_list])
+                photometryDict = {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'sky': sky, 'apertureRad': apertureRad, 'annulusInnerRad': annulusInnerRad,'annulusOuterRad': annulusOuterRad, 'flag': flags}
             else:
                 print 'Choose a valid type of photometry to perform!'
                 raise ValueError
@@ -151,12 +180,13 @@ class LightCurve():
         '''
 
         if photometryType is 'PSF':
-            PSFphoto = PSFphotometry(image,centroid,expTime,**kwargs)
-            fluxDict = PSFphoto.PSFfit(aper_radius=5.)
+            PSFphoto = PSFphotometry(image,centroid,expTime,verbose=self.verbose, showPlot=self.showPlot)
+            fluxDict = PSFphoto.PSFfit(**kwargs)
             del PSFphoto
         elif photometryType is 'aperture':
-            print 'Not implemented yet!'
-            raise IOError
+            aperPhoto = AperPhotometry(image,centroid,expTime,verbose=self.verbose, showPlot=self.showPlot)
+            fluxDict = aperPhoto.AperPhotometry(**kwargs)
+            del aperPhoto
         else:
             print 'Choose a valid type of photometry to perform!'
             raise ValueError
@@ -247,14 +277,18 @@ class LightCurve():
             flags - flag from centroiding algorithm. 0 means good. 1 means failed
                     Same length as number of images. If one star fails the centroiding then whole image is flagged
         '''
+        centroidDir = 'CentroidLists'
+        targetDir = 'Target'
+        refDir = 'Reference'
+        
         
         if fromCentroidFile:
-            names = os.listdir(self.path+os.sep+'CentroidLists')
+            names = os.listdir(self.path+os.sep+centroidDir)
             ref_fns = []
             for name in names:
-                if os.path.isdir(self.path+os.sep+'CentroidLists'+os.sep+name):
-                    if name=='target':
-                        target_fn = self.path+os.sep+'CentroidLists'+os.sep+name+os.sep+'Centroid_'+self.fileID+'.h5'
+                if os.path.isdir(self.path+os.sep+centroidDir+os.sep+name):
+                    if name==targetDir:
+                        target_fn = self.path+os.sep+centroidDir+os.sep+name+os.sep+'Centroid_'+self.fileID+'.h5'
                     else:
                         ref_fns.append(name)
                         
@@ -262,7 +296,7 @@ class LightCurve():
             if len(ref_fns) > 0:
                 centroid_list = [target_centroid]
                 for ref_name in sorted(ref_fns):
-                    ref_fn = self.path+os.sep+'CentroidLists'+os.sep+ref_name+os.sep+'Centroid_'+self.fileID+'.h5'
+                    ref_fn = self.path+os.sep+centroidDir+os.sep+ref_name+os.sep+'Centroid_'+self.fileID+'.h5'
                     ref_centroid, ref_flags = self.getCentroidFromFile(ref_fn)
                     centroid_list.append(ref_centroid)
                     flags+=ref_flags
@@ -278,9 +312,9 @@ class LightCurve():
             print 'Choose target Star.'
             xPositionList,yPositionList,flagList=quickCentroid(im_dict['images'],radiusOfSearch=10,maxMove = 4,usePsfFit=False)
             if save:
-                target_fn = self.path+os.sep+'CentroidLists'+os.sep+'target'+os.sep+'Centroid_'+self.fileID+'.h5'
+                target_fn = self.path+os.sep+centroidDir+os.sep+targetDir+os.sep+'Centroid_'+self.fileID+'.h5'
                 try:
-                    os.mkdir(self.path+os.sep+'CentroidLists'+os.sep+'target')
+                    os.mkdir(self.path+os.sep+centroidDir+os.sep+targetDir)
                 except:
                     pass
                 paramsList = [-1]*4
@@ -298,9 +332,10 @@ class LightCurve():
             while chooseRef is 'yes' or chooseRef is 'Yes' or chooseRef is 'y' or chooseRef is 'Y' or chooseRef is 'true' or chooseRef is 'True' or chooseRef is '1':
                 xPositionList,yPositionList,flagList=quickCentroid(im_dict['images'],radiusOfSearch=10,maxMove = 4,usePsfFit=False)
                 if save:
-                    ref_fn = self.path+os.sep+'CentroidLists'+os.sep+'ref'+str(ref_num)+os.sep+'Centroid_'+self.fileID+'.h5'
+                    ref_num_str = "%02.d" % (ref_num,)  #Format as 2 digit integer with leading zeros
+                    ref_fn = self.path+os.sep+centroidDir+os.sep+refDir+ref_num_str+os.sep+'Centroid_'+self.fileID+'.h5'
                     try:
-                        os.mkdir(self.path+os.sep+'CentroidLists'+os.sep+'ref'+str(ref_num))
+                        os.mkdir(self.path+os.sep+centroidDir+os.sep+refDir+ref_num_str)
                     except:
                         pass
                     paramsList = [-1]*4
@@ -335,7 +370,7 @@ if __name__ == '__main__':
     path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
     identifier = '0'
     
-    LC=LightCurve(path,identifier)
+    LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=True)
 
     #beammapFileName='/ScienceData/PAL2014/beammap_SCI6_B140731-Boba_20141118flip.h5'
     #im_dict = LC.getImages(fromObsFile=True,save=True,
@@ -343,8 +378,7 @@ if __name__ == '__main__':
     #             integrationTime=10, weighted=True, fluxWeighted=False, getRawCount=False, scaleByEffInt=False)
     #LC.getCentroids(fromCentroidFile=False,fromImageStack=True,save=True)
     
-    #photometryDict = LC.getLightCurve(fromLightCurveFile=False,fromObsFile=False,fromPhotonList=False,fromImageStack=True,save=True)
-    photometryDict = LC.getLightCurve(photometryType='PSF',fromPhotometryFile=True)
+    photometryDict = LC.getLightCurve(photometryType='aperture',fromPhotometryFile=True,save=False)
     
     def f(self):
         time = photometryDict['startTimes']
