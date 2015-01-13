@@ -375,7 +375,7 @@ class ObsFileSeq():
     def loadImageStack(self,fileName, wvlStart=None,wvlStop=None,
                            weighted=False, fluxWeighted=False, 
                            getRawCount=False, scaleByEffInt=False,
-                           deadTime=100.e-6)):
+                           deadTime=100.e-6):
         #If the file exists, read it out
         if os.path.isfile(fileName):
             print 'Loading image stack from ',fileName
@@ -472,7 +472,7 @@ class ObsFileSeq():
                 im[np.invert(np.isfinite(im))]=0.
                 
                 if retval is None:
-                    retval = {'image':im, 'pixIntTime':im_dict['effIntTimes'], 'intTime' = obsInfo["integrationTime"],'startTime'=self.frameIntervals[iFrame][0],'endTime'=self.frameIntervals[iFrame][1]}
+                    retval = {'image':im, 'pixIntTime':im_dict['effIntTimes'], 'intTime':obsInfo["integrationTime"],'startTime':self.frameIntervals[iFrame][0],'endTime':self.frameIntervals[iFrame][1]}
                 else:
                     retval['image'] += im
                     retval['pixIntTime'] += im_dict['effIntTimes']
