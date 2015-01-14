@@ -44,8 +44,6 @@ def removePixel(timeMaskPath,pixelRow,pixelCol,reason='manual hot pixel',nodePat
     tableName = constructDataTableName(x=pixelCol, y=pixelRow)
     eventListTable = timeMaskFile.getNode(nodePath + dataGroupName, name=tableName)
 
-    print hotPixelsOb.reasons,hotPixelsOb.reasonEnum
-    print eventListTable.read()
     newRow = eventListTable.row
     newRow['tBegin'] = tBegin
     newRow['tEnd'] = tEnd
@@ -53,7 +51,6 @@ def removePixel(timeMaskPath,pixelRow,pixelCol,reason='manual hot pixel',nodePat
     newRow.append()
 
     timeMaskFile.flush()
-    print eventListTable.read()
     timeMaskFile.close()
 
 def unremovePixel(timeMaskPath,pixelRow,pixelCol,reasons=['manual hot pixel','manual cold pixel'],nodePath='/'):
