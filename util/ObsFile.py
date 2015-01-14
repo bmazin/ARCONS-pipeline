@@ -110,6 +110,10 @@ class ObsFile:
         Closes the obs file and any cal files that are open
         """
         try:
+            self.file.close()
+        except:
+            pass
+        try:
             self.wvlCalFile.close()
         except:
             pass
