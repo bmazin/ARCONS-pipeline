@@ -3,10 +3,12 @@
 
 from functools import partial
 import numpy as np
+import matplotlib
 from util.popup import *
 from util.fitFunctions import model_list
 from photometry.LightCurve import LightCurve
 from photometry.plot3DImage import plot3DImage
+
 
 def clickCanvas(self,LC,event):
     if event.inaxes is self.axes and self.mpl_toolbar._active is None:
@@ -17,6 +19,14 @@ def clickCanvas(self,LC,event):
         
         pop=PopUp(parent=self,title='JD: '+str(time[closest_time_ind])+' PSF fit')
         pop_image(pop,LC,closest_time_ind)
+        pop.show()
+        
+        pop=PopUp(parent=self,title='JD: '+str(time[closest_time_ind])+' Fit Residual')
+        pop_residualImage(pop,LC,closest_time_ind)
+        pop.show()
+        
+        pop=PopUp(parent=self,title='JD: '+str(time[closest_time_ind])+' 2D Image')
+        pop_2DImage(pop,LC,closest_time_ind)
         pop.show()
         
 def pop_image(self,LC,ind,model='multiple_2d_circ_gauss_func'):
@@ -35,6 +45,32 @@ def pop_image(self,LC,ind,model='multiple_2d_circ_gauss_func'):
     
     plot3DImage(self.fig,self.axes,image,errs=errs,fit=guess)
     
+def pop_residualImage(self,LC,ind,model='multiple_2d_circ_gauss_func'):
+    photometryDict = LC.getLightCurve(fromLightCurveFile=True)
+    im_dict = LC.getImages(fromImageStack=True)
+    
+    image = im_dict['images'][ind]
+    image[np.invert(np.isfinite(image))]=0.
+    errs = np.sqrt(image)
+    errs[np.where(image==0.)]=np.inf
+    parameters = photometryDict['parameters'][ind]
+    models = model_list[model](parameters)(p=np.ones(len(parameters)),data=image,return_models=True)
+    guess = models[0]
+    for m in models[1:]:
+        guess+=m
+    
+    residualImage = (image-guess)/np.sqrt(image)
+    residualImage[np.where(image==0)] = 0
+    residualImage[np.invert(np.isfinite(residualImage))]=0.
+    self.plotArray(image=residualImage, title='Image Residual',cmap=matplotlib.cm.gnuplot2)
+    
+def pop_2DImage(self,LC,ind):
+    im_dict = LC.getImages(fromImageStack=True)
+    
+    image = im_dict['images'][ind]
+    image[np.invert(np.isfinite(image))]=0.
+
+    self.plotArray(image=image, title='Image',cmap=matplotlib.cm.gnuplot2)
     
 def hoverCanvas(self,time,event):
     if event.inaxes is self.axes:
