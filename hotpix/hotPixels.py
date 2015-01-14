@@ -986,10 +986,9 @@ def readHotPixels(inputFile,nodePath=None,reasons=[]):
                    supply a photon list file in 'inputFile', since the hot pixel
                    data hierarchy is copied directly into a sub-group within the
                    photon list file.
-        mask - The reasons you want to include in a mask
+        reasons - The reasons you want to include in a mask
     
     OUTPUTS:
-        ##Returns a dictionary with the following info:##
         Now returns a wrapper class object hotPixelMasker that has the following as attributes:
         
             'nRow' - number of rows in original obs File.
