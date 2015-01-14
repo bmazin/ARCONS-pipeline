@@ -314,11 +314,11 @@ class PSFphotometry(Photometry):
         
         parameter_guess,parameter_lowerlimit,parameter_upperlimit,parameter_ties = self.guess_parameters(aper_radius=aper_radius,tie_sigmas=tie_sigmas)
         
+        models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
+        guess = models[0]
+        for m in models[1:]:
+            guess+=m
         if self.showPlot:
-            models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
-            guess = models[0]
-            for m in models[1:]:
-                guess+=m
             pop(plotFunc=lambda popupOb: plot3DImage(popupOb.fig,popupOb.axes,self.image,errs=errs,fit=guess),title="Guess")
 
         #p_guess = np.ones(len(parameter_guess))
@@ -326,17 +326,17 @@ class PSFphotometry(Photometry):
         #p_ul = np.asarray(parameter_upperlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
         parameter_fit, redchi2gauss2, mpperr = fitData2D(np.copy(self.image),np.copy(errs),parameter_guess,parameter_lowerlimit,parameter_upperlimit,self.model,parameter_ties=parameter_ties,verbose=self.verbose)
 
+        models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
+        fitModelImg = models2[0]
+        for m in models2[1:]:
+            fitModelImg+=m
         if self.showPlot:
-            models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
-            guess2 = models2[0]
-            for m in models2[1:]:
-                guess2+=m
-            pop(plotFunc=lambda popupOb: plot3DImage(popupOb.fig,popupOb.axes,self.image,errs=errs,fit=guess2),title="Fitted")
+            pop(plotFunc=lambda popupOb: plot3DImage(popupOb.fig,popupOb.axes,self.image,errs=errs,fit=fitModelImg),title="Fitted")
         
         
         flag = 2.0*self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit)
         #return self.getFlux(parameter_fit)
-        return {'flux': self.getFlux(parameter_fit), 'parameters': parameter_fit, 'mpperr':mpperr,'redChi2':redchi2gauss2,'flag':flag}
+        return {'flux': self.getFlux(parameter_fit), 'parameters': parameter_fit, 'mpperr':mpperr,'redChi2':redchi2gauss2,'flag':flag,'fitModelImg':fitModelImg}
 
     def fitHitLimit(self,parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
         """
