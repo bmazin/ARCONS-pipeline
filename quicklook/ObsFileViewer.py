@@ -1,3 +1,7 @@
+'''
+Author: Matt Strader        Date: January 06, 2015
+'''
+
 import sys, os
 import numpy as np
 from PyQt4 import QtCore
@@ -6,15 +10,17 @@ import matplotlib
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
+from functools import partial
 
 from util.FileName import FileName
 from util.ObsFile import ObsFile
+from util.CalLookupFile import CalLookupFile
 
 class ObsFileViewer(QtGui.QMainWindow):
-    def __init__(self, obsPath=None,showMe=True):
+    def __init__(self, obsPath=None):
         self.app = QtGui.QApplication([])
         self.app.setStyle('plastique')
-        super(self.__class__,self).__init__()
+        super(ObsFileViewer,self).__init__()
         self.setWindowTitle('ObsFile Viewer')
         self.createWidgets()
         self.createWindows()
@@ -26,10 +32,9 @@ class ObsFileViewer(QtGui.QMainWindow):
         if not obsPath is None:
             self.loadObsFile(obsPath)
             
-        self.show()
 
     def show(self):
-        super(self.__class__,self).show()
+        super(ObsFileViewer,self).show()
         self.app.exec_()
 
     def createWindows(self):
@@ -114,11 +119,15 @@ class ObsFileViewer(QtGui.QMainWindow):
         addActions(self.helpMenu, (aboutAction,))
 
     def connectControls(self):
+        self.clickFuncs = []
         self.connect(self.button_drawPlot,QtCore.SIGNAL('clicked()'), self.drawPlot)
         self.connect(self.button_jumpToBeginning,QtCore.SIGNAL('clicked()'), self.jumpToBeginning)
         self.connect(self.button_jumpToEnd,QtCore.SIGNAL('clicked()'), self.jumpToEnd)
         self.connect(self.button_incrementForward,QtCore.SIGNAL('clicked()'), self.incrementForward)
         self.connect(self.button_incrementBack,QtCore.SIGNAL('clicked()'), self.incrementBack)
+
+    def addClickFunc(self,clickFunc):
+        self.clickFuncs.append(clickFunc)
 
     def updateHeader(self):
         keys = self.obs.titles
@@ -221,6 +230,7 @@ class ObsFileViewer(QtGui.QMainWindow):
             cid = self.fig.canvas.mpl_connect('button_press_event', self.clickColorBar)
         self.axes.set_title(title)
         cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
+        cid = self.fig.canvas.mpl_connect('button_press_event', self.clickCanvas)
         print 'draw'
         self.draw()
 
@@ -231,6 +241,13 @@ class ObsFileViewer(QtGui.QMainWindow):
             if row < np.shape(self.image)[0] and col < np.shape(self.image)[1]:
                 self.statusText.setText('({:d},{:d}) {}'.format(col,row,self.image[row,col]))
 
+    def clickCanvas(self,event):
+        if event.inaxes is self.axes:
+            col = round(event.xdata)
+            row = round(event.ydata)
+            print '(%d,%d)'%(row,col)
+            for func in self.clickFuncs:
+                func(row=row,col=col)
 
     def scrollColorBar(self, event):
         if event.inaxes is self.fig.cbar.ax:
@@ -283,12 +300,14 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.label_obsFilename.setText(os.path.basename(obsPath))
         self.textbox_endTime.setText(str(self.headerInfo['exptime']))
 
+    def obsMethod(self,method,*args,**kwargs):
+        getattr(self.obs,method)(*args,**kwargs)
     
     def loadObsFileWindow(self):
         LoadObsDialog(parent=self)
 
     def loadCalFiles(self):
-        LoadCalsDialog(parent=self)
+        LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
 
 class ModelessWindow(QtGui.QDialog):
     def __init__(self,parent=None):
@@ -346,23 +365,33 @@ class ImageParamsWindow(ModelessWindow):
     
 
 class LoadWidget(QtGui.QWidget):
-    def __init__(self,parent=None,fileNameMethod='obs',promptStr='',initialParams={}):
+    def __init__(self,parent=None,fileNameMethod='obs',promptStr='',obsTstamp=''):
         super(LoadWidget,self).__init__(parent=parent)
         self.parent=parent
         self.fileNameMethod = fileNameMethod
         self.promptStr=promptStr
-        self.initialParams = initialParams
-        self.initUI()
+        if obsTstamp != '':
+            self.calLookupFile = CalLookupFile()
+            self.obsTstamp = obsTstamp
+            print 'getattr',fileNameMethod
+            initialLoadPath = getattr(self.calLookupFile,fileNameMethod)(self.obsTstamp)
+            
+            print initialLoadPath
+            initialParams = self.calLookupFile.getComponents(self.obsTstamp,fileNameMethod)
+        else:
+            initialParams = {}
+            initialLoadPath = ''
+        self.initUI(initialLoadPath=initialLoadPath,initialParams=initialParams)
 
-    def initUI(self):
-        self.textbox_run = QtGui.QLineEdit(self.initialParams.get('run'))
-        self.textbox_date = QtGui.QLineEdit(self.initialParams.get('date'))
-        self.textbox_tstamp = QtGui.QLineEdit(self.initialParams.get('tstamp'))
+    def initUI(self,initialLoadPath='',initialParams={}):
+        self.textbox_run = QtGui.QLineEdit(initialParams.get('run'))
+        self.textbox_date = QtGui.QLineEdit(initialParams.get('date'))
+        self.textbox_tstamp = QtGui.QLineEdit(initialParams.get('tstamp'))
         self.button_loadFilename = QtGui.QPushButton('Lookup FileName Path')
 
         self.button_openDialog = QtGui.QPushButton('Open Path')
-        self.textbox_filename = QtGui.QLineEdit('')
-        self.setFilenameFromParams()
+        self.textbox_filename = QtGui.QLineEdit(initialLoadPath)
+        #self.setFilenameFromParams()
 
         self.textbox_run.setMaximumWidth(200)
         self.textbox_date.setMaximumWidth(200)
@@ -380,6 +409,7 @@ class LoadWidget(QtGui.QWidget):
         self.connect(self.button_loadFilename,QtCore.SIGNAL('clicked()'), self.setFilenameFromParams)
         self.connect(self.button_openDialog,QtCore.SIGNAL('clicked()'), self.setFilenameFromDialog)
 
+
     def setFilenameFromDialog(self):
         run = str(self.textbox_run.text())
         date = str(self.textbox_date.text())
@@ -391,14 +421,14 @@ class LoadWidget(QtGui.QWidget):
         run = str(self.textbox_run.text())
         date = str(self.textbox_date.text())
         tstamp = str(self.textbox_tstamp.text())
-
-        fn = FileName(run=run,date=date,tstamp=tstamp)
-        path = getattr(fn,self.fileNameMethod)()
-        self.textbox_filename.setText(path)
+        if run != '' or date != '' or tstamp != '':
+            fn = FileName(run=run,date=date,tstamp=tstamp)
+            path = getattr(fn,self.fileNameMethod)()
+            self.textbox_filename.setText(path)
 
 class LoadObsDialog(QtGui.QDialog):
     def __init__(self,parent=None):
-        super(self.__class__,self).__init__(parent=parent)
+        super(LoadObsDialog,self).__init__(parent=parent)
         self.parent=parent
         self.initUI()
         self.connectButtons()
@@ -425,22 +455,23 @@ class LoadObsDialog(QtGui.QDialog):
 
 
 class LoadCalsDialog(QtGui.QDialog):
-    def __init__(self,parent=None):
-        super(self.__class__,self).__init__(parent=parent)
+    def __init__(self,parent=None,obsTstamp=''):
+        super(LoadCalsDialog,self).__init__(parent=parent)
         self.parent=parent
+        self.obsTstamp = obsTstamp
         self.initUI()
         self.connectButtons()
         self.exec_()
 
     def initUI(self):
 
-        self.loadWvlWidget = LoadWidget(self,'calSoln','Choose the wavelength cal')
-        self.loadFlatWidget = LoadWidget(self,'flatSoln','Choose the flat cal')
-        self.loadFluxWidget = LoadWidget(self,'fluxSoln','Choose the flux cal')
-        self.loadTimeMaskWidget = LoadWidget(self,'timeMask','Choose the time mask file')
-        self.loadTimeAdjustmentWidget = LoadWidget(self,'timeAdjustments','Choose the time adjustment file')
-        self.loadCosmicWidget = LoadWidget(self,'cosmicMask','Choose the cosmic mask file')
-        self.loadBeammapWidget = LoadWidget(self,'beammap','Choose the beammap file')
+        self.loadWvlWidget = LoadWidget(self,'calSoln','Choose the wavelength cal',obsTstamp=self.obsTstamp)
+        self.loadFlatWidget = LoadWidget(self,'flatSoln','Choose the flat cal',obsTstamp=self.obsTstamp)
+        self.loadFluxWidget = LoadWidget(self,'fluxSoln','Choose the flux cal',obsTstamp=self.obsTstamp)
+        self.loadTimeMaskWidget = LoadWidget(self,'timeMask','Choose the time mask file',obsTstamp=self.obsTstamp)
+        self.loadTimeAdjustmentWidget = LoadWidget(self,'timeAdjustments','Choose the time adjustment file',obsTstamp=self.obsTstamp)
+        self.loadCosmicWidget = LoadWidget(self,'cosmicMask','Choose the cosmic mask file',obsTstamp=self.obsTstamp)
+        self.loadBeammapWidget = LoadWidget(self,'beammap','Choose the beammap file',obsTstamp=self.obsTstamp)
 
         self.button_loadWvl = QtGui.QPushButton('Load Wvl Cal')
         self.button_loadFlat = QtGui.QPushButton('Load Flat Cal')
@@ -450,7 +481,7 @@ class LoadCalsDialog(QtGui.QDialog):
         self.button_loadCosmic = QtGui.QPushButton('Load Cosmic Mask')
         self.button_loadBeammap = QtGui.QPushButton('Load Beammap')
 
-        self.button_load = QtGui.QPushButton('Load All Cals')
+        self.button_loadAll = QtGui.QPushButton('Load All Cals')
 
         wvlBox = layoutBox('H',(self.loadWvlWidget,self.button_loadWvl))
         flatBox = layoutBox('H',(self.loadFlatWidget,self.button_loadFlat))
@@ -460,17 +491,34 @@ class LoadCalsDialog(QtGui.QDialog):
         cosmicBox = layoutBox('H',(self.loadCosmicWidget,self.button_loadCosmic))
         beammapBox = layoutBox('H',(self.loadBeammapWidget,self.button_loadBeammap))
 
-        mainBox = layoutBox('V',(wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,beammapBox,self.button_load))
+        mainBox = layoutBox('V',(wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,beammapBox,self.button_loadAll))
         self.setLayout(mainBox)
 
     def connectButtons(self):
-        self.connect(self.button_load,QtCore.SIGNAL('clicked()'),self.load)
+        self.connect(self.button_loadWvl,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadWvlWidget,'loadWvlCalFile'))
+        self.connect(self.button_loadFlat,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadFlatWidget,'loadFlatCalFile'))
+        self.connect(self.button_loadFlux,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadFluxWidget,'loadFluxCalFile'))
+        self.connect(self.button_loadTimeMask,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeMaskWidget,'loadTimeMaskFile'))
+        self.connect(self.button_loadTimeAdjustment,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile'))
+        self.connect(self.button_loadCosmic,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadCosmicWidget,'loadCosmicMaskFile'))
+        self.connect(self.button_loadBeammap,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadBeammapWidget,'loadBeammapFile'))
+        self.connect(self.button_loadAll,QtCore.SIGNAL('clicked()'),self.loadAll)
 
-    def load(self):
-        filename = str(self.loadObsWidget.textbox_filename.text())
+    def loadCal(self,calWidget,obsMethod):
+        path = str(calWidget.textbox_filename.text())
+        if path != '':
+            print 'loading',path
+            self.parent.obsMethod(obsMethod,path)
+    
+    def loadAll(self):
+        self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
+        self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
+        self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
+        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile')
+        self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
+        self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
+        self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
         self.close()
-#QtGui.QFileDialog.getOpenFileName(self, 'Open File',".","(*.writer)")
-        
 
 #gui functions
 def addActions(target, actions):
@@ -523,6 +571,7 @@ def layoutBox(type,elements):
 
 if __name__ == "__main__":
     form = ObsFileViewer()
+    form.show()
 
 
 
