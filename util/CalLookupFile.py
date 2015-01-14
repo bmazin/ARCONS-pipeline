@@ -232,7 +232,7 @@ def writeNewCalLookupFile(path=None):
     file.close()
 
 if __name__=='__main__':
-    path = 'lookup.h5'
+    path = os.environ['MKID_CAL_LOOKUP']
     if not os.path.exists(path):
         writeNewCalLookupFile(path)
     lookup = CalLookupFile(path,mode='a')
