@@ -16,17 +16,30 @@ from hotpix.hotPixels import constructDataTableName,dataGroupName,readHotPixels
 manualHotPixelReason = tm.timeMaskReason['manual hot pixel']
 manualColdPixelReason = tm.timeMaskReason['manual cold pixel']
 
-def removePixel(timeMaskPath,pixelRow,pixelCol,reason='manual hot pixel',nodePath='/'):
+def removePixel(timeMaskPath,pixelRow,pixelCol,reason='manual hot pixel',nodePath='/',timeInterval=None):
     timeMaskFile = tables.openFile(timeMaskPath,mode='a')
+
+        
 
     hotPixelsOb = readHotPixels(timeMaskFile)
     expTime = hotPixelsOb.expTime
     reasonEnum = hotPixelsOb.reasonEnum
+
+    if not timeInterval is None:
+        if len(timeInterval) == 2:
+            tBegin = timeInterval[0]
+            tEnd = timeInterval[1]
+        else:
+            raise TypeError('timeInterval needs to be a tuple (tBegin,tEnd), given:{}'.format(timeInterval))
+    else:
+        tBegin = 0.
+        tEnd = expTime*hotPixelsOb.ticksPerSec
+
     try:
         reasonValue = reasonEnum[reason]
     except IndexError:
         outStr = 'reason given for removing pixel,{}, is not in the enum embedded in the existing hot pixel file'.format(reason)
-        raise IndexError(outStr)
+        raise TypeError(outStr)
 
     tableName = constructDataTableName(x=pixelCol, y=pixelRow)
     eventListTable = timeMaskFile.getNode(nodePath + dataGroupName, name=tableName)
@@ -34,8 +47,8 @@ def removePixel(timeMaskPath,pixelRow,pixelCol,reason='manual hot pixel',nodePat
     print hotPixelsOb.reasons,hotPixelsOb.reasonEnum
     print eventListTable.read()
     newRow = eventListTable.row
-    newRow['tBegin'] = 0.
-    newRow['tEnd'] = expTime*hotPixelsOb.ticksPerSec
+    newRow['tBegin'] = tBegin
+    newRow['tEnd'] = tEnd
     newRow['reason'] = reasonValue
     newRow.append()
 
