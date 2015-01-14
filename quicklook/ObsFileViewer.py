@@ -44,12 +44,7 @@ class ObsFileViewer(QtGui.QMainWindow):
     def createWidgets(self):
         self.mainFrame = QtGui.QWidget()
         
-        # Create the mpl Figure and FigCanvas objects. 
-        self.dpi = 100
-        self.fig = Figure((5.0, 5.0), dpi=self.dpi)
-        self.canvas = FigureCanvas(self.fig)
-        self.canvas.setParent(self.mainFrame)
-        self.axes = self.fig.add_subplot(111)
+        self.initFig()
 
         # Create the navigation toolbar, tied to the canvas
         #self.canvasToolbar = NavigationToolbar(self.canvas, self.mainFrame)
@@ -206,7 +201,21 @@ class ObsFileViewer(QtGui.QMainWindow):
     def draw(self):
         self.fig.canvas.draw()
 
-    def plotArray(self,image,normNSigma=3,title='',showColorBar=True,**kwargs):
+    def initFig(self):
+        # Create the mpl Figure and FigCanvas objects. 
+        dpi = 100
+        self.fig = Figure((5.0, 5.0), dpi=dpi)
+        self.canvas = FigureCanvas(self.fig)
+        self.canvas.setParent(self.mainFrame)
+        self.axes = self.fig.add_subplot(111)
+        self.plotArray(np.arange(9).reshape((3,3)))
+        cid = self.fig.canvas.mpl_connect('scroll_event', self.scrollColorBar)
+        cid = self.fig.canvas.mpl_connect('button_press_event', self.clickColorBar)
+        cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
+        cid = self.fig.canvas.mpl_connect('button_press_event', self.clickCanvas)
+        
+
+    def plotArray(self,image,normNSigma=3,title='',**kwargs):
         self.image = image
         if not 'vmax' in kwargs:
             goodImage = image[np.isfinite(image)]
@@ -218,34 +227,26 @@ class ObsFileViewer(QtGui.QMainWindow):
         if not 'origin' in kwargs:
             kwargs['origin'] = 'lower'
 
-        if 'button_press_event' in kwargs:
-            cid = self.fig.canvas.mpl_connect('button_press_event',partial(kwargs.pop('button_press_event'),self))
-
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)
-        self.handleMatshow = self.axes.matshow(image,**kwargs)
-        if showColorBar:
-            self.fig.cbar = self.fig.colorbar(self.handleMatshow)
-            cid = self.fig.canvas.mpl_connect('scroll_event', self.scrollColorBar)
-            cid = self.fig.canvas.mpl_connect('button_press_event', self.clickColorBar)
         self.axes.set_title(title)
-        cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
-        cid = self.fig.canvas.mpl_connect('button_press_event', self.clickCanvas)
-        print 'draw'
+
+        self.handleMatshow = self.axes.matshow(image,**kwargs)
+        self.fig.cbar = self.fig.colorbar(self.handleMatshow)
         self.draw()
+        print 'image drawn'
 
     def hoverCanvas(self,event):
         if event.inaxes is self.axes:
             col = int(round(event.xdata))
             row = int(round(event.ydata))
             if row < np.shape(self.image)[0] and col < np.shape(self.image)[1]:
-                self.statusText.setText('({:d},{:d}) {}'.format(col,row,self.image[row,col]))
+                self.statusText.setText('(x,y)=({:d},{:d}) {}'.format(col,row,self.image[row,col]))
 
     def clickCanvas(self,event):
         if event.inaxes is self.axes:
             col = round(event.xdata)
             row = round(event.ydata)
-            print '(%d,%d)'%(row,col)
             for func in self.clickFuncs:
                 func(row=row,col=col)
 
@@ -373,7 +374,6 @@ class LoadWidget(QtGui.QWidget):
         if obsTstamp != '':
             self.calLookupFile = CalLookupFile()
             self.obsTstamp = obsTstamp
-            print 'getattr',fileNameMethod
             initialLoadPath = getattr(self.calLookupFile,fileNameMethod)(self.obsTstamp)
             
             print initialLoadPath
@@ -498,26 +498,28 @@ class LoadCalsDialog(QtGui.QDialog):
         self.connect(self.button_loadWvl,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadWvlWidget,'loadWvlCalFile'))
         self.connect(self.button_loadFlat,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadFlatWidget,'loadFlatCalFile'))
         self.connect(self.button_loadFlux,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadFluxWidget,'loadFluxCalFile'))
-        self.connect(self.button_loadTimeMask,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeMaskWidget,'loadTimeMaskFile'))
+        self.connect(self.button_loadTimeMask,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeMaskWidget,'loadHotPixCalFile'))
         self.connect(self.button_loadTimeAdjustment,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile'))
         self.connect(self.button_loadCosmic,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadCosmicWidget,'loadCosmicMaskFile'))
         self.connect(self.button_loadBeammap,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadBeammapWidget,'loadBeammapFile'))
-        self.connect(self.button_loadAll,QtCore.SIGNAL('clicked()'),self.loadAll)
+        self.connect(self.button_loadAll,QtCore.SIGNAL('clicked()'),self.loadAllCals)
 
-    def loadCal(self,calWidget,obsMethod):
+    def loadCal(self,calWidget,obsMethod,*args,**kwargs):
         path = str(calWidget.textbox_filename.text())
         if path != '':
             print 'loading',path
-            self.parent.obsMethod(obsMethod,path)
+            self.parent.obsMethod(obsMethod,path,*args,**kwargs)
     
-    def loadAll(self):
+    def loadAllCals(self):
         self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
         self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
         self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
-        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile')
+        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile',reasons=['hot pixel','dead pixel','unknown'])
         self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
         self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
         self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
+        self.parent.imageParamsWindow.checkbox_getRawCount.setCheckState(False)
+        print 'setting getRawCount=False'
         self.close()
 
 #gui functions
