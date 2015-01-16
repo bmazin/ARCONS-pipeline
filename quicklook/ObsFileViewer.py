@@ -23,7 +23,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         super(ObsFileViewer,self).__init__()
         self.setWindowTitle('ObsFile Viewer')
         self.createWidgets()
-        self.createWindows()
+        self.initWindows()
         self.createMenu()
         self.createStatusBar()
         self.arrangeMainFrame()
@@ -37,14 +37,21 @@ class ObsFileViewer(QtGui.QMainWindow):
         super(ObsFileViewer,self).show()
         self.app.exec_()
 
-    def createWindows(self):
+    def initWindows(self):
         self.headerWindow = HeaderWindow(self)
         self.imageParamsWindow = ImageParamsWindow(self)
+        self.plotWindows = []
+
+    def newPlotWindow(self):
+        newPlotId = len(self.plotWindows)
+        plotWindow = PlotWindow(parent=self,plotId=newPlotId)
+        self.plotWindows.append(plotWindow)
+        plotWindow.show()
 
     def createWidgets(self):
         self.mainFrame = QtGui.QWidget()
         
-        self.initFig()
+        self.arrayImageWidget = ArrayImageWidget(parent=self,hoverCall=self.hoverCanvas)
 
         # Create the navigation toolbar, tied to the canvas
         #self.canvasToolbar = NavigationToolbar(self.canvas, self.mainFrame)
@@ -52,17 +59,17 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.label_obsFilename = QtGui.QLabel('No obs loaded')
 
         self.textbox_startTime = QtGui.QLineEdit('0')
-        self.textbox_startTime.setMaximumWidth(50)
+        #self.textbox_startTime.setMaximumWidth(50)
         self.label_startToEnd = QtGui.QLabel('s to')
         self.textbox_endTime = QtGui.QLineEdit('0')
-        self.textbox_endTime.setMaximumWidth(50)
+        #self.textbox_endTime.setMaximumWidth(50)
         self.label_unitsAfterEndTime = QtGui.QLabel('s')
 
         self.button_drawPlot = QtGui.QPushButton('Plot')
 
 
         self.textbox_timeIncrement = QtGui.QLineEdit('10')
-        self.textbox_timeIncrement.setMaximumWidth(50)
+        #self.textbox_timeIncrement.setMaximumWidth(50)
         self.button_jumpToBeginning = QtGui.QPushButton('|<')
         self.button_jumpToEnd = QtGui.QPushButton('>|')
         self.button_incrementBack = QtGui.QPushButton('<')
@@ -76,7 +83,7 @@ class ObsFileViewer(QtGui.QMainWindow):
 
     def arrangeMainFrame(self):
 
-        canvasBox = layoutBox('V',(self.canvas,))#self.canvasToolbar
+        canvasBox = layoutBox('V',(self.arrayImageWidget,))
 
         timeBoundsBox = layoutBox('H',(3,self.textbox_startTime,'s to',self.textbox_endTime,'s',1,self.button_drawPlot,3))
         incrementControlsBox = layoutBox('H',(1,self.button_jumpToBeginning,self.button_incrementBack,
@@ -105,7 +112,9 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.windowsMenu = self.menuBar().addMenu("&Windows")
         headerAction = createAction(self,"Header Info",slot=self.headerWindow.show)
         imgParamsAction = createAction(self,"Image Plot Parameters",slot=self.imageParamsWindow.show)
-        addActions(self.windowsMenu,(headerAction,imgParamsAction))
+        newPlotWindowAction = createAction(self,'New Plot Window',slot=self.newPlotWindow)
+
+        addActions(self.windowsMenu,(newPlotWindowAction,None,headerAction,imgParamsAction))
         
         self.helpMenu = self.menuBar().addMenu("&Help")
         aboutAction = createAction(self,"&About", 
@@ -114,15 +123,12 @@ class ObsFileViewer(QtGui.QMainWindow):
         addActions(self.helpMenu, (aboutAction,))
 
     def connectControls(self):
-        self.clickFuncs = []
-        self.connect(self.button_drawPlot,QtCore.SIGNAL('clicked()'), self.drawPlot)
+        self.connect(self.button_drawPlot,QtCore.SIGNAL('clicked()'), self.getObsImage)
         self.connect(self.button_jumpToBeginning,QtCore.SIGNAL('clicked()'), self.jumpToBeginning)
         self.connect(self.button_jumpToEnd,QtCore.SIGNAL('clicked()'), self.jumpToEnd)
         self.connect(self.button_incrementForward,QtCore.SIGNAL('clicked()'), self.incrementForward)
         self.connect(self.button_incrementBack,QtCore.SIGNAL('clicked()'), self.incrementBack)
 
-    def addClickFunc(self,clickFunc):
-        self.clickFuncs.append(clickFunc)
 
     def updateHeader(self):
         keys = self.obs.titles
@@ -131,12 +137,12 @@ class ObsFileViewer(QtGui.QMainWindow):
             self.headerInfo[eachKey] = self.obs.getFromHeader(eachKey)
             self.headerWindow.append('{}:\n{}\n'.format(eachKey,self.headerInfo[eachKey]))
             
-    def drawPlot(self):
+    def getObsImage(self):
         firstSec = float(self.textbox_startTime.text())
         intTime = float(self.textbox_endTime.text())-firstSec
         
         if self.obs.wvlCalFile is None:
-            self.imageParamsWindow.checkbox_getRawCount.setCheckState(True)
+            self.imageParamsWindow.checkbox_getRawCount.setChecked(True)
             print 'setting getRawCount, since wvlcal is not loaded'
         paramsDict = self.imageParamsWindow.getParams()
         
@@ -152,7 +158,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         newEndTime = intTime
         self.textbox_startTime.setText(str(newStartTime))
         self.textbox_endTime.setText(str(newEndTime))
-        self.drawPlot()
+        self.getObsImage()
 
     def jumpToEnd(self):
         firstSec = float(self.textbox_startTime.text())
@@ -161,7 +167,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         newStartTime = newEndTime-intTime
         self.textbox_startTime.setText(str(newStartTime))
         self.textbox_endTime.setText(str(newEndTime))
-        self.drawPlot()
+        self.getObsImage()
 
     def incrementForward(self):
         startTime = float(self.textbox_startTime.text())
@@ -171,7 +177,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         newEndTime = endTime + timeIncrement
         self.textbox_startTime.setText(str(newStartTime))
         self.textbox_endTime.setText(str(newEndTime))
-        self.drawPlot()
+        self.getObsImage()
 
     def incrementBack(self):
         startTime = float(self.textbox_startTime.text())
@@ -181,7 +187,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         newEndTime = endTime - timeIncrement
         self.textbox_startTime.setText(str(newStartTime))
         self.textbox_endTime.setText(str(newEndTime))
-        self.drawPlot()
+        self.getObsImage()
 
     def savePlot(self):
         file_choices = "PNG (*.png)|*.png"
@@ -201,22 +207,208 @@ class ObsFileViewer(QtGui.QMainWindow):
     def draw(self):
         self.fig.canvas.draw()
 
-    def initFig(self):
-        # Create the mpl Figure and FigCanvas objects. 
-        dpi = 100
-        self.fig = Figure((5.0, 5.0), dpi=dpi)
+    def plotArray(self,*args,**kwargs):
+        self.arrayImageWidget.plotArray(*args,**kwargs)
+
+    def hoverCanvas(self,event):
+        col = int(round(event.xdata))
+        row = int(round(event.ydata))
+        if row < self.arrayImageWidget.nRow and col < self.arrayImageWidget.nCol:
+            self.statusText.setText('(x,y,z) = ({:d},{:d},{})'.format(col,row,self.arrayImageWidget.image[row,col]))
+
+    def loadObsFile(self,obsPath):
+        print 'loading',obsPath
+        self.obs = ObsFile(obsPath)
+        self.fn = FileName(obsFile=self.obs)
+        firstImg = self.obs.getPixelCountImage(firstSec=0,integrationTime=1,getRawCount=True)
+        self.image = firstImg['image']
+        self.plotArray(self.image)
+        self.updateHeader()
+        self.label_obsFilename.setText(os.path.basename(obsPath))
+        self.textbox_endTime.setText(str(self.headerInfo['exptime']))
+
+    def obsMethod(self,method,*args,**kwargs):
+        getattr(self.obs,method)(*args,**kwargs)
+    
+    def loadObsFileWindow(self):
+        LoadObsDialog(parent=self)
+
+    def loadCalFiles(self):
+        LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
+
+class ModelessWindow(QtGui.QDialog):
+    def __init__(self,parent=None):
+        super(ModelessWindow,self).__init__(parent=parent)
+        self.parent=parent
+        self.initUI()
+        self._want_to_close = False
+
+    def closeEvent(self, evt):
+        if self._want_to_close:
+            super(ModelessWindow, self).closeEvent(evt)
+        else:
+            evt.ignore()
+            self.setVisible(False)
+
+    def initUI(self):
+        pass
+
+class PlotWindow(QtGui.QDialog):
+    def __init__(self,parent=None,plotId=0):
+        super(PlotWindow,self).__init__(parent=parent)
+        self.parent=parent
+        self.id = plotId
+        self.initUI()
+
+    def closeEvent(self,evt):
+        super(PlotWindow,self).closeEvent(evt)
+
+    def initUI(self):
+        self.checkbox_trackSelection = QtGui.QCheckBox('Plot Selected Pixel(s)',self)
+        self.checkbox_trackSelection.setChecked(True)
+        self.button_drawPlot = QtGui.QPushButton('Plot',self)
+        self.connect(self.button_drawPlot,QtCore.SIGNAL('clicked()'), self.updatePlot)
+        self.dpi = 100
+        self.fig = Figure((10.0, 3.0), dpi=self.dpi)
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.setParent(self.mainFrame)
+        self.canvasToolbar = NavigationToolbar(self.canvas, self)
         self.axes = self.fig.add_subplot(111)
+        self.fig.subplots_adjust(left=0.07,right=.93,top=.93,bottom=0.07)
+
+        self.combobox_plotType = QtGui.QComboBox(self)
+        self.plotTypeStrs = ['Light Curve','Spectrum','Phase Histogram']
+        self.combobox_plotType.addItems(self.plotTypeStrs)
+        self.connect(self.combobox_plotType,QtCore.SIGNAL('activated(QString)'), self.changePlotType)
+
+        self.textbox_intTime = QtGui.QLineEdit('1')
+        self.textbox_intTime.setFixedWidth(50)
+        
+        lightCurveControlsBox = layoutBox('H',('Int Time',self.textbox_intTime,'s',1.))
+        lightCurveControlsBox.setContentsMargins(0,0,0,0)
+        spectrumControlsBox = layoutBox('H',('Spec',10.))
+        spectrumControlsBox.setContentsMargins(0,0,0,0)
+        phaseHistControlsBox = layoutBox('H',('ph',10.))
+        phaseHistControlsBox.setContentsMargins(0,0,0,0)
+        
+        self.lightCurveControlsWidget = QtGui.QFrame(parent=self)
+        self.lightCurveControlsWidget.setLayout(lightCurveControlsBox)
+
+        self.spectrumControlsWidget = QtGui.QFrame(parent=self)
+        self.spectrumControlsWidget.setLayout(spectrumControlsBox)
+        self.spectrumControlsWidget.setVisible(False)
+
+        self.phaseHistControlsWidget = QtGui.QFrame(parent=self)
+        self.phaseHistControlsWidget.setLayout(phaseHistControlsBox)
+        self.phaseHistControlsWidget.setVisible(False)
+
+        checkboxBox = layoutBox('H',(self.checkbox_trackSelection,self.combobox_plotType,2.,self.button_drawPlot))
+        controlsBox = layoutBox('H',(self.lightCurveControlsWidget,self.spectrumControlsWidget,self.phaseHistControlsWidget))
+        #controlsBox = layoutBox('V',(lightCurveControlsBox,self.spectrumControlsWidget,self.phaseHistControlsWidget))
+        mainBox = layoutBox('V',(checkboxBox,controlsBox,self.canvas,self.canvasToolbar))
+        self.setLayout(mainBox)
+
+    def changePlotType(self,plotType):
+        print 'change',plotType
+        if plotType == 'Light Curve':
+            self.lightCurveControlsWidget.setVisible(True)
+            self.spectrumControlsWidget.setVisible(False)
+            self.phaseHistControlsWidget.setVisible(False)
+        elif plotType == 'Spectrum':
+            self.lightCurveControlsWidget.setVisible(False)
+            self.spectrumControlsWidget.setVisible(True)
+            self.phaseHistControlsWidget.setVisible(False)
+        elif plotType == 'Phase Histogram':
+            self.lightCurveControlsWidget.setVisible(False)
+            self.spectrumControlsWidget.setVisible(False)
+            self.phaseHistControlsWidget.setVisible(True)
+
+    def updatePlot(self):
+        plotType = self.combobox_plotType.currentText()
+        if plotType == 'Light Curve':
+            self.plotLightCurve()
+        elif plotType == 'Spectrum':
+            self.plotSpectrum()
+        elif plotType == 'Phase Histogram':
+            self.plotPhaseHist()
+
+    def plotLightCurve(self):
+        pass
+    def plotSpectrum(self):
+        pass
+    def plotPhaseHist(self):
+        pass
+     
+class HeaderWindow(ModelessWindow):
+    def append(self,text):
+        self.textArea.append(text)
+
+    def setHeader(self,newHeaderText):
+        self.textArea.setText(newHeaderText)
+
+    def initUI(self):
+        self.textArea = QtGui.QTextEdit('')
+        self.textArea.setReadOnly(True)
+        mainBox = layoutBox('V',(self.textArea,))
+        self.setLayout(mainBox)
+
+class ImageParamsWindow(ModelessWindow):
+    def initUI(self):
+        self.checkbox_getRawCount = QtGui.QCheckBox('getRawCount',self)
+        self.checkbox_weighted = QtGui.QCheckBox('weighted',self)
+        self.checkbox_fluxWeighted = QtGui.QCheckBox('fluxWeighted',self)
+        self.checkbox_scaleByEffInt = QtGui.QCheckBox('scaleByEffInt',self)
+
+        mainBox = layoutBox('V',('ObsFile.getPixelCountImage Parameters',self.checkbox_getRawCount,
+                    self.checkbox_weighted,self.checkbox_fluxWeighted,self.checkbox_scaleByEffInt))
+
+        self.setLayout(mainBox)
+
+
+    def getParams(self):
+        obsParamsDict = {}
+        plotParamsDict = {}
+        obsParamsDict['getRawCount'] = self.checkbox_getRawCount.isChecked()
+        obsParamsDict['weighted'] = self.checkbox_weighted.isChecked()
+        obsParamsDict['fluxWeighted'] = self.checkbox_fluxWeighted.isChecked()
+        obsParamsDict['scaleByEffInt'] = self.checkbox_scaleByEffInt.isChecked()
+        outDict = {}
+        outDict['obsParams'] = obsParamsDict
+        outDict['plotParams'] = plotParamsDict
+        return outDict
+
+
+
+    
+class ArrayImageWidget(QtGui.QWidget):
+    def __init__(self,parent=None,hoverCall=None):
+        super(ArrayImageWidget,self).__init__(parent=parent)
+        self.parent=parent
+        # Create the mpl Figure and FigCanvas objects. 
+        self.hoverCall = hoverCall
+        self.initUI()
+
+    def initUI(self):
+        self.dpi = 100
+        self.fig = Figure((5.0, 5.0), dpi=self.dpi)
+        self.canvas = FigureCanvas(self.fig)
+        self.axes = self.fig.add_subplot(111)
+        self.fig.subplots_adjust(left=0.07,right=.93,top=.93,bottom=0.07)
         self.plotArray(np.arange(9).reshape((3,3)))
+        self.selectedPixels = []
+
+        self.clickFuncs = []
         cid = self.fig.canvas.mpl_connect('scroll_event', self.scrollColorBar)
         cid = self.fig.canvas.mpl_connect('button_press_event', self.clickColorBar)
         cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
         cid = self.fig.canvas.mpl_connect('button_press_event', self.clickCanvas)
-        
+        canvasBox = layoutBox('V',(self.canvas,))
+        self.setLayout(canvasBox)
 
     def plotArray(self,image,normNSigma=3,title='',**kwargs):
         self.image = image
+        self.imageShape = np.shape(image)
+        self.nRow = self.imageShape[0]
+        self.nCol = self.imageShape[1]
         if not 'vmax' in kwargs:
             goodImage = image[np.isfinite(image)]
             kwargs['vmax'] = np.mean(goodImage)+normNSigma*np.std(goodImage)
@@ -236,12 +428,8 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.draw()
         print 'image drawn'
 
-    def hoverCanvas(self,event):
-        if event.inaxes is self.axes:
-            col = int(round(event.xdata))
-            row = int(round(event.ydata))
-            if row < np.shape(self.image)[0] and col < np.shape(self.image)[1]:
-                self.statusText.setText('(x,y)=({:d},{:d}) {}'.format(col,row,self.image[row,col]))
+    def addClickFunc(self,clickFunc):
+        self.clickFuncs.append(clickFunc)
 
     def clickCanvas(self,event):
         if event.inaxes is self.axes:
@@ -249,6 +437,10 @@ class ObsFileViewer(QtGui.QMainWindow):
             row = round(event.ydata)
             for func in self.clickFuncs:
                 func(row=row,col=col)
+
+    def hoverCanvas(self,event):
+        if event.inaxes is self.axes:
+            self.hoverCall(event)
 
     def scrollColorBar(self, event):
         if event.inaxes is self.fig.cbar.ax:
@@ -290,80 +482,12 @@ class ObsFileViewer(QtGui.QMainWindow):
             self.fig.cbar.mappable.set_clim(newClim)
             self.fig.canvas.draw()
 
-    def loadObsFile(self,obsPath):
-        print 'loading',obsPath
-        self.obs = ObsFile(obsPath)
-        self.fn = FileName(obsFile=self.obs)
-        firstImg = self.obs.getPixelCountImage(firstSec=0,integrationTime=1,getRawCount=True)
-        self.image = firstImg['image']
-        self.plotArray(self.image)
-        self.updateHeader()
-        self.label_obsFilename.setText(os.path.basename(obsPath))
-        self.textbox_endTime.setText(str(self.headerInfo['exptime']))
+    def draw(self):
+        self.fig.canvas.draw()
 
-    def obsMethod(self,method,*args,**kwargs):
-        getattr(self.obs,method)(*args,**kwargs)
-    
-    def loadObsFileWindow(self):
-        LoadObsDialog(parent=self)
+    def addClickFunc(self,clickFunc):
+        self.clickFuncs.append(clickFunc)
 
-    def loadCalFiles(self):
-        LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
-
-class ModelessWindow(QtGui.QDialog):
-    def __init__(self,parent=None):
-        super(ModelessWindow,self).__init__(parent=parent)
-        self.parent=parent
-        self.initUI()
-        self._want_to_close = False
-
-    def closeEvent(self, evt):
-        if self._want_to_close:
-            super(ModelessWindow, self).closeEvent(evt)
-        else:
-            evt.ignore()
-            self.setVisible(False)
-
-    def initUI(self):
-        pass
-
-class HeaderWindow(ModelessWindow):
-    def append(self,text):
-        self.textArea.append(text)
-
-    def setHeader(self,newHeaderText):
-        self.textArea.setText(newHeaderText)
-
-    def initUI(self):
-        self.textArea = QtGui.QTextEdit('')
-        mainBox = layoutBox('V',(self.textArea,))
-        self.setLayout(mainBox)
-
-class ImageParamsWindow(ModelessWindow):
-    def initUI(self):
-        self.checkbox_getRawCount = QtGui.QCheckBox('getRawCount',self)
-        self.checkbox_weighted = QtGui.QCheckBox('weighted',self)
-        self.checkbox_fluxWeighted = QtGui.QCheckBox('fluxWeighted',self)
-        self.checkbox_scaleByEffInt = QtGui.QCheckBox('scaleByEffInt',self)
-
-        mainBox = layoutBox('V',('ObsFile.getPixelCountImage Parameters',self.checkbox_getRawCount,
-                    self.checkbox_weighted,self.checkbox_fluxWeighted,self.checkbox_scaleByEffInt))
-
-        self.setLayout(mainBox)
-
-
-    def getParams(self):
-        obsParamsDict = {}
-        plotParamsDict = {}
-        obsParamsDict['getRawCount'] = self.checkbox_getRawCount.isChecked()
-        obsParamsDict['weighted'] = self.checkbox_weighted.isChecked()
-        obsParamsDict['fluxWeighted'] = self.checkbox_fluxWeighted.isChecked()
-        obsParamsDict['scaleByEffInt'] = self.checkbox_scaleByEffInt.isChecked()
-        outDict = {}
-        outDict['obsParams'] = obsParamsDict
-        outDict['plotParams'] = plotParamsDict
-        return outDict
-    
 
 class LoadWidget(QtGui.QWidget):
     def __init__(self,parent=None,fileNameMethod='obs',promptStr='',obsTstamp=''):
@@ -393,10 +517,10 @@ class LoadWidget(QtGui.QWidget):
         self.textbox_filename = QtGui.QLineEdit(initialLoadPath)
         #self.setFilenameFromParams()
 
-        self.textbox_run.setMaximumWidth(200)
-        self.textbox_date.setMaximumWidth(200)
-        self.textbox_tstamp.setMaximumWidth(400)
-        self.textbox_filename.setMaximumWidth(1000)
+#        self.textbox_run.setMaximumWidth(200)
+#        self.textbox_date.setMaximumWidth(200)
+#        self.textbox_tstamp.setMaximumWidth(400)
+#        self.textbox_filename.setMaximumWidth(1000)
         self.button_openDialog.setMaximumWidth(100)
 
         fnBox = layoutBox('H',('run:',self.textbox_run,'date:',self.textbox_date,
@@ -518,7 +642,7 @@ class LoadCalsDialog(QtGui.QDialog):
         self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
         self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
         self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
-        self.parent.imageParamsWindow.checkbox_getRawCount.setCheckState(False)
+        self.parent.imageParamsWindow.checkbox_getRawCount.setChecked(False)
         print 'setting getRawCount=False'
         self.close()
 
@@ -563,10 +687,12 @@ def layoutBox(type,elements):
                 box.addLayout(element)
             except:
                 try:
-                    box.addSpacing(element)
+                    box.addStretch(element)
                 except:
                     try:
-                        box.addWidget(QtGui.QLabel(element))
+                        label = QtGui.QLabel(element)
+                        box.addWidget(label)
+                        #label.adjustSize()
                     except:
                         print 'could\'t add {} to layout box'.format(element)
     return box
