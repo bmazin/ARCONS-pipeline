@@ -37,6 +37,7 @@ class HotPixGui(ObsFileViewer):
             removePixel(timeMaskPath=timeMaskPath,pixelRow=row,
                         pixelCol=col,reason=reason)
             self.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=['hot pixel','dead pixel','unknown'])
+            print 'pixel (x,y)=({},{}) tagged'
         
 if __name__ == "__main__":
     if len(sys.argv) > 1:
