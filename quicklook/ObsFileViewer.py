@@ -129,6 +129,8 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.connect(self.button_incrementForward,QtCore.SIGNAL('clicked()'), self.incrementForward)
         self.connect(self.button_incrementBack,QtCore.SIGNAL('clicked()'), self.incrementBack)
 
+    def addClickFunc(self,clickFunc):
+        self.arrayImageWidget.addClickFunc(clickFunc)
 
     def updateHeader(self):
         keys = self.obs.titles
