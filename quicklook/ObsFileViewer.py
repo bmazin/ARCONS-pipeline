@@ -65,6 +65,12 @@ class ObsFileViewer(QtGui.QMainWindow):
         #self.textbox_endTime.setMaximumWidth(50)
         self.label_unitsAfterEndTime = QtGui.QLabel('s')
 
+        self.textbox_startWvl = QtGui.QLineEdit('3000')
+        self.label_startToEndWvl = QtGui.QLabel('Angstroms to')
+        self.textbox_endWvl = QtGui.QLineEdit('11000')
+        #self.textbox_endTime.setMaximumWidth(50)
+        self.label_unitsAfterEndWvl = QtGui.QLabel('Angstroms')
+
         self.button_drawPlot = QtGui.QPushButton('Plot')
 
 
@@ -88,7 +94,8 @@ class ObsFileViewer(QtGui.QMainWindow):
         timeBoundsBox = layoutBox('H',(3,self.textbox_startTime,'s to',self.textbox_endTime,'s',1,self.button_drawPlot,3))
         incrementControlsBox = layoutBox('H',(1,self.button_jumpToBeginning,self.button_incrementBack,
                     self.textbox_timeIncrement,'s',self.button_incrementForward,self.button_jumpToEnd,1))
-        mainBox = layoutBox('V',(self.label_obsFilename,canvasBox,timeBoundsBox,incrementControlsBox))
+        wvlBoundsBox = layoutBox('H',(3,self.textbox_startWvl,'Angstroms to',self.textbox_endWvl,'Angstroms',1,3))
+        mainBox = layoutBox('V',(self.label_obsFilename,canvasBox,timeBoundsBox,incrementControlsBox, wvlBoundsBox))
 
         self.mainFrame.setLayout(mainBox)
         self.setCentralWidget(self.mainFrame)
@@ -141,11 +148,16 @@ class ObsFileViewer(QtGui.QMainWindow):
         firstSec = float(self.textbox_startTime.text())
         intTime = float(self.textbox_endTime.text())-firstSec
         
+        startWvl = float(self.textbox_startWvl.text())
+        endWvl = float(self.textbox_endWvl.text())
+
         if self.obs.wvlCalFile is None:
             self.imageParamsWindow.checkbox_getRawCount.setChecked(True)
             print 'setting getRawCount, since wvlcal is not loaded'
+        else:
+            self.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
+
         paramsDict = self.imageParamsWindow.getParams()
-        
         imgDict = self.obs.getPixelCountImage(firstSec=firstSec,integrationTime=intTime,**paramsDict['obsParams'])
 
         self.image = imgDict['image']
