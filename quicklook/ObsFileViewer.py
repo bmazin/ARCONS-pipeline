@@ -81,6 +81,13 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.button_incrementBack = QtGui.QPushButton('<')
         self.button_incrementForward = QtGui.QPushButton('>')
 
+        self.textbox_wvlIncrement = QtGui.QLineEdit('1000')
+        #self.textbox_timeIncrement.setMaximumWidth(50)
+        self.button_jumpToStartWvl = QtGui.QPushButton('|<')
+        self.button_jumpToEndWvl = QtGui.QPushButton('>|')
+        self.button_incrementWvlBack = QtGui.QPushButton('<')
+        self.button_incrementWvlForward = QtGui.QPushButton('>')
+
         self.button_jumpToBeginning.setMaximumWidth(30)
         self.button_jumpToEnd.setMaximumWidth(30)
         self.button_incrementBack.setMaximumWidth(30)
@@ -95,7 +102,9 @@ class ObsFileViewer(QtGui.QMainWindow):
         incrementControlsBox = layoutBox('H',(1,self.button_jumpToBeginning,self.button_incrementBack,
                     self.textbox_timeIncrement,'s',self.button_incrementForward,self.button_jumpToEnd,1))
         wvlBoundsBox = layoutBox('H',(3,self.textbox_startWvl,'Angstroms to',self.textbox_endWvl,'Angstroms',1,3))
-        mainBox = layoutBox('V',(self.label_obsFilename,canvasBox,timeBoundsBox,incrementControlsBox, wvlBoundsBox))
+        incrementWvlControlsBox = layoutBox('H',(1,self.button_jumpToStartWvl,self.button_incrementWvlBack,
+                    self.textbox_wvlIncrement,'Angstroms',self.button_incrementWvlForward,self.button_jumpToEndWvl,1))
+        mainBox = layoutBox('V',(self.label_obsFilename,canvasBox,timeBoundsBox,incrementControlsBox, wvlBoundsBox, incrementWvlControlsBox))
 
         self.mainFrame.setLayout(mainBox)
         self.setCentralWidget(self.mainFrame)
@@ -135,6 +144,10 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.connect(self.button_jumpToEnd,QtCore.SIGNAL('clicked()'), self.jumpToEnd)
         self.connect(self.button_incrementForward,QtCore.SIGNAL('clicked()'), self.incrementForward)
         self.connect(self.button_incrementBack,QtCore.SIGNAL('clicked()'), self.incrementBack)
+        self.connect(self.button_jumpToStartWvl,QtCore.SIGNAL('clicked()'), self.jumpToStartWvl)
+        self.connect(self.button_jumpToEndWvl,QtCore.SIGNAL('clicked()'), self.jumpToEndWvl)
+        self.connect(self.button_incrementWvlForward,QtCore.SIGNAL('clicked()'), self.incrementWvlForward)
+        self.connect(self.button_incrementWvlBack,QtCore.SIGNAL('clicked()'), self.incrementWvlBack)
 
     def addClickFunc(self,clickFunc):
         self.arrayImageWidget.addClickFunc(clickFunc)
@@ -174,6 +187,14 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.textbox_endTime.setText(str(newEndTime))
         self.getObsImage()
 
+    def jumpToStartWvl(self):
+        newStartWvl = 3000.
+        wvlIncrement = float(self.textbox_wvlIncrement.text())
+        newEndWvl = newStartWvl+wvlIncrement
+        self.textbox_startWvl.setText(str(newStartWvl))
+        self.textbox_endWvl.setText(str(newEndWvl))
+        self.getObsImage()
+
     def jumpToEnd(self):
         firstSec = float(self.textbox_startTime.text())
         intTime = float(self.textbox_endTime.text())-firstSec
@@ -181,6 +202,14 @@ class ObsFileViewer(QtGui.QMainWindow):
         newStartTime = newEndTime-intTime
         self.textbox_startTime.setText(str(newStartTime))
         self.textbox_endTime.setText(str(newEndTime))
+        self.getObsImage()
+
+    def jumpToEndWvl(self):
+        wvlIncrement = float(self.textbox_wvlIncrement.text())
+        newEndWvl = 11000.
+        newStartWvl = newEndWvl-wvlIncrement
+        self.textbox_startWvl.setText(str(newStartWvl))
+        self.textbox_endWvl.setText(str(newEndWvl))
         self.getObsImage()
 
     def incrementForward(self):
@@ -193,6 +222,16 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.textbox_endTime.setText(str(newEndTime))
         self.getObsImage()
 
+    def incrementWvlForward(self):
+        startWvl = float(self.textbox_startWvl.text())
+        endWvl = float(self.textbox_endWvl.text())
+        wvlIncrement = float(self.textbox_wvlIncrement.text())
+        newStartWvl = startWvl + wvlIncrement
+        newEndWvl = endWvl + wvlIncrement
+        self.textbox_startWvl.setText(str(newStartWvl))
+        self.textbox_endWvl.setText(str(newEndWvl))
+        self.getObsImage()
+
     def incrementBack(self):
         startTime = float(self.textbox_startTime.text())
         endTime = float(self.textbox_endTime.text())
@@ -201,6 +240,16 @@ class ObsFileViewer(QtGui.QMainWindow):
         newEndTime = endTime - timeIncrement
         self.textbox_startTime.setText(str(newStartTime))
         self.textbox_endTime.setText(str(newEndTime))
+        self.getObsImage()
+
+    def incrementWvlBack(self):
+        startWvl = float(self.textbox_startWvl.text())
+        endWvl = float(self.textbox_endWvl.text())
+        wvlIncrement = float(self.textbox_wvlIncrement.text())
+        newStartWvl = startWvl - wvlIncrement
+        newEndWvl = endWvl - wvlIncrement
+        self.textbox_startWvl.setText(str(newStartWvl))
+        self.textbox_endWvl.setText(str(newEndWvl))
         self.getObsImage()
 
     def savePlot(self):
