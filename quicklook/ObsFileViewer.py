@@ -17,7 +17,7 @@ from util.ObsFile import ObsFile
 from util.CalLookupFile import CalLookupFile
 
 class ObsFileViewer(QtGui.QMainWindow):
-    def __init__(self, obsPath=None):
+    def __init__(self, obsPath=None, obsTstamp=None):
         self.app = QtGui.QApplication([])
         self.app.setStyle('plastique')
         super(ObsFileViewer,self).__init__()
@@ -31,7 +31,13 @@ class ObsFileViewer(QtGui.QMainWindow):
 
         if not obsPath is None:
             self.loadObsFile(obsPath)
-            
+        elif not obsTstamp is None:
+            obsPath = CalLookupFile().obs(obsTstamp)
+            self.loadObsFile(obsPath)
+
+        self.obs.loadAllCals()
+        if not self.obs.hotPixTimeMask is None:
+            self.enableTimeMaskParams()
 
     def show(self):
         super(ObsFileViewer,self).show()
@@ -172,6 +178,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         else:
             self.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
 
+        self.imageParamsWindow.setObsState(self.obs)
         paramsDict = self.imageParamsWindow.getParams()
         imgDict = self.obs.getPixelCountImage(firstSec=firstSec,integrationTime=intTime,**paramsDict['obsParams'])
 
@@ -299,6 +306,12 @@ class ObsFileViewer(QtGui.QMainWindow):
     def loadCalFiles(self):
         LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
 
+    def enableTimeMaskParams(self):
+        reasonEnum = self.obs.hotPixTimeMask.reasonEnum
+        selectedReasons = self.obs.hotPixTimeMask.enabledReasons
+        reasons = [reasonPair[0] for reasonPair in reasonEnum]
+        self.imageParamsWindow.enableTimeMaskParams(reasons=reasons,selectedReasons=selectedReasons)
+
 class ModelessWindow(QtGui.QDialog):
     def __init__(self,parent=None):
         super(ModelessWindow,self).__init__(parent=parent)
@@ -371,7 +384,6 @@ class PlotWindow(QtGui.QDialog):
         self.setLayout(mainBox)
 
     def changePlotType(self,plotType):
-        print 'change',plotType
         if plotType == 'Light Curve':
             self.lightCurveControlsWidget.setVisible(True)
             self.spectrumControlsWidget.setVisible(False)
@@ -420,13 +432,58 @@ class ImageParamsWindow(ModelessWindow):
         self.checkbox_weighted = QtGui.QCheckBox('weighted',self)
         self.checkbox_fluxWeighted = QtGui.QCheckBox('fluxWeighted',self)
         self.checkbox_scaleByEffInt = QtGui.QCheckBox('scaleByEffInt',self)
+        self.checkbox_applyTimeMask = QtGui.QCheckBox('apply time mask',self)
+        self.checkbox_applyTimeMask.setEnabled(False)
+        self.checkbox_applyCosmicMask = QtGui.QCheckBox('apply cosmic mask',self)
+        self.checkbox_applyCosmicMask.setEnabled(False)
+
+        self.group_timeMaskReasons = QtGui.QGroupBox('Reasons to mask times',self)
+        self.group_timeMaskReasons.setVisible(False)
+        self.timeMaskReasonsLoaded = False
 
         mainBox = layoutBox('V',('ObsFile.getPixelCountImage Parameters',self.checkbox_getRawCount,
-                    self.checkbox_weighted,self.checkbox_fluxWeighted,self.checkbox_scaleByEffInt))
+                    self.checkbox_weighted,self.checkbox_fluxWeighted,self.checkbox_scaleByEffInt,
+                    self.checkbox_applyTimeMask,self.group_timeMaskReasons,self.checkbox_applyCosmicMask))
 
         self.setLayout(mainBox)
 
 
+    def enableTimeMaskParams(self,reasons=[],selectedReasons=[]):
+        self.checkboxes_timeMaskReasons = {}
+        vbox = QtGui.QVBoxLayout()
+        if len(reasons) > 0:
+            for reason in reasons:
+                checkbox = QtGui.QCheckBox(reason,self)
+                self.checkboxes_timeMaskReasons[reason] = checkbox
+                vbox.addWidget(checkbox)
+                if reason in selectedReasons:
+                    checkbox.setChecked(True)
+            self.group_timeMaskReasons.setLayout(vbox)
+            self.group_timeMaskReasons.setVisible(True)
+        self.checkbox_applyTimeMask.setEnabled(True)
+        self.checkbox_applyTimeMask.setChecked(True)
+        self.timeMaskReasonsLoaded = True
+        
+    def getCheckedTimeMaskReasons(self):
+        allReasons = self.checkboxes_timeMaskReasons.keys()
+        checkedReasons = [reason for reason in allReasons if (self.checkboxes_timeMaskReasons[reason]).isChecked()]
+        return checkedReasons
+
+    def enableCosmicMaskParams(self):
+        self.checkbox_applyCosmicMask.setEnabled(True)
+
+    def setObsState(self,obs):
+        if self.checkbox_applyTimeMask.isChecked():
+            reasons = self.getCheckedTimeMaskReasons()
+            obs.switchOnHotPixTimeMask(reasons=reasons)
+        else:
+            obs.switchOffHotPixTimeMask()
+
+        if self.checkbox_applyCosmicMask.isChecked():
+            obs.switchOnCosmicTimeMask()
+        else:
+            obs.switchOffCosmicTimeMask()
+            
     def getParams(self):
         obsParamsDict = {}
         plotParamsDict = {}
@@ -438,9 +495,6 @@ class ImageParamsWindow(ModelessWindow):
         outDict['obsParams'] = obsParamsDict
         outDict['plotParams'] = plotParamsDict
         return outDict
-
-
-
     
 class ArrayImageWidget(QtGui.QWidget):
     def __init__(self,parent=None,hoverCall=None):
@@ -697,11 +751,15 @@ class LoadCalsDialog(QtGui.QDialog):
             print 'loading',path
             self.parent.obsMethod(obsMethod,path,*args,**kwargs)
     
+    def loadTimeMask(self):
+        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile',reasons=['hot pixel','dead pixel','unknown'])
+        self.parent.enableTimeMaskParams()
+        
     def loadAllCals(self):
         self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
         self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
         self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
-        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile',reasons=['hot pixel','dead pixel','unknown'])
+        self.loadTimeMask()
         self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
         self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
         self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
@@ -761,7 +819,17 @@ def layoutBox(type,elements):
     return box
 
 if __name__ == "__main__":
-    form = ObsFileViewer()
+    kwargs = {}
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+            print 'Usage: {} obsFilePath/obsTstamp'.format(sys.argv[0])
+        elif os.path.exists(sys.argv[1]):
+            kwargs['obsPath'] = sys.argv[1]
+        else:
+            kwargs['obsTstamp'] = sys.argv[1]
+    else:
+        obsPath = None
+    form = ObsFileViewer(**kwargs)
     form.show()
 
 
