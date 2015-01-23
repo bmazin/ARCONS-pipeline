@@ -42,7 +42,7 @@ class HotPixGui(ObsFileViewer):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         if sys.argv[1] == '-h' or sys.argv[1] == '--help':
-            print 'Usage: {} obsFilePath'
+            print 'Usage: {} obsFilePath'.format(sys.argv[0])
         else:
             obsPath = sys.argv[1]
     else:
