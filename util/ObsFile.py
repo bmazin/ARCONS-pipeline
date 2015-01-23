@@ -71,6 +71,7 @@ import astropy.constants
 from util import utils
 from util.FileName import FileName
 from headers import TimeMask
+from util.CalLookupFile import CalLookupFile
 
 class ObsFile:
     h = astropy.constants.h.to('eV s').value  #4.135668e-15 #eV s
@@ -1476,6 +1477,12 @@ class ObsFile:
 
     def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True,reasons=[]):
         """
+        Included for backward compatibility, simply calls loadTimeMask
+        """
+        self.loadTimeMask(timeMaskFileName=hotPixCalFileName,switchOnMask=switchOnMask,reasons=reasons)
+
+    def loadTimeMask(self, timeMaskFileName, switchOnMask=True,reasons=[]):
+        """
         Load a hot pixel time mask from the given file, in a similar way to
         loadWvlCalFile, loadFlatCalFile, etc. Switches on hot pixel
         masking by default.
@@ -1484,15 +1491,15 @@ class ObsFile:
         import hotpix.hotPixels as hotPixels    #Here instead of at top to prevent circular import problems.
 
         scratchDir = os.getenv('MKID_PROC_PATH', '/')
-        hotPixCalPath = os.path.join(scratchDir, 'hotPixCalFiles')
-        fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
-        if (not os.path.exists(fullHotPixCalFileName)):
-            print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
+        timeMaskPath = os.path.join(scratchDir, 'timeMasks')
+        fullTimeMaskFileName = os.path.join(timeMaskPath, timeMaskFileName)
+        if (not os.path.exists(fullTimeMaskFileName)):
+            print 'time mask file does not exist: ', fullTimeMaskFileName
             raise IOError
 
-        self.hotPixFile = tables.openFile(fullHotPixCalFileName)
+        self.hotPixFile = tables.openFile(fullTimeMaskFileName)
         self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile, reasons=reasons)
-        self.hotPixFileName = fullHotPixCalFileName
+        self.hotPixFileName = fullTimeMaskFileName
         
         if (os.path.basename(self.hotPixTimeMask.obsFileName)
             != os.path.basename(self.fileName)):
@@ -1623,6 +1630,79 @@ class ObsFile:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
             raise
             
+    def loadAllCals(self,calLookupTablePath=None,wvlCalPath=None,flatCalPath=None,
+            fluxCalPath=None,timeMaskPath=None,timeAdjustmentPath=None,cosmicMaskPath=None,
+            beammapPath=None,centroidListPath=None):
+        """
+        loads all possible cal files from parameters or a calLookupTable. To avoid loading a particular cal, set the corresponding parameter to the empty string ''
+        """
+
+        calLookupTable = CalLookupFile(path=calLookupTablePath)
+        
+        _,_,obsTstamp = FileName(obsFile=self).getComponents()
+        if wvlCalPath is None:
+            wvlCalPath = calLookupTable.calSoln(obsTstamp)
+        if wvlCalPath != '':
+            self.loadWvlCalFile(wvlCalPath)
+            print 'loaded wavecal',self.wvlCalFileName
+        else:
+            print 'did not load wavecal'
+
+        if flatCalPath is None:
+            flatCalPath = calLookupTable.flatSoln(obsTstamp)
+        if flatCalPath != '':
+            self.loadFlatCalFile(flatCalPath)
+            print 'loaded flatcal',self.flatCalFileName
+        else:
+            print 'did not load flatcal'
+
+        if fluxCalPath is None:
+            fluxCalPath = calLookupTable.fluxSoln(obsTstamp)
+        if fluxCalPath != '':
+            self.loadFluxCalFile(fluxCalPath)
+            print 'loaded fluxcal',self.fluxCalFileName
+        else:
+            print 'did not load fluxcal'
+
+        if timeMaskPath is None:
+            timeMaskPath = calLookupTable.timeMask(obsTstamp)
+        if timeMaskPath != '':
+            self.loadTimeMask(timeMaskPath)
+            print 'loaded time mask',timeMaskPath
+        else:
+            print 'did not load time mask'
+
+        if timeAdjustmentPath is None:
+            timeAdjustmentPath = calLookupTable.timeAdjustments(obsTstamp)
+        if timeAdjustmentPath != '':
+            self.loadTimeAdjustmentFile(timeAdjustmentPath)
+            print 'loaded time adjustments',self.timeAdjustFileName
+        else:
+            print 'did not load time adjustments'
+
+        if cosmicMaskPath is None:
+            cosmicMaskPath = calLookupTable.cosmicMask(obsTstamp)
+        if cosmicMaskPath != '':
+            self.loadCosmicMask(cosmicMaskPath)
+            print 'loaded cosmic mask',self.cosmicMaskFileName
+        else:
+            print 'did not load cosmic mask'
+
+        if beammapPath is None:
+            beammapPath = calLookupTable.beammap(obsTstamp)
+        if beammapPath != '':
+            self.loadBeammapFile(beammapPath)
+            print 'loaded beammap',beammapPath
+        else:
+            print 'did not load new beammap'
+
+        if centroidListPath is None:
+            centroidListPath = calLookupTable.centroidList(obsTstamp)
+        if centroidListPath != '':
+            self.loadCentroidListFile(centroidListPath)
+            print 'loaded centroid list',self.centroidListFileName
+        else:
+            print 'did not load centroid list'
 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):
@@ -1747,7 +1827,8 @@ class ObsFile:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
         if len(reasons)>0:
-            self.hotPixTimeMask.mask = [self.hotPixTimeMask.reasonEnum[reason] for reason in reasons]
+            self.hotPixTimeMask.set_mask(reasons)
+            #self.hotPixTimeMask.mask = [self.hotPixTimeMask.reasonEnum[reason] for reason in reasons]
         
 
     def switchOffCosmicTimeMask(self):
