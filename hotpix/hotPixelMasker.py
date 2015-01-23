@@ -40,11 +40,13 @@ class hotPixelMasker:
         if reasons==None or len(reasons)==0:
             reasons = ['hot pixel', 'dead pixel']
             
+        self.enabledReasons = reasons
         self.set_mask(reasons)
 
         
     def set_mask(self,reasons=[]):
         if not len(reasons)==0:
+            self.enabledReasons = reasons
             self.mask = [self.reasonEnum[reason] for reason in reasons]
         
     def get_intervals(self,row,col,reasons=[]):
