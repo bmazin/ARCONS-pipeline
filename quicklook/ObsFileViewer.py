@@ -192,7 +192,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         imgDict = self.obs.getPixelCountImage(firstSec=firstSec,integrationTime=intTime,**paramsDict['obsParams'])
 
         self.image = imgDict['image']
-        if scaletoCps:
+        if scaleToCps:
             self.image = self.image / intTime
         self.plotArray(self.image,**paramsDict['plotParams'])
 
