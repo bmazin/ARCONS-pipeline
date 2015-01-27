@@ -30,15 +30,18 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.arrangeMainFrame()
         self.connectControls()
 
+        bInitWithObs = (not obsPath is None) or (not obsTstamp is None)
+
         if not obsPath is None:
             self.loadObsFile(obsPath)
         elif not obsTstamp is None:
             obsPath = CalLookupFile().obs(obsTstamp)
             self.loadObsFile(obsPath)
 
-        self.obs.loadAllCals()
-        if not self.obs.hotPixTimeMask is None:
-            self.enableTimeMaskParams()
+        if bInitWithObs:
+            self.obs.loadAllCals()
+            if not self.obs.hotPixTimeMask is None:
+                self.enableTimeMaskParams()
 
     def show(self):
         super(ObsFileViewer,self).show()
@@ -185,9 +188,12 @@ class ObsFileViewer(QtGui.QMainWindow):
 
         self.setObsState()
         paramsDict = self.imageParamsWindow.getParams()
+        scaleToCps = paramsDict['plotParams'].pop('scaleToCps',False)
         imgDict = self.obs.getPixelCountImage(firstSec=firstSec,integrationTime=intTime,**paramsDict['obsParams'])
 
         self.image = imgDict['image']
+        if scaletoCps:
+            self.image = self.image / intTime
         self.plotArray(self.image,**paramsDict['plotParams'])
 
     def getObsParams(self):
@@ -309,7 +315,7 @@ class ObsFileViewer(QtGui.QMainWindow):
         self.textbox_endTime.setText(str(self.headerInfo['exptime']))
 
     def obsMethod(self,method,*args,**kwargs):
-        getattr(self.obs,method)(*args,**kwargs)
+        return getattr(self.obs,method)(*args,**kwargs)
     
     def loadObsFileWindow(self):
         LoadObsDialog(parent=self)
@@ -549,7 +555,37 @@ class PlotWindow(QtGui.QDialog):
         self.axes.set_ylabel(ylabel)
 
     def plotPhaseHist(self):
-        pass
+        if self.checkbox_trackTimes.isChecked():
+            startTime = float(self.parent.textbox_startTime.text())
+            endTime = float(self.parent.textbox_endTime.text())
+        else:
+            startTime = float(self.textbox_startTime.text())
+            endTime = float(self.textbox_endTime.text())
+        histIntTime = float(self.textbox_intTime.text())
+        firstSec = startTime
+        duration = endTime-startTime
+        hists = []
+        nBins=100
+        histBinEdges = None
+        for col,row in self.selectedPixels:
+            returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
+            timestamps = returnDict['timestamps']
+            peakHeights = returnDict['peakHeights']
+            baselines = returnDict['baselines']
+            if histBinEdges == None:
+                bins = nBins
+            else:
+                bins = histBinEdges
+            hist,histBinEdges = np.histogram(peakHeights,bins=bins)
+            hists.append(hist)
+
+        hists = np.array(hists)
+        hist = np.sum(hists,axis=0)
+
+        binWidths = np.diff(histBinEdges)
+        plotHist(self.axes,histBinEdges,self.hist)
+        self.axes.set_xlabel('phase')
+        self.axes.set_ylabel('counts')
      
 class HeaderWindow(ModelessWindow):
     def append(self,text):
@@ -571,6 +607,7 @@ class ImageParamsWindow(ModelessWindow):
         self.checkbox_fluxWeighted = QtGui.QCheckBox('fluxWeighted',self)
         self.checkbox_scaleByEffInt = QtGui.QCheckBox('scaleByEffInt',self)
         self.checkbox_applyTimeMask = QtGui.QCheckBox('apply time mask',self)
+        self.checkbox_scaleToCps = QtGui.QCheckBox('scale as counts per sec',self)
         self.checkbox_applyTimeMask.setEnabled(False)
         self.checkbox_applyCosmicMask = QtGui.QCheckBox('apply cosmic mask',self)
         self.checkbox_applyCosmicMask.setEnabled(False)
@@ -589,7 +626,7 @@ class ImageParamsWindow(ModelessWindow):
         obsGroup = QtGui.QGroupBox('ObsFile.getPixelCountImage Parameters',self)
         obsGroup.setLayout(obsBox)
 
-        imgBox = layoutBox('H',(self.combobox_cmap,))
+        imgBox = layoutBox('H',(self.combobox_cmap,self.checkbox_scaleToCps))
         imgGroup = QtGui.QGroupBox('plotArray Parameters',self)
         imgGroup.setLayout(imgBox)
 
@@ -646,6 +683,7 @@ class ImageParamsWindow(ModelessWindow):
         if cmapStr != 'gray':
             cmap.set_bad('0.15')
         plotParamsDict['cmap']=cmap
+        plotParamsDict['scaleToCps']=self.checkbox_scaleToCps.isChecked()
 
         outDict = {}
         outDict['obsParams'] = obsParamsDict
