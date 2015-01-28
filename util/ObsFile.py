@@ -723,37 +723,27 @@ class ObsFile:
             maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel (for calculating eff. int. time)
             effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
 
-            timestamps = []
-            baselines = []
-            peakHeights = []
-
-            # pixelData is an array of data for this iRow,iCol, at each good time
-            #interTickList = (inter - (floorFirstSec + ts)) * self.ticksPerSec         
-                #interTicks = interTickList[iSec]
-            #wholeInterTicks = inter*self.ticksPerSec
-            #tickShiftsBySec = (np.floor(firstSec)+np.arange(len(pixelData)))*self.ticksPerSec
-            #for sec in range(len(pixelData)):
-            for iSec in range(len(pixelData)):
-                interTicks = (inter - (np.floor(firstSec) + iSec)) * self.ticksPerSec         
-                #interTicks = wholeInterTicks+tickShiftsBySec[iSec]
-                #interTicks = wholeInterTicks
-                #print inter,floorFirstSec,sec,interTicks
-                times, peaks, bases = self.parsePhotonPackets(pixelData[iSec], inter=interTicks)
-                times = np.floor(firstSec) + iSec + self.tickDuration * times #convert from units of ticks to secs
-                timestamps.append(times)
-                baselines.append(bases)
-                peakHeights.append(peaks)
-                
-            if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
-                timestamps = np.concatenate(timestamps)
-                baselines = np.concatenate(baselines)
-                peakHeights = np.concatenate(peakHeights)
-            else:
+            if (inter == self.intervalAll) or len(pixelData) == 0:
                 timestamps = np.array([])
-                baselines = np.array([])
                 peakHeights = np.array([])
+                baselines = np.array([])
+                rawCounts = 0.
+                if inter == self.intervalAll:
+                    effectiveIntTime = 0.
+
+            else:
+                parsedData = self.parsePhotonPacketLists(pixelData)
+                timestamps = [(np.floor(firstSec)+iSec+(self.tickDuration*times)) for iSec,times in enumerate(parsedData['timestamps'])]
+
+                timestamps = np.concatenate(timestamps)
+                baselines = np.concatenate(parsedData['baselines'])
+                peakHeights = np.concatenate(parsedData['parabolaFitPeaks'])
+
+                maskedDict = self.maskTimestamps(timestamps=timestamps,inter=inter,otherListsToFilter=[baselines,peakHeights])
+                timestamps = maskedDict['timestamps']
+                baselines,peakHeights = maskedDict['otherLists']
             
-            rawCounts = len(timestamps)
+                rawCounts = len(timestamps)
 
             if expTailTimescale != None and len(timestamps) > 0:
                 #find the time between peaks
@@ -1754,7 +1744,92 @@ class ObsFile:
         return wvlBinEdges
 
     @profile
-    def parsePhotonPackets(self, packets, inter=interval(),
+    def parsePhotonPacketLists(self, packets, doParabolaFitPeaks=True, doBaselines=True):
+        """
+        Parses an array of uint64 packets with the obs file format
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
+        """
+        # parse all packets
+        packetsAll = [np.array(packetList, dtype='uint64') for packetList in packets] #64 bit photon packet
+        timestampsAll = [np.bitwise_and(packetList, self.timestampMask) for packetList in packetsAll]
+        outDict = {'timestamps':timestampsAll}
+
+        if doParabolaFitPeaks:
+            parabolaFitPeaksAll = [np.bitwise_and(\
+                np.right_shift(packetList, self.nBitsAfterParabolaPeak), \
+                    self.pulseMask) for packetList in packetsAll]
+            outDict['parabolaFitPeaks']=parabolaFitPeaksAll
+
+        if doBaselines:
+            baselinesAll = [np.bitwise_and(\
+                np.right_shift(packetList, self.nBitsAfterBaseline), \
+                    self.pulseMask) for packetList in packetsAll]
+            outDict['baselines'] = baselinesAll
+            
+        return outDict
+
+    @profile
+    def parsePhotonPackets(self, packets, doParabolaFitPeaks=True, doBaselines=True):
+        """
+        Parses an array of uint64 packets with the obs file format
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
+        """
+        # parse all packets
+        packetsAll = np.array(packets, dtype='uint64') #64 bit photon packet
+        timestampsAll = np.bitwise_and(packets, self.timestampMask)
+
+        if doParabolaFitPeaks:
+            parabolaFitPeaksAll = np.bitwise_and(\
+                np.right_shift(packets, self.nBitsAfterParabolaPeak), \
+                    self.pulseMask)
+        else:
+            parabolaFitPeaksAll = np.arange(0)
+
+        if doBaselines:
+            baselinesAll = np.bitwise_and(\
+                np.right_shift(packets, self.nBitsAfterBaseline), \
+                    self.pulseMask)
+        else:
+            baselinesAll = np.arange(0)
+
+        timestamps = timestampsAll
+        parabolaFitPeaks = parabolaFitPeaksAll
+        baselines = baselinesAll
+        # return the values filled in above
+        return timestamps, parabolaFitPeaks, baselines
+
+    def maskTimestamps(self,timestamps,inter=interval(),otherListsToFilter=[]):
+        """
+        Masks out timestamps that fall in an given interval
+        inter is an interval of time values to mask out
+        otherListsToFilter is a list of parallel arrays to timestamps that should be masked in the same way
+        returns a dict with keys 'timestamps','otherLists'
+        """
+        # first special case:  inter masks out everything so return zero-length
+        # numpy arrays
+        if (inter == self.intervalAll):
+            filteredTimestamps = np.arange(0)
+            otherLists = [np.arange(0) for list in otherListsToFilter]
+        else:
+            if inter == interval() or len(timestamps) == 0:
+                # nothing excluded or nothing to exclude
+                # so return all unpacked values
+                filteredTimestamps = timestamps
+                otherLists = otherListsToFilter
+            else:
+                # there is a non-trivial set of times to mask. 
+                slices = calculateSlices(inter, timestamps)
+                filteredTimestamps = repackArray(timestamps, slices)
+                otherLists = []
+                for eachList in otherListsToFilter:
+                    filteredList = repackArray(eachList,slices)
+                    otherLists.append(filteredList)
+        # return the values filled in above
+        return {'timestamps':filteredTimestamps,'otherLists':otherLists}
+
+    def parsePhotonPackets_old(self, packets, inter=interval(),
                            doParabolaFitPeaks=True, doBaselines=True,timestampOffset=0):
         """
         Parses an array of uint64 packets with the obs file format
