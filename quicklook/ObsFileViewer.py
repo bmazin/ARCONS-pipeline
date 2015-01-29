@@ -324,10 +324,11 @@ class ObsFileViewer(QtGui.QMainWindow):
         LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
 
     def enableTimeMaskParams(self):
-        reasonEnum = self.obs.hotPixTimeMask.reasonEnum
-        selectedReasons = self.obs.hotPixTimeMask.enabledReasons
-        reasons = [reasonPair[0] for reasonPair in reasonEnum]
-        self.imageParamsWindow.enableTimeMaskParams(reasons=reasons,selectedReasons=selectedReasons)
+        if not self.obs.hotPixTimeMask is None:
+            reasonEnum = self.obs.hotPixTimeMask.reasonEnum
+            selectedReasons = self.obs.hotPixTimeMask.enabledReasons
+            reasons = [reasonPair[0] for reasonPair in reasonEnum]
+            self.imageParamsWindow.enableTimeMaskParams(reasons=reasons,selectedReasons=selectedReasons)
 
 class ModelessWindow(QtGui.QDialog):
     def __init__(self,parent=None):
@@ -360,6 +361,7 @@ class PlotWindow(QtGui.QDialog):
         self.fig.canvas.draw()
 
     def initUI(self):
+        #first gui controls that apply to all modes
         self.checkbox_trackSelection = QtGui.QCheckBox('Plot selected pixel(s)',self)
         self.checkbox_trackSelection.setChecked(True)
 
@@ -380,7 +382,7 @@ class PlotWindow(QtGui.QDialog):
         self.fig.subplots_adjust(left=0.07,right=.93,top=.93,bottom=0.15)
 
         self.combobox_plotType = QtGui.QComboBox(self)
-        self.plotTypeStrs = ['Light Curve','Spectrum','Phase Histogram']
+        self.plotTypeStrs = ['Light Curve','Time Mask','Spectrum','Phase Histogram']
         self.combobox_plotType.addItems(self.plotTypeStrs)
         self.connect(self.combobox_plotType,QtCore.SIGNAL('activated(QString)'), self.changePlotType)
 
@@ -388,6 +390,8 @@ class PlotWindow(QtGui.QDialog):
         #light curve controls
         self.textbox_intTime = QtGui.QLineEdit('1')
         self.textbox_intTime.setFixedWidth(50)
+        lightCurveControlsBox = layoutBox('H',('Int Time',self.textbox_intTime,'s',1.))
+
 
         #spectrum controls
         self.checkbox_divideWvlBinWidths = QtGui.QCheckBox('Divide by bin widths',self)
@@ -400,6 +404,28 @@ class PlotWindow(QtGui.QDialog):
         self.wvlGroup = QtGui.QGroupBox('',parent=self)
         wvlBox = layoutBox('H',['Start Wavelength',self.textbox_startWvl,'Angstroms',1.,'End Wavelength',self.textbox_endWvl,'Angstroms',10.])
         self.wvlGroup.setLayout(wvlBox)
+        spectrumControlsBox = layoutBox('H',(self.checkbox_divideWvlBinWidths,self.checkbox_trackWvls,self.wvlGroup,10.))
+
+        #phase hist controls
+        self.checkbox_restrictPhaseRange = QtGui.QCheckBox('Restrict phase range')
+        self.connect(self.checkbox_restrictPhaseRange,QtCore.SIGNAL('stateChanged(int)'),self.changeRestrictPhaseRange)
+        self.checkbox_restrictPhaseRange.setChecked(False)
+
+        self.checkbox_keepRawPhase = QtGui.QCheckBox('Raw units')
+
+        self.textbox_phaseHistStart = QtGui.QLineEdit('')
+        self.textbox_phaseHistEnd = QtGui.QLineEdit('')
+        self.changeRestrictPhaseRange()
+
+        self.textbox_phaseHistNBins = QtGui.QLineEdit('1')
+        self.combobox_phaseHistType = QtGui.QComboBox(self)
+        self.phaseHistTypeStrs = ['Peaks','Baselines','Peaks - Baselines']
+        self.combobox_phaseHistType.addItems(self.phaseHistTypeStrs)
+        self.combobox_phaseHistType.setCurrentIndex(2)
+
+        phaseHistControlsBoxRow0 = layoutBox('H',(self.combobox_phaseHistType,1.,self.checkbox_keepRawPhase,1.,self.checkbox_restrictPhaseRange,10.))
+        phaseHistControlsBoxRow1 = layoutBox('H',('Start phase',self.textbox_phaseHistStart,1.,'End phase',self.textbox_phaseHistEnd,1.,'Number of ADC units per bin',self.textbox_phaseHistNBins,10.))
+        phaseHistControlsBox = layoutBox('V',(phaseHistControlsBoxRow0,phaseHistControlsBoxRow1))
 
         #time controls
         self.textbox_startTime = QtGui.QLineEdit(self.parent.textbox_startTime.text())
@@ -410,15 +436,9 @@ class PlotWindow(QtGui.QDialog):
         timesBox = layoutBox('H',['Start Time',self.textbox_startTime,'s',1.,'End Time',self.textbox_endTime,'s',10.])
         self.timesGroup.setLayout(timesBox)
         self.timesGroup.setVisible(False)
-
         timesChoiceBox = layoutBox('H',[self.checkbox_trackTimes,self.timesGroup])
+
         
-        lightCurveControlsBox = layoutBox('H',('Int Time',self.textbox_intTime,'s',1.))
-        #lightCurveControlsBox.setContentsMargins(0,0,0,0)
-        spectrumControlsBox = layoutBox('H',(self.checkbox_divideWvlBinWidths,self.checkbox_trackWvls,self.wvlGroup,10.))
-        #spectrumControlsBox.setContentsMargins(0,0,0,0)
-        phaseHistControlsBox = layoutBox('H',('ph',10.))
-        #phaseHistControlsBox.setContentsMargins(0,0,0,0)
         
         self.lightCurveControlsGroup = QtGui.QGroupBox('Light Curve Controls',parent=self)
         self.lightCurveControlsGroup.setLayout(lightCurveControlsBox)
@@ -443,6 +463,14 @@ class PlotWindow(QtGui.QDialog):
         else:
             self.timesGroup.setVisible(True)
 
+    def changeRestrictPhaseRange(self):
+        if self.checkbox_restrictPhaseRange.isChecked():
+            self.textbox_phaseHistStart.setEnabled(True)
+            self.textbox_phaseHistEnd.setEnabled(True)
+        else:
+            self.textbox_phaseHistStart.setEnabled(False)
+            self.textbox_phaseHistEnd.setEnabled(False)
+
     def changeTrackWvls(self):
         if self.checkbox_trackWvls.isChecked():
             self.wvlGroup.setVisible(False)
@@ -462,6 +490,10 @@ class PlotWindow(QtGui.QDialog):
             self.lightCurveControlsGroup.setVisible(False)
             self.spectrumControlsGroup.setVisible(False)
             self.phaseHistControlsGroup.setVisible(True)
+        elif plotType == 'Time Mask':
+            self.lightCurveControlsGroup.setVisible(True)
+            self.spectrumControlsGroup.setVisible(False)
+            self.phaseHistControlsGroup.setVisible(False)
 
     def newPixelSelection(self,selectedPixels):
         print selectedPixels
@@ -481,9 +513,14 @@ class PlotWindow(QtGui.QDialog):
             self.plotSpectrum()
         elif plotType == 'Phase Histogram':
             self.plotPhaseHist()
+        elif plotType == 'Time Mask':
+            self.plotTimeMask()
         self.lastPlotType = plotType
         self.draw()
         print 'plot updated'
+
+    def plotTimeMask(self):
+        self.plotLightCurve()
 
     def plotLightCurve(self):
         if self.checkbox_trackTimes.isChecked():
@@ -551,10 +588,11 @@ class PlotWindow(QtGui.QDialog):
             ylabel = 'Counts'
         
         plotHist(self.axes,wvlBinEdges,self.spectrum)
-        self.axes.set_xlabel('Wavlength (Angstrom)')
+        self.axes.set_xlabel('Wavelength (Angstrom)')
         self.axes.set_ylabel(ylabel)
 
     def plotPhaseHist(self):
+        phaseHistType = self.combobox_phaseHistType.currentText()
         if self.checkbox_trackTimes.isChecked():
             startTime = float(self.parent.textbox_startTime.text())
             endTime = float(self.parent.textbox_endTime.text())
@@ -565,26 +603,50 @@ class PlotWindow(QtGui.QDialog):
         firstSec = startTime
         duration = endTime-startTime
         hists = []
-        nBins=100
+        nBinsPerUnit = int(self.textbox_phaseHistNBins.text())
         histBinEdges = None
+        scaleToDegrees = 180./np.pi*1./2**9
+        zeroOffset = 2**11 # phase is +/-4 radians, where 0 radians is represented by bin value 2048
+        if self.checkbox_restrictPhaseRange.isChecked():
+            range = np.array([float(self.textbox_phaseHistStart.text()),float(self.textbox_phaseHistEnd.text())])
+            if not self.checkbox_keepRawPhase.isChecked():
+                range = range / scaleToDegrees
+        else:
+            range = None
         for col,row in self.selectedPixels:
             returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             peakHeights = returnDict['peakHeights']
             baselines = returnDict['baselines']
+            if phaseHistType == 'Peaks':
+                listToHist = peakHeights-zeroOffset
+            elif phaseHistType == 'Baselines':
+                listToHist = baselines-zeroOffset
+            elif phaseHistType == 'Peaks - Baselines':
+                listToHist = peakHeights-baselines
+
             if histBinEdges == None:
-                bins = nBins
+                if not self.checkbox_restrictPhaseRange.isChecked():
+                    range = np.array([np.min(listToHist),np.max(listToHist)])
+                bins = (range[1]-range[0])//nBinsPerUnit
             else:
                 bins = histBinEdges
-            hist,histBinEdges = np.histogram(peakHeights,bins=bins)
+
+            hist,histBinEdges = np.histogram(listToHist,bins=bins,range=range)
             hists.append(hist)
 
         hists = np.array(hists)
-        hist = np.sum(hists,axis=0)
+        self.hist = np.sum(hists,axis=0)
 
         binWidths = np.diff(histBinEdges)
+            
+        if self.checkbox_keepRawPhase.isChecked():
+            xlabel = 'phase'
+        else:
+            histBinEdges = histBinEdges * scaleToDegrees
+            xlabel = 'phase (${}^\circ$)'
         plotHist(self.axes,histBinEdges,self.hist)
-        self.axes.set_xlabel('phase')
+        self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel('counts')
      
 class HeaderWindow(ModelessWindow):
@@ -975,6 +1037,7 @@ class LoadCalsDialog(QtGui.QDialog):
     
     def loadTimeMask(self):
         self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile',reasons=['hot pixel','dead pixel','unknown'])
+        path = str(self.loadTimeMaskWidget.textbox_filename.text())
         self.parent.enableTimeMaskParams()
         
     def loadAllCals(self):
