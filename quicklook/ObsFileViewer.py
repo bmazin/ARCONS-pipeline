@@ -16,6 +16,8 @@ from functools import partial
 from util.FileName import FileName
 from util.ObsFile import ObsFile
 from util.CalLookupFile import CalLookupFile
+from util import utils
+from hotpix.manuallyRemovePixels import removePixel
 
 class ObsFileViewer(QtGui.QMainWindow):
     def __init__(self, obsPath=None, obsTstamp=None):
@@ -54,7 +56,7 @@ class ObsFileViewer(QtGui.QMainWindow):
 
     def newPlotWindow(self):
         newPlotId = len(self.plotWindows)
-        plotWindow = PlotWindow(parent=self,plotId=newPlotId)
+        plotWindow = PlotWindow(parent=self,plotId=newPlotId,selectedPixels=self.arrayImageWidget.selectedPixels)
         self.plotWindows.append(plotWindow)
         self.connect(self.arrayImageWidget,QtCore.SIGNAL('newPixelSelection(PyQt_PyObject)'), plotWindow.newPixelSelection)
         
@@ -110,15 +112,15 @@ class ObsFileViewer(QtGui.QMainWindow):
 
     def arrangeMainFrame(self):
 
-        canvasBox = layoutBox('V',(self.arrayImageWidget,))
+        canvasBox = layoutBox('V',[self.arrayImageWidget])
 
-        timeBoundsBox = layoutBox('H',(3,self.textbox_startTime,'s to',self.textbox_endTime,'s',1,self.button_drawPlot,3))
-        incrementControlsBox = layoutBox('H',(1,self.button_jumpToBeginning,self.button_incrementBack,
-                    self.textbox_timeIncrement,'s',self.button_incrementForward,self.button_jumpToEnd,1))
-        wvlBoundsBox = layoutBox('H',(3,self.textbox_startWvl,'Angstroms to',self.textbox_endWvl,'Angstroms',1,3))
-        incrementWvlControlsBox = layoutBox('H',(1,self.button_jumpToStartWvl,self.button_incrementWvlBack,
-                    self.textbox_wvlIncrement,'Angstroms',self.button_incrementWvlForward,self.button_jumpToEndWvl,1))
-        mainBox = layoutBox('V',(self.label_obsFilename,canvasBox,timeBoundsBox,incrementControlsBox, wvlBoundsBox, incrementWvlControlsBox))
+        timeBoundsBox = layoutBox('H',[3,self.textbox_startTime,'s to',self.textbox_endTime,'s',1,self.button_drawPlot,3])
+        incrementControlsBox = layoutBox('H',[1,self.button_jumpToBeginning,self.button_incrementBack,
+                    self.textbox_timeIncrement,'s',self.button_incrementForward,self.button_jumpToEnd,1])
+        wvlBoundsBox = layoutBox('H',[3,self.textbox_startWvl,'Angstroms to',self.textbox_endWvl,'Angstroms',1,3])
+        incrementWvlControlsBox = layoutBox('H',[1,self.button_jumpToStartWvl,self.button_incrementWvlBack,
+                    self.textbox_wvlIncrement,'Angstroms',self.button_incrementWvlForward,self.button_jumpToEndWvl,1])
+        mainBox = layoutBox('V',[self.label_obsFilename,canvasBox,timeBoundsBox,incrementControlsBox, wvlBoundsBox, incrementWvlControlsBox])
 
         self.mainFrame.setLayout(mainBox)
         self.setCentralWidget(self.mainFrame)
@@ -174,8 +176,11 @@ class ObsFileViewer(QtGui.QMainWindow):
             self.headerWindow.append('{}:\n{}\n'.format(eachKey,self.headerInfo[eachKey]))
             
     def getObsImage(self):
-        firstSec = float(self.textbox_startTime.text())
-        intTime = float(self.textbox_endTime.text())-firstSec
+        self.startTime = float(self.textbox_startTime.text())
+        self.stopTime = float(self.textbox_endTime.text())
+
+        firstSec = self.startTime
+        intTime = self.stopTime - firstSec
         
         startWvl = float(self.textbox_startWvl.text())
         endWvl = float(self.textbox_endWvl.text())
@@ -188,7 +193,7 @@ class ObsFileViewer(QtGui.QMainWindow):
 
         self.setObsState()
         paramsDict = self.imageParamsWindow.getParams()
-        scaleToCps = paramsDict['plotParams'].pop('scaleToCps',False)
+        scaleToCps = paramsDict['otherParams'].pop('scaleToCps',False)
         imgDict = self.obs.getPixelCountImage(firstSec=firstSec,integrationTime=intTime,**paramsDict['obsParams'])
 
         self.image = imgDict['image']
@@ -291,10 +296,8 @@ class ObsFileViewer(QtGui.QMainWindow):
         """
         QtGui.QMessageBox.about(self, "ObsFile Viewer", msg.strip())
 
-    def draw(self):
-        self.fig.canvas.draw()
-
     def plotArray(self,*args,**kwargs):
+        self.overplotTimeMask()
         self.arrayImageWidget.plotArray(*args,**kwargs)
 
     def hoverCanvas(self,event):
@@ -307,7 +310,10 @@ class ObsFileViewer(QtGui.QMainWindow):
         print 'loading',obsPath
         self.obs = ObsFile(obsPath)
         self.fn = FileName(obsFile=self.obs)
-        firstImg = self.obs.getPixelCountImage(firstSec=0,integrationTime=1,getRawCount=True)
+
+        self.startTime = 0.
+        self.stopTime = 1.
+        firstImg = self.obs.getPixelCountImage(firstSec=self.startTime,integrationTime=(self.stopTime-self.startTime),getRawCount=True)
         self.image = firstImg['image']
         self.plotArray(self.image)
         self.updateHeader()
@@ -323,12 +329,36 @@ class ObsFileViewer(QtGui.QMainWindow):
     def loadCalFiles(self):
         LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
 
+    def getTimeMaskReasons(self):
+        reasonEnum = self.obs.hotPixTimeMask.reasonEnum
+        reasons = [reasonPair[0] for reasonPair in reasonEnum]
+        selectedReasons = self.obs.hotPixTimeMask.enabledReasons
+        return {'reasons':reasons,'selectedReasons':selectedReasons}
+
     def enableTimeMaskParams(self):
         if not self.obs.hotPixTimeMask is None:
-            reasonEnum = self.obs.hotPixTimeMask.reasonEnum
-            selectedReasons = self.obs.hotPixTimeMask.enabledReasons
-            reasons = [reasonPair[0] for reasonPair in reasonEnum]
-            self.imageParamsWindow.enableTimeMaskParams(reasons=reasons,selectedReasons=selectedReasons)
+            reasonDict = self.getTimeMaskReasons()
+            self.imageParamsWindow.enableTimeMaskParams(reasons=reasonDict['reasons'],selectedReasons=reasonDict['selectedReasons'])
+
+    def overplotTimeMask(self):
+        if self.imageParamsWindow.checkbox_overplotMasked.isChecked():
+            color = str(self.imageParamsWindow.combobox_overplotColor.currentText())
+            timeMaskImage = self.makeTimeMaskImage()
+            self.arrayImageWidget.plotOverlayImage(timeMaskImage,color=color)
+        else:
+            self.arrayImageWidget.removeOverlayImage()
+
+    def makeTimeMaskImage(self):
+        timeMaskImage = np.zeros((self.obs.nRow,self.obs.nCol))
+        if not self.obs.hotPixTimeMask is None:
+            for iRow in xrange(self.obs.nRow):
+                for iCol in xrange(self.obs.nCol):
+                    maskedIntervals = self.obs.getPixelBadTimes(iRow,iCol)
+                    maskedTime = utils.intervalSize(maskedIntervals)
+                    totalTime = self.stopTime-self.startTime
+                    timeMaskImage[iRow,iCol] = 1.*maskedTime/totalTime
+        return timeMaskImage
+            
 
 class ModelessWindow(QtGui.QDialog):
     def __init__(self,parent=None):
@@ -348,10 +378,11 @@ class ModelessWindow(QtGui.QDialog):
         pass
 
 class PlotWindow(QtGui.QDialog):
-    def __init__(self,parent=None,plotId=0):
+    def __init__(self,parent=None,plotId=0,selectedPixels=[]):
         super(PlotWindow,self).__init__(parent=parent)
         self.parent=parent
         self.id = plotId
+        self.selectedPixels = selectedPixels
         self.initUI()
 
     def closeEvent(self,evt):
@@ -390,7 +421,17 @@ class PlotWindow(QtGui.QDialog):
         #light curve controls
         self.textbox_intTime = QtGui.QLineEdit('1')
         self.textbox_intTime.setFixedWidth(50)
-        lightCurveControlsBox = layoutBox('H',('Int Time',self.textbox_intTime,'s',1.))
+
+        self.button_maskEntirePixel = QtGui.QPushButton('Mask out entire pixel(s)')
+        self.connect(self.button_maskEntirePixel,QtCore.SIGNAL('clicked()'), self.maskEntirePixels)
+
+        self.combobox_timeMaskReason = QtGui.QComboBox(self)
+        reasonDict = self.parent.getTimeMaskReasons()
+        self.combobox_timeMaskReason.addItems(reasonDict['reasons'])
+
+        lightCurveControlsBox = layoutBox('H',['Int Time',self.textbox_intTime,'s',1.,self.button_maskEntirePixel,'reason:',self.combobox_timeMaskReason,10.])
+        self.lightCurveControlsGroup = QtGui.QGroupBox('Light Curve Controls',parent=self)
+        self.lightCurveControlsGroup.setLayout(lightCurveControlsBox)
 
 
         #spectrum controls
@@ -401,10 +442,15 @@ class PlotWindow(QtGui.QDialog):
         self.textbox_startWvl.setFixedWidth(100)
         self.textbox_endWvl = QtGui.QLineEdit(self.parent.textbox_endWvl.text())
         self.textbox_endWvl.setFixedWidth(100)
+
         self.wvlGroup = QtGui.QGroupBox('',parent=self)
         wvlBox = layoutBox('H',['Start Wavelength',self.textbox_startWvl,'Angstroms',1.,'End Wavelength',self.textbox_endWvl,'Angstroms',10.])
         self.wvlGroup.setLayout(wvlBox)
-        spectrumControlsBox = layoutBox('H',(self.checkbox_divideWvlBinWidths,self.checkbox_trackWvls,self.wvlGroup,10.))
+        spectrumControlsBox = layoutBox('H',[self.checkbox_divideWvlBinWidths,self.checkbox_trackWvls,self.wvlGroup,10.])
+
+        self.spectrumControlsGroup = QtGui.QGroupBox('Spectrum Controls',parent=self)
+        self.spectrumControlsGroup.setLayout(spectrumControlsBox)
+        self.spectrumControlsGroup.setVisible(False)
 
         #phase hist controls
         self.checkbox_restrictPhaseRange = QtGui.QCheckBox('Restrict phase range')
@@ -423,9 +469,13 @@ class PlotWindow(QtGui.QDialog):
         self.combobox_phaseHistType.addItems(self.phaseHistTypeStrs)
         self.combobox_phaseHistType.setCurrentIndex(2)
 
-        phaseHistControlsBoxRow0 = layoutBox('H',(self.combobox_phaseHistType,1.,self.checkbox_keepRawPhase,1.,self.checkbox_restrictPhaseRange,10.))
-        phaseHistControlsBoxRow1 = layoutBox('H',('Start phase',self.textbox_phaseHistStart,1.,'End phase',self.textbox_phaseHistEnd,1.,'Number of ADC units per bin',self.textbox_phaseHistNBins,10.))
-        phaseHistControlsBox = layoutBox('V',(phaseHistControlsBoxRow0,phaseHistControlsBoxRow1))
+        phaseHistControlsBoxRow0 = layoutBox('H',[self.combobox_phaseHistType,1.,self.checkbox_keepRawPhase,1.,self.checkbox_restrictPhaseRange,10.])
+        phaseHistControlsBoxRow1 = layoutBox('H',['Start phase',self.textbox_phaseHistStart,1.,'End phase',self.textbox_phaseHistEnd,1.,'Number of ADC units per bin',self.textbox_phaseHistNBins,10.])
+        phaseHistControlsBox = layoutBox('V',[phaseHistControlsBoxRow0,phaseHistControlsBoxRow1])
+
+        self.phaseHistControlsGroup = QtGui.QGroupBox('Phase Histogram Controls',parent=self)
+        self.phaseHistControlsGroup.setLayout(phaseHistControlsBox)
+        self.phaseHistControlsGroup.setVisible(False)
 
         #time controls
         self.textbox_startTime = QtGui.QLineEdit(self.parent.textbox_startTime.text())
@@ -438,23 +488,10 @@ class PlotWindow(QtGui.QDialog):
         self.timesGroup.setVisible(False)
         timesChoiceBox = layoutBox('H',[self.checkbox_trackTimes,self.timesGroup])
 
-        
-        
-        self.lightCurveControlsGroup = QtGui.QGroupBox('Light Curve Controls',parent=self)
-        self.lightCurveControlsGroup.setLayout(lightCurveControlsBox)
+        checkboxBox = layoutBox('H',[self.checkbox_trackSelection,self.combobox_plotType,2.,self.button_drawPlot])
+        controlsBox = layoutBox('H',[self.lightCurveControlsGroup,self.spectrumControlsGroup,self.phaseHistControlsGroup])
 
-        self.spectrumControlsGroup = QtGui.QGroupBox('Spectrum Controls',parent=self)
-        self.spectrumControlsGroup.setLayout(spectrumControlsBox)
-        self.spectrumControlsGroup.setVisible(False)
-
-        self.phaseHistControlsGroup = QtGui.QGroupBox('Phase Histogram Controls',parent=self)
-        self.phaseHistControlsGroup.setLayout(phaseHistControlsBox)
-        self.phaseHistControlsGroup.setVisible(False)
-
-        checkboxBox = layoutBox('H',(self.checkbox_trackSelection,self.combobox_plotType,2.,self.button_drawPlot))
-        controlsBox = layoutBox('H',(self.lightCurveControlsGroup,self.spectrumControlsGroup,self.phaseHistControlsGroup))
-        #controlsBox = layoutBox('V',(lightCurveControlsBox,self.spectrumControlsGroup,self.phaseHistControlsGroup))
-        mainBox = layoutBox('V',(checkboxBox,timesChoiceBox,self.checkbox_clearPlot,controlsBox,self.canvas,self.canvasToolbar))
+        mainBox = layoutBox('V',[checkboxBox,timesChoiceBox,self.checkbox_clearPlot,controlsBox,self.canvas,self.canvasToolbar])
         self.setLayout(mainBox)
 
     def changeTrackTimes(self):
@@ -496,7 +533,6 @@ class PlotWindow(QtGui.QDialog):
             self.phaseHistControlsGroup.setVisible(False)
 
     def newPixelSelection(self,selectedPixels):
-        print selectedPixels
         if self.checkbox_trackSelection.isChecked():
             self.selectedPixels = selectedPixels
             self.updatePlot()
@@ -520,9 +556,17 @@ class PlotWindow(QtGui.QDialog):
         print 'plot updated'
 
     def plotTimeMask(self):
+        self.parent.obsMethod('switchOffHotPixTimeMask')
         self.plotLightCurve()
+        for col,row in self.selectedPixels:
+            maskedIntervals = self.parent.obsMethod('getPixelBadTimes',pixelRow=row,pixelCol=col)
+            print maskedIntervals
+            for inter in maskedIntervals:
+                self.axes.axvspan(inter[0],inter[1],facecolor='r',alpha=0.3)
+        
 
-    def plotLightCurve(self):
+    def plotLightCurve(self,getRaw=False):
+        paramsDict = self.parent.getObsParams()
         if self.checkbox_trackTimes.isChecked():
             startTime = float(self.parent.textbox_startTime.text())
             endTime = float(self.parent.textbox_endTime.text())
@@ -537,7 +581,7 @@ class PlotWindow(QtGui.QDialog):
         if histBinEdges[-1]+histIntTime == endTime:
             histBinEdges = np.append(histBinEdges,endTime)
         for col,row in self.selectedPixels:
-            returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
+            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=(not paramsDict['getRawCount']))
             timestamps = returnDict['timestamps']
             hist,_ = np.histogram(timestamps,bins=histBinEdges)
             hists.append(hist)
@@ -648,6 +692,24 @@ class PlotWindow(QtGui.QDialog):
         plotHist(self.axes,histBinEdges,self.hist)
         self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel('counts')
+
+    def maskEntirePixels(self):
+        reason = str(self.combobox_timeMaskReason.currentText())
+        reasonDict = self.parent.getTimeMaskReasons()
+        reply = QtGui.QMessageBox.question(self, 'Confirm',
+                'Mark pixels (x,y)={} with tag \'{}\'?'.format(self.selectedPixels,reason), QtGui.QMessageBox.Yes |
+                QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+        if reply == QtGui.QMessageBox.Yes:
+            if not self.parent.obs.hotPixFileName is None:
+                timeMaskPath = self.parent.obs.hotPixFileName
+            else:
+                raise AttributeError('obs file does not have a timeMask loaded')
+            self.parent.obs.hotPixFile.close()
+            for col,row in self.selectedPixels:
+                removePixel(timeMaskPath=timeMaskPath,pixelRow=row,
+                            pixelCol=col,reason=reason)
+                print 'pixel (x,y)=({},{}) tagged'.format(col,row)
+            self.parent.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=reasonDict['selectedReasons'])
      
 class HeaderWindow(ModelessWindow):
     def append(self,text):
@@ -659,7 +721,7 @@ class HeaderWindow(ModelessWindow):
     def initUI(self):
         self.textArea = QtGui.QTextEdit('')
         self.textArea.setReadOnly(True)
-        mainBox = layoutBox('V',(self.textArea,))
+        mainBox = layoutBox('V',[self.textArea])
         self.setLayout(mainBox)
 
 class ImageParamsWindow(ModelessWindow):
@@ -669,7 +731,6 @@ class ImageParamsWindow(ModelessWindow):
         self.checkbox_fluxWeighted = QtGui.QCheckBox('fluxWeighted',self)
         self.checkbox_scaleByEffInt = QtGui.QCheckBox('scaleByEffInt',self)
         self.checkbox_applyTimeMask = QtGui.QCheckBox('apply time mask',self)
-        self.checkbox_scaleToCps = QtGui.QCheckBox('scale as counts per sec',self)
         self.checkbox_applyTimeMask.setEnabled(False)
         self.checkbox_applyCosmicMask = QtGui.QCheckBox('apply cosmic mask',self)
         self.checkbox_applyCosmicMask.setEnabled(False)
@@ -678,23 +739,36 @@ class ImageParamsWindow(ModelessWindow):
         self.group_timeMaskReasons.setVisible(False)
         self.timeMaskReasonsLoaded = False
 
+        obsBox = layoutBox('V',[self.checkbox_getRawCount,
+                    self.checkbox_weighted,self.checkbox_fluxWeighted,self.checkbox_scaleByEffInt,
+                    self.checkbox_applyTimeMask,self.group_timeMaskReasons,self.checkbox_applyCosmicMask])
+        obsGroup = QtGui.QGroupBox('ObsFile.getPixelCountImage parameters',self)
+        obsGroup.setLayout(obsBox)
+
         self.combobox_cmap = QtGui.QComboBox(self)
         self.cmapStrs = ['hot','gray','jet','gnuplot2','Paired']
         self.combobox_cmap.addItems(self.cmapStrs)
 
-        obsBox = layoutBox('V',(self.checkbox_getRawCount,
-                    self.checkbox_weighted,self.checkbox_fluxWeighted,self.checkbox_scaleByEffInt,
-                    self.checkbox_applyTimeMask,self.group_timeMaskReasons,self.checkbox_applyCosmicMask))
-        obsGroup = QtGui.QGroupBox('ObsFile.getPixelCountImage Parameters',self)
-        obsGroup.setLayout(obsBox)
+        plotArrayBox = layoutBox('V',[self.combobox_cmap])
+        plotArrayGroup = QtGui.QGroupBox('plotArray parameters',self)
+        plotArrayGroup.setLayout(plotArrayBox)
 
-        imgBox = layoutBox('V',(self.combobox_cmap,self.checkbox_scaleToCps))
-        imgGroup = QtGui.QGroupBox('plotArray Parameters',self)
-        imgGroup.setLayout(imgBox)
+        
+        self.checkbox_scaleToCps = QtGui.QCheckBox('scale as counts per sec',self)
+        self.checkbox_overplotMasked = QtGui.QCheckBox('Show time masked pixels (over total time)',self)
+        self.connect(self.checkbox_overplotMasked,QtCore.SIGNAL('stateChanged(int)'),self.parent.overplotTimeMask)
+        self.combobox_overplotColor = QtGui.QComboBox(self)
+        self.overplotColorStrs = ['blue','green','red','cyan','magenta','yellow','black','white','0.5']
+        self.combobox_overplotColor.addItems(self.overplotColorStrs)
 
-        mainBox = layoutBox('V',(imgGroup,obsGroup))
+        otherParamsBox = layoutBox('V',[self.checkbox_scaleToCps,self.checkbox_overplotMasked,self.combobox_overplotColor])
+        otherParamsGroup = QtGui.QGroupBox('Other parameters',self)
+        otherParamsGroup.setLayout(otherParamsBox)
+
+        mainBox = layoutBox('V',[plotArrayGroup,otherParamsGroup,obsGroup])
 
         self.setLayout(mainBox)
+
 
 
     def enableTimeMaskParams(self,reasons=[],selectedReasons=[]):
@@ -736,6 +810,7 @@ class ImageParamsWindow(ModelessWindow):
     def getParams(self):
         obsParamsDict = {}
         plotParamsDict = {}
+        otherParamsDict = {}
         obsParamsDict['getRawCount'] = self.checkbox_getRawCount.isChecked()
         obsParamsDict['weighted'] = self.checkbox_weighted.isChecked()
         obsParamsDict['fluxWeighted'] = self.checkbox_fluxWeighted.isChecked()
@@ -745,11 +820,12 @@ class ImageParamsWindow(ModelessWindow):
         if cmapStr != 'gray':
             cmap.set_bad('0.15')
         plotParamsDict['cmap']=cmap
-        plotParamsDict['scaleToCps']=self.checkbox_scaleToCps.isChecked()
+        otherParamsDict['scaleToCps']=self.checkbox_scaleToCps.isChecked()
 
         outDict = {}
         outDict['obsParams'] = obsParamsDict
         outDict['plotParams'] = plotParamsDict
+        outDict['otherParams'] = otherParamsDict
         return outDict
     
 class ArrayImageWidget(QtGui.QWidget):
@@ -759,8 +835,9 @@ class ArrayImageWidget(QtGui.QWidget):
         # Create the mpl Figure and FigCanvas objects. 
         self.hoverCall = hoverCall
         self.selectPixelsMode = 'singlePixel'
-        self.selectedPixels = []
         self.selectionPatches = []
+        self.selectedPixels = []
+        self.overlayImage = None
         self.initUI()
         
 
@@ -777,8 +854,34 @@ class ArrayImageWidget(QtGui.QWidget):
         cid = self.fig.canvas.mpl_connect('button_press_event', self.clickColorBar)
         cid = self.fig.canvas.mpl_connect('motion_notify_event', self.hoverCanvas)
         cid = self.fig.canvas.mpl_connect('button_press_event', self.clickCanvas)
-        canvasBox = layoutBox('V',(self.canvas,))
+        canvasBox = layoutBox('V',[self.canvas,])
         self.setLayout(canvasBox)
+
+    def plotOverlayImage(self,image,color='green',**kwargs):
+        self.overlayImage = image
+        self.overlayImageKwargs = kwargs
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list('my_cmap',[color,color],256)
+        cmap._init() # create the _lut array, with rgba values
+        alphas = np.linspace(0, 1., cmap.N+3)
+        cmap._lut[:,-1] = alphas
+        self.overlayCmap = cmap
+        self.drawOverlayImage()
+
+    def removeOverlayImage(self):
+        self.overlayImage = None
+        try:
+            self.handleOverlayMatshow.remove()
+        except:
+            pass
+        self.draw()
+
+    def drawOverlayImage(self):
+        try:
+            self.handleOverlayMatshow.remove()
+        except:
+            pass
+        self.handleOverlayMatshow = self.axes.matshow(self.overlayImage,cmap=self.overlayCmap,origin='lower',**self.overlayImageKwargs)
+        self.draw()
 
     def plotArray(self,image,normNSigma=3,title='',**kwargs):
         self.image = image
@@ -803,8 +906,10 @@ class ArrayImageWidget(QtGui.QWidget):
         self.matshowKwargs = kwargs
         self.handleMatshow = self.axes.matshow(image,**kwargs)
         self.fig.cbar = self.fig.colorbar(self.handleMatshow)
-        self.drawSelections()
-        self.draw()
+        if not self.overlayImage is None:
+            self.drawOverlayImage()
+        else:
+            self.draw()
         print 'image drawn'
 
     def drawSelections(self):
@@ -818,13 +923,11 @@ class ArrayImageWidget(QtGui.QWidget):
                     height=1.,edgecolor='blue',facecolor='none')
             self.selectionPatches.append(patch)
             self.axes.add_patch(patch)
-            self.draw()
 
     def addClickFunc(self,clickFunc):
         self.clickFuncs.append(clickFunc)
 
     def emitNewSelection(self):
-        print 'emit new select'
         self.emit(QtCore.SIGNAL('newPixelSelection(PyQt_PyObject)'),self.selectedPixels)
 
     def clickCanvas(self,event):
@@ -833,7 +936,7 @@ class ArrayImageWidget(QtGui.QWidget):
             row = round(event.ydata)
             if self.selectPixelsMode == 'singlePixel':
                 self.selectedPixels = [(col,row)]
-                self.drawSelections()
+                self.draw()
                 self.emitNewSelection()
             for func in self.clickFuncs:
                 func(row=row,col=col)
@@ -884,6 +987,7 @@ class ArrayImageWidget(QtGui.QWidget):
             self.fig.canvas.draw()
 
     def draw(self):
+        self.drawSelections()
         self.fig.canvas.draw()
 
     def addClickFunc(self,clickFunc):
@@ -924,10 +1028,10 @@ class LoadWidget(QtGui.QWidget):
 #        self.textbox_filename.setMaximumWidth(1000)
         self.button_openDialog.setMaximumWidth(100)
 
-        fnBox = layoutBox('H',('run:',self.textbox_run,'date:',self.textbox_date,
-                    'timestamp:',self.textbox_tstamp,self.button_loadFilename))
-        dialogBox = layoutBox('H',(self.button_openDialog,self.textbox_filename))
-        mainBox = layoutBox('V',(self.promptStr,fnBox,dialogBox))
+        fnBox = layoutBox('H',['run:',self.textbox_run,'date:',self.textbox_date,
+                    'timestamp:',self.textbox_tstamp,self.button_loadFilename])
+        dialogBox = layoutBox('H',[self.button_openDialog,self.textbox_filename])
+        mainBox = layoutBox('V',[self.promptStr,fnBox,dialogBox])
 
         self.setLayout(mainBox)
 
@@ -965,8 +1069,8 @@ class LoadObsDialog(QtGui.QDialog):
 
         self.button_load = QtGui.QPushButton('Load Obs')
         self.button_cancel = QtGui.QPushButton('Cancel')
-        buttonBox = layoutBox('H',(self.button_cancel,self.button_load))
-        mainBox = layoutBox('V',(self.loadObsWidget,buttonBox))
+        buttonBox = layoutBox('H',[self.button_cancel,self.button_load])
+        mainBox = layoutBox('V',[self.loadObsWidget,buttonBox])
         self.setLayout(mainBox)
 
     def connectButtons(self):
@@ -1008,15 +1112,15 @@ class LoadCalsDialog(QtGui.QDialog):
 
         self.button_loadAll = QtGui.QPushButton('Load All Cals')
 
-        wvlBox = layoutBox('H',(self.loadWvlWidget,self.button_loadWvl))
-        flatBox = layoutBox('H',(self.loadFlatWidget,self.button_loadFlat))
-        fluxBox = layoutBox('H',(self.loadFluxWidget,self.button_loadFlux))
-        timeMaskBox = layoutBox('H',(self.loadTimeMaskWidget,self.button_loadTimeMask))
-        timeAdjustBox = layoutBox('H',(self.loadTimeAdjustmentWidget,self.button_loadTimeAdjustment))
-        cosmicBox = layoutBox('H',(self.loadCosmicWidget,self.button_loadCosmic))
-        beammapBox = layoutBox('H',(self.loadBeammapWidget,self.button_loadBeammap))
+        wvlBox = layoutBox('H',[self.loadWvlWidget,self.button_loadWvl])
+        flatBox = layoutBox('H',[self.loadFlatWidget,self.button_loadFlat])
+        fluxBox = layoutBox('H',[self.loadFluxWidget,self.button_loadFlux])
+        timeMaskBox = layoutBox('H',[self.loadTimeMaskWidget,self.button_loadTimeMask])
+        timeAdjustBox = layoutBox('H',[self.loadTimeAdjustmentWidget,self.button_loadTimeAdjustment])
+        cosmicBox = layoutBox('H',[self.loadCosmicWidget,self.button_loadCosmic])
+        beammapBox = layoutBox('H',[self.loadBeammapWidget,self.button_loadBeammap])
 
-        mainBox = layoutBox('V',(wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,beammapBox,self.button_loadAll))
+        mainBox = layoutBox('V',[wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,beammapBox,self.button_loadAll])
         self.setLayout(mainBox)
 
     def connectButtons(self):
@@ -1036,7 +1140,7 @@ class LoadCalsDialog(QtGui.QDialog):
             self.parent.obsMethod(obsMethod,path,*args,**kwargs)
     
     def loadTimeMask(self):
-        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile',reasons=['hot pixel','dead pixel','unknown'])
+        self.loadCal(self.loadTimeMaskWidget,'loadHotPixCalFile',reasons=['hot pixel','unknown'])
         path = str(self.loadTimeMaskWidget.textbox_filename.text())
         self.parent.enableTimeMaskParams()
         
