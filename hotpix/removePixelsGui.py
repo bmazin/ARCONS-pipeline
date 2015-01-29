@@ -23,7 +23,11 @@ class HotPixGui(ObsFileViewer):
     def __init__(self, **kwargs):
         super(HotPixGui,self).__init__(**kwargs)
         self.addClickFunc(self.removeBadPixel)
+        self.addClickFunc(self.printTimeMask)
         
+    def printTimeMask(self,row,col):
+        print self.obs.hotPixTimeMask.get_intervals(row,col)
+
     def removeBadPixel(self,row,col,reason='unknown'):
         reply = QtGui.QMessageBox.question(self, 'Confirm',
                 'Mark pixel (x,y)=({},{}) with tag \'{}\'?'.format(col,row,reason), QtGui.QMessageBox.Yes | 
@@ -37,16 +41,19 @@ class HotPixGui(ObsFileViewer):
             removePixel(timeMaskPath=timeMaskPath,pixelRow=row,
                         pixelCol=col,reason=reason)
             self.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=['hot pixel','dead pixel','unknown'])
-            print 'pixel (x,y)=({},{}) tagged'
+            print 'pixel (x,y)=({},{}) tagged'.format(col,row)
         
 if __name__ == "__main__":
+    kwargs = {}
     if len(sys.argv) > 1:
         if sys.argv[1] == '-h' or sys.argv[1] == '--help':
-            print 'Usage: {} obsFilePath'.format(sys.argv[0])
+            print 'Usage: {} obsFilePath/obsTstamp'.format(sys.argv[0])
+        elif os.path.exists(sys.argv[1]):
+            kwargs['obsPath'] = sys.argv[1]
         else:
-            obsPath = sys.argv[1]
+            kwargs['obsTstamp'] = sys.argv[1]
     else:
         obsPath = None
     
-    form = HotPixGui(obsPath=obsPath)
+    form = HotPixGui(**kwargs)
     form.show()
