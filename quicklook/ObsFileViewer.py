@@ -626,7 +626,7 @@ class ImageParamsWindow(ModelessWindow):
         obsGroup = QtGui.QGroupBox('ObsFile.getPixelCountImage Parameters',self)
         obsGroup.setLayout(obsBox)
 
-        imgBox = layoutBox('H',(self.combobox_cmap,self.checkbox_scaleToCps))
+        imgBox = layoutBox('V',(self.combobox_cmap,self.checkbox_scaleToCps))
         imgGroup = QtGui.QGroupBox('plotArray Parameters',self)
         imgGroup.setLayout(imgBox)
 
@@ -1042,6 +1042,7 @@ def layoutBox(type,elements):
 
 def plotHist(ax,histBinEdges,hist,**kwargs):
     ax.plot(histBinEdges,np.append(hist,hist[-1]),drawstyle='steps-post',**kwargs)
+
 
 if __name__ == "__main__":
     kwargs = {}
