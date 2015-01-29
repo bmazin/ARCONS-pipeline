@@ -417,7 +417,6 @@ class ObsFile:
             entry = 1.*unixtime/secsPerDay+unixEpochJD
         return entry
         
-    @profile
     def getPixel(self, iRow, iCol, firstSec=0, integrationTime= -1):
         """
         Retrieves a pixel using the file's attached beammap.
@@ -466,7 +465,6 @@ class ObsFile:
         self.seed = seed
         np.random.seed(seed)
 
-    @profile
     def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True,timeSpacingCut=None): #,getTimes=False):
         """
         returns a numpy array of photon wavelengths for a given pixel, integrated from firstSec to firstSec+integrationTime.
@@ -649,7 +647,6 @@ class ObsFile:
         return packetList
 
 
-    @profile
     def getTimedPacketList(self, iRow, iCol, firstSec=0, integrationTime= -1, timeSpacingCut=None,expTailTimescale=None):
         """
         Parses an array of uint64 packets with the obs file format,and makes timestamps absolute
@@ -733,9 +730,15 @@ class ObsFile:
 
             else:
                 parsedData = self.parsePhotonPacketLists(pixelData)
-                timestamps = [(np.floor(firstSec)+iSec+(self.tickDuration*times)) for iSec,times in enumerate(parsedData['timestamps'])]
+                #timestamps = [(np.floor(firstSec)+iSec+(self.tickDuration*times)) for iSec,times in enumerate(parsedData['timestamps'])]
+                #timestamps = np.concatenate(timestamps)
 
-                timestamps = np.concatenate(timestamps)
+                lengths = np.array([len(times) for times in parsedData['timestamps']])
+                secOffsets = np.floor(firstSec)+np.concatenate([np.ones(length)*iSec for iSec,length in enumerate(lengths)])
+                #secOffsets = np.floor(firstSec)+np.concatenate([[iSec]*len(times) for iSec,times in enumerate(parsedData['timestamps'])])
+                times = np.concatenate(parsedData['timestamps'])
+                timestamps = secOffsets+(self.tickDuration*times)
+                
                 baselines = np.concatenate(parsedData['baselines'])
                 peakHeights = np.concatenate(parsedData['parabolaFitPeaks'])
 
@@ -803,7 +806,6 @@ class ObsFile:
                 'baselines':baselines, 'effIntTime':effectiveIntTime, 'rawCounts':rawCounts}
 
 
-    @profile
     def getPixelCountImage(self, firstSec=0, integrationTime= -1, weighted=False,
                            fluxWeighted=False, getRawCount=False,
                            scaleByEffInt=False):
@@ -901,7 +903,6 @@ class ObsFile:
         #else:
         #    return secImg
     
-    @profile
     def getSpectralCube(self,firstSec=0,integrationTime=-1,weighted=True,fluxWeighted=True,wvlStart=3000,wvlStop=13000,wvlBinWidth=None,energyBinWidth=None,wvlBinEdges=None,timeSpacingCut=None):
         """
         Return a time-flattened spectral cube of the counts integrated from firstSec to firstSec+integrationTime.
@@ -927,7 +928,6 @@ class ObsFile:
         cube = np.array(cube)
         return {'cube':cube,'wvlBinEdges':wvlBinEdges,'effIntTime':effIntTime, 'rawCounts':rawCounts}
 
-    @profile
     def getPixelSpectrum(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,
                          weighted=False, fluxWeighted=False, wvlStart=None, wvlStop=None,
                          wvlBinWidth=None, energyBinWidth=None, wvlBinEdges=None,timeSpacingCut=None):
@@ -1743,7 +1743,6 @@ class ObsFile:
         wvlBinEdges = wvlBinEdges[::-1]
         return wvlBinEdges
 
-    @profile
     def parsePhotonPacketLists(self, packets, doParabolaFitPeaks=True, doBaselines=True):
         """
         Parses an array of uint64 packets with the obs file format
@@ -1769,7 +1768,6 @@ class ObsFile:
             
         return outDict
 
-    @profile
     def parsePhotonPackets(self, packets, doParabolaFitPeaks=True, doBaselines=True):
         """
         Parses an array of uint64 packets with the obs file format
@@ -2155,7 +2153,6 @@ class ObsFile:
 
 
 
-@profile
 def calculateSlices(inter, timestamps):
     '''
     Hopefully a quicker version of  the original calculateSlices. JvE 3/8/2013
