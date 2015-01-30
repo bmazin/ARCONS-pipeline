@@ -1,4 +1,5 @@
 '''
+        self.timeMaskOb = 
 Author: Matt Strader        Date: January 06, 2015
 '''
 
@@ -17,7 +18,7 @@ from util.FileName import FileName
 from util.ObsFile import ObsFile
 from util.CalLookupFile import CalLookupFile
 from util import utils
-from hotpix.manuallyRemovePixels import removePixel
+from hotpix.manuallyRemovePixels import removePixel,EditTimeMaskDialog
 
 class ObsFileViewer(QtGui.QMainWindow):
     def __init__(self, obsPath=None, obsTstamp=None):
@@ -412,6 +413,14 @@ class PlotWindow(QtGui.QDialog):
         self.axes = self.fig.add_subplot(111)
         self.fig.subplots_adjust(left=0.07,right=.93,top=.93,bottom=0.15)
 
+        cid = self.fig.canvas.mpl_connect('button_press_event', self.buttonPressCanvas)
+        cid = self.fig.canvas.mpl_connect('button_release_event', self.buttonReleaseCanvas)
+        cid = self.fig.canvas.mpl_connect('motion_notify_event', self.motionNotifyCanvas)
+        self.selectFirstPoint = None
+        self.selectSecondPoint = None
+        self.selectedRange = None
+        self.selecting = False
+
         self.combobox_plotType = QtGui.QComboBox(self)
         self.plotTypeStrs = ['Light Curve','Time Mask','Spectrum','Phase Histogram']
         self.combobox_plotType.addItems(self.plotTypeStrs)
@@ -422,14 +431,18 @@ class PlotWindow(QtGui.QDialog):
         self.textbox_intTime = QtGui.QLineEdit('1')
         self.textbox_intTime.setFixedWidth(50)
 
+        self.button_maskTimeSelection = QtGui.QPushButton('Mask out selection')
+        self.connect(self.button_maskTimeSelection,QtCore.SIGNAL('clicked()'), self.maskTimeSelection)
         self.button_maskEntirePixel = QtGui.QPushButton('Mask out entire pixel(s)')
-        self.connect(self.button_maskEntirePixel,QtCore.SIGNAL('clicked()'), self.maskEntirePixels)
+        self.connect(self.button_maskEntirePixel,QtCore.SIGNAL('clicked()'), self.maskPixels)
 
         self.combobox_timeMaskReason = QtGui.QComboBox(self)
         reasonDict = self.parent.getTimeMaskReasons()
         self.combobox_timeMaskReason.addItems(reasonDict['reasons'])
+        self.button_unmaskPixel = QtGui.QPushButton('Unmask pixel...')
+        self.connect(self.button_unmaskPixel,QtCore.SIGNAL('clicked()'), self.unmaskPixel)
 
-        lightCurveControlsBox = layoutBox('H',['Int Time',self.textbox_intTime,'s',1.,self.button_maskEntirePixel,'reason:',self.combobox_timeMaskReason,10.])
+        lightCurveControlsBox = layoutBox('H',['Int Time',self.textbox_intTime,'s',1.,self.button_maskTimeSelection,self.button_maskEntirePixel,'reason:',self.combobox_timeMaskReason,10.,self.button_unmaskPixel])
         self.lightCurveControlsGroup = QtGui.QGroupBox('Light Curve Controls',parent=self)
         self.lightCurveControlsGroup.setLayout(lightCurveControlsBox)
 
@@ -494,6 +507,35 @@ class PlotWindow(QtGui.QDialog):
         mainBox = layoutBox('V',[checkboxBox,timesChoiceBox,self.checkbox_clearPlot,controlsBox,self.canvas,self.canvasToolbar])
         self.setLayout(mainBox)
 
+    def buttonPressCanvas(self,event):
+        plotType = self.combobox_plotType.currentText()
+        if event.inaxes is self.axes and (plotType == 'Time Mask' or plotType == 'Light Curve') and self.canvasToolbar.mode == '':
+            x = event.xdata
+            y = event.ydata
+            self.selectFirstPoint = (x,y)
+            self.selecting = True
+
+    def buttonReleaseCanvas(self,event):
+        self.selecting = False
+
+    def motionNotifyCanvas(self,event):
+        plotType = self.combobox_plotType.currentText()
+        if self.selecting and event.inaxes is self.axes and (plotType == 'Time Mask' or plotType == 'Light Curve') and self.canvasToolbar.mode == '' and not self.selectFirstPoint is None:
+            print 'notify 2'
+            x = round(event.xdata)
+            y = round(event.ydata)
+            if self.selectSecondPoint is None or np.round(self.selectSecondPoint[0]) != np.round(x):
+                self.selectSecondPoint = (x,y)
+                xClicks = np.array([self.selectSecondPoint[0],self.selectFirstPoint[0]])
+                self.selectedRange = (int(np.floor(np.min(xClicks))),int(np.ceil(np.max(xClicks))))
+            try:
+                self.selectedRangeShading.remove()
+            except:
+                pass
+            self.selectedRangeShading = self.axes.axvspan(self.selectedRange[0],self.selectedRange[1],facecolor='b',alpha=0.3)
+            self.draw()
+        pass
+
     def changeTrackTimes(self):
         if self.checkbox_trackTimes.isChecked():
             self.timesGroup.setVisible(False)
@@ -557,12 +599,13 @@ class PlotWindow(QtGui.QDialog):
 
     def plotTimeMask(self):
         self.parent.obsMethod('switchOffHotPixTimeMask')
-        self.plotLightCurve()
+        self.plotLightCurve(getRaw=True)
         for col,row in self.selectedPixels:
             maskedIntervals = self.parent.obsMethod('getPixelBadTimes',pixelRow=row,pixelCol=col)
             print maskedIntervals
             for inter in maskedIntervals:
                 self.axes.axvspan(inter[0],inter[1],facecolor='r',alpha=0.3)
+    
         
 
     def plotLightCurve(self,getRaw=False):
@@ -693,11 +736,18 @@ class PlotWindow(QtGui.QDialog):
         self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel('counts')
 
-    def maskEntirePixels(self):
+    def maskTimeSelection(self):
+        if not self.selectedRange is None:
+            self.maskPixels(timeInterval=self.selectedRange)
+        
+    def maskPixels(self,timeInterval=None):
         reason = str(self.combobox_timeMaskReason.currentText())
         reasonDict = self.parent.getTimeMaskReasons()
+        intervalStr = ''
+        if not timeInterval is None:
+            intervalStr = ' for range {}'.format(timeInterval)
         reply = QtGui.QMessageBox.question(self, 'Confirm',
-                'Mark pixels (x,y)={} with tag \'{}\'?'.format(self.selectedPixels,reason), QtGui.QMessageBox.Yes |
+                'Mark pixels (x,y)={} with tag \'{}\' {}?'.format(self.selectedPixels,reason,intervalStr), QtGui.QMessageBox.Yes |
                 QtGui.QMessageBox.No, QtGui.QMessageBox.No)
         if reply == QtGui.QMessageBox.Yes:
             if not self.parent.obs.hotPixFileName is None:
@@ -707,10 +757,32 @@ class PlotWindow(QtGui.QDialog):
             self.parent.obs.hotPixFile.close()
             for col,row in self.selectedPixels:
                 removePixel(timeMaskPath=timeMaskPath,pixelRow=row,
-                            pixelCol=col,reason=reason)
+                            pixelCol=col,reason=reason, timeInterval=timeInterval)
                 print 'pixel (x,y)=({},{}) tagged'.format(col,row)
             self.parent.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=reasonDict['selectedReasons'])
      
+    def unmaskPixel(self):
+        print 'unmask pixel'
+        if len(self.selectedPixels) != 1:
+            QtGui.QMessageBox.critical(self,'Unmasking can only be done on one pixel at a time. Select only one pixel')
+        else:
+            if not self.parent.obs.hotPixFileName is None:
+                timeMaskPath = self.parent.obs.hotPixFileName
+            else:
+                raise AttributeError('obs file does not have a timeMask loaded')
+            reasonDict = self.parent.getTimeMaskReasons()
+            #close the obsFile's hot pixel file so it can be edited
+            self.parent.obs.hotPixFile.close()
+            col,row = self.selectedPixels[0]
+
+            #edit the file in a dialog
+            EditTimeMaskDialog(timeMaskPath,pixelRow=row,pixelCol=col,parent=self)
+            
+            #reload the edited hot pixel file
+            self.parent.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=reasonDict['selectedReasons'])
+            
+
+
 class HeaderWindow(ModelessWindow):
     def append(self,text):
         self.textArea.append(text)
