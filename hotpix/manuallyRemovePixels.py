@@ -150,14 +150,15 @@ class EditTimeMaskDialog(QtGui.QDialog):
             grid.addWidget(reasonLabel,iEntry,2)
             self.checkboxes.append(checkbox)
         self.button_removeSelected = QtGui.QPushButton('Remove Selected Intervals')
-        grid.addWidget(self.button_removeSelected,self.nEntries,0,1,3)
+        #grid.addWidget(self.button_removeSelected,self.nEntries,0,1,3)
 
         scrollWidget = QtGui.QWidget()
         scrollWidget.setLayout(grid)
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidget(scrollWidget)
-        box = QtGui.QHBoxLayout()
+        box = QtGui.QVBoxLayout()
         box.addWidget(scrollArea)
+        box.addWidget(self.button_removeSelected)
         self.setLayout(box)
         self.connect(self.button_removeSelected,QtCore.SIGNAL('clicked()'), self.removeSelectedIntervals)
             
