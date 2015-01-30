@@ -439,6 +439,10 @@ class PlotWindow(QtGui.QDialog):
         self.combobox_timeMaskReason = QtGui.QComboBox(self)
         reasonDict = self.parent.getTimeMaskReasons()
         self.combobox_timeMaskReason.addItems(reasonDict['reasons'])
+        try:
+            self.combobox_timeMaskReason.setCurrentIndex(3)
+        except:
+            pass
         self.button_unmaskPixel = QtGui.QPushButton('Unmask pixel...')
         self.connect(self.button_unmaskPixel,QtCore.SIGNAL('clicked()'), self.unmaskPixel)
 
@@ -521,7 +525,6 @@ class PlotWindow(QtGui.QDialog):
     def motionNotifyCanvas(self,event):
         plotType = self.combobox_plotType.currentText()
         if self.selecting and event.inaxes is self.axes and (plotType == 'Time Mask' or plotType == 'Light Curve') and self.canvasToolbar.mode == '' and not self.selectFirstPoint is None:
-            print 'notify 2'
             x = round(event.xdata)
             y = round(event.ydata)
             if self.selectSecondPoint is None or np.round(self.selectSecondPoint[0]) != np.round(x):
@@ -762,10 +765,10 @@ class PlotWindow(QtGui.QDialog):
             self.parent.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=reasonDict['selectedReasons'])
      
     def unmaskPixel(self):
-        print 'unmask pixel'
         if len(self.selectedPixels) != 1:
             QtGui.QMessageBox.critical(self,'Unmasking can only be done on one pixel at a time. Select only one pixel')
         else:
+            print 'loading unmask pixel gui...'
             if not self.parent.obs.hotPixFileName is None:
                 timeMaskPath = self.parent.obs.hotPixFileName
             else:
@@ -780,6 +783,7 @@ class PlotWindow(QtGui.QDialog):
             
             #reload the edited hot pixel file
             self.parent.obsMethod('loadHotPixCalFile',timeMaskPath,reasons=reasonDict['selectedReasons'])
+            print 'time mask editing completed.'
             
 
 
