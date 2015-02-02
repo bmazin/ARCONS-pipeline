@@ -4,7 +4,7 @@ import warnings
 import os
 import numpy as np
 import tables
-
+import hotpix.hotPixels as hp
 from util.ObsFile import ObsFile
 from util.FileName import FileName
 from util.readDict import readDict
@@ -154,6 +154,9 @@ def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,beammap
             
         obs.setWvlCutoffs(wvlLowerLimit=wvlLowerLimit, wvlUpperLimit=wvlUpperLimit)
         if loadHotPix:
+            if not os.path.isfile(FileName(obsFile=obs).timeMask()):
+                print "generating hp file ", FileName(obsFile=obs).timeMask()
+                hp.findHotPixels(obsFile=obs,outputFileName=FileName(obsFile=obs).timeMask())
             obs.loadHotPixCalFile(FileName(obsFile=obs).timeMask(),reasons=['hot pixel','dead pixel'])
         if loadWvlCal:
             obs.loadBestWvlCalFile()

@@ -71,6 +71,7 @@ import astropy.constants
 from util import utils
 from util.FileName import FileName
 from headers import TimeMask
+from util.CalLookupFile import CalLookupFile
 
 class ObsFile:
     h = astropy.constants.h.to('eV s').value  #4.135668e-15 #eV s
@@ -103,6 +104,7 @@ class ObsFile:
         self.centroidListFileName = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
+        self.setWvlDitherSeed()
         
 
     def __del__(self):
@@ -453,6 +455,15 @@ class ObsFile:
         #return {'pixelData':pixelData,'firstSec':firstSec,'lastSec':lastSec}
         return pixelData
 
+    def setWvlDitherSeed(self,seed=None):
+        """
+        sets the seed for the random number generator used to dither the wavelengths by an ADC value. 
+        See getPixelWvlList.
+        seed - if seed is not specified or None, uses the default numpy.random.RandomState seed, which according to docs,
+        'will try to read data from /dev/urandom (or the Windows analogue) if available or seed from the clock otherwise'
+        """
+        self.seed = seed
+        np.random.seed(seed)
 
     def getPixelWvlList(self,iRow,iCol,firstSec=0,integrationTime=-1,excludeBad=True,dither=True,timeSpacingCut=None): #,getTimes=False):
         """
@@ -709,29 +720,33 @@ class ObsFile:
             maskedIntervals = inter & integrationInterval  #Intersection of the integration and the bad times for this pixel (for calculating eff. int. time)
             effectiveIntTime = (lastSec - firstSec) - utils.intervalSize(maskedIntervals)
 
-            timestamps = []
-            baselines = []
-            peakHeights = []
-
-            # pixelData is an array of data for this iRow,iCol, at each good time
-            for t in range(len(pixelData)):
-                interTicks = (inter - (np.floor(firstSec) + t)) * self.ticksPerSec         
-                times, peaks, bases = self.parsePhotonPackets(pixelData[t], inter=interTicks)
-                times = np.floor(firstSec) + self.tickDuration * times + t
-                timestamps.append(times)
-                baselines.append(bases)
-                peakHeights.append(peaks)
-                
-            if len(pixelData) > 0:         #Check that concatenate won't barf (check added JvE, 6/17/2013).
-                timestamps = np.concatenate(timestamps)
-                baselines = np.concatenate(baselines)
-                peakHeights = np.concatenate(peakHeights)
-            else:
+            if (inter == self.intervalAll) or len(pixelData) == 0:
                 timestamps = np.array([])
-                baselines = np.array([])
                 peakHeights = np.array([])
+                baselines = np.array([])
+                rawCounts = 0.
+                if inter == self.intervalAll:
+                    effectiveIntTime = 0.
+
+            else:
+                parsedData = self.parsePhotonPacketLists(pixelData)
+                #timestamps = [(np.floor(firstSec)+iSec+(self.tickDuration*times)) for iSec,times in enumerate(parsedData['timestamps'])]
+                #timestamps = np.concatenate(timestamps)
+
+                lengths = np.array([len(times) for times in parsedData['timestamps']])
+                secOffsets = np.floor(firstSec)+np.concatenate([np.ones(length)*iSec for iSec,length in enumerate(lengths)])
+                #secOffsets = np.floor(firstSec)+np.concatenate([[iSec]*len(times) for iSec,times in enumerate(parsedData['timestamps'])])
+                times = np.concatenate(parsedData['timestamps'])
+                timestamps = secOffsets+(self.tickDuration*times)
+                
+                baselines = np.concatenate(parsedData['baselines'])
+                peakHeights = np.concatenate(parsedData['parabolaFitPeaks'])
+
+                maskedDict = self.maskTimestamps(timestamps=timestamps,inter=inter,otherListsToFilter=[baselines,peakHeights])
+                timestamps = maskedDict['timestamps']
+                baselines,peakHeights = maskedDict['otherLists']
             
-            rawCounts = len(timestamps)
+                rawCounts = len(timestamps)
 
             if expTailTimescale != None and len(timestamps) > 0:
                 #find the time between peaks
@@ -1476,6 +1491,12 @@ class ObsFile:
 
     def loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True,reasons=[]):
         """
+        Included for backward compatibility, simply calls loadTimeMask
+        """
+        self.loadTimeMask(timeMaskFileName=hotPixCalFileName,switchOnMask=switchOnMask,reasons=reasons)
+
+    def loadTimeMask(self, timeMaskFileName, switchOnMask=True,reasons=[]):
+        """
         Load a hot pixel time mask from the given file, in a similar way to
         loadWvlCalFile, loadFlatCalFile, etc. Switches on hot pixel
         masking by default.
@@ -1484,15 +1505,15 @@ class ObsFile:
         import hotpix.hotPixels as hotPixels    #Here instead of at top to prevent circular import problems.
 
         scratchDir = os.getenv('MKID_PROC_PATH', '/')
-        hotPixCalPath = os.path.join(scratchDir, 'hotPixCalFiles')
-        fullHotPixCalFileName = os.path.join(hotPixCalPath, hotPixCalFileName)
-        if (not os.path.exists(fullHotPixCalFileName)):
-            print 'Hot pixel cal file does not exist: ', fullHotPixCalFileName
+        timeMaskPath = os.path.join(scratchDir, 'timeMasks')
+        fullTimeMaskFileName = os.path.join(timeMaskPath, timeMaskFileName)
+        if (not os.path.exists(fullTimeMaskFileName)):
+            print 'time mask file does not exist: ', fullTimeMaskFileName
             raise IOError
 
-        self.hotPixFile = tables.openFile(fullHotPixCalFileName)
+        self.hotPixFile = tables.openFile(fullTimeMaskFileName)
         self.hotPixTimeMask = hotPixels.readHotPixels(self.hotPixFile, reasons=reasons)
-        self.hotPixFileName = fullHotPixCalFileName
+        self.hotPixFileName = fullTimeMaskFileName
         
         if (os.path.basename(self.hotPixTimeMask.obsFileName)
             != os.path.basename(self.fileName)):
@@ -1623,6 +1644,79 @@ class ObsFile:
             print 'wavelength cal file does not exist: ', fullWvlCalFileName
             raise
             
+    def loadAllCals(self,calLookupTablePath=None,wvlCalPath=None,flatCalPath=None,
+            fluxCalPath=None,timeMaskPath=None,timeAdjustmentPath=None,cosmicMaskPath=None,
+            beammapPath=None,centroidListPath=None):
+        """
+        loads all possible cal files from parameters or a calLookupTable. To avoid loading a particular cal, set the corresponding parameter to the empty string ''
+        """
+
+        calLookupTable = CalLookupFile(path=calLookupTablePath)
+        
+        _,_,obsTstamp = FileName(obsFile=self).getComponents()
+        if wvlCalPath is None:
+            wvlCalPath = calLookupTable.calSoln(obsTstamp)
+        if wvlCalPath != '':
+            self.loadWvlCalFile(wvlCalPath)
+            print 'loaded wavecal',self.wvlCalFileName
+        else:
+            print 'did not load wavecal'
+
+        if flatCalPath is None:
+            flatCalPath = calLookupTable.flatSoln(obsTstamp)
+        if flatCalPath != '':
+            self.loadFlatCalFile(flatCalPath)
+            print 'loaded flatcal',self.flatCalFileName
+        else:
+            print 'did not load flatcal'
+
+        if fluxCalPath is None:
+            fluxCalPath = calLookupTable.fluxSoln(obsTstamp)
+        if fluxCalPath != '':
+            self.loadFluxCalFile(fluxCalPath)
+            print 'loaded fluxcal',self.fluxCalFileName
+        else:
+            print 'did not load fluxcal'
+
+        if timeMaskPath is None:
+            timeMaskPath = calLookupTable.timeMask(obsTstamp)
+        if timeMaskPath != '':
+            self.loadTimeMask(timeMaskPath)
+            print 'loaded time mask',timeMaskPath
+        else:
+            print 'did not load time mask'
+
+        if timeAdjustmentPath is None:
+            timeAdjustmentPath = calLookupTable.timeAdjustments(obsTstamp)
+        if timeAdjustmentPath != '':
+            self.loadTimeAdjustmentFile(timeAdjustmentPath)
+            print 'loaded time adjustments',self.timeAdjustFileName
+        else:
+            print 'did not load time adjustments'
+
+        if cosmicMaskPath is None:
+            cosmicMaskPath = calLookupTable.cosmicMask(obsTstamp)
+        if cosmicMaskPath != '':
+            self.loadCosmicMask(cosmicMaskPath)
+            print 'loaded cosmic mask',self.cosmicMaskFileName
+        else:
+            print 'did not load cosmic mask'
+
+        if beammapPath is None:
+            beammapPath = calLookupTable.beammap(obsTstamp)
+        if beammapPath != '':
+            self.loadBeammapFile(beammapPath)
+            print 'loaded beammap',beammapPath
+        else:
+            print 'did not load new beammap'
+
+        if centroidListPath is None:
+            centroidListPath = calLookupTable.centroidList(obsTstamp)
+        if centroidListPath != '':
+            self.loadCentroidListFile(centroidListPath)
+            print 'loaded centroid list',self.centroidListFileName
+        else:
+            print 'did not load centroid list'
 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):
@@ -1649,8 +1743,92 @@ class ObsFile:
         wvlBinEdges = wvlBinEdges[::-1]
         return wvlBinEdges
 
-    def parsePhotonPackets(self, packets, inter=interval(),
-                           doParabolaFitPeaks=True, doBaselines=True):
+    def parsePhotonPacketLists(self, packets, doParabolaFitPeaks=True, doBaselines=True):
+        """
+        Parses an array of uint64 packets with the obs file format
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
+        """
+        # parse all packets
+        packetsAll = [np.array(packetList, dtype='uint64') for packetList in packets] #64 bit photon packet
+        timestampsAll = [np.bitwise_and(packetList, self.timestampMask) for packetList in packetsAll]
+        outDict = {'timestamps':timestampsAll}
+
+        if doParabolaFitPeaks:
+            parabolaFitPeaksAll = [np.bitwise_and(\
+                np.right_shift(packetList, self.nBitsAfterParabolaPeak), \
+                    self.pulseMask) for packetList in packetsAll]
+            outDict['parabolaFitPeaks']=parabolaFitPeaksAll
+
+        if doBaselines:
+            baselinesAll = [np.bitwise_and(\
+                np.right_shift(packetList, self.nBitsAfterBaseline), \
+                    self.pulseMask) for packetList in packetsAll]
+            outDict['baselines'] = baselinesAll
+            
+        return outDict
+
+    def parsePhotonPackets(self, packets, doParabolaFitPeaks=True, doBaselines=True):
+        """
+        Parses an array of uint64 packets with the obs file format
+        inter is an interval of time values to mask out
+        returns a list of timestamps,parabolaFitPeaks,baselines
+        """
+        # parse all packets
+        packetsAll = np.array(packets, dtype='uint64') #64 bit photon packet
+        timestampsAll = np.bitwise_and(packets, self.timestampMask)
+
+        if doParabolaFitPeaks:
+            parabolaFitPeaksAll = np.bitwise_and(\
+                np.right_shift(packets, self.nBitsAfterParabolaPeak), \
+                    self.pulseMask)
+        else:
+            parabolaFitPeaksAll = np.arange(0)
+
+        if doBaselines:
+            baselinesAll = np.bitwise_and(\
+                np.right_shift(packets, self.nBitsAfterBaseline), \
+                    self.pulseMask)
+        else:
+            baselinesAll = np.arange(0)
+
+        timestamps = timestampsAll
+        parabolaFitPeaks = parabolaFitPeaksAll
+        baselines = baselinesAll
+        # return the values filled in above
+        return timestamps, parabolaFitPeaks, baselines
+
+    def maskTimestamps(self,timestamps,inter=interval(),otherListsToFilter=[]):
+        """
+        Masks out timestamps that fall in an given interval
+        inter is an interval of time values to mask out
+        otherListsToFilter is a list of parallel arrays to timestamps that should be masked in the same way
+        returns a dict with keys 'timestamps','otherLists'
+        """
+        # first special case:  inter masks out everything so return zero-length
+        # numpy arrays
+        if (inter == self.intervalAll):
+            filteredTimestamps = np.arange(0)
+            otherLists = [np.arange(0) for list in otherListsToFilter]
+        else:
+            if inter == interval() or len(timestamps) == 0:
+                # nothing excluded or nothing to exclude
+                # so return all unpacked values
+                filteredTimestamps = timestamps
+                otherLists = otherListsToFilter
+            else:
+                # there is a non-trivial set of times to mask. 
+                slices = calculateSlices(inter, timestamps)
+                filteredTimestamps = repackArray(timestamps, slices)
+                otherLists = []
+                for eachList in otherListsToFilter:
+                    filteredList = repackArray(eachList,slices)
+                    otherLists.append(filteredList)
+        # return the values filled in above
+        return {'timestamps':filteredTimestamps,'otherLists':otherLists}
+
+    def parsePhotonPackets_old(self, packets, inter=interval(),
+                           doParabolaFitPeaks=True, doBaselines=True,timestampOffset=0):
         """
         Parses an array of uint64 packets with the obs file format
         inter is an interval of time values to mask out
@@ -1747,7 +1925,8 @@ class ObsFile:
             raise RuntimeError, 'No hot pixel file loaded'
         self.hotPixIsApplied = True
         if len(reasons)>0:
-            self.hotPixTimeMask.mask = [self.hotPixTimeMask.reasonEnum[reason] for reason in reasons]
+            self.hotPixTimeMask.set_mask(reasons)
+            #self.hotPixTimeMask.mask = [self.hotPixTimeMask.reasonEnum[reason] for reason in reasons]
         
 
     def switchOffCosmicTimeMask(self):

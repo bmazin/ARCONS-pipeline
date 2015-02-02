@@ -7,7 +7,6 @@ import os
 from headers.CalHeaders import CalLookup_Description
 from util import utils
 from util.FileName import FileName
-from util.ObsFile import ObsFile
 import tables
 import glob
 from matplotlib.dates import strpdate2num
@@ -112,7 +111,6 @@ class CalLookupFile:
         if fn is None:
             return ''
         else:
-            print fn
             isIllumCal = entry['flatSoln_isIllumCal']
             if isIllumCal:
                 return fn.illumSoln()
@@ -161,55 +159,126 @@ class CalLookupFile:
         else:
             return fn.centroidList()
 
-    def populateTimeMasks(self,runPath):
-        for root,dirs,files in os.walk(runPath):
-            obsFilenames = fnmatch.filter(files,'obs*.h5')
-            for obsFilename in obsFilenames:
-                obsPath = os.path.join(root,obsFilename)
-                
-                try:
-                    obs = ObsFile(obsPath)
-                    fn = FileName(obsFile=obsPath)
-                    params = {}
-                    params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
-                    params['timeMask_run'],params['timeMask_date'],params['timeMask_tstamp'] = fn.getComponents()
-                    print params
-                    self.updateObs(newParams=params)
-                except:
-                    pass
 
-    def populateWaveCals(self,runPath):
-        for root,dirs,files in os.walk(runPath):
-            obsFilenames = fnmatch.filter(files,'obs*.h5')
-            for obsFilename in obsFilenames:
-                obsPath = os.path.join(root,obsFilename)
-                
-                try:
-                    obs = ObsFile(obsPath)
-                    fn = FileName(obsFile=obsPath)
-                    params = {}
-                    params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
-                    params['waveSoln_run'] = params['obs_run']
+import util.ObsFile
+def populateTimeMasks(runPath,lookupPath=None):
+    if lookupPath is None:
+        lookupPath = os.environ['MKID_CAL_LOOKUP']
+    if not os.path.exists(path):
+        writeNewCalLookupFile(path)
 
-                    obs.loadBestWvlCalFile()
-                    waveCalPath = obs.wvlCalFileName
-                    waveCalFilename = os.path.basename(waveCalPath)
-                    if waveCalFilename.startswith('master'):
-                        params['waveSoln_isMasterCal'] = True
-                        tstamp = waveCalFilename.split('_')[1].split('.')[0]
-                        params['waveSoln_tstamp'] = tstamp
-                        params['waveSoln_date'] = ''
-                    else:
-                        params['waveSoln_isMasterCal'] = False
-                        tstamp = waveCalFilename.split('_')[1].split('.')[0]
-                        params['waveSoln_tstamp'] = tstamp
-                        dirs = os.path.dirname(os.path.normpath(waveCalPath)).split(os.sep)
-                        params['waveSoln_date'] = dirs[-1]
-                    print params
-                    self.updateObs(newParams=params)
-                except:
-                    pass
-    
+    lookup = CalLookupFile(path,mode='a')
+    for root,dirs,files in os.walk(runPath):
+        obsFilenames = fnmatch.filter(files,'obs*.h5')
+        for obsFilename in obsFilenames:
+            obsPath = os.path.join(root,obsFilename)
+            
+            try:
+                obs = util.ObsFile.ObsFile(obsPath)
+                fn = FileName(obsFile=obsPath)
+                params = {}
+                params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
+                params['timeMask_run'],params['timeMask_date'],params['timeMask_tstamp'] = fn.getComponents()
+                print params
+                lookup.updateObs(newParams=params)
+            except:
+                pass
+
+def populateFluxCals(runPath,lookupPath=None):
+    if lookupPath is None:
+        lookupPath = os.environ['MKID_CAL_LOOKUP']
+    if not os.path.exists(path):
+        writeNewCalLookupFile(path)
+
+    lookup = CalLookupFile(path,mode='a')
+    for root,dirs,files in os.walk(runPath):
+        obsFilenames = fnmatch.filter(files,'obs*.h5')
+        for obsFilename in obsFilenames:
+            obsPath = os.path.join(root,obsFilename)
+            
+            try:
+                obs = util.ObsFile.ObsFile(obsPath)
+                fn = FileName(obsFile=obsPath)
+                params = {}
+                params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
+                if params['obs_run'] == 'PAL2014':
+                    params['fluxSoln_run'] = 'PAL2012'
+                    params['fluxSoln_date'] = '20121211'
+                    params['fluxSoln_tstamp'] = 'absolute_021727'
+                
+                print params
+                lookup.updateObs(newParams=params)
+            except:
+                pass
+
+def populateFlatCals(runPath,lookupPath=None):
+    if lookupPath is None:
+        lookupPath = os.environ['MKID_CAL_LOOKUP']
+    if not os.path.exists(path):
+        writeNewCalLookupFile(path)
+
+    lookup = CalLookupFile(path,mode='a')
+
+    for root,dirs,files in os.walk(runPath):
+        obsFilenames = fnmatch.filter(files,'obs*.h5')
+        for obsFilename in obsFilenames:
+            obsPath = os.path.join(root,obsFilename)
+            
+            try:
+                obs = util.ObsFile.ObsFile(obsPath)
+                fn = FileName(obsFile=obsPath)
+                params = {}
+                params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
+                params['flatSoln_run'] = params['obs_run']
+
+                if params['obs_date'] in ['20140923','20140924','20141020','20141021','20141022']:
+                    params['flatSoln_date'] = params['obs_date']
+                else:
+                    if params['obs_date'] == '20140925':
+                        params['flatSoln_date'] = '20140924'
+                print params
+                lookup.updateObs(newParams=params)
+            except:
+                pass
+
+def populateWaveCals(runPath,lookupPath=None):
+    if lookupPath is None:
+        lookupPath = os.environ['MKID_CAL_LOOKUP']
+    if not os.path.exists(path):
+        writeNewCalLookupFile(path)
+
+    lookup = CalLookupFile(path,mode='a')
+    for root,dirs,files in os.walk(runPath):
+        obsFilenames = fnmatch.filter(files,'obs*.h5')
+        for obsFilename in obsFilenames:
+            obsPath = os.path.join(root,obsFilename)
+            
+            try:
+                obs = util.ObsFile.ObsFile(obsPath)
+                fn = FileName(obsFile=obsPath)
+                params = {}
+                params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
+                params['waveSoln_run'] = params['obs_run']
+
+                obs.loadBestWvlCalFile()
+                waveCalPath = obs.wvlCalFileName
+                waveCalFilename = os.path.basename(waveCalPath)
+                if waveCalFilename.startswith('master'):
+                    params['waveSoln_isMasterCal'] = True
+                    tstamp = waveCalFilename.split('_')[1].split('.')[0]
+                    params['waveSoln_tstamp'] = tstamp
+                    params['waveSoln_date'] = ''
+                else:
+                    params['waveSoln_isMasterCal'] = False
+                    tstamp = waveCalFilename.split('_')[1].split('.')[0]
+                    params['waveSoln_tstamp'] = tstamp
+                    dirs = os.path.dirname(os.path.normpath(waveCalPath)).split(os.sep)
+                    params['waveSoln_date'] = dirs[-1]
+                print params
+                lookup.updateObs(newParams=params)
+            except:
+                pass
+
 
 def writeNewCalLookupFile(path=None):
     if path is None:
@@ -235,9 +304,11 @@ if __name__=='__main__':
     path = os.environ['MKID_CAL_LOOKUP']
     if not os.path.exists(path):
         writeNewCalLookupFile(path)
-    lookup = CalLookupFile(path,mode='a')
-    #lookup.populateWaveCals('/ScienceData/PAL2014')
-    lookup.populateTimeMasks('/ScienceData/PAL2014')
+
+    lookup = CalLookupFile()
+    #populateWaveCals('/ScienceData/PAL2014')
+    #populateFlatCals('/ScienceData/PAL2014')
+    #populateFluxCals('/ScienceData/PAL2014')
 
     print lookup.obs('20141021-091336')
     
