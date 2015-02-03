@@ -10,16 +10,17 @@ from util.readDict import readDict
 import astrometry.CentroidCalc as cc
 import multiprocessing
 
-def centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess,hotPath,flatPath):
+def centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess):
     obs = ObsFile(obsPath)
     print obsPath,obs.getFromHeader('exptime'),obs
-    obs.loadBestWvlCalFile()
-    obs.loadFlatCalFile(flatPath)
-    obs.setWvlCutoffs(3000,8000)
-    if not os.path.exists(hotPath):
-        hp.findHotPixels(obsFile=obs,outputFileName=hotPath,display=True,fwhm=2.,boxSize=5, nSigmaHot=4.0,)
-    obs.loadHotPixCalFile(hotPath,switchOnMask=True)
-    cc.centroidCalc(obs,centroidRa,centroidDec,guessTime=300,integrationTime=100,secondMaxCountsForDisplay=2000,HA_offset=haOffset,xyapprox=[xGuess,yGuess],outputFileName=centroidPath,usePsfFit=True)
+    obs.loadAllCals()
+#    obs.loadBestWvlCalFile()
+#    obs.loadFlatCalFile(flatPath)
+    obs.setWvlCutoffs(3000,11000)
+#    if not os.path.exists(hotPath):
+#        hp.findHotPixels(obsFile=obs,outputFileName=hotPath,display=True,fwhm=2.,boxSize=5, nSigmaHot=4.0,)
+#    obs.loadHotPixCalFile(hotPath,switchOnMask=True)
+    cc.centroidCalc(obs,centroidRa,centroidDec,guessTime=300,integrationTime=30,secondMaxCountsForDisplay=2000,HA_offset=haOffset,xyapprox=[xGuess,yGuess],outputFileName=centroidPath,usePsfFit=True,radiusOfSearch=8)
     print 'done centroid',centroidPath
     del obs
 
@@ -74,21 +75,23 @@ if __name__=='__main__':
     haOffset = 150.
     print flatFilenames
 
-    nWorkers = 1
+    nWorkers = 7
     activeWorkers = []
+    print centerPixelGuesses
     for iSeq,obsSeq in enumerate(obsFilenames):
         for iObs,obsPath in enumerate(obsSeq):
             print 'starting',obsPath
             centroidPath = centroidFilenames[iSeq][iObs]
             yGuess,xGuess = centerPixelGuesses[iSeq]
-            hotPath = timeMaskFilenames[iSeq][iObs]
             flatPath = flatFilenames[iSeq]
             if nWorkers > 1:
-                worker = multiprocessing.Process(target=centroidObs,args=(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess,hotPath,flatPath))
+                worker = multiprocessing.Process(target=centroidObs,args=(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess))
                 worker.start()
                 activeWorkers.append(worker)
             else:
-                centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess,hotPath,flatPath)
+                print 'entering centroid'
+                centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess)
+                print 'exiting centroid'
             if len(activeWorkers) >= nWorkers:
                 for worker in activeWorkers:
                     worker.join()
