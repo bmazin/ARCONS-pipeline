@@ -1,4 +1,4 @@
-import os, math, time
+import os, math, time, warnings
 import numpy as np
 from util import FileName
 from util import ObsFile
@@ -7,6 +7,8 @@ from interval import interval, inf, imath
 import pyfits
 import matplotlib.pyplot as plt
 import pickle
+from headers.DisplayStackHeaders import writeImageStack,readImageStack
+
 class ObsFileSeq():
     """
     Deal with a sequence of obsFiles, and present data as a set of
@@ -51,17 +53,23 @@ class ObsFileSeq():
         self.date = date
         self.timeStamps = timeStamps
         self.timeStamps.sort()
+        self.dt=dt
         self.obsFiles = []
         self.fileNames = []
         self.obsFileUnixTimes = []
         for timeStamp in self.timeStamps:
             fn = FileName.FileName(run,date,timeStamp)
             self.fileNames.append(fn)
-            of = ObsFile.ObsFile(fn.obs()) 
-            fn2 = FileName.FileName(run,date,"")
+            of = ObsFile.ObsFile(fn.obs())
+            of.loadBeammapFile(fn.beammap())
             of.loadBestWvlCalFile()
+            fn2 = FileName.FileName(run,date,"")
             of.loadFlatCalFile(fn2.flatSoln())
-            of.loadHotPixCalFile(fn.timeMask())
+            try:
+                of.loadHotPixCalFile(fn.timeMask())
+                self.hotPixelsApplied=True
+            except:
+                self.hotPixelsApplied=False
             self.obsFiles.append(of)
             self.obsFileUnixTimes.append(of.getFromHeader('unixtime'))
         self.tcs = TCS.TCS(run,date)
@@ -81,7 +89,13 @@ class ObsFileSeq():
         self._defineFrames(dt)
 
         # Default settings for astrometry
-        self.setRm()
+        try:
+            self.setRm()
+        except:
+            #Fails if the telescope doesn't move every frame...
+            #Ignore this for now
+            pass
+            
     def setRm(self,
               degreesPerPixel = 0.4/3600,
               thetaDeg = 0.0,
@@ -373,31 +387,13 @@ class ObsFileSeq():
         hdu.writeto(fn)
         
     def loadImageStack(self,fileName, wvlStart=None,wvlStop=None,
-                           weighted=False, fluxWeighted=False, 
-                           getRawCount=False, scaleByEffInt=False,
+                           weighted=True, fluxWeighted=False, 
+                           getRawCount=False, scaleByEffInt=True,
                            deadTime=100.e-6):
         #If the file exists, read it out
         if os.path.isfile(fileName):
-            print 'Loading image stack from ',fileName
-            stackFile = tables.openFile(fullFilename, mode='r')
-            images = stackFile.getNode('/',imagesGroupName)._f_getChild(imagesTableName).read()
-            images = np.rollaxis(images,2,0)
-            try:
-                pixIntTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(pixIntTimeTableName).read()
-                pixIntTimes = np.rollaxis(pixIntTimes,2,0)
-            except tables.exceptions.NoSuchNodeError:
-                pixIntTimes = None
-            startTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(timeTableName).read()
-            try:
-                endTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(endTimeTableName).read()
-            except tables.exceptions.NoSuchNodeError:
-                endTimes = None
-            try:
-                intTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(intTimeTableName).read()
-            except tables.exceptions.NoSuchNodeError:
-                intTimes=None
-            stackFile.close()
-            return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':np.asarray(startTimes).flatten(),'endTimes':np.asarray(endTimes).flatten(),'intTimes':np.asarray(intTimes).flatten()}
+            return readImageStack(fileName)
+            
         #if the file doesn't exists, make it
         else:
             images=[]
@@ -406,23 +402,29 @@ class ObsFileSeq():
             endTimes=[]
             intTimes=[]
             for iFrame in range(len(self.frameIntervals)):
-                im_dict = getPixelCountImageByFrame(self,iFrame,wvlStart,wvlStop,
+                im_dict = self.getPixelCountImageByFrame(iFrame,wvlStart,wvlStop,
                                                     weighted, fluxWeighted, 
                                                     getRawCount, scaleByEffInt,
                                                     deadTime)
-                images.append(im_dict['images'])
-                pixIntTimes.append(im_dict['pixIntTimes'])
-                startTimes.append(im_dict['startTimes'])
-                endTimes.append(im_dict['endTimes'])
-                intTimes.append(im_dict['intTimes'])
+                images.append(im_dict['image'])
+                pixIntTimes.append(im_dict['pixIntTime'])
+                startTimes.append(im_dict['startTime'])
+                endTimes.append(im_dict['endTime'])
+                intTimes.append(im_dict['intTime'])
                 
+            writeImageStack(fileName, images, startTimes, endTimes=endTimes, intTimes=intTimes,
+                            pixIntTimes=pixIntTimes, targetName=self.name, run=self.run,
+                            nFrames=len(self.frameIntervals), wvlLowerLimit=wvlStart, 
+                            wvlUpperLimit=wvlStop, weighted=weighted, fluxWeighted=fluxWeighted,
+                            hotPixelsApplied=self.hotPixelsApplied, maxExposureTime=self.dt,
+                            tStamps=self.timeStamps)
             
-            
-            return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':startTimes,'endTimes':endTimes,'intTimes':intTimes}
+            #return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':startTimes,'endTimes':endTimes,'intTimes':intTimes}
+            return readImageStack(fileName)
 
     def getPixelCountImageByFrame(self,iFrame,wvlStart=None,wvlStop=None,
-                           weighted=False, fluxWeighted=False, 
-                           getRawCount=False, scaleByEffInt=False,
+                           weighted=True, fluxWeighted=True, 
+                           getRawCount=False, scaleByEffInt=True,
                            deadTime=100.e-6):
         '''
         This gets the i'th image
@@ -445,38 +447,36 @@ class ObsFileSeq():
             'endTIme' - end of image. Might be different from startTime+intTime if there's a break in the middle while switching to a new obsFile
             
         '''
-                           
-        scaleByEffInt=False #Do this manually so we can correct deadTime first                           
+                        
         retval = None
         for obsInfo in self.frameObsInfos[iFrame]:
-            if len(overlap) > 0:
-                print obsInfo
-                obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart, wvlUpperLimit=wvlStop)
-                im_dict = obsInfo['obs'].getPixelCountImage(obsInfo["firstSec"],
-                                                        obsInfo["integrationTime"],
-                                                        weighted,
-                                                        fluxWeighted,
-                                                        getRawCount,
-                                                        scaleByEffInt)
-                im = im_dict['image']
-                #Correct for dead time
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
-                    #warnings.simplefilter("ignore",RuntimeWarning)
-                    #warnings.simplefilter("ignore",FutureWarning)
-                    w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
-                im = im/w_deadTime
+            print obsInfo
+            obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart, wvlUpperLimit=wvlStop)
+            im_dict = obsInfo['obs'].getPixelCountImage(obsInfo["firstSec"],
+                                                    obsInfo["integrationTime"],
+                                                    weighted,
+                                                    fluxWeighted,
+                                                    getRawCount,
+                                                    scaleByEffInt=False)#Do this manually so we can correct deadTime first   
+            im = im_dict['image']
+            print 'im: ',np.sum(im)
+            #Correct for dead time
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
+                w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
+            im = im/w_deadTime
+            if scaleByEffInt:
                 #Correct for exposure time
                 im = im*obsInfo["integrationTime"]/im_dict['effIntTimes']
-                #Remove any funny values
-                im[np.invert(np.isfinite(im))]=0.
-                
-                if retval is None:
-                    retval = {'image':im, 'pixIntTime':im_dict['effIntTimes'], 'intTime':obsInfo["integrationTime"],'startTime':self.frameIntervals[iFrame][0],'endTime':self.frameIntervals[iFrame][1]}
-                else:
-                    retval['image'] += im
-                    retval['pixIntTime'] += im_dict['effIntTimes']
-                    retval['intTime'] += obsInfo["integrationTime"]
+            #Remove any funny values
+            im[np.invert(np.isfinite(im))]=0.
+            print '--> ',np.sum(im)
+            if retval is None:
+                retval = {'image':im, 'pixIntTime':im_dict['effIntTimes'], 'intTime':obsInfo["integrationTime"],'startTime':self.frameIntervals[iFrame][0][0],'endTime':self.frameIntervals[iFrame][0][1]}
+            else:
+                retval['image'] += im
+                retval['pixIntTime'] += im_dict['effIntTimes']
+                retval['intTime'] += obsInfo["integrationTime"]
                 
         return retval
 
