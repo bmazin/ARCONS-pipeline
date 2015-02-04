@@ -5,26 +5,51 @@ from util.ObsFile import ObsFile
 import os
 import hotpix.hotPixels as hp
 from util.FileName import FileName
-from util.popup import plotArray
+from util.popup import plotArray,PopUp
 from util.readDict import readDict
 import astrometry.CentroidCalc as cc
 import multiprocessing
 
-def centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess):
+def centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess,savePath,tstamp):
     obs = ObsFile(obsPath)
-    print obsPath,obs.getFromHeader('exptime'),obs
+#    if not os.path.exists(hotPath):
+#        hp.findHotPixels(obsFile=obs,outputFileName=hotPath)
     obs.loadAllCals()
+#    obs.loadHotPixCalFile(hotPath,switchOnMask=True)
 #    obs.loadBestWvlCalFile()
 #    obs.loadFlatCalFile(flatPath)
     obs.setWvlCutoffs(3000,11000)
-#    if not os.path.exists(hotPath):
-#        hp.findHotPixels(obsFile=obs,outputFileName=hotPath,display=True,fwhm=2.,boxSize=5, nSigmaHot=4.0,)
-#    obs.loadHotPixCalFile(hotPath,switchOnMask=True)
-    cc.centroidCalc(obs,centroidRa,centroidDec,guessTime=300,integrationTime=30,secondMaxCountsForDisplay=2000,HA_offset=haOffset,xyapprox=[xGuess,yGuess],outputFileName=centroidPath,usePsfFit=True,radiusOfSearch=8)
-    print 'done centroid',centroidPath
+    obs.loadCentroidListFile(centroidPath)
+    
+    ctrdFile = obs.centroidListFile
+    sliceTimes = ctrdFile.root.centroidlist.times.read()
+    xPositions = ctrdFile.root.centroidlist.xPositions.read()
+    yPositions = ctrdFile.root.centroidlist.yPositions.read()
+    intTime = sliceTimes[1]-sliceTimes[0]
+    
+    for iTime,time in enumerate(sliceTimes):
+        x = xPositions[iTime]
+        y = yPositions[iTime]
+        title='centroid_{}_{}s'.format(tstamp,time)
+        imgDict = obs.getPixelCountImage(firstSec=time,integrationTime=intTime,weighted=True)
+        imgPath=os.path.join(savePath,title+'.png')
+        pop = PopUp(showMe=False)
+        pop.plotArray(imgDict['image'],title=title)
+        pop.axes.plot(x,y,color='g',marker='d')
+        pop.fig.savefig(imgPath)
+        print 'saved to',imgPath
+        
     del obs
 
 if __name__=='__main__':
+    savePath = '/Scratch/dataProcessing/J0337/'
+    run = 'PAL2014'
+    sunsetDates = []
+    flatDates = []
+    obsSequences = []
+    guessRows = []
+    guessCols = []
+    
     paramFile = 'j0337.dict'
     params = readDict()
     params.read_from_file(paramFile)
@@ -38,23 +63,19 @@ if __name__=='__main__':
     centerPixelGuesses = []
 
     sunsetDates.append(params['sunsetDate0'])
-    flatDates.append(params['flatDate0'])
     parFiles.append(params['parFile0'])
     obsSequences.append(params['obsSequence0'])
     centerPixelGuesses.append(params['centerPixel0'])
 
     sunsetDates.append(params['sunsetDate1'])
-    flatDates.append(params['flatDate1'])
     parFiles.append(params['parFile1'])
     obsSequences.append(params['obsSequence1'])
     centerPixelGuesses.append(params['centerPixel1'])
 
     sunsetDates.append(params['sunsetDate2'])
-    flatDates.append(params['flatDate2'])
     parFiles.append(params['parFile2'])
     obsSequences.append(params['obsSequence2'])
     centerPixelGuesses.append(params['centerPixel2'])
-    
 
 
     obsFilenames = []
@@ -65,8 +86,7 @@ if __name__=='__main__':
         obsSequence = obsSequences[iSeq]
         sunsetDate = sunsetDates[iSeq]
         obsFilenames.append([FileName(run=run,date=sunsetDate,tstamp=ts).obs() for ts in obsSequence])
-        timeMaskFilenames.append([FileName(run=run,date=sunsetDate,tstamp=ts).timeMask() for ts in obsSequence])
-        flatFilenames.append(FileName(run=run,date=flatDates[iSeq],tstamp='').flatSoln())
+        #plFilenames.append([FileName(run=run,date=sunsetDate,tstamp=ts).crabList() for ts in obsSequence])
         centroidFilenames.append([FileName(run=run,date=sunsetDate,tstamp=ts).centroidList() for ts in obsSequence])
 
 
@@ -77,24 +97,24 @@ if __name__=='__main__':
 
     nWorkers = 7
     activeWorkers = []
-    print centerPixelGuesses
     for iSeq,obsSeq in enumerate(obsFilenames):
         for iObs,obsPath in enumerate(obsSeq):
             print 'starting',obsPath
             centroidPath = centroidFilenames[iSeq][iObs]
+#            xGuess = guessCols[iSeq]
+#            yGuess = guessRows[iSeq]
             yGuess,xGuess = centerPixelGuesses[iSeq]
-            flatPath = flatFilenames[iSeq]
-            if nWorkers > 1:
-                worker = multiprocessing.Process(target=centroidObs,args=(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess))
-                worker.start()
-                activeWorkers.append(worker)
-            else:
-                print 'entering centroid'
-                centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess)
-                print 'exiting centroid'
+#            hotPath = timeMaskFilenames[iSeq][iObs]
+#            flatPath = flatFilenames[iSeq]
+            tstamp = obsSequences[iSeq][iObs]
+            worker = multiprocessing.Process(target=centroidObs,args=(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess,savePath,tstamp))
+            worker.start()
+            activeWorkers.append(worker)
             if len(activeWorkers) >= nWorkers:
                 for worker in activeWorkers:
                     worker.join()
                 activeWorkers = []
+
+            #centroidObs(obsPath,centroidPath,centroidRa,centroidDec,haOffset,xGuess,yGuess,hotPath,flatPath)
 
     
