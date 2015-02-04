@@ -102,8 +102,10 @@ def plotLightCurve(self,LC):
     self.fig.canvas.draw()
 
 if __name__ == '__main__':
-    path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
-    identifier = '1'
+    #path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
+    #identifier = '1'
+    path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
+    identifier = '0'
     LC = LightCurve(path,fileID = identifier, PSF=True) 
     
     pop(plotFunc = partial(plotLightCurve,LC=LC),title="Light Curve Popup")

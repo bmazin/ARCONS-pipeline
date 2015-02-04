@@ -1,4 +1,4 @@
-import os, math, time
+import os, math, time, warnings
 import numpy as np
 from util import FileName
 from util import ObsFile
@@ -7,6 +7,15 @@ from interval import interval, inf, imath
 import pyfits
 import matplotlib.pyplot as plt
 import pickle
+
+from headers.DisplayStackHeaders import writeImageStack,readImageStack
+from PyQt4 import QtGui
+from PyQt4 import QtCore
+from PyQt4.QtGui import *
+import astrometry.CentroidCalc as cc
+import matplotlib as mpl
+
+
 class ObsFileSeq():
     """
     Deal with a sequence of obsFiles, and present data as a set of
@@ -51,17 +60,23 @@ class ObsFileSeq():
         self.date = date
         self.timeStamps = timeStamps
         self.timeStamps.sort()
+        self.dt=dt
         self.obsFiles = []
         self.fileNames = []
         self.obsFileUnixTimes = []
         for timeStamp in self.timeStamps:
             fn = FileName.FileName(run,date,timeStamp)
             self.fileNames.append(fn)
-            of = ObsFile.ObsFile(fn.obs()) 
-            fn2 = FileName.FileName(run,date,"")
+            of = ObsFile.ObsFile(fn.obs())
+            of.loadBeammapFile(fn.beammap())
             of.loadBestWvlCalFile()
+            fn2 = FileName.FileName(run,date,"")
             of.loadFlatCalFile(fn2.flatSoln())
-            of.loadHotPixCalFile(fn.timeMask())
+            try:
+                of.loadHotPixCalFile(fn.timeMask())
+                self.hotPixelsApplied=True
+            except:
+                self.hotPixelsApplied=False
             self.obsFiles.append(of)
             self.obsFileUnixTimes.append(of.getFromHeader('unixtime'))
         self.tcs = TCS.TCS(run,date)
@@ -81,7 +96,13 @@ class ObsFileSeq():
         self._defineFrames(dt)
 
         # Default settings for astrometry
-        self.setRm()
+        try:
+            self.setRm()
+        except:
+            #Fails if the telescope doesn't move every frame...
+            #Ignore this for now
+            pass
+            
     def setRm(self,
               degreesPerPixel = 0.4/3600,
               thetaDeg = 0.0,
@@ -248,7 +269,35 @@ class ObsFileSeq():
             retval.append(line)
         return retval
 
-
+    def getFrameDict(self, printLines = True):
+        """
+        Pretty much the same as getFramList except that it returns a dictionary for each frame
+        """
+        frameInfo = []
+        for i,frameInterval in enumerate(self.frameIntervals):
+            t0 = frameInterval[0][0]-self.beginTime
+            t1 = frameInterval[0][1]-self.beginTime
+            dt = t1-t0
+            locIdx = self.locationIdx[i]
+            xOff = self.tcsDict['raOffset'][locIdx]
+            yOff = self.tcsDict['decOffset'][locIdx]
+            meanTF = self.getTimeBySeq(i)
+            fI = {"iframe":i,
+                  "begin":t0,
+                  "expTime":dt,
+                  "loc":locIdx,
+                  "offsRA":xOff,
+                  "offsDec":yOff,
+                  "meanTime":meanTF}
+                 #"obsFile":ofs.fileNames[i].obs(),
+                 #"ob":ofs.obsFiles[i]}
+            if printLines:
+                print fI    
+            frameInfo.append(fI)
+        
+        self.frameDict = frameInfo
+        return frameInfo
+    
 
     def getSpectralCubeByFrame(self,iFrame,weighted=False, fluxWeighted=False,
                                    wvlStart=None,wvlStop=None,
@@ -373,31 +422,13 @@ class ObsFileSeq():
         hdu.writeto(fn)
         
     def loadImageStack(self,fileName, wvlStart=None,wvlStop=None,
-                           weighted=False, fluxWeighted=False, 
-                           getRawCount=False, scaleByEffInt=False,
+                           weighted=True, fluxWeighted=False, 
+                           getRawCount=False, scaleByEffInt=True,
                            deadTime=100.e-6):
         #If the file exists, read it out
         if os.path.isfile(fileName):
-            print 'Loading image stack from ',fileName
-            stackFile = tables.openFile(fullFilename, mode='r')
-            images = stackFile.getNode('/',imagesGroupName)._f_getChild(imagesTableName).read()
-            images = np.rollaxis(images,2,0)
-            try:
-                pixIntTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(pixIntTimeTableName).read()
-                pixIntTimes = np.rollaxis(pixIntTimes,2,0)
-            except tables.exceptions.NoSuchNodeError:
-                pixIntTimes = None
-            startTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(timeTableName).read()
-            try:
-                endTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(endTimeTableName).read()
-            except tables.exceptions.NoSuchNodeError:
-                endTimes = None
-            try:
-                intTimes = stackFile.getNode('/',imagesGroupName)._f_getChild(intTimeTableName).read()
-            except tables.exceptions.NoSuchNodeError:
-                intTimes=None
-            stackFile.close()
-            return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':np.asarray(startTimes).flatten(),'endTimes':np.asarray(endTimes).flatten(),'intTimes':np.asarray(intTimes).flatten()}
+            return readImageStack(fileName)
+            
         #if the file doesn't exists, make it
         else:
             images=[]
@@ -406,23 +437,29 @@ class ObsFileSeq():
             endTimes=[]
             intTimes=[]
             for iFrame in range(len(self.frameIntervals)):
-                im_dict = getPixelCountImageByFrame(self,iFrame,wvlStart,wvlStop,
+                im_dict = self.getPixelCountImageByFrame(iFrame,wvlStart,wvlStop,
                                                     weighted, fluxWeighted, 
                                                     getRawCount, scaleByEffInt,
                                                     deadTime)
-                images.append(im_dict['images'])
-                pixIntTimes.append(im_dict['pixIntTimes'])
-                startTimes.append(im_dict['startTimes'])
-                endTimes.append(im_dict['endTimes'])
-                intTimes.append(im_dict['intTimes'])
+                images.append(im_dict['image'])
+                pixIntTimes.append(im_dict['pixIntTime'])
+                startTimes.append(im_dict['startTime'])
+                endTimes.append(im_dict['endTime'])
+                intTimes.append(im_dict['intTime'])
                 
+            writeImageStack(fileName, images, startTimes, endTimes=endTimes, intTimes=intTimes,
+                            pixIntTimes=pixIntTimes, targetName=self.name, run=self.run,
+                            nFrames=len(self.frameIntervals), wvlLowerLimit=wvlStart, 
+                            wvlUpperLimit=wvlStop, weighted=weighted, fluxWeighted=fluxWeighted,
+                            hotPixelsApplied=self.hotPixelsApplied, maxExposureTime=self.dt,
+                            tStamps=self.timeStamps)
             
-            
-            return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':startTimes,'endTimes':endTimes,'intTimes':intTimes}
+            #return {'images':images,'pixIntTimes':pixIntTimes,'startTimes':startTimes,'endTimes':endTimes,'intTimes':intTimes}
+            return readImageStack(fileName)
 
     def getPixelCountImageByFrame(self,iFrame,wvlStart=None,wvlStop=None,
-                           weighted=False, fluxWeighted=False, 
-                           getRawCount=False, scaleByEffInt=False,
+                           weighted=True, fluxWeighted=True, 
+                           getRawCount=False, scaleByEffInt=True,
                            deadTime=100.e-6):
         '''
         This gets the i'th image
@@ -445,38 +482,36 @@ class ObsFileSeq():
             'endTIme' - end of image. Might be different from startTime+intTime if there's a break in the middle while switching to a new obsFile
             
         '''
-                           
-        scaleByEffInt=False #Do this manually so we can correct deadTime first                           
+                        
         retval = None
         for obsInfo in self.frameObsInfos[iFrame]:
-            if len(overlap) > 0:
-                print obsInfo
-                obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart, wvlUpperLimit=wvlStop)
-                im_dict = obsInfo['obs'].getPixelCountImage(obsInfo["firstSec"],
-                                                        obsInfo["integrationTime"],
-                                                        weighted,
-                                                        fluxWeighted,
-                                                        getRawCount,
-                                                        scaleByEffInt)
-                im = im_dict['image']
-                #Correct for dead time
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
-                    #warnings.simplefilter("ignore",RuntimeWarning)
-                    #warnings.simplefilter("ignore",FutureWarning)
-                    w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
-                im = im/w_deadTime
+            print obsInfo
+            obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart, wvlUpperLimit=wvlStop)
+            im_dict = obsInfo['obs'].getPixelCountImage(obsInfo["firstSec"],
+                                                    obsInfo["integrationTime"],
+                                                    weighted,
+                                                    fluxWeighted,
+                                                    getRawCount,
+                                                    scaleByEffInt=False)#Do this manually so we can correct deadTime first   
+            im = im_dict['image']
+            print 'im: ',np.sum(im)
+            #Correct for dead time
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
+                w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
+            im = im/w_deadTime
+            if scaleByEffInt:
                 #Correct for exposure time
                 im = im*obsInfo["integrationTime"]/im_dict['effIntTimes']
-                #Remove any funny values
-                im[np.invert(np.isfinite(im))]=0.
-                
-                if retval is None:
-                    retval = {'image':im, 'pixIntTime':im_dict['effIntTimes'], 'intTime':obsInfo["integrationTime"],'startTime':self.frameIntervals[iFrame][0],'endTime':self.frameIntervals[iFrame][1]}
-                else:
-                    retval['image'] += im
-                    retval['pixIntTime'] += im_dict['effIntTimes']
-                    retval['intTime'] += obsInfo["integrationTime"]
+            #Remove any funny values
+            im[np.invert(np.isfinite(im))]=0.
+            print '--> ',np.sum(im)
+            if retval is None:
+                retval = {'image':im, 'pixIntTime':im_dict['effIntTimes'], 'intTime':obsInfo["integrationTime"],'startTime':self.frameIntervals[iFrame][0][0],'endTime':self.frameIntervals[iFrame][0][1]}
+            else:
+                retval['image'] += im
+                retval['pixIntTime'] += im_dict['effIntTimes']
+                retval['intTime'] += obsInfo["integrationTime"]
                 
         return retval
 
@@ -497,6 +532,239 @@ class ObsFileSeq():
             plt.show()
         else:
             plt.savefig(fileName)
+
+
+#added by Neil vvvvvv 2/3/2015
+
+class MouseMonitor():
+    def __init__(self):
+        pass
+
+    def on_click(self,event):
+        if event.inaxes is self.ax1:
+            self.xyguess1 = [event.xdata,event.ydata]
+            print 'Clicked: ',self.xyguess1
+        
+        elif event.inaxes is self.ax2:
+            self.xyguess2 = [event.xdata,event.ydata]
+            print 'Clicked: ',self.xyguess2
+    
+    def on_scroll_cbar(self,event):
+        if event.inaxes is self.fig1.cbar.ax:
+            increment=0.05
+            currentClim = self.fig1.cbar.mappable.get_clim()
+            currentRange = currentClim[1]-currentClim[0]
+            if event.button == 'up':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]+increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]+increment*currentRange)
+            if event.button == 'down':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]-increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]-increment*currentRange)
+            self.fig1.cbar.mappable.set_clim(newClim)
+            self.fig1.canvas.draw()
+           
+        elif event.inaxes is self.fig2.cbar.ax:
+            increment=0.05
+            currentClim = self.fig2.cbar.mappable.get_clim()
+            currentRange = currentClim[1]-currentClim[0]
+            if event.button == 'up':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]+increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]+increment*currentRange)
+            if event.button == 'down':
+                if QtGui.QApplication.keyboardModifiers()==QtCore.Qt.ControlModifier:
+                    newClim = (currentClim[0]-increment*currentRange,currentClim[1])
+                elif QtGui.QApplication.keyboardModifiers()==QtCore.Qt.NoModifier:
+                    newClim = (currentClim[0],currentClim[1]-increment*currentRange)
+            self.fig2.cbar.mappable.set_clim(newClim)
+            self.fig2.canvas.draw()
+    
+    def connect(self):
+        self.cid1 = self.fig1.canvas.mpl_connect('button_press_event', self.on_click)
+        self.fig1.cbar = self.fig1.colorbar(self.handleMatshow1)
+        cid1 = self.fig1.canvas.mpl_connect('scroll_event', self.on_scroll_cbar)
+
+        self.cid2 = self.fig2.canvas.mpl_connect('button_press_event', self.on_click)
+        self.fig2.cbar = self.fig2.colorbar(self.handleMatshow2)
+        cid2 = self.fig2.canvas.mpl_connect('scroll_event', self.on_scroll_cbar)
+
+
+def getUserObjectGuess(images, norm = None):
+    '''
+    This is designed to allow the user to look at two frames, determine whether they contain matching stars,
+    and if so click on their position withing the image.
+    '''
+    flagList = np.array([1,1])
+    xyguess1 = [0,0]
+    xyguess2 = [0,0]
+
+    image1 = images[0]
+    image2 = images[1]
+
+    map = MouseMonitor()
+    map.fig1 = plt.figure(1)
+    map.ax1 = map.fig1.add_subplot(111)
+    map.ax1.set_title('Star Position Guess')
+    map.handleMatshow1 = map.ax1.matshow(image1,cmap = mpl.cm.gnuplot2, origin = 'lower', norm=norm)
+    
+    map.fig2 = plt.figure(2)
+    map.ax2 = map.fig2.add_subplot(111)
+    map.ax2.set_title('Star Position Guess')
+    map.handleMatshow2 = map.ax2.matshow(image2,cmap = mpl.cm.gnuplot2, origin = 'lower', norm=norm)
+
+    map.connect()
+    
+    plt.show() 
+    
+    try:
+        xyguess1 = map.xyguess1
+        print 'Guess1 = ' + str(xyguess1)
+        flagList[0]=0
+    except AttributeError:
+        pass
+
+    try:     
+        xyguess2 = map.xyguess2
+        print 'Guess2 = ' + str(xyguess2)
+        flagList[1]=0
+    except AttributeError:
+        pass
+    
+    xyguesses = np.array([xyguess1,xyguess2])    
+
+    return xyguesses, flagList
+
+def ObjectFinder(frames, data, RA = None, Dec = None, radiusOfSearch=10, usePsfFit=False):
+    '''
+    This allows the user to determine the exact positioning of a star withing a given frame, given that
+    the star exists in two frames. two images pop up, if they contain the same star, click on it in both images,
+    and the exact pixel positioning will be determine via centroiding. Some parts are fudged for now.
+
+    Inputs:
+        frames - This is an array of images corresponding to the various frames used for the mosaic. note that 
+                 the way this is written as of now requires that the first  and last frame include the same star. 
+                 I think this is typical so it should not be a problem.
+
+        data - this is an array of dictionaries corresponding to each frame. This is generated from
+               getFrameDict() which I have included in the ObsFileSeq class. This is required.
+
+        RA/Dec - these are not used as of now.
+    
+    Outputs:
+        
+        all the parameters that are needed for setRm()
+
+    Ben also suggested that a cross-correlating technique may be useful for matching frames with no star in them.
+    What do you guys think? I need to look into it more but I believe that this code can be expanded to also do
+    cross-correlation. - Neil
+    '''
+
+    offsRA = []
+    offsDec = []
+    iframe = [] 
+    meanTime = []  
+    
+    for i in range(len(data)):
+        offsRA.append(data[i]["offsRA"])
+        offsDec.append(data[i]["offsDec"])
+        iframe.append(data[i]["iframe"])
+        meanTime.append(data[i]["meanTime"])
+
+    offsRA = np.array(offsRA)
+    offsDec = np.array(offsDec)
+    iframe = np.array(iframe)
+    meanTime = np.array(meanTime)
+    
+    dpp = []
+    ang = []
+    
+    for i in range(1, len(frames)):
+        images = np.array([frames[i-1], frames[i]])    
+        oRA = np.array([offsRA[i-1], offsRA[i]])
+        oDec = np.array([offsDec[i-1], offsDec[i]])
+        print 'Looking for matching Stars...'
+
+        print 'frame: ', iframe[i-1], 'Offset RA: ', offsRA[i-1], 'Offset Dec: ', offsDec[i-1]
+        print 'frame: ', iframe[i], 'Offset RA: ', offsRA[i], 'Offset Dec: ', offsDec[i]         
+        
+        xyguesses, flagList = getUserObjectGuess(images)
+
+        if flagList[1]==0 and flagList[0]==0:
+            print 'match found! - determining centroid positions'
+                
+            xycenter1, flag1 = cc.centroidImage(images[1], xyguesses[1], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+            xycenter0, flag0 = cc.centroidImage(images[0], xyguesses[0], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+            print 'Success! Matching stars at: ', xycenter0, xycenter1                
+                
+            rc1 = np.array(xycenter1)
+            rc0 = np.array(xycenter0)
+            dCol = rc1[0] - rc0[0]
+            dRow = rc1[1] - rc0[1]                
+            dPix = math.sqrt(((rc1-rc0)**2).sum())
+
+            #center ra,dec of fram calculated from offsets
+            dRA = oRA[1]-oRA[0] #arcseconds
+            dDec = oDec[1]-oDec[0]
+            dDeg = math.sqrt(dRA**2+dDec**2)/3600 #degrees
+                
+            degPerPix = dDeg/dPix #plate scale
+    
+            #rotation
+            thetaPix = math.atan2(dCol,dRow) #angle from verticle
+            thetaSky = math.atan2(dRA, dDec) #angle from north
+            theta = thetaPix-thetaSky        #degrees
+                
+            dpp.append(degPerPix)
+            ang.append(theta)
+        
+        elif flagList[1]==1 or flagList[0]==1:
+            print 'no star found' 
+
+    dpp = np.array(dpp)
+    #print dpp
+    degPerPix = np.mean(dpp)
+    #print degPerPix
+    ang = np.array(ang)
+    #print ang
+    theta = np.mean(ang)  
+    #print theta  
+     
+    ## Pick two frames where the ra,dec offset is zero,
+    # usually the beginning and ending frames
+    
+    print 'Matching stars from the first and last frames'    
+    
+    images = [frames[0], frames[-1]]
+
+    print 'frame: ', iframe[0], 'Offset RA: ', offsRA[0], 'Offset Dec: ', offsDec[0]
+    print 'frame: ', iframe[-1], 'Offset RA: ', offsRA[-1], 'Offset Dec: ', offsDec[-1]  
+    
+    xyguesses, flagList = getUserObjectGuess(images)
+    
+    xycenter1, flag1 = cc.centroidImage(images[1], xyguesses[1], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+    xycenter0, flag0 = cc.centroidImage(images[0], xyguesses[0], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+    
+    print 'Success! Matching stars at: ', xycenter0, xycenter1        
+
+    rcA = np.array(xycenter1)
+    rcB = np.array(xycenter0)
+    sct = math.cos(theta)*degPerPix    
+    sst = math.sin(theta)*degPerPix
+    # This rotation matrix converts from row,col to ra,dec in degrees
+    rm = np.array([[sct,-sst],[sst,sct]])
+    rdA = rm.dot(rcA)
+    rdB = rm.dot(rcB)
+    deltaRa = rdB[0]-rdA[0]
+    deltaTime = meanTime[-1] - meanTime[0]
+    raArcsecPerSec = 3600*deltaRa/deltaTime
+    
+    return degPerPix, theta, raArcsecPerSec
+       
 
 if __name__ == "__main__":
     name = 'ring-20141020'
