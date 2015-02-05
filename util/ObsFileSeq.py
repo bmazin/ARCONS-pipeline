@@ -447,7 +447,7 @@ class ObsFileSeq():
                 endTimes.append(im_dict['endTime'])
                 intTimes.append(im_dict['intTime'])
                 
-            writeImageStack(fileName, images, startTimes, endTimes=endTimes, intTimes=intTimes,
+            writeImageStack(fileName, images, startTimes=startTimes, endTimes=endTimes, intTimes=intTimes,
                             pixIntTimes=pixIntTimes, targetName=self.name, run=self.run,
                             nFrames=len(self.frameIntervals), wvlLowerLimit=wvlStart, 
                             wvlUpperLimit=wvlStop, weighted=weighted, fluxWeighted=fluxWeighted,
