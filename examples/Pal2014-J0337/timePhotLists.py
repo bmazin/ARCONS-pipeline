@@ -54,5 +54,4 @@ if __name__=='__main__':
         for iPL,plPath in enumerate(plSeq):
             photonTiming.timePhotonList(plPath,parFile=parFile,bPulsarTiming=True,timingProgram='tempo',verbose=True,nPhotonsPerProcess=1e5,workingDir=workingDir)
     print 'DONE!'
-
     
