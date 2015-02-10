@@ -75,6 +75,7 @@ class ObsFileSeq():
             fn2 = FileName.FileName(run, date, "")
             of.loadFlatCalFile(fn2.flatSoln())
             try:
+                raise IOError
                 of.loadHotPixCalFile(fn.timeMask())
                 self.hotPixelsApplied = True
             except:

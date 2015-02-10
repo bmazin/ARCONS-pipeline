@@ -19,62 +19,6 @@ from util.mpfit import mpfit
 from util.popup import *
 
 
-
-
-def readPsfPhotometryFile(filename):
-    photometryFile = tables.openFile(filename, mode='r')
-    photometryTable = photometryFile.getNode(photometryFile.root,'PSFphotometry')._f_getChild('photometry')
-    startTimes = photometryTable.col('time')
-    intTimes = photometryTable.col('integration_time')
-    flux = photometryTable.col('flux')
-    parameters = photometryTable.col('parameters')
-    perrors = photometryTable.col('perrors')
-    redChi2 = photometryTable.col('redChi2')
-    flag = photometryTable.col('flag')
-    photometryFile.close()
-    
-    return {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'parameters': parameters, 'perrors': perrors, 'redChi2': redChi2, 'flag': flag}
-    
-
-def writePsfPhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
-    if os.path.isfile(filename):
-        warnings.warn("Overwriting photometry file: "+str(filename),UserWarning)
-        
-    photometryFile = tables.openFile(filename, mode='w')
-    photometryGroup = photometryFile.createGroup(photometryFile.root, 'PSFphotometry', 'Table of fit parameters for PSF')
-    
-    num_params = int(len(fluxDict_list[0]['parameters']))
-    num_stars = int(len(fluxDict_list[0]['flux']))
-    PSFphotometry_Description = {
-        "time"              : Float64Col(),             # Start time of images
-        "integration_time"  : Float64Col(),             # integration time of individual images
-        "flux"              : Float64Col(num_stars),    # array of flux values. [target_flux, ref0_flux, ...]
-        "parameters"        : Float64Col(num_params),   # parameters used to fit data
-        "perrors"           : Float64Col(num_params),   # the errors on the fits
-        "redChi2"           : Float64Col(),             # reduced chi^2 of the fits
-        "flag"              : UInt16Col()}              # flag to indicate if fit is good (0)  
-        
-    photometryTable = photometryFile.createTable(photometryGroup, 'photometry', PSFphotometry_Description, title='PSF fitting solution')
-    
-    for i in range(len(im_dict['startTimes'])):
-        row = photometryTable.row
-        row['time'] = im_dict['startTimes'][i]
-        row['integration_time'] = im_dict['intTimes'][i]
-        row['flux'] = fluxDict_list[i]['flux']
-        row['parameters'] = fluxDict_list[i]['parameters']
-        row['perrors'] = fluxDict_list[i]['mpperr']
-        row['redChi2'] = fluxDict_list[i]['redChi2']
-        row['flag'] = fluxDict_list[i]['flag']
-        row.append()
-        
-    # flush the table's I/O buffer to write the data to disk
-    photometryTable.flush()
-    if verbose:
-        print "Wrote to: "+filename
-    # close the file, flush all remaining buffers
-    photometryFile.close()
-
-
 def fitData2D(data,errs,parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,parameter_ties=None,verbose=False):
     """
         Runs mpfit.py. Gets all the parameters in the right format, calls mpfit, parses output.
@@ -179,28 +123,28 @@ def print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, p
 
 class PSFphotometry(Photometry):
 
-    def __init__(self,image,centroid,expTime=None,model = 'multiple_2d_circ_gauss_func', verbose=False,showPlot=False):
+    def __init__(self,image,centroid,expTime=None, verbose=False,showPlot=False):
         '''
         Inputs:
             image - 2D array of data (0 for dead pixel, shouldn't be any nan's or infs)
                   - Should be fully calibrated, dead time corrected, and scaled up to the effective integration time
             centroid - list of (col,row) tuples. The first tuple is the target location. The next are reference stars in the field 
             expTime - 2d array of effective exposure times (same size as image)
-            model - model used for fit. Options in util.fitFunctions
             verbose - show error messages
             showPlot - show and pause after each PSF fit
         '''
         self.verbose=verbose
         self.showPlot=showPlot
-        self.model=model
+        #self.model=model
         
         super(PSFphotometry,self).__init__(image=image,centroid=centroid,expTime=expTime)
 
 
         
-    def guess_parameters(self, aper_radius=9,tie_sigmas=True):
+    def guess_parameters(self, model, aper_radius=9,tie_sigmas=True):
         '''
         Inputs:
+            model - model used for fit. Options in util.fitFunctions
             aper_radius - double or list of doubles of the same length as self.centroid. Number of pixels around the star to be used in estimating parameters. -1 for the whole array.
             tie_sigmas - By default, tells mpfit to tie sigmas for multiple stars to the same value
             
@@ -215,7 +159,7 @@ class PSFphotometry(Photometry):
                            - Or can return parameter_ties=None
         '''
 
-        if self.model=='multiple_2d_circ_gauss_func':
+        if model=='multiple_2d_circ_gauss_func':
             #p[0] = background
             #p[1] = amplitude
             #p[2] = x_offset    column
@@ -271,7 +215,7 @@ class PSFphotometry(Photometry):
                 amp_ll = 0.
                 
                 sig_guess = 1.8
-                sig_ll = 0.8
+                sig_ll = 0.3
                 sig_ul = 2.5
                 if radius > 0. and sig_ul > radius: sig_ul = radius
                 
@@ -290,9 +234,10 @@ class PSFphotometry(Photometry):
         #print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, parameter_guess)
         return parameter_guess,parameter_lowerlimit,parameter_upperlimit,parameter_ties
 
-    def PSFfit(self,aper_radius=-1, tie_sigmas=True):
+    def PSFfit(self,model='multiple_2d_circ_gauss_func', aper_radius=-1, tie_sigmas=True):
         '''
         Inputs:
+            model - model used for fit. Options in util.fitFunctions
             aper_radius - double or list of doubles of the same length as self.centroid. Number of pixels around the star to be used in estimating parameters. -1 for the whole array.
             tie_sigmas - By default, tells mpfit to tie sigmas for multiple stars to the same value
             
@@ -302,6 +247,7 @@ class PSFphotometry(Photometry):
             mpperr - error on parameters from mpfit
             redChi2 - reduced chi^2 of fit
             flag - flag indicating if fit failed. 0 means success
+            model - model used to fit. Just returns the string you inputted
         '''
         self.image[np.invert(np.isfinite(self.image))]=0.
         errs = np.sqrt(self.image)
@@ -312,9 +258,9 @@ class PSFphotometry(Photometry):
         #errs[:,11:] = np.inf
         
         
-        parameter_guess,parameter_lowerlimit,parameter_upperlimit,parameter_ties = self.guess_parameters(aper_radius=aper_radius,tie_sigmas=tie_sigmas)
+        parameter_guess,parameter_lowerlimit,parameter_upperlimit,parameter_ties = self.guess_parameters(model,aper_radius=aper_radius,tie_sigmas=tie_sigmas)
         
-        models = model_list[self.model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
+        models = model_list[model](parameter_guess)(p=np.ones(len(parameter_guess)),data=self.image,return_models=True)
         guess = models[0]
         for m in models[1:]:
             guess+=m
@@ -324,9 +270,9 @@ class PSFphotometry(Photometry):
         #p_guess = np.ones(len(parameter_guess))
         #p_ll = np.asarray(parameter_lowerlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
         #p_ul = np.asarray(parameter_upperlimit,dtype=np.float)/np.asarray(parameter_guess,dtype=np.float)
-        parameter_fit, redchi2gauss2, mpperr = fitData2D(np.copy(self.image),np.copy(errs),parameter_guess,parameter_lowerlimit,parameter_upperlimit,self.model,parameter_ties=parameter_ties,verbose=self.verbose)
+        parameter_fit, redchi2gauss2, mpperr = fitData2D(np.copy(self.image),np.copy(errs),parameter_guess,parameter_lowerlimit,parameter_upperlimit,model,parameter_ties=parameter_ties,verbose=self.verbose)
 
-        models2 = model_list[self.model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
+        models2 = model_list[model](parameter_fit)(p=np.ones(len(parameter_fit)),data=self.image,return_models=True)
         fitModelImg = models2[0]
         for m in models2[1:]:
             fitModelImg+=m
@@ -336,7 +282,7 @@ class PSFphotometry(Photometry):
         
         flag = 2.0*self.fitHitLimit(parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit)
         #return self.getFlux(parameter_fit)
-        return {'flux': self.getFlux(parameter_fit), 'parameters': parameter_fit, 'mpperr':mpperr,'redChi2':redchi2gauss2,'flag':flag,'fitModelImg':fitModelImg}
+        return {'flux': self.getFlux(model,parameter_fit), 'parameters': parameter_fit, 'perrors':mpperr,'redChi2':redchi2gauss2,'flag':flag,'model':model}
 
     def fitHitLimit(self,parameter_fit,parameter_guess,parameter_lowerlimit,parameter_upperlimit):
         """
@@ -357,15 +303,16 @@ class PSFphotometry(Photometry):
             return False
 
 
-    def getFlux(self,parameter_fit):
+    def getFlux(self,model,parameter_fit):
         '''
         Inputs:
+            model - model used for fit. Options in util.fitFunctions
             parameter_fit - parameters of fit to calculate flux from
         Returns:
             flux - array of flux values. [target_flux, ref0_flux, ...]
         '''
         flux=[]
-        if self.model=='multiple_2d_circ_gauss_func':
+        if model=='multiple_2d_circ_gauss_func':
             for i in range(len(parameter_fit[1:])/4):
                 star_flux = 2.*np.pi*parameter_fit[1+4*i]*(parameter_fit[4+4*i])**2
                 flux.append(star_flux)
