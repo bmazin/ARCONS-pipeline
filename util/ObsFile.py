@@ -284,6 +284,11 @@ class ObsFile:
         wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
         wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
         
+        #check if this pixel is completely valid in the wavelength range set for this ObsFile
+        #if not, cut out the photons from this pixel
+        if excludeBad and ((self.wvlUpperLimit != -1 and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and wvlCalLowerLimit > self.wvlLowerLimit)):
+            wavelengths = np.array([],dtype=np.double)
+
         if excludeBad == True:
             energies = energies[energies != 0]
         wavelengths = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / energies
@@ -291,6 +296,7 @@ class ObsFile:
             wavelengths = wavelengths[wvlCalLowerLimit < wavelengths]
         elif excludeBad == True and self.wvlLowerLimit != None:
             wavelengths = wavelengths[self.wvlLowerLimit < wavelengths]
+
         if excludeBad == True and self.wvlUpperLimit == -1:
             wavelengths = wavelengths[wavelengths < wvlCalUpperLimit]
         elif excludeBad == True and self.wvlUpperLimit != None:
@@ -513,18 +519,24 @@ class ObsFile:
         with np.errstate(divide='ignore'):
             wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
         if excludeBad == True:
-            goodMask = ~np.isnan(wavelengths)
-            goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
-            if self.wvlLowerLimit == -1:
-                goodMask = np.logical_and(goodMask,wvlCalLowerLimit < wavelengths)
-            elif self.wvlLowerLimit != None:
-                goodMask = np.logical_and(goodMask,self.wvlLowerLimit < wavelengths)
-            if self.wvlUpperLimit == -1:
-                goodMask = np.logical_and(goodMask,wavelengths < wvlCalUpperLimit)
-            elif self.wvlUpperLimit != None:
-                goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
-            wavelengths = wavelengths[goodMask]
-            timestamps = timestamps[goodMask]
+            #check if this pixel is completely valid in the wavelength range set for this ObsFile
+            #if not, cut out the photons from this pixel
+            if (self.wvlUpperLimit != -1 and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and wvlCalLowerLimit > self.wvlLowerLimit):
+                wavelengths = np.array([],dtype=np.double)
+                timestamps = np.array([],dtype=np.double)
+            else:
+                goodMask = ~np.isnan(wavelengths)
+                goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
+                if self.wvlLowerLimit == -1:
+                    goodMask = np.logical_and(goodMask,wvlCalLowerLimit < wavelengths)
+                elif self.wvlLowerLimit != None:
+                    goodMask = np.logical_and(goodMask,self.wvlLowerLimit < wavelengths)
+                if self.wvlUpperLimit == -1:
+                    goodMask = np.logical_and(goodMask,wavelengths < wvlCalUpperLimit)
+                elif self.wvlUpperLimit != None:
+                    goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
+                wavelengths = wavelengths[goodMask]
+                timestamps = timestamps[goodMask]
 
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime, 'rawCounts':rawCounts}
