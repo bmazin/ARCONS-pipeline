@@ -161,7 +161,8 @@ def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,beammap
         if loadWvlCal:
             obs.loadBestWvlCalFile()
         if loadFlatCal:
-            obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
+            #obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
+            obs.loadFlatCalFile('/Scratch/flatCalSolnFiles/flatsol_1s.h5')
         if loadSpectralCal:
             pass
             

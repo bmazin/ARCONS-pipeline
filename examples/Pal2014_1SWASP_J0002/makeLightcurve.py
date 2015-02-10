@@ -31,8 +31,8 @@ def aperture(startpx,startpy,radius):
                     mask[y,x]=1.
         return mask
 
-startWvl = 7000
-stopWvl = 8000
+startWvl = 4000
+stopWvl = 5000
 
 scratchDir = '/home/srmeeker/scratch/PAL2014/1SWASP_J0002'
 
@@ -45,8 +45,8 @@ targetAperturePath = os.path.join(basePath, 'ApertureStacks/Target')
 referenceAperturePath = os.path.join(basePath, 'ApertureStacks/Reference01')
 
 targetApertureRadius = 8
-refApertureRadius = 8
-annulusInner = 15
+refApertureRadius = 7
+annulusInner = 12
 annulusOuter = 20
 
 imageStacks = []
@@ -150,6 +150,51 @@ if len(targetXs) != len(refXs):
     print len(refXs)
     print "Exiting..."
     sys.exit(0)
+
+
+
+#####################################################
+#Aperture Phot code using AperPhotometry Class
+#####################################################
+
+targetCentroids = zip(targetXs,targetYs)
+refCentroids = zip(refXs,refYs)
+allCentroids = np.asarray(zip(targetCentroids,refCentroids))
+expTimes = 10.0*np.ones((len(imageStacks)))
+objFluxes = []
+objSkyFluxes = []
+refFluxes = []
+refSkyFluxes = []
+for i in range(len(imageStacks)):
+    ap = AperPhotometry(image=imageStacks[i],centroid=allCentroids[i],expTime=expTimes,verbose=True,showPlot=True)
+    fluxDict = ap.AperPhotometry(aper_radius=[9,7], sky_sub="median", annulus_inner = 12, annulus_outer = 25, interpolation="linear")
+    objFluxes.append(fluxDict['flux'][0])
+    refFluxes.append(fluxDict['flux'][1])
+    objSkyFluxes.append(fluxDict['sky'][0])
+    refSkyFluxes.append(fluxDict['sky'][1])
+
+objFluxes = np.array(objFluxes,dtype=float)
+refFluxes = np.array(refFluxes,dtype=float)
+objSkyFluxes = np.array(objSkyFluxes,dtype=float)
+refSkyFluxes = np.array(refSkyFluxes,dtype=float)
+
+plt.plot(times, objFluxes, '.', color='blue')
+plt.plot(times, refFluxes, '.', color='red')
+plt.title("No sky sub")
+plt.show()
+
+plt.plot(times, objSkyFluxes, '.', color='blue')
+plt.plot(times, refSkyFluxes, '.', color='red')
+plt.title("Sky LCs")
+plt.show()
+
+plt.plot(times, objFluxes-objSkyFluxes, '.',color='blue')
+plt.plot(times, refFluxes-refSkyFluxes, '.',color='red')
+plt.show()
+
+plt.plot(times, (objFluxes-objSkyFluxes)/(refFluxes-refSkyFluxes), '.',color='blue')
+plt.show()
+
 
 #####################################################
 #PSF fitting code using Alex's double Gaussian from PSFphotometry
@@ -477,45 +522,4 @@ plt.title("Target/Reference WITH sky sub")
 plt.savefig(scratchDir+"/%i-%i_dividedLC_WithSkySub.png"%(startWvl,stopWvl))
 plt.show()
 '''
-
-#####################################################
-#Aperture Phot code using AperPhotometry Class
-#####################################################
-
-targetCentroids = zip(targetXs,targetYs)
-refCentroids = zip(refXs,refYs)
-allCentroids = np.asarray(zip(targetCentroids,refCentroids))
-expTimes = 10.0*np.ones((len(imageStacks)))
-objFluxes = []
-objSkyFluxes = []
-refFluxes = []
-refSkyFluxes = []
-for i in range(len(imageStacks)):
-    ap = AperPhotometry(image=imageStacks[i],centroid=allCentroids[i],expTime=expTimes,verbose=True,showPlot=False)
-    fluxDict = ap.AperPhotometry(aper_radius=[9,7], sky_sub="fit", annulus_inner = 15, annulus_outer = 20, interpolation=None)
-    objFluxes.append(fluxDict['flux'][0])
-    refFluxes.append(fluxDict['flux'][1])
-    objSkyFluxes.append(fluxDict['sky'][0])
-    refSkyFluxes.append(fluxDict['sky'][1])
-
-objFluxes = np.array(objFluxes)
-refFluxes = np.array(refFluxes)
-objSkyFluxes = np.array(objSkyFluxes)
-refSkyFluxes = np.array(refSkyFluxes)
-
-plt.plot(times, objFluxes, '.', color='blue')
-plt.plot(times, refFluxes, '.', color='red')
-plt.title("No sky sub")
-plt.show()
-
-plt.plot(times, objSkyFluxes, '.', color='blue')
-plt.plot(times, refSkyFluxes, '.', color='red')
-plt.title("Sky LCs")
-plt.show()
-
-plt.plot(times, objFluxes-objSkyFluxes, '.',color='blue')
-plt.plot(times, refFluxes-refSkyFluxes, '.',color='red')
-plt.show()
-
-
 

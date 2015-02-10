@@ -1,0 +1,15 @@
+datadir=/ScienceData/PAL2014/20141020
+flatdir=/Scratch/flatCalSolnFiles/PAL2014/20141020
+wvldir=/Scratch/waveCalSolnFiles/PAL2014/20141020
+fluxfile=obs_20141021-060002.h5
+skyfile=None
+flatfile=illumsol_20141020.h5
+wvlfile=calsol_20141021-061151.h5
+fluxdir=/Scratch/fluxCalSolnFiles/PAL2014/20140924
+fluxoutfile=fluxsol_20140925.h5
+objectName=2MASSJ0223
+xpix = 18
+ypix = 11
+rad = 10
+starttime = 0
+endtime = -1
