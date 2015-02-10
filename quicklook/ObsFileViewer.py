@@ -605,7 +605,6 @@ class PlotWindow(QtGui.QDialog):
         self.plotLightCurve(getRaw=True)
         for col,row in self.selectedPixels:
             maskedIntervals = self.parent.obsMethod('getPixelBadTimes',pixelRow=row,pixelCol=col)
-            print maskedIntervals
             for inter in maskedIntervals:
                 self.axes.axvspan(inter[0],inter[1],facecolor='r',alpha=0.3)
     
@@ -613,6 +612,8 @@ class PlotWindow(QtGui.QDialog):
 
     def plotLightCurve(self,getRaw=False):
         paramsDict = self.parent.getObsParams()
+        excludeBad = not (getRaw or paramsDict['getRawCount'])
+
         if self.checkbox_trackTimes.isChecked():
             startTime = float(self.parent.textbox_startTime.text())
             endTime = float(self.parent.textbox_endTime.text())
@@ -627,7 +628,7 @@ class PlotWindow(QtGui.QDialog):
         if histBinEdges[-1]+histIntTime == endTime:
             histBinEdges = np.append(histBinEdges,endTime)
         for col,row in self.selectedPixels:
-            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=(not paramsDict['getRawCount']))
+            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=excludeBad)
             timestamps = returnDict['timestamps']
             hist,_ = np.histogram(timestamps,bins=histBinEdges)
             hists.append(hist)
@@ -1196,7 +1197,7 @@ class LoadCalsDialog(QtGui.QDialog):
         cosmicBox = layoutBox('H',[self.loadCosmicWidget,self.button_loadCosmic])
         beammapBox = layoutBox('H',[self.loadBeammapWidget,self.button_loadBeammap])
 
-        mainBox = layoutBox('V',[wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,beammapBox,self.button_loadAll])
+        mainBox = layoutBox('V',[beammapBox,wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,self.button_loadAll])
         self.setLayout(mainBox)
 
     def connectButtons(self):
@@ -1221,13 +1222,13 @@ class LoadCalsDialog(QtGui.QDialog):
         self.parent.enableTimeMaskParams()
         
     def loadAllCals(self):
+        self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
         self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
         self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
         self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
         self.loadTimeMask()
         self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
         self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
-        self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
         self.parent.imageParamsWindow.checkbox_getRawCount.setChecked(False)
         print 'setting getRawCount=False'
         self.close()
