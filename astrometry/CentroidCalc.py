@@ -182,28 +182,35 @@ def centroidImage(image,xyguess,radiusOfSearch = 6,doDS9=True,usePsfFit=False):
     ccd = pg.CCDInfo(0,0.00001,1,2500)
     
 
+    xyguessPyguide = np.subtract(xyguess,(0.5,0.5)) #account for how pyguide puts pixel coordinates
     pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,radiusOfSearch,ccd,0,False,verbosity=0, doDS9=doDS9)     #Added by JvE May 31 2013
     # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
     try:
         xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+        np.add(xycenter,(0.5,0.5))#account for how pyguide puts pixel coordinates
         flag = 0
     except TypeError:
         xycenter = xyguess
         flag = 1
 
+
     if usePsfFit:
         xycenterGuide = xycenter
         psfPhot = PSFphotometry(image,centroid=[xycenterGuide],verbose=True)
         psfDict = psfPhot.PSFfit(aper_radius=radiusOfSearch)
+        xycenterPsf = [psfDict['parameters'][2],psfDict['parameters'][3]]
         if psfDict['flag'] == 0:
-            xycenter = [psfDict['parameters'][2],psfDict['parameters'][3]]
+            xycenter = xycenterPsf
             flag = 0
         else:
             print 'PSF fit failed with flag: ', psfDict['flag']
             xycenter = xycenterGuide 
             flag = 1
             
-    return xycenter,flag
+    outDict = {'xycenter':xycenter,'flag':flag,'xycenterGuide':xycenterGuide}
+    if usePsfFit:
+        outDict['xycenterPsf'] = xycenterPsf
+    return outDict
 
 def getUserCentroidGuess(image,norm=None):
     '''
@@ -270,7 +277,8 @@ def quickCentroid(images, radiusOfSearch=10, maxMove = 4,usePsfFit=False):
                 flagList[i] = flag
                 print i,': No star selected'
                 continue
-        xycenter,flag=centroidImage(images[i],xyguess,radiusOfSearch = radiusOfSearch,doDS9=False,usePsfFit=usePsfFit)
+        centroidDict = centroidImage(images[i],xyguess,radiusOfSearch = radiusOfSearch,doDS9=False,usePsfFit=usePsfFit)
+        xycenter,flag = centroidDict['xycenter'],centroidDict['flag']
         if flag==0 and np.linalg.norm(np.asarray(xycenter)-np.asarray(xyguess)) < (maxMove):
             #centroiding successful and didn't move too far!
             xPositionList[i]=xycenter[0]
@@ -286,7 +294,8 @@ def quickCentroid(images, radiusOfSearch=10, maxMove = 4,usePsfFit=False):
             print i,': Failed. No star selected'
             continue
 
-        xycenter,flag=centroidImage(images[i],xyguess,radiusOfSearch = radiusOfSearch,doDS9=False,usePsfFit=usePsfFit)
+        centroidDict = centroidImage(images[i],xyguess,radiusOfSearch = radiusOfSearch,doDS9=False,usePsfFit=usePsfFit)
+        xycenter,flag = centroidDict['xycenter'],centroidDict['flag']        
         xPositionList[i]=xycenter[0]
         yPositionList[i]=xycenter[1]
         flagList[i] = flag
@@ -377,6 +386,7 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
     hourAngleList=[]
     flagList=[]
     debugPlots = []
+    centroidDictList = []
     
     flag=0
     print 'Retrieving images...'
@@ -402,7 +412,9 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
             imageInformation = ob.getPixelCountImage(firstSec=iFrame, integrationTime= integrationTime, weighted=True,fluxWeighted=False, getRawCount=False,scaleByEffInt=False)
             image=imageInformation['image']        
 
-            xycenter,flag=centroidImage(image,xyguess,radiusOfSearch,doDS9=True,usePsfFit=usePsfFit)
+            centroidDict = centroidImage(image,xyguess,radiusOfSearch,doDS9=True,usePsfFit=usePsfFit)
+            xycenter,flag = centroidDict['xycenter'],centroidDict['flag']
+            centroidDictList.append(centroidDict)
             if flag==0:
                 print 'Calculated [x,y] center = ' + str((xycenter)) + ' for frame ' + str(iFrame) +'.'
             else:
@@ -428,6 +440,11 @@ def centroidCalc(obsFile, centroid_RA, centroid_DEC, outputFileName=None, guessT
             flagList.append(flag)
     # Save to h5 table
     saveTable(centroidListFileName=centroidListFileName,paramsList=paramsList,timeList=timeList,xPositionList=xPositionList,yPositionList=yPositionList,hourAngleList=hourAngleList,flagList=flagList)
+    outDict = {'xPositionList':xPositionList,'yPositionList':yPositionList,'flagList':flagList,
+            'xycenterGuide':[centroidDict['xycenterGuide'] for centroidDict in centroidDictList]}
+    if usePsfFit:
+        outDict['xycenterPsf'] = [centroidDict['xycenterPsf'] for centroidDict in centroidDictList]
+    return outDict
 
 # Test Function / Example
 if __name__=='__main__':
