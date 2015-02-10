@@ -281,13 +281,14 @@ class ObsFile:
         quad_term = self.wvlCalTable[iRow, iCol, 2]
         energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
 
-        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 0]
         
         #check if this pixel is completely valid in the wavelength range set for this ObsFile
         #if not, cut out the photons from this pixel
         if excludeBad and ((self.wvlUpperLimit != -1 and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and wvlCalLowerLimit > self.wvlLowerLimit)):
             wavelengths = np.array([],dtype=np.double)
+            return wavelengths
 
         if excludeBad == True:
             energies = energies[energies != 0]
@@ -513,8 +514,8 @@ class ObsFile:
         quad_term = self.wvlCalTable[iRow, iCol, 2]
         energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
 
-        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 0]
 
         with np.errstate(divide='ignore'):
             wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
@@ -524,6 +525,7 @@ class ObsFile:
             if (self.wvlUpperLimit != -1 and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and wvlCalLowerLimit > self.wvlLowerLimit):
                 wavelengths = np.array([],dtype=np.double)
                 timestamps = np.array([],dtype=np.double)
+                effIntTime=0
             else:
                 goodMask = ~np.isnan(wavelengths)
                 goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
