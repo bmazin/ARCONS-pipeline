@@ -241,7 +241,7 @@ def quickCentroid(images, radiusOfSearch=10, maxMove = 4,usePsfFit=False):
     '''
     Author: Alex Walter
     Date: Jan 6, 2015
-    This function creates centroid files automatically on a list of images (such as an image stack).
+    This function finds centroids automatically on a list of images (such as an image stack).
     It asks the user for a guess on the first image. 
     Then uses centroidImage() to find the centroid.
     It uses the centroid of the previous image as the guess for the next image, etc.
