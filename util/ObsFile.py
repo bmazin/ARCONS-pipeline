@@ -1654,6 +1654,15 @@ class ObsFile:
         calLookupTable = CalLookupFile(path=calLookupTablePath)
         
         _,_,obsTstamp = FileName(obsFile=self).getComponents()
+
+        if beammapPath is None:
+            beammapPath = calLookupTable.beammap(obsTstamp)
+        if beammapPath != '':
+            self.loadBeammapFile(beammapPath)
+            print 'loaded beammap',beammapPath
+        else:
+            print 'did not load new beammap'
+
         if wvlCalPath is None:
             wvlCalPath = calLookupTable.calSoln(obsTstamp)
         if wvlCalPath != '':
@@ -1702,13 +1711,6 @@ class ObsFile:
         else:
             print 'did not load cosmic mask'
 
-        if beammapPath is None:
-            beammapPath = calLookupTable.beammap(obsTstamp)
-        if beammapPath != '':
-            self.loadBeammapFile(beammapPath)
-            print 'loaded beammap',beammapPath
-        else:
-            print 'did not load new beammap'
 
         if centroidListPath is None:
             centroidListPath = calLookupTable.centroidList(obsTstamp)
