@@ -186,12 +186,6 @@ class ObsFileViewer(QtGui.QMainWindow):
         startWvl = float(self.textbox_startWvl.text())
         endWvl = float(self.textbox_endWvl.text())
 
-        if self.obs.wvlCalFile is None:
-            self.imageParamsWindow.checkbox_getRawCount.setChecked(True)
-            print 'setting getRawCount, since wvlcal is not loaded'
-        else:
-            self.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
-
         self.setObsState()
         paramsDict = self.imageParamsWindow.getParams()
         scaleToCps = paramsDict['otherParams'].pop('scaleToCps',False)
@@ -883,6 +877,12 @@ class ImageParamsWindow(ModelessWindow):
             obs.switchOnCosmicTimeMask()
         else:
             obs.switchOffCosmicTimeMask()
+
+        if self.obs.wvlCalFile is None:
+            self.imageParamsWindow.checkbox_getRawCount.setChecked(True)
+            print 'setting getRawCount, since wvlcal is not loaded'
+        else:
+            self.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
             
     def getParams(self):
         obsParamsDict = {}
