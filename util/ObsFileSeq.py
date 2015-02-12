@@ -75,7 +75,6 @@ class ObsFileSeq():
             fn2 = FileName.FileName(run, date, "")
             of.loadFlatCalFile(fn2.flatSoln())
             try:
-                raise IOError
                 of.loadHotPixCalFile(fn.timeMask())
                 self.hotPixelsApplied = True
             except:
@@ -533,7 +532,7 @@ class ObsFileSeq():
                                    #Do this manually so
                                    #we can correct deadTime first
             im = im_dict['image']
-            print 'im: ', np.sum(im)
+            #print 'im: ', np.sum(im)
             #Correct for dead time
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore",
@@ -547,7 +546,7 @@ class ObsFileSeq():
                 im = im*obsInfo["integrationTime"]/im_dict['effIntTimes']
             #Remove any funny values
             im[np.invert(np.isfinite(im))] = 0.
-            print '--> ', np.sum(im)
+            #print '--> ', np.sum(im)
             if retval is None:
                 retval = {'image': im, 'pixIntTime': im_dict['effIntTimes'],
                           'intTime': obsInfo["integrationTime"],
