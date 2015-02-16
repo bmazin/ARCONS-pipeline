@@ -266,6 +266,23 @@ class ObsFile:
 #                    corruptedSecs.append(sec)
 #                    print 'Corruption in pixel',pixelLabel, 'at',sec
 
+    def convertWvlToPhase(self, wavelengths, iRow, iCol):
+        const = self.wvlCalTable[iRow, iCol, 0]
+        lin_term = self.wvlCalTable[iRow, iCol, 1]
+        quad_term = self.wvlCalTable[iRow, iCol, 2]
+        wavelengths=np.asarray(wavelengths)
+        energies = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / wavelengths
+        if quad_term==0:
+            phases = (energies - const)/lin_term
+            print phases
+        else:
+            phase1=(-1.*np.sqrt(-4.*const*quad_term + lin_term**2. + 4.*quad_term*energies) - lin_term)/(2.*quad_term)
+            print phase1
+            phase2=(np.sqrt(-4.*const*quad_term + lin_term**2. + 4.*quad_term*energies) - lin_term)/(2.*quad_term)
+            print phase2
+            phases=phase1
+        return phases
+
     def convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True):
         """
         applies wavelength calibration to a list of photon pulse heights
@@ -515,6 +532,7 @@ class ObsFile:
         energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
 
         wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalLowerLimit = 0
         wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 0]
 
         with np.errstate(divide='ignore'):
@@ -972,8 +990,10 @@ class ObsFile:
         ABW Oct 7, 2014. Added rawCounts to dictionary
         ----
         """
+
         wvlStart=wvlStart if (wvlStart!=None and wvlStart>0.) else (self.wvlLowerLimit if (self.wvlLowerLimit!=None and self.wvlLowerLimit>0.) else 3000)
-        wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 13000)
+        wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 12000)
+
 
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
