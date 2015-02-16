@@ -186,12 +186,6 @@ class ObsFileViewer(QtGui.QMainWindow):
         startWvl = float(self.textbox_startWvl.text())
         endWvl = float(self.textbox_endWvl.text())
 
-        if self.obs.wvlCalFile is None:
-            self.imageParamsWindow.checkbox_getRawCount.setChecked(True)
-            print 'setting getRawCount, since wvlcal is not loaded'
-        else:
-            self.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
-
         self.setObsState()
         paramsDict = self.imageParamsWindow.getParams()
         scaleToCps = paramsDict['otherParams'].pop('scaleToCps',False)
@@ -455,9 +449,11 @@ class PlotWindow(QtGui.QDialog):
         self.checkbox_divideWvlBinWidths = QtGui.QCheckBox('Divide by bin widths',self)
         self.checkbox_trackWvls = QtGui.QCheckBox('Use main window wavelengths',self)
         self.connect(self.checkbox_trackWvls,QtCore.SIGNAL('stateChanged(int)'),self.changeTrackWvls)
-        self.textbox_startWvl = QtGui.QLineEdit(self.parent.textbox_startWvl.text())
+        #self.textbox_startWvl = QtGui.QLineEdit(self.parent.textbox_startWvl.text())
+        self.textbox_startWvl = QtGui.QLineEdit('0')
         self.textbox_startWvl.setFixedWidth(100)
-        self.textbox_endWvl = QtGui.QLineEdit(self.parent.textbox_endWvl.text())
+        #self.textbox_endWvl = QtGui.QLineEdit(self.parent.textbox_endWvl.text())
+        self.textbox_endWvl = QtGui.QLineEdit('-1')
         self.textbox_endWvl.setFixedWidth(100)
 
         self.wvlGroup = QtGui.QGroupBox('',parent=self)
@@ -656,6 +652,7 @@ class PlotWindow(QtGui.QDialog):
             startWvl = float(self.textbox_startWvl.text())
             endWvl = float(self.textbox_endWvl.text())
 
+        self.parent.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
         firstSec = startTime
         duration = endTime-startTime
         paramsDict = self.parent.getObsParams()
@@ -704,7 +701,10 @@ class PlotWindow(QtGui.QDialog):
                 range = range / scaleToDegrees
         else:
             range = None
+        pixCutOffPhases=[]
         for col,row in self.selectedPixels:
+            cutOffWvl = self.parent.obs.wvlRangeTable[row, col, 0]
+            pixCutOffPhases.append(self.parent.obs.convertWvlToPhase(cutOffWvl,row,col))
             returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             peakHeights = returnDict['peakHeights']
@@ -736,7 +736,10 @@ class PlotWindow(QtGui.QDialog):
         else:
             histBinEdges = histBinEdges * scaleToDegrees
             xlabel = 'phase (${}^\circ$)'
+            pixCutOffPhases=np.asarray(pixCutOffPhases) * scaleToDegrees
         plotHist(self.axes,histBinEdges,self.hist)
+        for pixCutOffPhase in pixCutOffPhases:
+            self.axes.axvline(x=pixCutOffPhase,color='k')
         self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel('counts')
 
@@ -883,6 +886,14 @@ class ImageParamsWindow(ModelessWindow):
             obs.switchOnCosmicTimeMask()
         else:
             obs.switchOffCosmicTimeMask()
+
+        if obs.wvlCalFile is None:
+            self.checkbox_getRawCount.setChecked(True)
+            print 'setting getRawCount, since wvlcal is not loaded'
+        else:
+            startWvl = float(self.parent.textbox_startWvl.text())
+            endWvl = float(self.parent.textbox_endWvl.text())
+            obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
             
     def getParams(self):
         obsParamsDict = {}
