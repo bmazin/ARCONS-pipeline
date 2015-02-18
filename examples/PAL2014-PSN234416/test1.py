@@ -14,7 +14,7 @@ of.loadFlatCalFile(fn2.flatSoln())
 row = 4
 col = 4
 firstSec = 72
-integrationTime = 73
+integrationTime = 1
 spec = of.getPixelSpectrum(row,col,firstSec,integrationTime)
 print "spec=",spec
 del of
