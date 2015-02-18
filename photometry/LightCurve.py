@@ -76,15 +76,36 @@ class LightCurve():
             self.loadImageStack()
         except:
             print "Need to make image stack for this object"
-
         #Get Centroids
         try:
             self.loadAllCentroidFiles()
         except:
             print "Need to make centroids for this object"
             
-    def viewLightCurve(self,photometryType,photometryFilename=''):
+    def viewLightCurve(self,photometryFilename='',photometryType=None):
+        if photometryFilename is '':
+            if isPSFString(photometryType): photometryFilename=self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
+            elif isAperString(photometryType): photometryFilename=self.path+os.sep+'ApertureStacks'+os.sep+'ApertureStack_'+self.fileID+'.h5'
+            else:
+                print 'You must provide a valid photometry type if you want to automatically generate the photometry filename'
+                raise ValueError
+        
+        headerDict, dataDict = readPhotometryFile(photometryFilename)
+        photometryType = headerDict['photometryType']
+        #if isPSFString(photometryType):
+        #    pop = PSF_Popup()
         print "implement this!"
+        
+    def loadLightCurve(self,photometryFilename='',photometryType=None):
+        if photometryFilename is '':
+            if isPSFString(photometryType): photometryFilename=self.path+os.sep+'FittedStacks'+os.sep+'FittedStack_'+self.fileID+'.h5'
+            elif isAperString(photometryType): photometryFilename=self.path+os.sep+'ApertureStacks'+os.sep+'ApertureStack_'+self.fileID+'.h5'
+            else:
+                print 'You must provide a valid photometry type if you want to automatically generate the photometry filename'
+                raise ValueError
+        
+        self.photometry_params, self.photometry_dict = readPhotometryFile(photometryFilename)
+        self.photometryType = self.photometry_params['photometryType']
             
     def makeLightCurve(self,photometryType,photometryFilename='',**photometryKwargs):
         '''
@@ -323,7 +344,7 @@ class LightCurve():
             assert num_images>0
             self.centroidFilenames=[]
         except:
-            print "Need to make image stack for this object"
+            print "Need to make image stack before loading centroids"
             return
             
         if centroidFilenames is None or len(centroidFilenames)<1:
@@ -407,20 +428,21 @@ class LightCurve():
                   
 if __name__ == '__main__':
     path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
-    identifier = 'test'
+    identifier = 'manHotPix'
     #path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
     #identifier = '4000-5000_flat'
     
     
     LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=False)
-    #LC.makeImageStack(imageStackFilename='',dt=200,wvlStart=4000,wvlStop=9000,
+    #LC.makeImageStack(imageStackFilename='',dt=30,wvlStart=4000,wvlStop=9000,
     #                       weighted=True, fluxWeighted=False, getRawCount=False, 
     #                       scaleByEffInt=True, deadTime=100.e-6)
     #LC.makeAllCentroidFiles(centroidFilenames=['',''])
-    print LC.centroids
-    print LC.flags
-    LC.makeLightCurve(photometryType='aper')
-    
+    #print LC.centroids
+    #print LC.flags
+    #LC.makeLightCurve(photometryType='PSF')
+    LC.loadLightCurve(photometryType='aper')
+    photometryDict=LC.photometry_dict
     
     
     #transit_mid = 2456953.81673
@@ -434,11 +456,11 @@ if __name__ == '__main__':
         
         self.axes.plot(time,tar_flux,'b.',label='target')
         self.axes.plot(time,ref_flux,'g.',label='ref')
-        self.axes.axvline(x=transit_mid,c='k',ls='-')
-        self.axes.axvline(x=transit_mid-duration/2.,c='k',ls='--')
-        self.axes.axvline(x=transit_mid+duration/2.,c='k',ls='--')
+        #self.axes.axvline(x=transit_mid,c='k',ls='-')
+        #self.axes.axvline(x=transit_mid-duration/2.,c='k',ls='--')
+        #self.axes.axvline(x=transit_mid+duration/2.,c='k',ls='--')
         #self.axes.plot(time[np.where(flags==1.)],ref_flux[np.where(flags==1.)],'ro',label='Failed Centroid')
         #self.axes.plot(time[np.where(flags>1.1)],ref_flux[np.where(flags>1.1)],'ro',label='Failed Fit')
         self.axes.legend()
-    #pop(plotFunc=f,title='Flux')
+    pop(plotFunc=f,title='Flux')
 
