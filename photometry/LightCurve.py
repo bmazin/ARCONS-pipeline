@@ -251,22 +251,6 @@ class LightCurve():
             raise ValueError
             
         return fluxDict
-    
-    def getFNs(self):
-        '''
-        Should loop through obs files. Return list of FileName objects
-        '''
-        obsFNs = []
-        run=self.run
-        if self.run==None:
-            run = os.path.basename(os.path.dirname(self.path))
-        for i in range(len(self.params['sunsetDates'])):
-            for j in range(len(self.params['obsTimes'][i])):
-                obsFN = FileName(run=run, date=self.params['sunsetDates'][i], tstamp=self.params['utcDates'][i]+'-'+self.params['obsTimes'][i][j])
-                obsFNs.append(obsFN)
-                print obsFN
-                
-        return obsFNs
 
     def makeImageStack(self,imageStackFilename='',dt=30,wvlStart=None,wvlStop=None,
                            weighted=True, fluxWeighted=False, getRawCount=False, 
