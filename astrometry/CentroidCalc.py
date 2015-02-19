@@ -186,16 +186,15 @@ def centroidImage(image,xyguess,radiusOfSearch = 6,doDS9=True,usePsfFit=False):
     pyguide_output = pg.centroid(image,deadMask,satMask,xyguess,radiusOfSearch,ccd,0,False,verbosity=0, doDS9=doDS9)     #Added by JvE May 31 2013
     # Use PyGuide centroid positions, if algorithm failed, use xy guess center positions instead
     try:
-        xycenter = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
-        np.add(xycenter,(0.5,0.5))#account for how pyguide puts pixel coordinates
+        xycenterGuide = [float(pyguide_output.xyCtr[0]),float(pyguide_output.xyCtr[1])]
+        np.add(xycenterGuide,(0.5,0.5))#account for how pyguide puts pixel coordinates
         flag = 0
     except TypeError:
-        xycenter = xyguess
+        xycenterGuide = xyguess
         flag = 1
-
+    xycenter=xycenterGuide
 
     if usePsfFit:
-        xycenterGuide = xycenter
         psfPhot = PSFphotometry(image,centroid=[xycenterGuide],verbose=True)
         psfDict = psfPhot.PSFfit(aper_radius=radiusOfSearch)
         xycenterPsf = [psfDict['parameters'][2],psfDict['parameters'][3]]
@@ -204,11 +203,12 @@ def centroidImage(image,xyguess,radiusOfSearch = 6,doDS9=True,usePsfFit=False):
             flag = 0
         else:
             print 'PSF fit failed with flag: ', psfDict['flag']
-            xycenter = xycenterGuide 
+            #xycenter = xycenterGuide 
             flag = 1
             
-    outDict = {'xycenter':xycenter,'flag':flag,'xycenterGuide':xycenterGuide}
+    outDict = {'xycenter':xycenter,'flag':flag}
     if usePsfFit:
+        outDict['xycenterGuide'] = xycenterGuide
         outDict['xycenterPsf'] = xycenterPsf
     return outDict
 
