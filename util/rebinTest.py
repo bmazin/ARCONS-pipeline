@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from util import MKIDStd
-from util.rebin import rebin
+from util.utils import rebin
 from matplotlib import rcParams
 import matplotlib
 from scipy import interpolate
