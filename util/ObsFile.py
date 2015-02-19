@@ -78,7 +78,7 @@ class ObsFile:
     c = astropy.constants.c.to('m/s').value   #'2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
+    def __init__(self, fileName, verbose=False, makeMaskVersion='v2',repeatable=False):
         """
         load the given file with fileName relative to $MKID_RAW_PATH
         """
@@ -104,7 +104,10 @@ class ObsFile:
         self.centroidListFileName = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
-        self.setWvlDitherSeed()
+        if repeatable:
+            self.setWvlDitherSeed(seed=0)
+        else:
+            self.setWvlDitherSeed()
         
 
     def __del__(self):
