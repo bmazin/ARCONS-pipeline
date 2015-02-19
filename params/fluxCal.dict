@@ -1,0 +1,32 @@
+##Files and Dirs
+
+run = 'PAL2012'
+
+fluxSunsetLocalDate = '20121211'
+fluxTimestamp = '20121212-021727'
+skyTimestamp = ''
+
+wvlCalSunsetLocalDate = '20121210'
+wvlCalTimestamp = '20121211-133056'
+
+#wvlCalFileName = 'calsol_20120917-072537.h5'
+#flatCalFileName = 'flatsol_20120919-131142.h5'
+flatCalFileName = ''
+
+startTime = 0
+integrationTime = -1
+method = 'absolute'
+object = 'G158-100'
+energyResolution = 8
+deadtime = 0.0001
+
+#photometry = 'PSF'
+
+centroidRow = 6
+centroidCol = 13
+apertureRad = 8
+collectingArea = 178420.70
+
+photometry = 'aperture'
+annulusInner = 10
+annulusOuter = 20
