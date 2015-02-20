@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from util import MKIDStd
 from headers import pipelineFlags
-from util.rebin import rebin
+from util.utils import gaussianConvolution
 import matplotlib
 from mpltools	import style
 from scipy import interpolate
@@ -177,8 +177,7 @@ y=flux
 plt.plot(x, y)
 plt.show()
 
-
-
+'''
 ##======  multiply spectrum by ARCONS filter transmission to properly simulate edge cutoffs ==
 transmission = np.ones(len(x))
 transmission[x<3500]=0
@@ -188,7 +187,13 @@ plt.plot(x,transmission)
 plt.show()
 plt.plot(x,y)
 plt.show()
+'''
 
+newX, newY = gaussianConvolution(x,y,xEnMin=0.005,xEnMax=6.0,xdE=0.001,fluxUnits = "lambda",r=8,plots=True)
+
+
+
+'''
 ##================  Convert to F_nu and put x-axis in frequency  ===================
 xEn = heV*(c*1E8)/x
 xNu = xEn/heV
@@ -238,5 +243,5 @@ yWvl = convY/(xWvl**2)*3E-5 #convert Fnu(Jy) to Flambda
 plt.plot(xWvl[xWvl<16000], yWvl[xWvl<16000])
 plt.plot(x,y/max(y)*max(yWvl))
 plt.show()
-
+'''
 

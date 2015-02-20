@@ -1,0 +1,56 @@
+##Files and Dirs
+
+
+##G158-100 files from PAL2012
+
+run = 'PAL2012'
+
+fluxSunsetLocalDate = '20121211'
+fluxTimestamp = '20121212-021727'
+skyTimestamp = ''
+
+wvlCalSunsetLocalDate = ''
+flatCalFileName = ''
+
+startTime = 0
+integrationTime = -1
+method = 'absolute'
+object = 'G158-100'
+energyResolution = 8
+deadtime = 0.0001
+
+centroidRow = 6
+centroidCol = 13
+apertureRad = 8
+collectingArea = 178420.70
+
+photometry = 'PSF'
+annulusInner = 10
+annulusOuter = 20
+
+##HZ21 files from PAL2013 (there are 4 available)
+
+#run = 'PAL2013'
+
+#fluxSunsetLocalDate = '20131209'
+#fluxTimestamp = '20131209-122152'
+#skyTimestamp = ''
+
+#wvlCalSunsetLocalDate = ''
+#flatCalFileName = ''
+
+#startTime = 40
+#integrationTime = -1
+#method = 'absolute'
+#object = 'hz21'
+#energyResolution = 8
+#deadtime = 0.0001
+
+#centroidRow = 23
+#centroidCol = 14
+#apertureRad = 15
+#collectingArea = 178420.70
+
+#photometry = 'aperture'
+#annulusInner = 18
+#annulusOuter = 25
