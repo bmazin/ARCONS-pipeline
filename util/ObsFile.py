@@ -78,7 +78,7 @@ class ObsFile:
     c = astropy.constants.c.to('m/s').value   #'2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
+    def __init__(self, fileName, verbose=False, makeMaskVersion='v2',repeatable=False):
         """
         load the given file with fileName relative to $MKID_RAW_PATH
         """
@@ -104,7 +104,10 @@ class ObsFile:
         self.centroidListFileName = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
-        self.setWvlDitherSeed()
+        if repeatable:
+            self.setWvlDitherSeed(seed=0)
+        else:
+            self.setWvlDitherSeed()
         
 
     def __del__(self):
@@ -303,7 +306,7 @@ class ObsFile:
         
         #check if this pixel is completely valid in the wavelength range set for this ObsFile
         #if not, cut out the photons from this pixel
-        if excludeBad and ((self.wvlUpperLimit != -1 and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and wvlCalLowerLimit > self.wvlLowerLimit)):
+        if excludeBad and ((self.wvlUpperLimit != -1  and not self.wvlUpperLimit is None and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and not self.wvlLowerLimit is None and wvlCalLowerLimit > self.wvlLowerLimit)):
             wavelengths = np.array([],dtype=np.double)
             return wavelengths
 
@@ -540,7 +543,7 @@ class ObsFile:
         if excludeBad == True:
             #check if this pixel is completely valid in the wavelength range set for this ObsFile
             #if not, cut out the photons from this pixel
-            if (self.wvlUpperLimit != -1 and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and wvlCalLowerLimit > self.wvlLowerLimit):
+            if (self.wvlUpperLimit != -1  and not self.wvlUpperLimit is None and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and not self.wvlLowerLimit is None and wvlCalLowerLimit > self.wvlLowerLimit):
                 wavelengths = np.array([],dtype=np.double)
                 timestamps = np.array([],dtype=np.double)
                 effIntTime=0

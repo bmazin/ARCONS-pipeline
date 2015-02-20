@@ -56,6 +56,7 @@ class ObsFileSeq():
         date -- sundown date (20141020)
         timeStamps -- the UTC date/time stamp
         dt -- the maximum number of seconds for one frame
+        beamMapFile -- the beamMap file to use (None to use default)
         """
         self.name = name
         self.run = run
@@ -373,7 +374,7 @@ class ObsFileSeq():
                           wvlBinEdges=None, timeSpacingCut=None):
         """
         calls getSpectralCubeByFrame on each iFrame, storing the
-        resuls in the list self.cubes
+        results in the list self.cubes
 
         use a pickle file named name.pkl as a buffer.  If that file
         exists, load the cubes from there, and save the cubes there
@@ -430,12 +431,17 @@ class ObsFileSeq():
         plt.title(fn)
         plt.savefig(fn)
 
+    def makeAllFitsFiles(self, wvMin, wvMax):
+        self.loadSpectralCubes(wvlStart=wvMin, wvlStop=wvMax)
+        for interval in range(len(self.frameIntervals)):
+            self.makeFitsFileByInterval(interval, wvMin, wvMax)
+        return
+
     def makeFitsFileByInterval(self, thisInterval, wvMin, wvMax):
         fn = "%s-%03d-%05d-%05d.fit" % (self.name, thisInterval,
                                         int(wvMin), int(wvMax))
         print "now make fn=", fn
-        scInfo = self.getSpectralCubes(thisInterval, wvMin, wvMax)
-        pixels = scInfo[0]['cube'].sum(axis=2)
+        pixels = self.cubes[thisInterval]['cube'].sum(axis=2)
         print "number of counts=", pixels.sum()
 
         hdu = pyfits.PrimaryHDU(pixels)
@@ -571,6 +577,7 @@ class ObsFileSeq():
         plt.title(self.name)
         plt.xlabel("raOffset (arcsec)")
         plt.ylabel("decOffset (arcsec)")
+        print "in ObsFileSeq.plotLocations:  fileName=",fileName
         if not fileName:
             plt.show()
         else:
