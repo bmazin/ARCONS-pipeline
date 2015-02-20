@@ -450,6 +450,7 @@ class PlotWindow(QtGui.QDialog):
 
         #spectrum controls
         self.checkbox_divideWvlBinWidths = QtGui.QCheckBox('Divide by bin widths',self)
+        self.checkbox_normalizeSpectrum = QtGui.QCheckBox('Normalize',self)
         self.checkbox_trackWvls = QtGui.QCheckBox('Use main window wavelengths',self)
         self.connect(self.checkbox_trackWvls,QtCore.SIGNAL('stateChanged(int)'),self.changeTrackWvls)
         #self.textbox_startWvl = QtGui.QLineEdit(self.parent.textbox_startWvl.text())
@@ -462,7 +463,7 @@ class PlotWindow(QtGui.QDialog):
         self.wvlGroup = QtGui.QGroupBox('',parent=self)
         wvlBox = layoutBox('H',['Start Wavelength',self.textbox_startWvl,'Angstroms',1.,'End Wavelength',self.textbox_endWvl,'Angstroms',10.])
         self.wvlGroup.setLayout(wvlBox)
-        spectrumControlsBox = layoutBox('H',[self.checkbox_divideWvlBinWidths,self.checkbox_trackWvls,self.wvlGroup,10.])
+        spectrumControlsBox = layoutBox('H',[self.checkbox_divideWvlBinWidths,self.checkbox_normalizeSpectrum,self.checkbox_trackWvls,self.wvlGroup,10.])
 
         self.spectrumControlsGroup = QtGui.QGroupBox('Spectrum Controls',parent=self)
         self.spectrumControlsGroup.setLayout(spectrumControlsBox)
@@ -670,13 +671,15 @@ class PlotWindow(QtGui.QDialog):
 
         spectrums = np.array(spectrums)
         self.spectrum = np.sum(spectrums,axis=0)
-
         binWidths = np.diff(wvlBinEdges)
+        
+        ylabel='Counts'
         if self.checkbox_divideWvlBinWidths.isChecked():
             self.spectrum = 1. * self.spectrum / binWidths
-            ylabel = 'Counts / Angstrom'
-        else:
-            ylabel = 'Counts'
+            ylabel+=' / Angstrom'
+        if self.checkbox_normalizeSpectrum.isChecked():
+            self.spectrum = 1. * self.spectrum / np.sum(self.spectrum)
+            ylabel='Normalized '+ylabel
         
         plotHist(self.axes,wvlBinEdges,self.spectrum)
         self.axes.set_xlabel('Wavelength (Angstrom)')

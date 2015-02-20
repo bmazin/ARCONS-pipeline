@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from util import MKIDStd
-from util.rebin import rebin
+from util.utils import rebin
 import matplotlib
 from mpltools	import style
 from scipy import interpolate
@@ -14,6 +14,10 @@ from scipy.optimize.minpack import curve_fit
 from matplotlib.ticker import ScalarFormatter 
 from numpy import exp
 import figureHeader
+
+'''
+Final code used to make ARCONS pipeline paper throughput plot - SRM 2/18/15
+'''
 
 def cleanSpectrum(x,y,objectName, wvlBinEdges):
         #locations and widths of absorption features in Angstroms
@@ -299,13 +303,21 @@ multqe = np.array(QEcurvePoints) * np.array(bvrthru)
 #sig^2 = df/da^2*sig_a^2 where f is QEcurvePoints*bvrthru and sig_a is errors
 multqeErrs = np.sqrt(np.array(errors)**2*np.array(QEcurvePoints)**2 + .01**2*np.array(bvrthru)**2) 
 
-plt.errorbar(multqewvls, np.array(multqe)*100, xerr = widths, yerr=multqeErrs*100, color='blue',fmt='o',markersize=8)
+plt.errorbar(multqewvls, np.array(multqe)*100, xerr = widths, yerr=multqeErrs*100, color='blue',fmt='^',markersize=8)
 print multqe
 
 
 ####Load and average On-sky 2013 throughput, plot up to where data gets messy
+
+
+#old version
 path2013 = '/home/srmeeker/ARCONS-pipeline/examples/Pal2013_throughput/'
-files = ['115553/hz21_throughput.npz','120100/hz21_throughput.npz','121634/hz21_throughput.npz','122152/hz21_throughput.npz']
+files = ['115553/hz21_throughput.npz', '120100/hz21_throughput.npz', '121634/hz21_throughput.npz', '122152/hz21_throughput.npz']
+
+#new file versions
+#path2013 = '/Scratch/fluxCalSolnFiles/PAL2013/20131209/plots/'
+#files = ['hz21_20131209-115553_throughput.npz', 'hz21_20131209-120100_throughput.npz', 'hz21_20131209-121634_throughput.npz', 'hz21_20131209-122152_throughput.npz']
+
 fnum=0
 allthruput = []
 for filename in files:
@@ -333,7 +345,7 @@ plt.fill_between(wvls2013[:-4],(curve2013[:-4]-np.abs(thruputErrs[:-4]))*100,(cu
 
 #automatic legend generation
 #leg=plt.legend(['Telescope BVR Throughput (2013)','ARCONS QE (2013)', 'On-sky Total Throughput (2013)', 'On-sky Total Throughput (2012)'],'upper right', numpoints=1)
-leg=plt.legend(['Telescope BVR\nThroughput','ARCONS QE', "(Telescope TP) *\n(ARCONS QE)", 'Measured Total\nThroughput'],'upper right', numpoints=1,prop={'size':8})
+leg=plt.legend(['Telescope BVR\nThroughput','ARCONS QE', "(Telescope TP) x\n(ARCONS QE)", 'Measured Total\nThroughput'],'upper right', numpoints=1,prop={'size':8})
 
 #generate legend manually with right justified text
 #vp = leg._legend_box._children[-1]._children[0] 
@@ -354,18 +366,21 @@ yax = plt.gca().yaxis
 yax.set_major_formatter(ScalarFormatter()) 
 #plt.ticklabel_format(style='plain',useOffset=False)
 
-plt.savefig("FluxCal_LightAccounting.eps",format='eps')
+outDir = '/Scratch/fluxCalSolnFiles/PAL2013/20131209/plots/'
+plt.savefig(outDir+"FluxCal_LightAccounting_2013.eps",format='eps')
 
 #MAKE THROUGHPUT CURVE FROM absSpectrumG158.py
+#changed 2/18/15 to make sensitivity curve from average of PAL2013 HZ21 files
 fig = plt.figure()
 ax = fig.add_subplot(111)
 #Plot 2012 measured throughput data inverse: flux cal correction curve
-ax.plot(wvls,1/(curve/y),'black',linewidth=3)#, label='On-sky Total Throughput (2012)')
+#ax.plot(wvls,1/(curve/y),'black',linewidth=3)#, label='On-sky Total Throughput (2012)')
+ax.plot(wvls2013, 1/curve2013, 'black', linewidth=3)
 ax.set_xlim(4000,11000)
 ax.set_ylim(0,250)
 plt.xlabel(ur"Wavelength (\r{A})")
 plt.ylabel(ur"Spectral Calibration Curve")
-plt.savefig("FluxCal_SensitivityCurve.eps",format='eps')
+plt.savefig(outDir+"FluxCal_SensitivityCurve_HZ21.eps",format='eps')
 
 #plt.show()
 
