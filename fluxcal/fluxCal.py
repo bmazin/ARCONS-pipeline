@@ -37,7 +37,7 @@ from scipy import interpolate
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 from headers import pipelineFlags
-#import figureHeader
+import figureHeader
 
 
 class FluxCal:
@@ -58,7 +58,7 @@ class FluxCal:
         
         run = self.params['run']
         sunsetDate = self.params['fluxSunsetLocalDate']
-        fluxTstamp = self.params['fluxTimestamp']
+        self.fluxTstamp = self.params['fluxTimestamp']
         skyTstamp = self.params['skyTimestamp']
         wvlSunsetDate = self.params['wvlCalSunsetLocalDate']
         wvlTimestamp = self.params['wvlCalTimestamp']
@@ -80,7 +80,7 @@ class FluxCal:
         self.startTime = self.params['startTime']
         self.intTime = self.params['integrationTime']
 
-        fluxFN = FileName(run=run,date=sunsetDate,tstamp=fluxTstamp)
+        fluxFN = FileName(run=run,date=sunsetDate,tstamp=self.fluxTstamp)
         self.fluxFileName = fluxFN.obs()
         self.fluxFile = ObsFile(self.fluxFileName)
 
@@ -116,7 +116,7 @@ class FluxCal:
         timeAdjustFileName = FileName(run=run).timeAdjustments()
 
         #make filename for output fluxCalSoln file
-        self.fluxCalFileName = FileName(run=run,date=sunsetDate,tstamp=fluxTstamp).fluxSoln()
+        self.fluxCalFileName = FileName(run=run,date=sunsetDate,tstamp=self.fluxTstamp).fluxSoln()
         print "Creating flux cal: %s"%self.fluxCalFileName
 
         if wvlSunsetDate != '':
@@ -251,7 +251,7 @@ class FluxCal:
         cube*=DTCorr #cube now in units of counts/s and corrected for dead time
 
         
-        if self.plots:
+        if self.plots and not 'figureHeader' in sys.modules:
             if self.verbose: print "Saving spectral frames as movie..."
             movieCube = np.zeros((self.nWvlBins,np.shape(cube)[0],np.shape(cube)[1]),dtype=float)
             for i in xrange(self.nWvlBins):
@@ -271,7 +271,7 @@ class FluxCal:
             frame = cube[:,:,i]
             if self.verbose: print "%s photometry on frame %i of cube, central wvl = %f Angstroms"%(self.photometry,i,self.binCenters[i])
             if self.photometry == 'aperture':
-                fDict = LC.performPhotometry(self.photometry,frame,[[self.centroidCol,self.centroidRow]],expTime=None,aper_radius = self.aperture, annulus_inner = self.annulusInner, annulus_outer = self.annulusOuter)
+                fDict = LC.performPhotometry(self.photometry,frame,[[self.centroidCol,self.centroidRow]],expTime=None,aper_radius = self.aperture, annulus_inner = self.annulusInner, annulus_outer = self.annulusOuter, interpolation="linear")
                 self.fluxSpectrum[i] = fDict['flux']
                 self.skySpectrum[i] = fDict['sky']
                 print "Sky estimate = ", fDict['sky']
@@ -423,11 +423,25 @@ class FluxCal:
         fluxCalBase = 'FluxCal_%s'%self.objectName       
         plotFileName = fluxCalBase+".pdf"
         fullFluxPlotFileName = os.path.join(fluxDir,plotFileName)
+        
+        #uncomment to make some plots for the paper. Proper formatting Will also require figureheader to be imported and for movie making to be turned off
+        self.paperFig = plt.figure()
+        self.paperAx = self.paperFig.add_subplot(111)
+        plt.xlim(4000,11000)
+        plt.plot(self.binCenters,self.fluxFactors,linewidth=3,color='black')
+        plt.xlabel(ur"Wavelength (\r{A})")
+        plt.ylabel(ur"Spectral Calibration Curve")
+        plt.ylim(0,150)
+        plt.savefig(self.plotSavePath+'FluxCal_Sensitivity_%s.eps'%self.objectName,format='eps')
+
+        #save throughput as a .npz file that other code uses when making paper plots
+        np.savez(self.plotSavePath+'%s_%s_throughput.npz'%(self.objectName.strip(),self.fluxTstamp),throughput=1.0/self.fluxFactors,wvls=self.binCenters)
+
         pp = PdfPages(fullFluxPlotFileName)
-        plt.rcParams['font.size'] = 2
+        #plt.rcParams['font.size'] = 2
 
         wvls = self.binCenters
-        
+
         plt.figure()
         ax1 = plt.subplot(111)
         ax1.set_title('ARCONS median flat cal\'d flux in counts')
