@@ -42,7 +42,10 @@ class ObsFileViewer(QtGui.QMainWindow):
             self.loadObsFile(obsPath)
 
         if bInitWithObs:
-            self.obs.loadAllCals()
+            try:
+                self.obs.loadAllCals()
+            except IOError:
+                pass
             if not self.obs.hotPixTimeMask is None:
                 self.enableTimeMaskParams()
 
@@ -1233,13 +1236,16 @@ class LoadCalsDialog(QtGui.QDialog):
         self.parent.enableTimeMaskParams()
         
     def loadAllCals(self):
-        self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
-        self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
-        self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
-        self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
-        self.loadTimeMask()
-        self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
-        self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
+        try:
+            self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
+            self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
+            self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
+            self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
+            self.loadTimeMask()
+            self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
+            self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
+        except IOError:
+            pass
         self.parent.imageParamsWindow.checkbox_getRawCount.setChecked(False)
         print 'setting getRawCount=False'
         self.close()
