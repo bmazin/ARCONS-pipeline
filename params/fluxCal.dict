@@ -24,7 +24,7 @@ centroidCol = 13
 apertureRad = 8
 collectingArea = 178420.70
 
-photometry = 'PSF'
+photometry = 'aperture'
 annulusInner = 10
 annulusOuter = 20
 

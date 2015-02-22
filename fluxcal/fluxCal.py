@@ -135,7 +135,7 @@ class FluxCal:
                 obs.loadBestWvlCalFile()
 
             obs.loadFlatCalFile(flatCalFileName)
-            obs.setWvlCutoffs(3000,13000)
+            obs.setWvlCutoffs(-1,-1)
 
             if needTimeAdjust:
                 obs.loadTimeAdjustmentFile(timeAdjustFileName)
@@ -273,8 +273,8 @@ class FluxCal:
             if self.photometry == 'aperture':
                 fDict = LC.performPhotometry(self.photometry,frame,[[self.centroidCol,self.centroidRow]],expTime=None,aper_radius = self.aperture, annulus_inner = self.annulusInner, annulus_outer = self.annulusOuter, interpolation="linear")
                 self.fluxSpectrum[i] = fDict['flux']
-                self.skySpectrum[i] = fDict['sky']
-                print "Sky estimate = ", fDict['sky']
+                self.skySpectrum[i] = fDict['skyFlux']
+                print "Sky estimate = ", fDict['skyFlux']
             else:
                 fDict = LC.performPhotometry(self.photometry,frame,[[self.centroidCol,self.centroidRow]],expTime=None,aper_radius = self.aperture)
                 self.fluxSpectrum[i] = fDict['flux']

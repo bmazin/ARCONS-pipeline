@@ -1287,7 +1287,7 @@ def gaussianConvolution(x,y,xEnMin=0.005,xEnMax=6.0,xdE=0.001,fluxUnits = "lambd
     if plots==True:
         plt.plot(xNuGrid,yNuGrid,label="Spectrum in energy space")
     ##====== Integrate curve to get total flux, required to ensure flux conservation later =======
-    originalTotalFlux = integrate.simps(yNuGrid,x=xNuGrid)
+    originalTotalFlux = scipy.integrate.simps(yNuGrid,x=xNuGrid)
     ##======  define gaussian for convolution, on same gridding as spectral data  ======
     #WARNING: right now flux is NOT conserved
     amp = 1.0
@@ -1308,7 +1308,7 @@ def gaussianConvolution(x,y,xEnMin=0.005,xEnMax=6.0,xdE=0.001,fluxUnits = "lambd
         plt.legend()
         plt.show()
     ##============ Conserve Flux ==============
-    newTotalFlux = integrate.simps(convY,x=xNuGrid)
+    newTotalFlux = scipy.integrate.simps(convY,x=xNuGrid)
     convY*=(originalTotalFlux/newTotalFlux)
     ##==================   Convert back to wavelength space   ==========================
     if fluxUnits=='lambda':

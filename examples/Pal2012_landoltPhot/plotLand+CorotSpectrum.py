@@ -282,7 +282,7 @@ tp = np.array(fdata[:,1])
 
 #scratchdir = '/home/srmeeker/scratch/standards/'
 scratchdir = '/Scratch/fluxCalSolnFiles/PAL2012/20121211/plots/'
-fname = 'G158-100_throughput.npz'
+fname = 'G158-100_20121212-021727_throughput.npz'
 fdata = np.load(scratchdir+fname)
 x = fdata['wvls']
 tp = fdata['throughput']
