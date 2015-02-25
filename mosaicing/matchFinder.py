@@ -187,12 +187,17 @@ def ObjectFinder(frames, data, RA = None, Dec = None, radiusOfSearch=10, usePsfF
         if flagList[1]==0 and flagList[0]==0:
             print 'match found! - determining centroid positions'
                 
-            xycenter1, flag1 = cc.centroidImage(images[1], xyguesses[1], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
-            xycenter0, flag0 = cc.centroidImage(images[0], xyguesses[0], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
-            print 'Success! Matching stars at: ', xycenter0, xycenter1                
+            #xycenter1, flag1 
+            cenDict1 = cc.centroidImage(images[1], xyguesses[1], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+            #xycenter0, flag0 
+            cenDict0 = cc.centroidImage(images[0], xyguesses[0], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+            print 'Success! Matching stars at: ', cenDict0['xycenter'], cenDict1['xycenter']                
                 
-            rc1 = np.array(xycenter1)
-            rc0 = np.array(xycenter0)
+            #rc1 = np.array(xycenter1)
+            #rc0 = np.array(xycenter0)
+            rc1 = np.array(cenDict1['xycenter'])
+            rc0 = np.array(cenDict0['xycenter'])
+            
             dCol = rc1[0] - rc0[0]
             dRow = rc1[1] - rc0[1]                
             dPix = math.sqrt(((rc1-rc0)**2).sum())
@@ -220,9 +225,9 @@ def ObjectFinder(frames, data, RA = None, Dec = None, radiusOfSearch=10, usePsfF
     degPerPix = np.mean(dpp)
     #print degPerPix
     ang = np.array(ang)
-    #print ang
+    print ang
     theta = np.mean(ang)  
-    #print theta  
+    print theta  
      
     ## Pick two frames where the ra,dec offset is zero,
     # usually the beginning and ending frames
@@ -236,13 +241,15 @@ def ObjectFinder(frames, data, RA = None, Dec = None, radiusOfSearch=10, usePsfF
     
     xyguesses, flagList = getUserObjectGuess(images)
     
-    xycenter1, flag1 = cc.centroidImage(images[1], xyguesses[1], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
-    xycenter0, flag0 = cc.centroidImage(images[0], xyguesses[0], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+    #xycenter1, flag1 
+    cenDict1 = cc.centroidImage(images[1], xyguesses[1], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
+    #xycenter0, flag0 
+    cenDict0 = cc.centroidImage(images[0], xyguesses[0], radiusOfSearch=radiusOfSearch, doDS9=False, usePsfFit=usePsfFit)
     
-    print 'Success! Matching stars at: ', xycenter0, xycenter1        
-
-    rcA = np.array(xycenter1)
-    rcB = np.array(xycenter0)
+    print 'Success! Matching stars at: ', cenDict0['xycenter'], cenDict1['xycenter']        
+    #start here
+    rcA = np.array(cenDict0['xycenter'])
+    rcB = np.array(cenDict1['xycenter'])
     sct = math.cos(theta)*degPerPix    
     sst = math.sin(theta)*degPerPix
     # This rotation matrix converts from row,col to ra,dec in degrees
