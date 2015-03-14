@@ -78,7 +78,7 @@ class ObsFile:
     c = astropy.constants.c.to('m/s').value   #'2.998e8 #m/s
     angstromPerMeter = 1e10
     nCalCoeffs = 3
-    def __init__(self, fileName, verbose=False, makeMaskVersion='v2'):
+    def __init__(self, fileName, verbose=False, makeMaskVersion='v2',repeatable=False):
         """
         load the given file with fileName relative to $MKID_RAW_PATH
         """
@@ -104,7 +104,10 @@ class ObsFile:
         self.centroidListFileName = None
         self.wvlLowerLimit = None
         self.wvlUpperLimit = None
-        self.setWvlDitherSeed()
+        if repeatable:
+            self.setWvlDitherSeed(seed=0)
+        else:
+            self.setWvlDitherSeed()
         
 
     def __del__(self):
@@ -266,6 +269,23 @@ class ObsFile:
 #                    corruptedSecs.append(sec)
 #                    print 'Corruption in pixel',pixelLabel, 'at',sec
 
+    def convertWvlToPhase(self, wavelengths, iRow, iCol):
+        const = self.wvlCalTable[iRow, iCol, 0]
+        lin_term = self.wvlCalTable[iRow, iCol, 1]
+        quad_term = self.wvlCalTable[iRow, iCol, 2]
+        wavelengths=np.asarray(wavelengths)
+        energies = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / wavelengths
+        if quad_term==0:
+            phases = (energies - const)/lin_term
+            print phases
+        else:
+            phase1=(-1.*np.sqrt(-4.*const*quad_term + lin_term**2. + 4.*quad_term*energies) - lin_term)/(2.*quad_term)
+            print phase1
+            phase2=(np.sqrt(-4.*const*quad_term + lin_term**2. + 4.*quad_term*energies) - lin_term)/(2.*quad_term)
+            print phase2
+            phases=phase1
+        return phases
+
     def convertToWvl(self, pulseHeights, iRow, iCol, excludeBad=True):
         """
         applies wavelength calibration to a list of photon pulse heights
@@ -281,9 +301,15 @@ class ObsFile:
         quad_term = self.wvlCalTable[iRow, iCol, 2]
         energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
 
-        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 0]
         
+        #check if this pixel is completely valid in the wavelength range set for this ObsFile
+        #if not, cut out the photons from this pixel
+        if excludeBad and ((self.wvlUpperLimit != -1  and not self.wvlUpperLimit is None and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and not self.wvlLowerLimit is None and wvlCalLowerLimit > self.wvlLowerLimit)):
+            wavelengths = np.array([],dtype=np.double)
+            return wavelengths
+
         if excludeBad == True:
             energies = energies[energies != 0]
         wavelengths = ObsFile.h * ObsFile.c * ObsFile.angstromPerMeter / energies
@@ -291,6 +317,7 @@ class ObsFile:
             wavelengths = wavelengths[wvlCalLowerLimit < wavelengths]
         elif excludeBad == True and self.wvlLowerLimit != None:
             wavelengths = wavelengths[self.wvlLowerLimit < wavelengths]
+
         if excludeBad == True and self.wvlUpperLimit == -1:
             wavelengths = wavelengths[wavelengths < wvlCalUpperLimit]
         elif excludeBad == True and self.wvlUpperLimit != None:
@@ -507,24 +534,32 @@ class ObsFile:
         quad_term = self.wvlCalTable[iRow, iCol, 2]
         energies = const+lin_term*pulseHeights+quad_term*pulseHeights**2.0
 
-        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 0]
-        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalLowerLimit = self.wvlRangeTable[iRow, iCol, 1]
+        wvlCalLowerLimit = 0
+        wvlCalUpperLimit = self.wvlRangeTable[iRow, iCol, 0]
 
         with np.errstate(divide='ignore'):
             wavelengths = ObsFile.h*ObsFile.c*ObsFile.angstromPerMeter/energies
         if excludeBad == True:
-            goodMask = ~np.isnan(wavelengths)
-            goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
-            if self.wvlLowerLimit == -1:
-                goodMask = np.logical_and(goodMask,wvlCalLowerLimit < wavelengths)
-            elif self.wvlLowerLimit != None:
-                goodMask = np.logical_and(goodMask,self.wvlLowerLimit < wavelengths)
-            if self.wvlUpperLimit == -1:
-                goodMask = np.logical_and(goodMask,wavelengths < wvlCalUpperLimit)
-            elif self.wvlUpperLimit != None:
-                goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
-            wavelengths = wavelengths[goodMask]
-            timestamps = timestamps[goodMask]
+            #check if this pixel is completely valid in the wavelength range set for this ObsFile
+            #if not, cut out the photons from this pixel
+            if (self.wvlUpperLimit != -1  and not self.wvlUpperLimit is None and wvlCalUpperLimit < self.wvlUpperLimit) or (self.wvlLowerLimit != -1 and not self.wvlLowerLimit is None and wvlCalLowerLimit > self.wvlLowerLimit):
+                wavelengths = np.array([],dtype=np.double)
+                timestamps = np.array([],dtype=np.double)
+                effIntTime=0
+            else:
+                goodMask = ~np.isnan(wavelengths)
+                goodMask = np.logical_and(goodMask,wavelengths!=np.inf)
+                if self.wvlLowerLimit == -1:
+                    goodMask = np.logical_and(goodMask,wvlCalLowerLimit < wavelengths)
+                elif self.wvlLowerLimit != None:
+                    goodMask = np.logical_and(goodMask,self.wvlLowerLimit < wavelengths)
+                if self.wvlUpperLimit == -1:
+                    goodMask = np.logical_and(goodMask,wavelengths < wvlCalUpperLimit)
+                elif self.wvlUpperLimit != None:
+                    goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
+                wavelengths = wavelengths[goodMask]
+                timestamps = timestamps[goodMask]
 
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime, 'rawCounts':rawCounts}
@@ -958,8 +993,10 @@ class ObsFile:
         ABW Oct 7, 2014. Added rawCounts to dictionary
         ----
         """
+
         wvlStart=wvlStart if (wvlStart!=None and wvlStart>0.) else (self.wvlLowerLimit if (self.wvlLowerLimit!=None and self.wvlLowerLimit>0.) else 3000)
-        wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 13000)
+        wvlStop=wvlStop if (wvlStop!=None and wvlStop>0.) else (self.wvlUpperLimit if (self.wvlUpperLimit!=None and self.wvlUpperLimit>0.) else 12000)
+
 
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
@@ -1654,6 +1691,15 @@ class ObsFile:
         calLookupTable = CalLookupFile(path=calLookupTablePath)
         
         _,_,obsTstamp = FileName(obsFile=self).getComponents()
+
+        if beammapPath is None:
+            beammapPath = calLookupTable.beammap(obsTstamp)
+        if beammapPath != '':
+            self.loadBeammapFile(beammapPath)
+            print 'loaded beammap',beammapPath
+        else:
+            print 'did not load new beammap'
+
         if wvlCalPath is None:
             wvlCalPath = calLookupTable.calSoln(obsTstamp)
         if wvlCalPath != '':
@@ -1702,13 +1748,6 @@ class ObsFile:
         else:
             print 'did not load cosmic mask'
 
-        if beammapPath is None:
-            beammapPath = calLookupTable.beammap(obsTstamp)
-        if beammapPath != '':
-            self.loadBeammapFile(beammapPath)
-            print 'loaded beammap',beammapPath
-        else:
-            print 'did not load new beammap'
 
         if centroidListPath is None:
             centroidListPath = calLookupTable.centroidList(obsTstamp)

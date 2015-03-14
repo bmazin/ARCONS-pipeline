@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util.ObsFile import ObsFile
 from util import MKIDStd
-from util.rebin import rebin
+from util.utils import rebin
 from matplotlib import rcParams
 #from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib
@@ -280,8 +280,9 @@ x = np.array(fdata[:,0])
 tp = np.array(fdata[:,1])
 '''
 
-scratchdir = '/home/srmeeker/scratch/standards/'
-fname = 'G158-100_throughput.npz'
+#scratchdir = '/home/srmeeker/scratch/standards/'
+scratchdir = '/Scratch/fluxCalSolnFiles/PAL2012/20121211/plots/'
+fname = 'G158-100_20121212-021727_throughput.npz'
 fdata = np.load(scratchdir+fname)
 x = fdata['wvls']
 tp = fdata['throughput']
@@ -311,7 +312,7 @@ percents = counterrors/counts * 100
 print "percents (errors/counts * 100) = ", percents
 
 #plt.show()
-plotDir = "."#"/home/srmeeker/scratch/standards"
+plotDir = scratchdir#"/home/srmeeker/scratch/standards"
 #plotFileName = "Land+CorotSpec.pdf"
 plotFileName = "Land+CorotSpec.eps"
 fullFluxPlotFileName = os.path.join(plotDir,plotFileName)
@@ -327,7 +328,7 @@ curve = curve*(h*c/wvls)*1e15
 
 plt.step(wvlBinEdges[1:],curve/tp, color='black', where='pre')
 
-ax.set_ylim(min((curve/tp)[wvls>3800])/5.0,max((curve/tp)[wvls>3800])*1.0)
+ax.set_ylim(min((curve/tp)[wvls>3800])/5.0,max((curve/tp)[wvls>3800])*1.2)
 #ax.set_ylim(min((curve/tp)[wvls>3800])/3,max((curve/tp)[wvls>3800])/2.0)
 ax.set_xlim(4000,11000)
 
@@ -379,6 +380,7 @@ curve/= area #spectrum is now in counts/s/Angs/cm^2
 
 # bands are [U,B,V,R,I,J]
 #corot Mags
+#from A&A 533, A130 (2011)
 mags = [15,15.79,15.00,14.472,14.051,13.441]
 errors = [0,0,0.1,0.048,0.03,0.024]
 

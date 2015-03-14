@@ -1,16 +1,15 @@
 ## Files and Dirs
 
 run = 'PAL2014'
-#sunsetDate = None                       # if None then do all dates and all files for run
+sunsetDate = None                       # if None then do all dates and all files for run
 calTimeStamps = None                    # if None then do all files in directory
-sunsetDate = '20140924'
-#calTimeStamps = ['20140924-071950']
+#sunsetDate = '20141022'
+#calTimeStamps = ['20140924-060135', '20140924-062552', '20140924-065308', '20140924-071950', '20140924-090204', '20140924-091428', '20140924-111213', '20140924-123225']
 
-
-#mkidDataDir=None    # /ScienceData by default
-mkidDataDir='/home/kids/PAL2014_data/ScienceData'
-#intermDir=None      # /Scratch by default
-intermDir='/home/kids/labData/PAL2014_data'
+mkidDataDir=None    # /ScienceData by default
+#mkidDataDir='/home/kids/PAL2014_data/ScienceData'
+intermDir=None      # /Scratch by default
+#intermDir='/home/kids/labData/PAL2014_data'
 outdir=None         # /waveCalSolnFiles by default
 #outdir='/waveCalSolnFiles/test'
 figdir = '/figs'

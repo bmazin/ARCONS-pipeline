@@ -53,62 +53,6 @@ def polyval2d(x, y, m):
         z += a * x**i * y**j
     return z
 
-#needs to be updated
-def readAperPhotometryFile(filename):
-    photometryFile = tables.openFile(filename, mode='r')
-    photometryTable = photometryFile.getNode(photometryFile.root,'AperPhotometry')._f_getChild('photometry')
-    startTimes = photometryTable.col('time')
-    intTimes = photometryTable.col('integration_time')
-    flux = photometryTable.col('flux')
-    sky = photometryTable.col('sky')
-    apertureRad = photometryTable.col('apertureRad')
-    annulusInnerRad = photometryTable.col('annulusInnerRad')
-    annulusOuterRad = photometryTable.col('annulusOuterRad')
-    flag = photometryTable.col('flag')
-    photometryFile.close()
-    
-    return {'startTimes': startTimes, 'intTimes': intTimes, 'flux': flux, 'sky': sky, 'apertureRad': apertureRad, 'annulusInnerRad': annulusInnerRad, 'annulusOuterRad': annulusOuterRad, 'flag': flag}
-
-
-def writeAperPhotometryFile(fluxDict_list, im_dict, filename,verbose = False):
-    if os.path.isfile(filename):
-        warnings.warn("Overwriting photometry file: "+str(filename),UserWarning)
-        
-    photometryFile = tables.openFile(filename, mode='w')
-    photometryGroup = photometryFile.createGroup(photometryFile.root, 'AperPhotometry', 'Table of aperture photometry data')
-
-    num_stars = int(len(fluxDict_list[0]['flux']))
-    AperPhotometry_Description = {
-        "time"              : Float64Col(),             # Start time of images
-        "integration_time"  : Float64Col(),             # integration time of individual images
-        "flux"              : Float64Col(num_stars),    # array of object flux values. [target_flux, ref0_flux, ...]
-        "sky"               : Float64Col(num_stars),    # array of sky flux values, scaled to same n_pix as object flux. [target_sky, ref0_flux, ...]
-        "apertureRad"       : Float64Col(num_stars),    # radius of aperture used for each object [target_apertureRad, ref0_apertureRad, ...]
-        "annulusInnerRad"   : Float64Col(num_stars),    # radius of inner annulus used for sky subtraction. 0s if sky fitting was used.
-        "annulusOuterRad"   : Float64Col(num_stars),    # radius of outer annulus used for sky subtraction. 0s if sky fitting was used
-        "flag"              : UInt16Col()}              # flag to indicate if sky fit is good (0) 
-        
-    photometryTable = photometryFile.createTable(photometryGroup, 'photometry', AperPhotometry_Description, title='Aperture Photometry Data')
-    
-    for i in range(len(im_dict['startTimes'])):
-        row = photometryTable.row
-        row['time'] = im_dict['startTimes'][i]
-        row['integration_time'] = im_dict['intTimes'][i]
-        row['flux'] = fluxDict_list[i]['flux']
-        row['sky'] = fluxDict_list[i]['sky']
-        row['apertureRad'] = fluxDict_list[i]['apertureRad']
-        row['annulusInnerRad'] = fluxDict_list[i]['annulusInnerRad']
-        row['annulusOuterRad'] = fluxDict_list[i]['annulusOuterRad']
-        row['flag'] = fluxDict_list[i]['flag']
-        row.append()
-        
-    # flush the table's I/O buffer to write the data to disk
-    photometryTable.flush()
-    if verbose:
-        print "Wrote to: "+filename
-    # close the file, flush all remaining buffers
-    photometryFile.close()
-
 
 class AperPhotometry(Photometry):
 
@@ -134,14 +78,23 @@ class AperPhotometry(Photometry):
             sky_sub - indicates type of sky subtraction to be performed.
                       "median" - to use median sky value in annulus
                       "fit" - to mask objects and estimate sky in aperture with polynomial fit
-            annulus_inner - double or list of doubles of same length as self.centroid. Gives radius of inner part of sky annulus for use in "median" sky sub. Ignored if sky_sub is not "median"
+            annulus_inner - double or list of doubles of same length as self.centroid. Gives radius of inner part of sky annulus for use in "median" sky sub. Ignored if sky_sub is not "median" [target_apertureRad, ref0_apertureRad, ...]
             annulus_outer - double or list of doubles of same length as self.centroid. Gives radius of outer part of sky annulus for use in "median" sky sub. Ignored if sky_sub is not "median"
             interpolation - select type of interpolation to perform on image before doing photometry
                             None - to skip interpolation
                             "cubic" - to do 2D cubic interpolation
                             "linear" - to do 2D linear interpolation (default)
-            Returns: Dictionary with keywords
+                            
+        Returns: Dictionary with keywords. These keywords should be the same as in aperPhotometryDataDescription in headers.DisplayStackHeaders
             flux - array of flux values. [target_flux, target_sky_flux, ref0_flux, ...]
+            skyFlux - array of sky flux values, scaled to same n_pix as object flux. [target_sky, ref0_sky, ...]
+            flag - flag to indicate successful analysis. 0 is good
+            apertureRad - same as input
+            annulusInnerRad - same as input
+            annulusOuterRad - same as input
+            interpolation - same as input
+            
+            
         '''
 
         flux = []
@@ -217,7 +170,7 @@ class AperPhotometry(Photometry):
         if self.showPlot:
             form.show()
 
-        return {'flux': np.asarray(flux), 'sky': np.asarray(sky), 'apertureRad':np.asarray(apRadOut), 'annulusInnerRad':np.asarray(annInOut), 'annulusOuterRad':np.asarray(annOutOut), 'flag':flag}
+        return {'flux': np.asarray(flux), 'skyFlux': np.asarray(sky), 'apertureRad':np.asarray(apRadOut), 'annulusInnerRad':np.asarray(annInOut), 'annulusOuterRad':np.asarray(annOutOut), 'flag':flag, 'interpolation':interpolation}
 
 
     def getApertureCounts(self, im, radius, center):

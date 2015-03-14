@@ -65,9 +65,14 @@ class CalLookupFile:
         if keyPrefix == 'calSoln':
             keyPrefix = 'waveSoln'
         entry = self.lookupObs(obsTstamp)
-        run = entry[keyPrefix+'_run']
-        date = entry[keyPrefix+'_date']
-        tstamp = entry[keyPrefix+'_tstamp']
+        if entry is not None:
+            run = entry[keyPrefix+'_run']
+            date = entry[keyPrefix+'_date']
+            tstamp = entry[keyPrefix+'_tstamp']
+        else:
+            run = ''
+            date = ''
+            tstamp = ''
         
         return {'run':run,'date':date,'tstamp':tstamp}
 

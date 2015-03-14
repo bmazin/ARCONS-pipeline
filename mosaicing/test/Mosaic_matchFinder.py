@@ -7,6 +7,7 @@ from util.popup import PopUp, plotArray
 import matplotlib.pyplot as plt
 import pickle
 import astrometry.CentroidCalc as cc
+import mosaicing.matchFinder as mf
 #import obsfileViewerTest as ovt
 
 # Define a set of observation files for this mosaic run
@@ -56,7 +57,7 @@ for iFrame in iFrameList:
 frame_list = np.array([image_list[0], image_list[28], image_list[29], image_list[65]])
 
 #degPerPix, theta, raArcsecPerSec = ObsFileSeq.ObjectFinder(image_list, fd, RA, Dec)
-degPerPix, theta, raArcsecPerSec = ObsFileSeq.ObjectFinder(frame_list, fd, RA, Dec)
+degPerPix, theta, raArcsecPerSec = mf.ObjectFinder(frame_list, fd, RA, Dec)
 
 ofs.setRm(degPerPix,
           math.degrees((theta)),

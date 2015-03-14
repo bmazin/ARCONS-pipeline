@@ -8,7 +8,7 @@ import hotpix.hotPixels as hp
 from util.ObsFile import ObsFile
 from util.FileName import FileName
 from util.readDict import readDict
-from headers.DisplayStackHeaders import *
+from headers.DisplayStackHeaders_old import *
 
 
 def writeImageStack(images, startTimes, intTimes=None, pixIntTimes=None, path='/Scratch/DisplayStack/RUN_TEMPLATE/TARGET_TEMPLATE',outputFilename='ImageStack_0.h5'):
@@ -110,7 +110,7 @@ def getImages(fromObsFile=False,fromPhotonList=False,fromImageStack=False,**kwar
         intTimes - [Seconds] list of image integration times for each image. 
     '''
     assert 1.0*fromObsFile+fromPhotonList+fromImageStack==1, "Choose whether to get images from a list of ObsFiles, from a list of PhotonLists, or from an .h5 file made by imagestack"
-    
+
     if fromObsFile:
         return getObsFileImages(**kwargs)
     elif fromPhotonList:
@@ -120,6 +120,7 @@ def getImages(fromObsFile=False,fromPhotonList=False,fromImageStack=False,**kwar
         return loadImagesFromStack(**kwargs)
         
 def loadImagesFromStack(fullFilename=''):
+    print "Loading images from stack..."
     #fullFilename=imageStackFilename
     if not os.path.isfile(fullFilename): return None
     stackFile = tables.openFile(fullFilename, mode='r')
@@ -161,7 +162,8 @@ def generateObsObjectList(obsFNs,wvlLowerLimit=3000, wvlUpperLimit=13000,beammap
         if loadWvlCal:
             obs.loadBestWvlCalFile()
         if loadFlatCal:
-            obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
+            #obs.loadFlatCalFile(FileName(obsFile=obs).flatSoln())
+            obs.loadFlatCalFile('/Scratch/flatCalSolnFiles/flatsol_1s.h5')
         if loadSpectralCal:
             pass
             

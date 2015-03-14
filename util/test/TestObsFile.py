@@ -805,7 +805,33 @@ iRow= 44  iCol= 43
                                   weighted=True, fluxWeighted=False)
         print "done"
 
-        
+
+    def testGetPixelSpectrum(self):
+        """
+        Regression test for one file, one pixel, one second,
+        using the "repeatable=True" flag
+        """
+        run = "PAL2014"
+        date = "20141022"
+        timeStamp = '20141023-033821'
+        fn = FileName.FileName(run,date,timeStamp)
+
+        of = ObsFile.ObsFile(fn.obs(), repeatable=True)
+        of.loadBeammapFile(fn.beammap())
+        of.loadBestWvlCalFile()
+        fn2 = FileName.FileName(run,date,"")
+        of.loadFlatCalFile(fn2.flatSoln())
+        row = 4
+        col = 4
+        firstSec = 72
+        integrationTime = 1
+        spec = of.getPixelSpectrum(row,col,firstSec,integrationTime)
+        expectedSpectrum = np.array([0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 3,
+                                     1, 0, 1, 1, 0, 0, 1, 2, 3, 0, 0, 2,
+                                     4, 6, 1, 3, 9, 5, 6])
+        self.assertTrue(np.array_equal(expectedSpectrum,spec['spectrum']))
+        del of
+
 def npEquals(a,b):
     if (len(a) != len(b)):
         return False

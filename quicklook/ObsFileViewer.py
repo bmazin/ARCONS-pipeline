@@ -42,7 +42,10 @@ class ObsFileViewer(QtGui.QMainWindow):
             self.loadObsFile(obsPath)
 
         if bInitWithObs:
-            self.obs.loadAllCals()
+            try:
+                self.obs.loadAllCals()
+            except IOError:
+                pass
             if not self.obs.hotPixTimeMask is None:
                 self.enableTimeMaskParams()
 
@@ -185,12 +188,6 @@ class ObsFileViewer(QtGui.QMainWindow):
         
         startWvl = float(self.textbox_startWvl.text())
         endWvl = float(self.textbox_endWvl.text())
-
-        if self.obs.wvlCalFile is None:
-            self.imageParamsWindow.checkbox_getRawCount.setChecked(True)
-            print 'setting getRawCount, since wvlcal is not loaded'
-        else:
-            self.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
 
         self.setObsState()
         paramsDict = self.imageParamsWindow.getParams()
@@ -453,17 +450,20 @@ class PlotWindow(QtGui.QDialog):
 
         #spectrum controls
         self.checkbox_divideWvlBinWidths = QtGui.QCheckBox('Divide by bin widths',self)
+        self.checkbox_normalizeSpectrum = QtGui.QCheckBox('Normalize',self)
         self.checkbox_trackWvls = QtGui.QCheckBox('Use main window wavelengths',self)
         self.connect(self.checkbox_trackWvls,QtCore.SIGNAL('stateChanged(int)'),self.changeTrackWvls)
-        self.textbox_startWvl = QtGui.QLineEdit(self.parent.textbox_startWvl.text())
+        #self.textbox_startWvl = QtGui.QLineEdit(self.parent.textbox_startWvl.text())
+        self.textbox_startWvl = QtGui.QLineEdit('0')
         self.textbox_startWvl.setFixedWidth(100)
-        self.textbox_endWvl = QtGui.QLineEdit(self.parent.textbox_endWvl.text())
+        #self.textbox_endWvl = QtGui.QLineEdit(self.parent.textbox_endWvl.text())
+        self.textbox_endWvl = QtGui.QLineEdit('-1')
         self.textbox_endWvl.setFixedWidth(100)
 
         self.wvlGroup = QtGui.QGroupBox('',parent=self)
         wvlBox = layoutBox('H',['Start Wavelength',self.textbox_startWvl,'Angstroms',1.,'End Wavelength',self.textbox_endWvl,'Angstroms',10.])
         self.wvlGroup.setLayout(wvlBox)
-        spectrumControlsBox = layoutBox('H',[self.checkbox_divideWvlBinWidths,self.checkbox_trackWvls,self.wvlGroup,10.])
+        spectrumControlsBox = layoutBox('H',[self.checkbox_divideWvlBinWidths,self.checkbox_normalizeSpectrum,self.checkbox_trackWvls,self.wvlGroup,10.])
 
         self.spectrumControlsGroup = QtGui.QGroupBox('Spectrum Controls',parent=self)
         self.spectrumControlsGroup.setLayout(spectrumControlsBox)
@@ -605,7 +605,6 @@ class PlotWindow(QtGui.QDialog):
         self.plotLightCurve(getRaw=True)
         for col,row in self.selectedPixels:
             maskedIntervals = self.parent.obsMethod('getPixelBadTimes',pixelRow=row,pixelCol=col)
-            print maskedIntervals
             for inter in maskedIntervals:
                 self.axes.axvspan(inter[0],inter[1],facecolor='r',alpha=0.3)
     
@@ -613,6 +612,8 @@ class PlotWindow(QtGui.QDialog):
 
     def plotLightCurve(self,getRaw=False):
         paramsDict = self.parent.getObsParams()
+        excludeBad = not (getRaw or paramsDict['getRawCount'])
+
         if self.checkbox_trackTimes.isChecked():
             startTime = float(self.parent.textbox_startTime.text())
             endTime = float(self.parent.textbox_endTime.text())
@@ -627,7 +628,7 @@ class PlotWindow(QtGui.QDialog):
         if histBinEdges[-1]+histIntTime == endTime:
             histBinEdges = np.append(histBinEdges,endTime)
         for col,row in self.selectedPixels:
-            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=(not paramsDict['getRawCount']))
+            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=excludeBad)
             timestamps = returnDict['timestamps']
             hist,_ = np.histogram(timestamps,bins=histBinEdges)
             hists.append(hist)
@@ -655,6 +656,7 @@ class PlotWindow(QtGui.QDialog):
             startWvl = float(self.textbox_startWvl.text())
             endWvl = float(self.textbox_endWvl.text())
 
+        self.parent.obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
         firstSec = startTime
         duration = endTime-startTime
         paramsDict = self.parent.getObsParams()
@@ -669,13 +671,15 @@ class PlotWindow(QtGui.QDialog):
 
         spectrums = np.array(spectrums)
         self.spectrum = np.sum(spectrums,axis=0)
-
         binWidths = np.diff(wvlBinEdges)
+        
+        ylabel='Counts'
         if self.checkbox_divideWvlBinWidths.isChecked():
             self.spectrum = 1. * self.spectrum / binWidths
-            ylabel = 'Counts / Angstrom'
-        else:
-            ylabel = 'Counts'
+            ylabel+=' / Angstrom'
+        if self.checkbox_normalizeSpectrum.isChecked():
+            self.spectrum = 1. * self.spectrum / np.sum(self.spectrum)
+            ylabel='Normalized '+ylabel
         
         plotHist(self.axes,wvlBinEdges,self.spectrum)
         self.axes.set_xlabel('Wavelength (Angstrom)')
@@ -703,7 +707,10 @@ class PlotWindow(QtGui.QDialog):
                 range = range / scaleToDegrees
         else:
             range = None
+        pixCutOffPhases=[]
         for col,row in self.selectedPixels:
+            cutOffWvl = self.parent.obs.wvlRangeTable[row, col, 0]
+            pixCutOffPhases.append(self.parent.obs.convertWvlToPhase(cutOffWvl,row,col))
             returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             peakHeights = returnDict['peakHeights']
@@ -735,7 +742,10 @@ class PlotWindow(QtGui.QDialog):
         else:
             histBinEdges = histBinEdges * scaleToDegrees
             xlabel = 'phase (${}^\circ$)'
+            pixCutOffPhases=np.asarray(pixCutOffPhases) * scaleToDegrees
         plotHist(self.axes,histBinEdges,self.hist)
+        for pixCutOffPhase in pixCutOffPhases:
+            self.axes.axvline(x=pixCutOffPhase,color='k')
         self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel('counts')
 
@@ -882,6 +892,14 @@ class ImageParamsWindow(ModelessWindow):
             obs.switchOnCosmicTimeMask()
         else:
             obs.switchOffCosmicTimeMask()
+
+        if obs.wvlCalFile is None:
+            self.checkbox_getRawCount.setChecked(True)
+            print 'setting getRawCount, since wvlcal is not loaded'
+        else:
+            startWvl = float(self.parent.textbox_startWvl.text())
+            endWvl = float(self.parent.textbox_endWvl.text())
+            obs.setWvlCutoffs(wvlLowerLimit=startWvl, wvlUpperLimit=endWvl)
             
     def getParams(self):
         obsParamsDict = {}
@@ -1196,7 +1214,7 @@ class LoadCalsDialog(QtGui.QDialog):
         cosmicBox = layoutBox('H',[self.loadCosmicWidget,self.button_loadCosmic])
         beammapBox = layoutBox('H',[self.loadBeammapWidget,self.button_loadBeammap])
 
-        mainBox = layoutBox('V',[wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,beammapBox,self.button_loadAll])
+        mainBox = layoutBox('V',[beammapBox,wvlBox,flatBox,fluxBox,timeMaskBox,timeAdjustBox,cosmicBox,self.button_loadAll])
         self.setLayout(mainBox)
 
     def connectButtons(self):
@@ -1221,13 +1239,16 @@ class LoadCalsDialog(QtGui.QDialog):
         self.parent.enableTimeMaskParams()
         
     def loadAllCals(self):
-        self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
-        self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
-        self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
-        self.loadTimeMask()
-        self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
-        self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
-        self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
+        try:
+            self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
+            self.loadCal(self.loadWvlWidget,'loadWvlCalFile')
+            self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
+            self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
+            self.loadTimeMask()
+            self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
+            self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
+        except IOError:
+            pass
         self.parent.imageParamsWindow.checkbox_getRawCount.setChecked(False)
         print 'setting getRawCount=False'
         self.close()

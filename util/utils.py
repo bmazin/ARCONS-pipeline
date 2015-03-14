@@ -1118,13 +1118,14 @@ def interpolateImage(inputArray, method='linear'):
 
     finalshape = numpy.shape(inputArray)
 
-    dataPoints = numpy.where(inputArray!=0) #data points for interp are only pixels with counts
+    dataPoints = numpy.where(numpy.logical_or(numpy.isnan(inputArray),inputArray==0)==False) #data points for interp are only pixels with counts
+    data = inputArray[dataPoints]
     dataPoints = numpy.array((dataPoints[0],dataPoints[1]),dtype=numpy.int).transpose() #griddata expects them in this order
-
-    interpPoints = numpy.where(inputArray!=numpy.nan) #final image is full array. NANs still excluded
+    
+    interpPoints = numpy.where(inputArray!=numpy.nan) #should include all points as interpolation points
     interpPoints = numpy.array((interpPoints[0],interpPoints[1]),dtype=numpy.int).transpose()
 
-    interpolatedFrame = griddata(dataPoints, inputArray[numpy.where(inputArray!=0)], interpPoints, 'linear')
+    interpolatedFrame = griddata(dataPoints, data, interpPoints, method)
     interpolatedFrame = numpy.reshape(interpolatedFrame, finalshape) #reshape interpolated frame into original shape
     
     return interpolatedFrame
@@ -1214,7 +1215,117 @@ def fitBlackbody(wvls,flux,fraction=1.0,newWvls=None,tempGuess=6000):
         return T
 
 
-    
+def rebin(x,y,binedges):
+    '''
+    Seth Meeker 1-29-2013
+    Given arrays of wavelengths and fluxes (x and y) rebins to specified bin size by taking average value of input data within each bin
+    use: rebinnedData = rebin(x,y,binedges)
+    binedges typically can be imported from a FlatCal after being applied in an ObsFile
+    '''
+    #must be passed binedges array since spectra will not be binned with evenly sized bins
+    start = binedges[0]
+    stop = x[-1]
+    #calculate how many new bins we will have
+    nbins = len(binedges)-1
+    #create output arrays
+    rebinned = numpy.zeros((nbins,2),dtype = float)
+    n=0
+    binsize=binedges[n+1]-binedges[n]
+    while start+(binsize/2.0)<stop:
+        #print start
+        #print binsize
+        #print stop
+        #print n
+        rebinned[n,0] = (start+(binsize/2.0))
+        ind = numpy.where((x>start) & (x<start+binsize))
+        rebinned[n,1] = numpy.mean(y[ind])
+        start += binsize
+        n+=1
+        try:
+            binsize=binedges[n+1]-binedges[n]
+        except IndexError:
+            break
+    return rebinned
+
+def gaussianConvolution(x,y,xEnMin=0.005,xEnMax=6.0,xdE=0.001,fluxUnits = "lambda",r=8, plots=False):
+    '''
+    Seth 2-16-2015
+    Given arrays of wavelengths and fluxes (x and y) convolves with gaussian of a given energy resolution (r)
+    Input spectrum is converted into F_nu units, where a Gaussian of a given R has a constant width unlike in
+    wavelength space, and regridded to an even energy gridding defined by xEnMin, xEnMax, and xdE
+    INPUTS:
+        x - wavelengths of data points in Angstroms or Hz
+        y - fluxes of data points in F_lambda (ergs/s/cm^2/Angs) or F_nu (ergs/s/cm^2/Hz)
+        xEnMin - minimum value of evenly spaced energy grid that spectrum will be interpolated on to
+        xEnMax - maximum value of evenly spaced energy grid that spectrum will be interpolated on to
+        xdE - energy spacing of evenly spaced energy grid that spectrum will be interpolated on to
+        fluxUnits - "lambda" for default F_lambda, x must be in Angstroms. "nu" for F_nu, x must be in Hz.
+        r - energy resolution of gaussian to be convolved with. R=8 at 405nm by default.
+    OUTPUTS:
+        xOut - new x-values that convolution is calculated at (defined by xEnMin, xEnMax, xdE), returned in same units as original x
+        yOut - fluxes calculated at new x-values are returned in same units as original y provided
+    '''
+    ##=======================  Define some Constants     ============================
+    c=3.00E10 #cm/s
+    h=6.626E-27 #erg*s
+    k=1.3806488E-16 #erg/K
+    heV = 4.13566751E-15
+    ##================  Convert to F_nu and put x-axis in frequency  ===================
+    if fluxUnits == 'lambda':
+        xEn = heV*(c*1.0E8)/x
+        xNu = xEn/heV
+        yNu = y * x**2 * 3.34E4 #convert Flambda to Fnu(Jy)
+    elif fluxUnits =='nu':
+        xNu = x
+        xEn = xNu*heV
+        yNu = y
+    else:
+        raise ValueError("fluxUnits must be either 'nu' or 'lambda'")
+    ##============  regrid to a constant energy spacing for convolution  ===============
+    xNuGrid = numpy.arange(xEnMin,xEnMax,xdE)/heV #make new x-axis gridding in constant freq bins
+    yNuGrid = griddata(xNu,yNu,xNuGrid, 'linear', fill_value=0)
+    if plots==True:
+        plt.plot(xNuGrid,yNuGrid,label="Spectrum in energy space")
+    ##====== Integrate curve to get total flux, required to ensure flux conservation later =======
+    originalTotalFlux = scipy.integrate.simps(yNuGrid,x=xNuGrid)
+    ##======  define gaussian for convolution, on same gridding as spectral data  ======
+    #WARNING: right now flux is NOT conserved
+    amp = 1.0
+    offset = 0
+    E0=heV*c/(450*1E-7) # 450rnm light is ~3eV
+    dE = E0/r
+    sig = dE/heV/2.355 #define sigma as FWHM converted to frequency
+    gaussX = numpy.arange(-2,2,0.001)/heV
+    gaussY = amp * numpy.exp(-1.0*(gaussX-offset)**2/(2.0*(sig**2)))
+    if plots==True:
+        plt.plot(gaussX, gaussY*yNuGrid.max(),label="Gaussian to be convolved")
+        plt.legend()
+        plt.show()
+    ##================================    convolve    ==================================
+    convY = numpy.convolve(yNuGrid,gaussY,'same')
+    if plots==True:
+        plt.plot(xNuGrid,convY,label="Convolved spectrum")
+        plt.legend()
+        plt.show()
+    ##============ Conserve Flux ==============
+    newTotalFlux = scipy.integrate.simps(convY,x=xNuGrid)
+    convY*=(originalTotalFlux/newTotalFlux)
+    ##==================   Convert back to wavelength space   ==========================
+    if fluxUnits=='lambda':
+        xOut = c/xNuGrid*1E8
+        yOut = convY/(xOut**2)*3E-5 #convert Fnu(Jy) to Flambda
+    else:
+        xOut = xNuGrid
+        yOut = convY
+    if plots==True:
+        plt.plot(xOut[xOut<25000], yOut[xOut<25000],label="Convolved Spectrum")
+        plt.plot(x,y,label="Original spectrum")
+        plt.legend()
+        plt.ylabel('F_%s'%fluxUnits)
+        plt.show()
+
+    return [xOut,yOut]
+
 
 
 

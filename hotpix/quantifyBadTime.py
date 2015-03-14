@@ -363,7 +363,7 @@ if __name__ == "__main__":
     '''
     To call from command line:
     
-        python quantifyHotTime inputfilename [startTime endTime]
+        python quantifyBadTime.py inputfilename [startTime endTime]
     
     '''
     
@@ -376,6 +376,6 @@ if __name__ == "__main__":
     if nArg > 2: startTime = float(sys.argv[2])
     if nArg > 3: endTime = float(sys.argv[3])
     if nArg > 4: print 'Too many arguments provided - ignoring everything after third'
-    if inputFileName is not None: quantifyHotTime(inputFileName, startTime=startTime, endTime=endTime)
+    if inputFileName is not None: quantifyBadTime(inputFileName, startTime=startTime, endTime=endTime)
        
        

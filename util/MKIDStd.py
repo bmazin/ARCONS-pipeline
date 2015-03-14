@@ -142,6 +142,14 @@ class MKIDStd:
         """
         a[:,1] /= (a[:,0] * self.k)
         return a
+
+    def ergsToCounts(self,a):
+        """
+        This function changes the units of the spectra from ergs to 
+        counts. 
+        """
+        a[:,1] *= (a[:,0] * self.k)
+        return a
     
     def measureBandPassFlux(self,aFlux,aFilter):
         """
