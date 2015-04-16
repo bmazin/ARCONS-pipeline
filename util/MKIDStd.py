@@ -30,7 +30,7 @@ class MKIDStd:
         self.referenceWavelength=referenceWavelength
         self.objects = {}
         self.filters = {}
-        self.filterList = ['U','B','V','R','I','g','i','r','u','z']
+        self.filterList = ['U','B','V','R','I','u','g','r','i','z']
         self.this_dir, this_filename = os.path.split(__file__)
         pattern = os.path.join(self.this_dir,"data","*.txt")
         for file in glob.glob(pattern):
@@ -46,6 +46,19 @@ class MKIDStd:
         self.k = ((1.0*10**-10)/(1.0*10**7))/h/c
 
         self.vegaInCounts = "not loaded yet"
+
+    def _loadFilter(self, filterName):
+        if filterName in ['U','B','V','R','I']:
+            print "Loading Johnson %s filter"%filterName
+            self._loadUBVRIFilters()
+        elif filterName in ['u','g','r','i','z']:
+            print "Loading SDSS %s filter"%filterName
+            self._loadSDSSFilters()
+        else:
+            raise ValueError("INVALID FILTER. Currently supported filters:", self.filterList)
+        wvls = self.filters[filterName][0]
+        trans = self.filters[filterName][1]
+        return wvls, trans
 
     def _loadUBVRIFilters(self):
             
@@ -303,6 +316,7 @@ class MKIDStd:
             x = a[0,:]
             plt.plot(x,y, label=filter)
             plt.legend()
+            #plt.show()
             plt.savefig('filters'+'.png')
 
     def getFluxAtReferenceWavelength(self, a):

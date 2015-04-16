@@ -38,6 +38,7 @@ loadFluxCalFile(self, fluxCalFileName)
 loadHotPixCalFile(self, hotPixCalFileName, switchOnMask=True)
 loadTimeAdjustmentFile(self,timeAdjustFileName,verbose=False)
 loadWvlCalFile(self, wvlCalFileName)
+loadFilter(self, filterName = 'V', wvlBinEdges = None,switchOnFilter = True):
 makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000)
 parsePhotonPackets(self, packets, inter=interval(),doParabolaFitPeaks=True, doBaselines=True)
 plotPixelSpectra(self, pixelRow, pixelCol, firstSec=0, integrationTime= -1,weighted=False, fluxWeighted=False)getApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False, fluxWeighted=False, lowCut=3000, highCut=7000,firstSec=0,integrationTime=-1)
@@ -46,6 +47,8 @@ plotApertureSpectrum(self, pixelRow, pixelCol, radius1, radius2, weighted=False,
 setWvlCutoffs(self, wvlLowerLimit=3000, wvlUpperLimit=8000)
 switchOffHotPixTimeMask(self)
 switchOnHotPixTimeMask(self, reasons=[])
+switchOffFilter(self)
+switchOnFilter(self)
 writePhotonList(self)
 
 calculateSlices_old(inter, timestamps)
@@ -69,6 +72,7 @@ from tables.nodes import filenode
 import astropy.constants
 
 from util import utils
+from util import MKIDStd
 from util.FileName import FileName
 from headers import TimeMask
 from util.CalLookupFile import CalLookupFile
@@ -91,6 +95,8 @@ class ObsFile:
         self.flatCalFileName = None
         self.fluxCalFile = None
         self.fluxCalFileName = None
+        self.filterIsApplied = None
+        self.filterTrans = None
         self.timeAdjustFile = None
         self.timeAdjustFileName = None
         self.hotPixFile = None
@@ -1001,6 +1007,9 @@ class ObsFile:
         x = self.getPixelWvlList(pixelRow, pixelCol, firstSec, integrationTime,timeSpacingCut=timeSpacingCut)
         wvlList, effIntTime, rawCounts = x['wavelengths'], x['effIntTime'], x['rawCounts']
 
+        if (weighted == False) and (fluxWeighted == True):
+            raise ValueError("Cannot apply flux cal without flat cal. Please load flat cal and set weighted=True")
+
         if (self.flatCalFile is not None) and (((wvlBinEdges is None) and (energyBinWidth is None) and (wvlBinWidth is None)) or weighted == True):
         #We've loaded a flat cal already, which has wvlBinEdges defined, and no other bin edges parameters are specified to override it.
             spectrum, wvlBinEdges = np.histogram(wvlList, bins=self.flatCalWvlBins)
@@ -1027,6 +1036,11 @@ class ObsFile:
             else:#We are given wvlBinEdges array
                 spectrum, wvlBinEdges = np.histogram(wvlList, bins=wvlBinEdges)
        
+        if self.filterIsApplied == True:
+            if not np.array_equal(self.filterWvlBinEdges, wvlBinEdges):
+                raise ValueError("Synthetic filter wvlBinEdges do not match pixel spectrum wvlBinEdges!")
+            spectrum*=self.filterTrans
+
         #if getEffInt is True:
         return {'spectrum':spectrum, 'wvlBinEdges':wvlBinEdges, 'effIntTime':effIntTime, 'rawCounts':rawCounts}
         #else:
@@ -1756,6 +1770,38 @@ class ObsFile:
             print 'loaded centroid list',self.centroidListFileName
         else:
             print 'did not load centroid list'
+
+    def loadFilter(self, filterName = 'V', wvlBinEdges = None,switchOnFilter = True):
+        '''
+        '''
+        std = MKIDStd.MKIDStd()
+        self.rawFilterWvls, self.rawFilterTrans = std._loadFilter(filterName)
+        #check to see if wvlBinEdges are provided, and make them if not
+        if wvlBinEdges == None:
+            if self.flatCalFile is not None:
+                print "No wvlBinEdges provided, using bins defined by flatCalFile"
+                wvlBinEdges = self.flatCalWvlBins
+            else:
+                raise ValueError("No wvlBinEdges provided. Please load flatCalFile or make bins with ObsFile.makeWvlBins")
+        self.rawFilterTrans/=max(self.rawFilterTrans) #normalize filter to 1
+        rebinned = utils.rebin(self.rawFilterWvls, self.rawFilterTrans, wvlBinEdges)
+        self.filterWvlBinEdges = wvlBinEdges
+        self.filterWvls = rebinned[:,0]
+        self.filterTrans = rebinned[:,1]
+        self.filterTrans[np.isnan(self.filterTrans)] = 0.0
+        if switchOnFilter: self.switchOnFilter()
+
+    def switchOffFilter(self):
+        self.filterIsApplied = False
+        print "Turned off synthetic filter"
+
+    def switchOnFilter(self):
+        if self.filterTrans != None:
+            self.filterIsApplied = True
+            print "Turned on synthetic filter"
+        else:
+            print "No filter loaded! Use loadFilter to select a filter first"
+            self.filterIsApplied = False
 
     @staticmethod
     def makeWvlBins(energyBinWidth=.1, wvlStart=3000, wvlStop=13000):

@@ -1221,6 +1221,9 @@ def rebin(x,y,binedges):
     Given arrays of wavelengths and fluxes (x and y) rebins to specified bin size by taking average value of input data within each bin
     use: rebinnedData = rebin(x,y,binedges)
     binedges typically can be imported from a FlatCal after being applied in an ObsFile
+    returns rebinned data as 2D array:
+        rebinned[:,0] = centers of wvl bins
+        rebinned[:,1] = average of y-values per new bins
     '''
     #must be passed binedges array since spectra will not be binned with evenly sized bins
     start = binedges[0]
@@ -1229,6 +1232,8 @@ def rebin(x,y,binedges):
     nbins = len(binedges)-1
     #create output arrays
     rebinned = numpy.zeros((nbins,2),dtype = float)
+    for i in xrange(nbins):
+        rebinned[i,0] = binedges[i]+(binedges[i+1]-binedges[i])/2.0
     n=0
     binsize=binedges[n+1]-binedges[n]
     while start+(binsize/2.0)<stop:
