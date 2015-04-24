@@ -18,6 +18,8 @@ from headers.DisplayStackHeaders import writeImageStack, readImageStack
 #import matplotlib as mpl
 
 
+from util.popup import *
+
 class ObsFileSeq():
     """
     Deal with a sequence of obsFiles, and present data as a set of
@@ -67,19 +69,25 @@ class ObsFileSeq():
         self.obsFiles = []
         self.fileNames = []
         self.obsFileUnixTimes = []
+        self.hotPixelsApplied = True
         for timeStamp in self.timeStamps:
             fn = FileName.FileName(run, date, timeStamp)
             self.fileNames.append(fn)
             of = ObsFile.ObsFile(fn.obs())
-            of.loadBeammapFile(fn.beammap())
-            of.loadBestWvlCalFile()
-            fn2 = FileName.FileName(run, date, "")
-            of.loadFlatCalFile(fn2.flatSoln())
-            try:
-                of.loadHotPixCalFile(fn.timeMask())
-                self.hotPixelsApplied = True
-            except:
-                self.hotPixelsApplied = False
+            
+            of.loadAllCals()
+            
+            #of.loadBeammapFile(fn.beammap())
+            #of.loadBestWvlCalFile()
+            #fn2 = FileName.FileName(run, date, "")
+            #of.loadFlatCalFile(fn2.flatSoln())
+            #try:
+            #    of.loadHotPixCalFile(fn.timeMask(),reasons=['hot pixel','manual hot pixel','manual cold pixel','unknown'])
+            #    self.hotPixelsApplied = True
+            #except:
+            #    raise
+            #    self.hotPixelsApplied = False
+            self.hotPixelsApplied = of.hotPixIsApplied and self.hotPixelsApplied        #make sure it's applied to all files
             self.obsFiles.append(of)
             self.obsFileUnixTimes.append(of.getFromHeader('unixtime'))
         self.tcs = TCS.TCS(run, date)
@@ -455,6 +463,14 @@ class ObsFileSeq():
                        weighted=True, fluxWeighted=False,
                        getRawCount=False, scaleByEffInt=True,
                        deadTime=100.e-6):
+                                      
+        #print '\nMaking images:'
+        #print str(wvlStart),'-',wvlStop,'A'
+        #print 'weighted:',weighted
+        #print 'fluxWeighted:',fluxWeighted
+        #print 'getRawCount:',getRawCount
+        #print 'scaleByEffInt:',scaleByEffInt
+        
         #If the file exists, read it out
         if os.path.isfile(fileName):
             return readImageStack(fileName)
@@ -466,6 +482,7 @@ class ObsFileSeq():
             endTimes = []
             intTimes = []
             for iFrame in range(len(self.frameIntervals)):
+                #print '\nFrame:',iFrame
                 im_dict = self.getPixelCountImageByFrame(iFrame,
                                                          wvlStart, wvlStop,
                                                          weighted,
@@ -473,11 +490,17 @@ class ObsFileSeq():
                                                          getRawCount,
                                                          scaleByEffInt,
                                                          deadTime)
-                images.append(im_dict['image'])
-                pixIntTimes.append(im_dict['pixIntTime'])
-                startTimes.append(im_dict['startTime'])
-                endTimes.append(im_dict['endTime'])
-                intTimes.append(im_dict['intTime'])
+                if im_dict is not None:
+                    images.append(im_dict['image'])
+                    pixIntTimes.append(im_dict['pixIntTime'])
+                    startTimes.append(im_dict['startTime'])
+                    endTimes.append(im_dict['endTime'])
+                    intTimes.append(im_dict['intTime'])
+                    #pop=PopUp(parent=None,title='JD: '+str(im_dict['startTime'])+' Image')
+                    #pop.plotArray(image=im_dict['image'], title='Image')
+                    #pop.show()
+                    #plotArray(image=im_dict['image'], title='JD: '+str(im_dict['startTime'])+' Image')
+                    #print '\n'
 
             writeImageStack(fileName, images, startTimes=startTimes,
                             endTimes=endTimes, intTimes=intTimes,
@@ -525,7 +548,8 @@ class ObsFileSeq():
 
         retval = None
         for obsInfo in self.frameObsInfos[iFrame]:
-            print obsInfo
+            #print obsInfo['obs'].fullFileName
+            #print obsInfo
             obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart,
                                          wvlUpperLimit=wvlStop)
             im_dict = obsInfo['obs'].\
@@ -541,15 +565,16 @@ class ObsFileSeq():
             #print 'im: ', np.sum(im)
             #Correct for dead time
             with warnings.catch_warnings():
-                warnings.filterwarnings("ignore",
-                                        'invalid value encountered in divide',
-                                        RuntimeWarning)
-                w_deadTime = \
-                    1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
+                warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
+                warnings.filterwarnings("ignore",'divide by zero encountered in divide',RuntimeWarning)
+                w_deadTime = 1.0-im_dict['rawCounts']*deadTime/im_dict['effIntTimes']
             im = im/w_deadTime
             if scaleByEffInt:
-                #Correct for exposure time
-                im = im*obsInfo["integrationTime"]/im_dict['effIntTimes']
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
+                    warnings.filterwarnings("ignore",'divide by zero encountered in divide',RuntimeWarning)
+                    #Correct for exposure time
+                    im = im*obsInfo["integrationTime"]/im_dict['effIntTimes']
             #Remove any funny values
             im[np.invert(np.isfinite(im))] = 0.
             #print '--> ', np.sum(im)

@@ -53,6 +53,10 @@ nearestNstdDevFilter(inputArray,n=24)
 nearestNmedFilter(inputArray,n=24)
 interpolateImage(inputArray,method='linear')
 showzcoord()
+fitBlackbody(wvls,flux,fraction=1.0,newWvls=None,tempGuess=6000)
+rebin(x,y,binedges)
+gaussianConvolution(x,y,xEnMin=0.005,xEnMax=6.0,xdE=0.001,fluxUnits = "lambda",r=8, plots=False)
+countsToApparentMag(cps, filterName = 'V', telescope = None)
 """
 
 def aperture(startpx=None, startpy=None, cenRA=None, cenDec=None, nPixRA=None, nPixDec=None, limits = None, degrees = False, radius=3):
@@ -1221,6 +1225,9 @@ def rebin(x,y,binedges):
     Given arrays of wavelengths and fluxes (x and y) rebins to specified bin size by taking average value of input data within each bin
     use: rebinnedData = rebin(x,y,binedges)
     binedges typically can be imported from a FlatCal after being applied in an ObsFile
+    returns rebinned data as 2D array:
+        rebinned[:,0] = centers of wvl bins
+        rebinned[:,1] = average of y-values per new bins
     '''
     #must be passed binedges array since spectra will not be binned with evenly sized bins
     start = binedges[0]
@@ -1229,6 +1236,8 @@ def rebin(x,y,binedges):
     nbins = len(binedges)-1
     #create output arrays
     rebinned = numpy.zeros((nbins,2),dtype = float)
+    for i in xrange(nbins):
+        rebinned[i,0] = binedges[i]+(binedges[i+1]-binedges[i])/2.0
     n=0
     binsize=binedges[n+1]-binedges[n]
     while start+(binsize/2.0)<stop:
@@ -1327,6 +1336,36 @@ def gaussianConvolution(x,y,xEnMin=0.005,xEnMax=6.0,xdE=0.001,fluxUnits = "lambd
     return [xOut,yOut]
 
 
+def countsToApparentMag(cps, filterName = 'V', telescope = None):
+    '''
+    routine to convert counts measured in a given filter to an apparent magnitude
+    input: cps = counts/s to be converted to magnitude. Can accept np array of numbers.
+           filterName = filter to have magnitude calculated for
+           telescope = name of telescope used. This is necessary to determine the collecting
+                       area since the counts need to be in units of counts/s/m^2 for conversion to mags
+                       If telescope = None: assumes data was already given in correct units
+    output: apparent magnitude. Returns same format as input (either single value or np array)
+    '''
+    Jansky2Counts = 1.51E7
+    dLambdaOverLambda = {'U':0.15,'B':0.22,'V':0.16,'R':0.23,'I':0.19,'g':0.14,'r':0.14,'i':0.16,'z':0.13}
+    f0 = {'U':1810.,'B':4260.,'V':3640.,'R':3080.,'I':2550.,'g':3730.,'r':4490.,'i':4760.,'z':4810.}
 
+    if filterName not in f0.keys():
+        raise ValueError("Not a valid filter. Please select from 'U','B','V','R','I','g','r','i','z'")    
+
+    if telescope in ['Palomar','PAL','palomar','pal','Hale','hale']:
+        telArea = 17.8421 #m^2 for Hale 200" primary
+    elif telescope in ['Lick','LICK','Shane']:
+        raise ValueError("LICK NOT IMPLEMENTED")
+    elif telescope == None:
+        print "WARNING: no telescope provided for conversion to apparent mag. Assuming data is in units of counts/s/m^2"
+        telArea=1.0
+    else:
+        raise ValueError("No suitable argument provided for telescope name. Use None if data in counts/s/m^2 already.")
+
+    cpsPerArea=cps/telArea
+    mag = -2.5*numpy.log10(cpsPerArea/(f0[filterName]*Jansky2Counts*dLambdaOverLambda[filterName]))
+    return mag
+    
 
 
