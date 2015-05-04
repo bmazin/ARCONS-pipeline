@@ -1,9 +1,10 @@
 import numpy as np
 import scipy.stats,scipy.special
 import matplotlib.pyplot as plt
-from util.popup import plotArray
+from util.popup import plotArray,PopUp
 import scipy.ndimage
 import os
+from util.readDict import readDict
 
 def plotPulseProfile(ax,phaseBinEdges,pulseProfile,profileErrors=None,plotDoublePulse=True,**kwargs):
     if plotDoublePulse:
@@ -25,6 +26,15 @@ def plotPulseProfile(ax,phaseBinEdges,pulseProfile,profileErrors=None,plotDouble
 def nSigma(pvalue):
     return scipy.special.erfinv(pvalue)*np.sqrt(2.)
 
+def weightedStd(values, **kwargs):
+    """
+    Return the weighted average and standard deviation.
+    values, kwargs -- Numpy ndarrays with the same shape.
+    """
+    average = np.average(values, **kwargs)
+    variance = np.average((values-average)**2, **kwargs)  # Fast and numerically precise
+    return {'avg':average,'std':np.sqrt(variance)}
+
 def rebinHists(oldBinEdges,oldHist,nOldBinsInNewBin=2,axis=-1):
     firstAfterConvolve = (nOldBinsInNewBin//2) - 1 +(nOldBinsInNewBin%2)
     rebinnedEdges = oldBinEdges[::nOldBinsInNewBin]
@@ -42,7 +52,8 @@ def combineProfiles(phaseBinEdges,phaseProfiles,nNewBins=10,label='',ax=None):
 
     phaseProfile = np.sum(phaseProfiles,axis=0)
 
-    #totalProfileErrors = np.std(phaseProfiles,axis=0)
+    allErrors = np.std(phaseProfiles)
+    #profileErrors = np.std(phaseProfiles,axis=0)
     profileErrors = np.sqrt(phaseProfile)
 
     profileAvg = np.average(phaseProfile,weights=1./profileErrors**2)
@@ -68,27 +79,82 @@ def combineProfiles(phaseBinEdges,phaseProfiles,nNewBins=10,label='',ax=None):
     ax.set_title('J0337 Pulse Profile - {}'.format(label))
 
 if __name__=='__main__':
+
+
+    paramFile = 'j0337.dict'
+    params = readDict()
+    params.read_from_file(paramFile)
+    obsSequences = [params[key] for key in sorted(params.keys()) if key.startswith('obsSequence')]
+    sunsetDates = [params[key] for key in sorted(params.keys()) if key.startswith('sunsetDate')]
+
+
+#    sunsetDates.append(params['sunsetDate0'])
+#    obsSequences.append(params['obsSequence0'])
+#
+#    sunsetDates.append(params['sunsetDate1'])
+#    obsSequences.append(params['obsSequence1'])
+#
+#    sunsetDates.append(params['sunsetDate2'])
+#    obsSequences.append(params['obsSequence2'])
+    tstampsToUse = np.concatenate(obsSequences)
+
     nPhaseBins = 150
-    wvlStart = 3000 #angstrom
-    wvlEnd = 8000 #angstrom
-    apertureRadius=.5#arcsec
-    dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{}arcsecAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd,apertureRadius)
+    wvlStart = 4000 #angstrom
+    wvlEnd = 5000 #angstrom
+    #dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{}arcsecAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd,apertureRadius)
+    dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_optimalAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd)
     print os.path.basename(dataPath)
 
     dataDict = np.load(dataPath)
     phaseProfiles = np.array(dataDict['phaseProfiles'],dtype=np.double)
     phaseBinEdges = dataDict['phaseBinEdges']
     tstamps = dataDict['obsTimestamps']
+    apertureRadiusList = dataDict['apertureRadiusList']
+    psfFits = dataDict['psfFits']
+    print len(tstamps),'files in phaseProfiles'
+
+    tstampMask = np.array([tstamp in tstampsToUse for tstamp in tstamps])
+    print np.sum(tstampMask), 'files used'
+    tstamps = tstamps[tstampMask]
+    phaseProfiles = phaseProfiles[tstampMask]
+    apertureRadiusList = apertureRadiusList[tstampMask]
+    psfFits = psfFits[tstampMask]
+
+    dateMasks = []
+    phaseProfilesByDate = []
+    for iDate,obsSeq in enumerate(obsSequences):
+        dateMask = np.array([tstamp in obsSeq for tstamp in tstamps])
+        phaseProfilesOnDate  = phaseProfiles[dateMask]
+        combineProfiles(phaseBinEdges,phaseProfilesOnDate,label=sunsetDates[iDate])
+        dateMasks.append(dateMask)
+    combineProfiles(phaseBinEdges,phaseProfiles,label='total')
+    
     #print '20140924',tstamps[0:17]
     #print '20140925',tstamps[17:47]
     #print '20141021',tstamps[47:]
     #profileErrors = dataDict['profileErrors']
-    plotArray(phaseProfiles)
+    pop = PopUp(showMe=False)
+    pop.plotArray(phaseProfiles,aspect=2.)
+    pop.axes.set_yticks(np.arange(np.shape(phaseProfiles)[0]))
+    pop.axes.tick_params(axis='both', which='major', labelsize=7)
+    pop.axes.set_yticklabels(tstamps)
+    pop.show()
 
-    combineProfiles(phaseBinEdges,phaseProfiles,label='total')
-    combineProfiles(phaseBinEdges,phaseProfiles[0:15],label='20140924')
-    combineProfiles(phaseBinEdges,phaseProfiles[17:47],label='20140925')
-    combineProfiles(phaseBinEdges,phaseProfiles[47:],label='20141021')
+    #plotArray(phaseProfiles)
+
+#    combineProfiles(phaseBinEdges,phaseProfiles,label='total')
+#    combineProfiles(phaseBinEdges,phaseProfiles[0:15],label='20140924')
+#    combineProfiles(phaseBinEdges,phaseProfiles[17:47],label='20140925')
+#    combineProfiles(phaseBinEdges,phaseProfiles[47:],label='20141021')
+    timeProfile = np.mean(phaseProfiles,axis=1)
+    fig,(ax,ax2,ax3,ax4) = plt.subplots(4,1,sharex='col')
+    ax.plot(apertureRadiusList)
+    ax2.plot([psfFit['flux'] for psfFit in psfFits])
+    ax3.plot([psfFit['parameters'][0] for psfFit in psfFits])
+    ax4.plot(timeProfile)
+    for iTime,tstamp in enumerate(tstamps):
+        print iTime,tstamp
+
 
     print 'done'
     plt.show()
