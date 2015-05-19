@@ -10,6 +10,7 @@ from timing import photonTiming
 import ephem
 import functools
 from util.readDict import readDict
+from util.ObsFile import ObsFile
 
 RADIANS_PER_ARCSEC = np.pi/648000.
 
@@ -92,17 +93,19 @@ if __name__=='__main__':
     obsTimestamps = np.concatenate(obsSequences)
     plPaths = [path for pathList in plPaths for path in pathList]
 
-    nPhaseBins = 150 #bin it finely, we can rebin later
+    nPhaseBins = 1500 #bin it finely, we can rebin later
     wvlStart = 3000 #angstrom
     wvlEnd = 13000 #angstrom
     wvlRange = (wvlStart,wvlEnd)
     centroidRaStr='03:37:43.826'
     centroidDecStr='14:15:14.828'
 
-    #open up the first photon list and extract the wavelength bin edges used to make the flatcal and fluxcal
-    pl0 = PhotList(plPaths[0])
-    wvlBinEdges = np.array(pl0.file.root.flatcal.wavelengthBins.read())
-    del pl0
+
+    wvlBinEdges = ObsFile.makeWvlBins(.01)
+#    #open up the first photon list and extract the wavelength bin edges used to make the flatcal and fluxcal
+#    pl0 = PhotList(plPaths[0])
+#    wvlBinEdges = np.array(pl0.file.root.flatcal.wavelengthBins.read())
+#    del pl0
     print wvlBinEdges
 
 
@@ -118,7 +121,7 @@ if __name__=='__main__':
 
     bUseOptimalApert = True
     if bUseOptimalApert:
-        dataPathApert = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{:.1f}arcsecAperture_sigma.npz'.format(nPhaseBins,3000,8000,3.)
+        dataPathApert = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{:.1f}arcsecAperture_sigma.npz'.format(150,3000,8000,3.)
         apertureDataDict = np.load(dataPathApert)
         apertureList = apertureDataDict['smoothOptimalApertureRadii']
         tstamps = apertureDataDict['obsTimestamps']

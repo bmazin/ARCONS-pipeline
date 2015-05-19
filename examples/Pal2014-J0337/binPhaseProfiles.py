@@ -91,7 +91,7 @@ if __name__=='__main__':
 
     nPhaseBins = 150 #bin it finely, we can rebin later
     wvlStart = 4000 #angstrom
-    wvlEnd = 5000 #angstrom
+    wvlEnd = 5500 #angstrom
     wvlRange = (wvlStart,wvlEnd)
     centroidRaStr='03:37:43.826'
     centroidDecStr='14:15:14.828'
@@ -122,7 +122,7 @@ if __name__=='__main__':
         apertureList = np.ones(len(obsTstamps))*apertureRadius
     foldArgs = zip(plPaths,apertureList)
 
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count()-1)
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count()-3)
     outDicts = pool.map(foldPlOneArg,foldArgs)
 
     phaseProfiles = np.array([d['phaseProfile'] for d in outDicts])

@@ -99,7 +99,7 @@ if __name__=='__main__':
 
     nPhaseBins = 150
     wvlStart = 4000 #angstrom
-    wvlEnd = 5000 #angstrom
+    wvlEnd = 5500 #angstrom
     #dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{}arcsecAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd,apertureRadius)
     dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_optimalAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd)
     print os.path.basename(dataPath)
@@ -126,7 +126,7 @@ if __name__=='__main__':
     print 'avg',chiDict['profileAvg']
     phaseBinEdges = combineDict['phaseBinEdges']
 
-    nSigmaThreshold = 3.
+    nSigmaThreshold = 5.
 
     #sharp pulsar
 
@@ -192,6 +192,32 @@ if __name__=='__main__':
     print 'fraction',fluxFraction
     print 'mag diff',-2.5*np.log10(fluxFraction)
 
+    nSigmaSig = 0.
+    fakePulseAmplitude = 100.
+    normSinePulseProfile = np.zeros_like(combineDict['phaseProfile'])
+    phaseBinCenters = phaseBinEdges[0:-1] + np.diff(phaseBinEdges)/2.
+    normSinePulseProfile = np.sin(2.*np.pi*phaseBinCenters)
+    normSinePulseProfile -= np.min(normSinePulseProfile)
+    nomrSinePulseProfile = 1.*normSinePulseProfile / np.sum(normSinePulseProfile)
+
+    while  nSigmaSig < nSigmaThreshold:
+        fakedProfile = combineDict['phaseProfile'] + fakePulseAmplitude* normSinePulseProfile
+        fakedProfileErrors = np.sqrt(fakedProfile)
+
+        fakedChiDict = flatChiTest(fakedProfile,fakedProfileErrors,verbose=False)
+        nSigmaSig = fakedChiDict['nSigmaSignificance']
+        if nSigmaSig < nSigmaThreshold:
+            fakePulseAmplitude += 100.
+
+    sineAmp = fakePulseAmplitude
+    flux = np.mean(sineAmp*normSinePulseProfile)
+    totalSineProfile = np.array(fakedProfile)
+    print ''
+    print 'sine profile'
+    print 'amplitude',sineAmp, 'flux',flux, 'photons',np.sum(sineAmp*normSinePulseProfile)
+    fluxFraction = 1.*flux/chiDict['profileAvg']
+    print 'fraction',fluxFraction
+    print 'mag diff',-2.5*np.log10(fluxFraction)
 
     fig,axs = plt.subplots(4,1)
 
@@ -203,11 +229,12 @@ if __name__=='__main__':
     plotPulseProfile(axs[3],phaseBinEdges,combineDict['phaseProfile']+sharpAmp*normSharpPulseProfile,np.sqrt(combineDict['phaseProfile']+sharpAmp*normSharpPulseProfile),color='b',plotDoublePulse=False)
     plotPulseProfile(axs[3],phaseBinEdges,combineDict['phaseProfile']+doubleAmp*normDoublePulseProfile,np.sqrt(combineDict['phaseProfile']+doubleAmp*normDoublePulseProfile),color='r',plotDoublePulse=False)
 
+    fig,ax = plt.subplots(1,1)
+    plotPulseProfile(ax,phaseBinEdges,combineDict['phaseProfile'],combineDict['profileErrors'],color='black',plotDoublePulse=False)
+    plotPulseProfile(ax,phaseBinEdges,totalSineProfile,np.sqrt(totalSineProfile),color='r',plotDoublePulse=False)
+    
 
     plt.show()
-
-
-
 
     
 

@@ -100,7 +100,7 @@ if __name__=='__main__':
 
     nPhaseBins = 150
     wvlStart = 4000 #angstrom
-    wvlEnd = 5000 #angstrom
+    wvlEnd = 5500 #angstrom
     #dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{}arcsecAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd,apertureRadius)
     dataPath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_optimalAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd)
     print os.path.basename(dataPath)
