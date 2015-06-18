@@ -25,27 +25,41 @@ class TCS:
             self.dra[i] = float(lineList[3])
             self.ddec[i] = float(lineList[4])
 
-    def select(self,obsBegin,obsEnd):
+    def select(self, obsBegin, obsEnd):
         """
         Select all the moves that occur from the beginning of obsBegin
         to the end of obsEnd, given by the ObsFile
 
-        Return a dictionary of "time" (UNIX time in seconds) ,"dra", and "ddec"
-        (in arcsec)
+        Return a dictionary of
+          "time" (UNIX time in seconds)
+          "dra",  "ddec" length of the move in arcsec
+          "raOffset", "decOffset" the resulting offset from the first frame
+          "timeOffset" the time elapsed between the middle of this frame ande the middle of the first frame
+
+        Note that the offset arrays have length nFrames, and the move arrays ("time", "dra", "dddec")
+        have lengths nFrames-1.
         """
         t0 = obsBegin.getFromHeader('unixtime')
         t1 = obsEnd.getFromHeader('unixtime')+obsEnd.getFromHeader('exptime')
         b = (t0 < self.time) & (self.time < t1)
-        times = self.time[b]
+        time = self.time[b]
         dras = self.dra[b]
         ddecs = self.ddec[b]
-        raOffsets = np.zeros(len(times)+1)
-        decOffsets = np.zeros(len(times)+1)
-        for i in range(len(times)):
-            raOffsets[i+1] = raOffsets[i]+dras[i]
-            decOffsets[i+1] = decOffsets[i]+ddecs[i]
-        return {"time":times, "dra":dras, "ddec":ddecs,
-                "raOffset":raOffsets,"decOffset":decOffsets}
+        raOffsets = np.zeros(len(time)+1)
+        decOffsets = np.zeros(len(time)+1)
+        for i in range(len(time)):
+            raOffsets[i+1] = raOffsets[i] + dras[i]
+            decOffsets[i+1] = decOffsets[i] + ddecs[i]
+
+        # These are the beginning and ending times for all frames.
+        allTimes = np.concatenate( (np.array([t0]), time, np.array([t1])) )
+        # This is the delta time in each frame
+        dts = allTimes[1:]-allTimes[:-1]
+        # This is the offset of the middle of each frame from the middle of the first frame
+        timeOffsets = np.concatenate((np.array([0]), dts.cumsum()))[:-1] + 0.5*(dts-dts[0])
+
+        return {'time': time, 'dra': dras, 'ddec': ddecs, 'raOffset': raOffsets, 'decOffset': decOffsets,
+                'timeOffset': timeOffsets}
 
 # Simple test
 if __name__ == "__main__":
@@ -57,7 +71,7 @@ if __name__ == "__main__":
     dt1 = '20141021-051726'
     of0 = ObsFile.ObsFile(FileName.FileName(run,date,dt0).obs())
     of1 = ObsFile.ObsFile(FileName.FileName(run,date,dt1).obs())    
-    tcsDict = tcs.select(of0,of1)
+    tcsDict = tcs.select(of0, of1)
     del of0
     del of1
     dx = tcsDict['dra']
