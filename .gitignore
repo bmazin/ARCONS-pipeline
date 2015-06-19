@@ -9,3 +9,4 @@ dir_to_ignore/fluxcal/test/plots
 dir_to_ignore/fluxcal/test/plotsHighCut
 boxer.so
 .idea
+*.iml
