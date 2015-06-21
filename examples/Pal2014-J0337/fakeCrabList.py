@@ -53,6 +53,21 @@ probs = np.linspace(0.,1.,nBins)
 # probs = invCdf(y)
 sineInvCdf = scipy.interpolate.interp1d(y=probs,x=sineCdf,bounds_error=False,fill_value=0.)
 
+def inverseCdf(pdf):
+    cdf = np.cumsum(pdf)
+    nBins = len(cdf)
+    probs = np.linspace(0.,1.,nBins)
+    invCdf = scipy.interpolate.interp1d(y=probs,x=cdf,bounds_error=False,fill_value=0.)
+    return invCdf
+
+def inverseTransformSampler(pdf):
+    invCdf = inverseCdf(pdf)
+    def sampler(nSamples):
+        uniformProbs = np.random.random(nSamples)
+        return invCdf(uniformProbs)
+    return sampler
+
+
 def fakeCrabPhases(nPhotons=100):
     """Generates a list of phases with a profile resembling the Crab Pulsar"""
     uniformProbs = np.random.random(nPhotons)
