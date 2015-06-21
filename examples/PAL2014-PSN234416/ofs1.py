@@ -1,3 +1,7 @@
+"""
+Make all the FITS files and the plot location file.
+Use this to find the information needed fo ofs2.py
+"""
 from util.ObsFileSeq import ObsFileSeq
 from util.readDict import readDict
 
@@ -9,6 +13,6 @@ ofs = ObsFileSeq(name, d['run'], d['date'], d['timeStampList'], dt)
 #ofs.plotLocations(name+".png")
 wvMin = 3000
 wvMax = 13000
-#ofs.makeAllFitsFiles(wvMin, wvMax)
-sc0 = ofs.getSpectralCubeByFrame(0)
-del ofs
+ofs.makeAllFitsFiles(wvMin, wvMax)
+
+
