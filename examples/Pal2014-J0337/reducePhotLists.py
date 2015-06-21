@@ -115,8 +115,8 @@ if __name__=='__main__':
     sortedIndices = np.argsort(phases)
     phases = phases[sortedIndices]
     wavelengths = wavelengths[sortedIndices]
+    nPhotons = len(phases)
     print len(phases),'photons found'
-
 
     photonRecArray = np.recarray(dtype=[('phase',np.double),('wavelength',np.double)],shape=(nPhotons,))
     photonRecArray['phase'] = phases
@@ -130,7 +130,7 @@ if __name__=='__main__':
     #make a description for the table we will put in photFile
     desc = {'phase':tables.Float64Col(),'wavelength':tables.Float64Col()}
     zlibFilter = tables.Filters(complevel=2, complib='zlib', fletcher32=False)
-    photTable = photFile.createTable(photGroup,'photTable',title='Phase,Wavelength pairs',description=desc,expectedrows=nPhotons,filters=zlibFilter)
+    photTable = photFile.createTable(plGroup,'photTable',title='Phase,Wavelength pairs',description=desc,expectedrows=nPhotons,filters=zlibFilter)
     print 'append'
     photTable.append(photonRecArray)
     #photTable.cols.wavelength = wavelengths[:]
