@@ -36,26 +36,21 @@ def hTestTrial(iTrial,nPhotons,photonPulseFraction,pulseModel,pulseModelQueryPoi
 
 if __name__=='__main__':
 
-    path = '/Scratch/dataProcessing/J0337/masterPhotons2.h5'
-    trialsPath = '/Scratch/dataProcessing/J0337/randomTests4000.0-5500.0.npz'
+    path = '/Scratch/dataProcessing/J0337/masterPhotons3.h5'
 
     wvlStart = 4000.
     wvlEnd = 5500.
     bLoadFromPl = True
-    hTestPath = '/Scratch/dataProcessing/J0337/hTestResults_{}-{}.npz'.format(wvlStart,wvlEnd)
     nPhaseBins = 20
+    hTestPath = '/Scratch/dataProcessing/J0337/hTestResults_withProfiles_{}-{}.npz'.format(wvlStart,wvlEnd)
     phaseBinEdges = np.linspace(0.,1.,nPhaseBins+1)
 
     if bLoadFromPl:
         photFile = tables.openFile(path,'r')
         photTable = photFile.root.photons.photTable
-        i = 0
         phases = photTable.readWhere('(wvlStart < wavelength) & (wavelength < wvlEnd)')['phase']
         photFile.close()
         print 'cut wavelengths to range ({},{})'.format(wvlStart,wvlEnd)
-
-        simHs = np.load(trialsPath)['hMetrics']
-        bUseSimulationFpp=False
 
         nPhotons = len(phases)
         print nPhotons,'real photons read'
@@ -64,11 +59,6 @@ if __name__=='__main__':
         observedProfile = 1.0*observedProfile 
         observedProfileErrors = np.sqrt(observedProfile)
 
-        fig,ax = plt.subplots(1,1)
-        plotPulseProfile(phaseBinEdges,observedProfile,profileErrors=observedProfileErrors,color='k',plotDoublePulse=False,label='observed',ax=ax)
-        ax.set_ylabel('counts')
-        ax.set_xlabel('phase')
-        ax.set_title('Observed Folded Light Curve 400-550 nm')
 
         #Do H-test
         hDict = h_test2(phases)
@@ -100,6 +90,13 @@ if __name__=='__main__':
         print 'H,M,fpp:',H,M,pval
         print nSigma(1-pval),'sigmas'
         
+    #Plot the observed profile
+    fig,ax = plt.subplots(1,1)
+    plotPulseProfile(phaseBinEdges,observedProfile,profileErrors=observedProfileErrors,color='k',plotDoublePulse=False,label='observed',ax=ax)
+    ax.set_ylabel('counts')
+    ax.set_xlabel('phase')
+    ax.set_title('Observed Folded Light Curve {}-{} nm'.format(wvlStart/10.,wvlEnd/10.))
+
     #make as set of x points for the pulse model we'll make
     #Do NOT include x=0, or the inverted function will have a jump that causes an excess of samples
     #at phase=0
@@ -134,7 +131,7 @@ if __name__=='__main__':
     simHs = np.array([out['H'] for out in outDicts])
     simPvals = np.array([out['fpp'] for out in outDicts])
     #save the resulting list of H vals
-    np.savez('sim-h-{}.npz'.format(nTrials),simHs=simHs,simPvals=simPvals,pval=pval,H=H,photonPulseFraction=photonPulseFraction,nPhotons=nPhotons)
+    np.savez('sim3-h-{}.npz'.format(nTrials),simHs=simHs,simPvals=simPvals,pval=pval,H=H,photonPulseFraction=photonPulseFraction,nPhotons=nPhotons)
 
     #make a model profile once more for a plot
     modelSampler = inverseTransformSampler(pdf=pulseModel,queryPoints=pulseModelQueryPoints)

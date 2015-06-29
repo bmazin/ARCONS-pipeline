@@ -130,7 +130,7 @@ if __name__=='__main__':
     #make a description for the table we will put in photFile
     desc = {'phase':tables.Float64Col(),'wavelength':tables.Float64Col()}
     zlibFilter = tables.Filters(complevel=2, complib='zlib', fletcher32=False)
-    photTable = photFile.createTable(plGroup,'photTable',title='Phase,Wavelength pairs',description=desc,expectedrows=nPhotons,filters=zlibFilter)
+    photTable = plFile.createTable(plGroup,'photTable',title='Phase,Wavelength pairs',description=desc,expectedrows=nPhotons,filters=zlibFilter)
     print 'append'
     photTable.append(photonRecArray)
     #photTable.cols.wavelength = wavelengths[:]
@@ -138,5 +138,5 @@ if __name__=='__main__':
     print 'index wavelength'
     photTable.cols.wavelength.createCSIndex()
 
-    photFile.close()
+    plFile.close()
     
