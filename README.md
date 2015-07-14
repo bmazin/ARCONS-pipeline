@@ -31,6 +31,16 @@ ds9 -- need to download pyds9 and install. Download the package from the
 
 If you are having troubles with PyTables (which you shouldn't since it is built into EPD), see http://www.tumblr.com/tagged/pytables and instructions therein for Mac.
 
+We also use astropy.  The version on Turk is 0.3.1
+Anaconda installs a newer version which is pretty much the same,
+but in some code this import needs to work:
+
+from astropy.stats.funcs import sigma_clip
+
+Newer versions of astropy have something called astropy.stats.sigma_clipping which may
+or not may not be the same algorithm.
+
+
 ***
 To make nicer looking plots, you need the packages configobj and mpltools
 
