@@ -566,6 +566,7 @@ class ObsFile:
                     goodMask = np.logical_and(goodMask,wavelengths < self.wvlUpperLimit)
                 wavelengths = wavelengths[goodMask]
                 timestamps = timestamps[goodMask]
+                if wavelengths.sum() == 0: effIntTime = 0
 
         return {'timestamps':timestamps, 'wavelengths':wavelengths,
                 'effIntTime':effIntTime, 'rawCounts':rawCounts}
