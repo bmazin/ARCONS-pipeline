@@ -40,28 +40,30 @@ if flux==True:
     outputFN+='_flux'
 if hp==True:
     outputFN+='_hp'
-#outputFN+='.h5'
 
 identifier=outputFN
 print outputFN
 
+#replace everything below here with lightCurve.py example under __main()__
+=======
 LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=False)
-#LC.makeImageStack(imageStackFilename='',dt=intTime,wvlStart=startWl,wvlStop=endWl,
-#                           weighted=True, fluxWeighted=True, getRawCount=False, 
-#                           scaleByEffInt=True, deadTime=100.e-6, filterName=filt)
-#print "\n\n###########################\nFINISHED MAKING IMAGE STACKS\n#############################\n\n"
+LC.makeImageStack(imageStackFilename='',dt=intTime,wvlStart=startWl,wvlStop=endWl,
+                           weighted=True, fluxWeighted=True, getRawCount=False, 
+                           scaleByEffInt=True, deadTime=100.e-6, filterName=filt)
+print "\n\n###########################\nFINISHED MAKING IMAGE STACKS\n#############################\n\n"
 
-#LC.makeAllCentroidFiles(centroidFilenames=['',''])
+LC.makeAllCentroidFiles(centroidFilenames=['',''])
 
 
 
 '''
+>>>>>>> 7edaa38518bd8e99dd76c9a379439a900670e4b2
 LC = LightCurve(path,verbose=verbose,showPlot=showPlot)
 obsFNs = LC.getFNs()
 #print 'obs[10]: ',obsFNs[10:11][0].obs()
 obsFiles = generateObsObjectList(obsFNs, wvlLowerLimit=startWl, wvlUpperLimit=endWl, loadHotPix=hp, loadWvlCal=True, loadFlatCal=flat, loadSpectralCal=False)
 print 'numObs: ',len(obsFiles)
-im_dict = getImages(fromObsFile=True, fromPhotonList=False, fromImageStack=False, obsFiles=obsFiles, integrationTime=10, weighted=flat,  fluxWeighted=False, getRawCount=False)
+im_dict = getImages(fromObsFile=True, fromPhotonList=False, fromImageStack=False, obsFiles=obsFiles, integrationTime=integrationTime, weighted=flat,  fluxWeighted=False, getRawCount=False)
 images=im_dict['images']
 pixIntTimes=im_dict['pixIntTimes']
 print 'numImages: ',len(images)

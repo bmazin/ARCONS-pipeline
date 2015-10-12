@@ -10,6 +10,7 @@ from timing import photonTiming
 import ephem
 import functools
 from util.readDict import readDict
+from util.ObsFile import ObsFile
 
 RADIANS_PER_ARCSEC = np.pi/648000.
 
@@ -32,7 +33,7 @@ def makePixelImage(photons):
             image[y,x] = counts
     return {'image':image,'xRange':xRange,'yRange':yRange}
 
-def foldPl(plPath,centroidRaStr='03:37:43.826',centroidDecStr='14:15:14.828',apertureRadius=1.,nPhaseBins=150,wvlRange=(3000,13000)):
+def foldPl(plPath,centroidRaStr='03:37:43.826',centroidDecStr='14:15:14.828',apertureRadius=1.,nPhaseBins=150,wvlRange=(3000,13000),wvlBinEdges=np.array([3000.,13000.])):
     print 'folding',plPath
     centroidRa = float(ephem.hours(centroidRaStr))
     centroidDec = float(ephem.degrees(centroidDecStr))
@@ -40,18 +41,21 @@ def foldPl(plPath,centroidRaStr='03:37:43.826',centroidDecStr='14:15:14.828',ape
     apertureRadius *= RADIANS_PER_ARCSEC
     wvlStart,wvlEnd = wvlRange
     print 'reading photons'
-    photons = pl.photTable.readWhere('(sqrt((ra-centroidRa)**2. + (dec-centroidDec)**2.) < apertureRadius) & (wvlStart < wavelength) & (wavelength < wvlEnd)')
+    photons = pl.photTable.readWhere('(sqrt((ra-centroidRa)**2. + (dec-centroidDec)**2.) < apertureRadius)')
     pixelImageDict = makePixelImage(photons)
     
     print 'binning phases'
     del pl
 
     phases = photons['pulsePhase']
-    phaseProfile,phaseBinEdges = np.histogram(phases,bins=nPhaseBins,range=(0.,1.))
-    profileErrors = np.sqrt(phaseProfile)
+    wavelengths = photons['wavelength']
+    phaseBinEdges = np.linspace(0.,1.,nPhaseBins+1)
+    #phaseProfile,phaseBinEdges = np.histogram(phases,bins=nPhaseBins,range=(0.,1.))
+    phaseProfiles,phaseBinEdges,wvlBinEdges = np.histogram2d(phases,wavelengths,bins=[phaseBinEdges,wvlBinEdges])
+    profileErrors = np.sqrt(phaseProfiles)
     print 'done folding'
-    del photons,phases
-    return {'phaseProfile':phaseProfile,'phaseBinEdges':phaseBinEdges,'profileErrors':profileErrors,'pixelImage':pixelImageDict['image'],'pixelImageXRange':pixelImageDict['xRange'],'pixelImageYRange':pixelImageDict['yRange']}
+    del photons,phases,wavelengths
+    return {'phaseProfile':phaseProfiles,'phaseBinEdges':phaseBinEdges,'wvlBinEdges':wvlBinEdges,'profileErrors':profileErrors,'pixelImage':pixelImageDict['image'],'pixelImageXRange':pixelImageDict['xRange'],'pixelImageYRange':pixelImageDict['yRange']}
 
 
 if __name__=='__main__':
@@ -89,26 +93,35 @@ if __name__=='__main__':
     obsTimestamps = np.concatenate(obsSequences)
     plPaths = [path for pathList in plPaths for path in pathList]
 
-    nPhaseBins = 150 #bin it finely, we can rebin later
-    wvlStart = 4000 #angstrom
-    wvlEnd = 5500 #angstrom
+    nPhaseBins = 1500 #bin it finely, we can rebin later
+    wvlStart = 3000 #angstrom
+    wvlEnd = 13000 #angstrom
     wvlRange = (wvlStart,wvlEnd)
     centroidRaStr='03:37:43.826'
     centroidDecStr='14:15:14.828'
 
 
+    wvlBinEdges = ObsFile.makeWvlBins(.01)
+#    #open up the first photon list and extract the wavelength bin edges used to make the flatcal and fluxcal
+#    pl0 = PhotList(plPaths[0])
+#    wvlBinEdges = np.array(pl0.file.root.flatcal.wavelengthBins.read())
+#    del pl0
+    print wvlBinEdges
+
+
 #    apertureData = np.loadtxt('smoothApertList.txt',dtype={'names':('obsTimestamp','oldApert','apertureRadius'),'formats':('S80','f8','f8')},delimiter='\t')
 #    apertureRadiusDict = {eachItem['obsTimestamp']:eachItem['apertureRadius'] for eachItem in apertureData}
 #    apertureList = [apertureRadiusDict[timestamp] for timestamp in obsTimestamps]
+    
 
-    foldPlBins = functools.partial(foldPl,nPhaseBins=nPhaseBins,wvlRange=wvlRange,centroidRaStr=centroidRaStr,centroidDecStr=centroidDecStr)
+    foldPlBins = functools.partial(foldPl,nPhaseBins=nPhaseBins,wvlBinEdges=wvlBinEdges,wvlRange=wvlRange,centroidRaStr=centroidRaStr,centroidDecStr=centroidDecStr)
     def foldPlOneArg(foldArg):
         plPath,apertureRadius = foldArg
         return foldPlBins(plPath,apertureRadius=apertureRadius)
 
     bUseOptimalApert = True
     if bUseOptimalApert:
-        dataPathApert = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{:.1f}arcsecAperture_sigma.npz'.format(nPhaseBins,3000,8000,3.)
+        dataPathApert = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{:.1f}arcsecAperture_sigma.npz'.format(150,3000,8000,3.)
         apertureDataDict = np.load(dataPathApert)
         apertureList = apertureDataDict['smoothOptimalApertureRadii']
         tstamps = apertureDataDict['obsTimestamps']
@@ -122,21 +135,23 @@ if __name__=='__main__':
         apertureList = np.ones(len(obsTstamps))*apertureRadius
     foldArgs = zip(plPaths,apertureList)
 
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count()-3)
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count()-1)
     outDicts = pool.map(foldPlOneArg,foldArgs)
 
     phaseProfiles = np.array([d['phaseProfile'] for d in outDicts])
     profileErrors = np.array([d['profileErrors'] for d in outDicts])
     pixelImages = np.array([d['pixelImage'] for d in outDicts])
     phaseBinEdges = outDicts[0]['phaseBinEdges']
+    wvlBinEdges = outDicts[0]['wvlBinEdges']
     if bUseOptimalApert:
-        savePath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_optimalAperture.npz'.format(nPhaseBins,wvlStart,wvlEnd)
+        savePath = '/Scratch/dataProcessing/J0337/hists2014_{}bins_optimalAperture.npz'.format(nPhaseBins)
     else:
-        savePath = '/Scratch/dataProcessing/J0337/profiles2014_{}bins_{}-{}angstroms_{:.1f}arcsecAperture_sigma.npz'.format(nPhaseBins,wvlStart,wvlEnd,3.)
-    np.savez(savePath,phaseProfiles=phaseProfiles,profileErrors=profileErrors,phaseBinEdges=phaseBinEdges,obsTimestamps=obsTimestamps,pixelImages=pixelImages,apertureRadiusList=apertureList,psfFits=psfDicts)
+        savePath = '/Scratch/dataProcessing/J0337/hists2014_{}bins_{:.1f}arcsecAperture_sigma.npz'.format(nPhaseBins,3.)
+    np.savez(savePath,phaseProfiles=phaseProfiles,profileErrors=profileErrors,phaseBinEdges=phaseBinEdges,wvlBinEdges=wvlBinEdges,obsTimestamps=obsTimestamps,pixelImages=pixelImages,apertureRadiusList=apertureList,psfFits=psfDicts)
+    print 'saved'
     
     fig,ax = plt.subplots()
-    plotPulseProfile(ax,phaseBinEdges,phaseProfiles[0])
+    plotPulseProfile(ax,phaseBinEdges,phaseProfiles[0][:,0])
     print 'done'
     plt.show()
     
