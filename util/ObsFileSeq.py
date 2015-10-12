@@ -105,6 +105,7 @@ class ObsFileSeq():
                 tEnd = tEndThis
             self.obsIntervals.append(interval[tStart, tEnd])
         self._defineFrames(dt)
+        print "Finished defining OFS frames"
 
         # Default settings for astrometry
         try:
@@ -462,7 +463,7 @@ class ObsFileSeq():
     def loadImageStack(self, fileName, wvlStart=None, wvlStop=None,
                        weighted=True, fluxWeighted=False,
                        getRawCount=False, scaleByEffInt=True,
-                       deadTime=100.e-6):
+                       deadTime=100.e-6, filterName=None):
                                       
         #print '\nMaking images:'
         #print str(wvlStart),'-',wvlStop,'A'
@@ -470,7 +471,7 @@ class ObsFileSeq():
         #print 'fluxWeighted:',fluxWeighted
         #print 'getRawCount:',getRawCount
         #print 'scaleByEffInt:',scaleByEffInt
-        
+        print "N timeStamps = ", len(self.timeStamps)
         #If the file exists, read it out
         if os.path.isfile(fileName):
             return readImageStack(fileName)
@@ -482,14 +483,14 @@ class ObsFileSeq():
             endTimes = []
             intTimes = []
             for iFrame in range(len(self.frameIntervals)):
-                #print '\nFrame:',iFrame
+                print '\nStacking Frame:',iFrame, "of", len(self.frameIntervals),"..."
                 im_dict = self.getPixelCountImageByFrame(iFrame,
                                                          wvlStart, wvlStop,
                                                          weighted,
                                                          fluxWeighted,
                                                          getRawCount,
                                                          scaleByEffInt,
-                                                         deadTime)
+                                                         deadTime, filterName)
                 if im_dict is not None:
                     images.append(im_dict['image'])
                     pixIntTimes.append(im_dict['pixIntTime'])
@@ -506,7 +507,7 @@ class ObsFileSeq():
                             endTimes=endTimes, intTimes=intTimes,
                             pixIntTimes=pixIntTimes, targetName=self.name,
                             run=self.run,
-                            nFrames=len(self.frameIntervals),
+                            nFrames=len(images),
                             wvlLowerLimit=wvlStart,
                             wvlUpperLimit=wvlStop, weighted=weighted,
                             fluxWeighted=fluxWeighted,
@@ -515,12 +516,13 @@ class ObsFileSeq():
                             tStamps=self.timeStamps)
             #return {'images':images,'pixIntTimes':pixIntTimes,
             #'startTimes':startTimes,'endTimes':endTimes,'intTimes':intTimes}
+            print "Saved %i frames out of %i (the rest were blank intervals)"%(len(images), len(self.frameIntervals))
             return readImageStack(fileName)
 
     def getPixelCountImageByFrame(self, iFrame, wvlStart=None, wvlStop=None,
                                   weighted=True, fluxWeighted=True,
                                   getRawCount=False, scaleByEffInt=True,
-                                  deadTime=100.e-6):
+                                  deadTime=100.e-6, filterName=None):
         '''
         This gets the i'th image
 
@@ -550,8 +552,8 @@ class ObsFileSeq():
         for obsInfo in self.frameObsInfos[iFrame]:
             #print obsInfo['obs'].fullFileName
             #print obsInfo
-            obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart,
-                                         wvlUpperLimit=wvlStop)
+            #obsInfo['obs'].setWvlCutoffs(wvlLowerLimit=wvlStart,wvlUpperLimit=wvlStop)
+            if filterName != None: obsInfo['obs'].loadFilter(filterName)
             im_dict = obsInfo['obs'].\
                 getPixelCountImage(obsInfo["firstSec"],
                                    obsInfo["integrationTime"],

@@ -254,7 +254,7 @@ class LightCurve():
 
     def makeImageStack(self,imageStackFilename='',dt=30,wvlStart=None,wvlStop=None,
                            weighted=True, fluxWeighted=False, getRawCount=False, 
-                           scaleByEffInt=True, deadTime=100.e-6):
+                           scaleByEffInt=True, deadTime=100.e-6, filterName = None):
         '''
         This function makes an image stack using the ObsFileSeq class
         
@@ -270,10 +270,11 @@ class LightCurve():
                 tsl.append(self.params['utcDates'][day_i]+'-'+tstamp)
         #tsl=tsl[:2]        
         ofs = ObsFileSeq(name=self.targetName,run=self.run,date=self.params['sunsetDates'][0],timeStamps=tsl,dt=dt)
+
         if imageStackFilename is None or imageStackFilename is '': imageStackFilename = self.path+os.sep+'ImageStacks'+os.sep+'ImageStack_'+self.fileID+'.h5'
         self.im_params, self.im_dict = ofs.loadImageStack(imageStackFilename, wvlStart=wvlStart,wvlStop=wvlStop,
                                                            weighted=weighted, fluxWeighted=fluxWeighted, getRawCount=getRawCount, 
-                                                           scaleByEffInt=scaleByEffInt, deadTime=deadTime)
+                                                           scaleByEffInt=scaleByEffInt, deadTime=deadTime, filterName = filterName)
         self.imageStackFilename = imageStackFilename
         #return self.im_params, self.im_dict       
                             
@@ -348,8 +349,8 @@ class LightCurve():
             
         if centroidFilenames is None or len(centroidFilenames)<1:
             nStars=0
-            for file_i in os.listdir(path+os.sep+centroidDir):
-                nStars+=int(os.path.isdir(path+os.sep+centroidDir+os.sep+file_i))
+            for file_i in os.listdir(self.path+os.sep+centroidDir):
+                nStars+=int(os.path.isdir(self.path+os.sep+centroidDir+os.sep+file_i))
             centroidFilenames=['']*nStars
         if centroidFilenames[0] is '':
             try: centroidFilenames[0] = self.path+os.sep+centroidDir+os.sep+targetDir+os.sep+'Centroid_'+self.fileID+'.h5'
@@ -426,8 +427,8 @@ class LightCurve():
 
                   
 if __name__ == '__main__':
-    path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
-    identifier = 'manHotPix'
+    path = '/Scratch/DisplayStack/PAL2014/1SWASP_J0002'
+    identifier = '30s_V_flat_flux_hp'
     #path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
     #identifier = '4000-5000_flat'
     

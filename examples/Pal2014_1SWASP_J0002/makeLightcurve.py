@@ -15,511 +15,162 @@ import tables
 from util.popup import *
 from photometry.LightCurve import LightCurve
 from photometry.AperPhotometry import AperPhotometry
+from timing.photonTiming import *
 
-#this aperture function needs to be added to photometry section, generalized from 44x46 shape
-def aperture(startpx,startpy,radius):
-        r = radius
-        length = 2*r 
-        height = length
-        allx = xrange(startpx-int(np.ceil(length/2.0)),startpx+int(np.floor(length/2.0))+1)
-        ally = xrange(startpy-int(np.ceil(height/2.0)),startpy+int(np.floor(height/2.0))+1)
-        mask=np.zeros((46,44))
-        
-        for x in allx:
-            for y in ally:
-                if (np.abs(x-startpx))**2+(np.abs(y-startpy))**2 <= (r)**2 and 0 <= y and y < 46 and 0 <= x and x < 44:
-                    mask[y,x]=1.
-        return mask
-
-startWvl = 4000
-stopWvl = 5000
-
-scratchDir = '/home/srmeeker/scratch/PAL2014/1SWASP_J0002'
-
-basePath = '/Scratch/DisplayStack/PAL2014/1SWASP_J0002/'
-imageStackPath = os.path.join(basePath, 'ImageStacks/')
-
-targetCentroidPath = os.path.join(basePath, 'CentroidLists/Target')
-referenceCentroidPath = os.path.join(basePath, 'CentroidLists/Reference01')
-targetAperturePath = os.path.join(basePath, 'ApertureStacks/Target')
-referenceAperturePath = os.path.join(basePath, 'ApertureStacks/Reference01')
-
-targetApertureRadius = 8
-refApertureRadius = 7
-annulusInner = 12
-annulusOuter = 20
-
-imageStacks = []
-interpolatedStacks = []
-times = []
-targetXs = []
-targetYs = []
-refXs = []
-refYs = []
-
-targetCounts = []
-targetSkyCounts = []
-
-referenceCounts = []
-referenceSkyCounts = []
-
-#get centroid guess positions first
-print "Grabbing Target Centroid positions..."
-targetCentroidFiles = sorted(glob.glob(os.path.join(targetCentroidPath, "Centroid*.h5")))
-print targetCentroidFiles
-for fname in targetCentroidFiles:
-    print "\n------------------------------\n"
-    print fname
-    centroidFile = tables.openFile(fname, mode='r')
-    xPos = np.array(centroidFile.root.centroidlist.xPositions.read())
-    yPos = np.array(centroidFile.root.centroidlist.yPositions.read())
-    centroidFile.close()
-    for i in xrange(len(xPos)):
-        targetXs.append(xPos[i])
-        targetYs.append(yPos[i])
-
-#print targetXs
-#print targetYs
+def writeToPHOEBEFile(fname, objName, passband, times, mags, errors):
+    '''
+    function to output data to PHOEBE formatted txt file
+    '''
+    f = open(fname,'w')
+    f.write('# Object:\t%s\n'%objName)
+    f.write('# Passband:\t%s\n'%passband)
+    f.write('# Source:\tARCONS, Palomar Observatory\n')
+    f.write('# BJD\t%smag\tError\n'%passband)
+    for i in xrange(len(times)):
+        f.write('%.6f\t%.3f\t%.3f\n'%(times[i],mags[i],errors[i]))
+    f.close()
+    print "Finished writing to PHOEBE format file"
+    return
 
 
-print "Grabbing Reference Centroid positions..."
-refCentroidFiles = sorted(glob.glob(os.path.join(referenceCentroidPath, "Centroid*.h5")))
-for fname in refCentroidFiles:
-    print "\n------------------------------\n"
-    print fname
-    centroidFile = tables.openFile(fname, mode='r')
-    xPos = np.array(centroidFile.root.centroidlist.xPositions.read())
-    yPos = np.array(centroidFile.root.centroidlist.yPositions.read())
-    centroidFile.close()
-    for i in xrange(len(xPos)):
-        refXs.append(xPos[i])
-        refYs.append(yPos[i])
+if len(sys.argv)>1:
+    filt = sys.argv[1]
+else:
+    filt = None
 
-#print refXs
-#print refYs
-
-
-print "Concatenating image stacks and JDs..."
-imageFiles = sorted(glob.glob(os.path.join(imageStackPath, "ImageStack_%i-%i_flat_hp.h5"%(startWvl,stopWvl)))) #change to *_hp.npz to get hot pixel masked versions
-for fname in imageFiles:
-    print "\n------------------------------\n"
-    print fname
-    stackFile = tables.openFile(fname, mode='r')
-    stackNode = stackFile.root.stack
-    stack = np.array(stackNode.stack.read())
-    jd = np.array(stackNode.time.read()[0])
-    stackFile.close()
-    print "Stack length = ", np.shape(stack)
-    print "JD length = ", np.shape(jd)
-    for i in xrange(len(stack[0,0,:])):
-        print "Concatenating Frame ", i, " in stack"
-        frame = stack[:,:,i]
-        #nanMask = np.isnan(frame)
-        #frame[nanMask] = 0.0
-        imageStacks.append(frame)
-        #try:
-        #    interpFrame = utils.interpolateImage(frame, method='linear')
-        #except ValueError:
-        #    interpFrame = np.zeros(np.shape(frame),dtype=float)
-        #    print "Empty frame encountered, filled with zeros"
-        #interpolatedStacks.append(interpFrame)
-        times.append(jd[i])
-        #inspect some interpolated frames
-        '''
-        if i%20==0:
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            ax.set_title(jd[i])
-            im = ax.matshow(frame, cmap = cm.get_cmap('rainbow'), vmax = 500)
-            fig.colorbar(im)
-            
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            ax.set_title(jd[i])
-            im = ax.matshow(interpFrame, cmap = cm.get_cmap('rainbow'), vmax = 500)
-            fig.colorbar(im)
-            plt.show()
-        '''
-
-totalAngles = 100
-angleArray = np.linspace(0,2*np.pi,totalAngles)
-
-if len(targetXs) != len(refXs):
-    print "Target and Reference centroids have different number of points!!!!"
-    print len(targetXs)
-    print len(refXs)
-    print "Exiting..."
-    sys.exit(0)
-
-
-
-#####################################################
-#Aperture Phot code using AperPhotometry Class
-#####################################################
-
-targetCentroids = zip(targetXs,targetYs)
-refCentroids = zip(refXs,refYs)
-allCentroids = np.asarray(zip(targetCentroids,refCentroids))
-expTimes = 10.0*np.ones((len(imageStacks)))
-objFluxes = []
-objSkyFluxes = []
-refFluxes = []
-refSkyFluxes = []
-for i in range(len(imageStacks)):
-    ap = AperPhotometry(image=imageStacks[i],centroid=allCentroids[i],expTime=expTimes,verbose=True,showPlot=True)
-    fluxDict = ap.AperPhotometry(aper_radius=[9,7], sky_sub="median", annulus_inner = 12, annulus_outer = 25, interpolation="linear")
-    objFluxes.append(fluxDict['flux'][0])
-    refFluxes.append(fluxDict['flux'][1])
-    objSkyFluxes.append(fluxDict['sky'][0])
-    refSkyFluxes.append(fluxDict['sky'][1])
-
-objFluxes = np.array(objFluxes,dtype=float)
-refFluxes = np.array(refFluxes,dtype=float)
-objSkyFluxes = np.array(objSkyFluxes,dtype=float)
-refSkyFluxes = np.array(refSkyFluxes,dtype=float)
-
-plt.plot(times, objFluxes, '.', color='blue')
-plt.plot(times, refFluxes, '.', color='red')
-plt.title("No sky sub")
-plt.show()
-
-plt.plot(times, objSkyFluxes, '.', color='blue')
-plt.plot(times, refSkyFluxes, '.', color='red')
-plt.title("Sky LCs")
-plt.show()
-
-plt.plot(times, objFluxes-objSkyFluxes, '.',color='blue')
-plt.plot(times, refFluxes-refSkyFluxes, '.',color='red')
-plt.show()
-
-plt.plot(times, (objFluxes-objSkyFluxes)/(refFluxes-refSkyFluxes), '.',color='blue')
-plt.show()
-
-
-#####################################################
-#PSF fitting code using Alex's double Gaussian from PSFphotometry
-#####################################################
-'''
+objName = '1SWASP_J0002'
+path = '/Scratch/DisplayStack/PAL2014/1SWASP_J0002' #J0002 for my object, J2210 for Alex's object
 verbose=True
-showPlot=False
-LC = LightCurve(basePath,verbose=verbose,showPlot=showPlot)
-targetCentroids = zip(targetXs,targetYs)
-refCentroids = zip(refXs,refYs)
-allCentroids = np.asarray(zip(targetCentroids,refCentroids))
-TargetLC = LC.makeLightCurve(imageStacks,allCentroids,10.0*np.ones((len(imageStacks)),dtype=int))
-#RefLC=LC.makeLightCurve(imageStacks,zip(refXs,refYs),10.0*np.ones((len(images)),dtype=int))
+showPlot=True
 
-pop(plotFunc=lambda fig,axes: axes.plot(TargetLC),title="Flux")
+intTime=30
+startWl = 3000
+endWl = 13000
+hp=True
+flat = True
+flux = True
 
-plt.plot(times,TargetLC[0], 'b')
-plt.plot(times,TargetLC[1], 'r')
-#plt.show()
-plt.plot(times,TargetLC[0]/TargetLC[1], 'black')
-plt.show()
+#outputFN = '%ss_%s-%s'%(intTime,startWl, endWl)
+outputFN = '%ss_%s'%(intTime,filt)
+
+if flat==True:
+    outputFN+='_flat'
+if flux==True:
+    outputFN+='_flux'
+if hp==True:
+    outputFN+='_hp'
+#outputFN+='.h5'
+
+identifier=outputFN
+print outputFN
+
+
+LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=False)
+
+'''
+LC.loadImageStack()
+LC.loadAllCentroidFiles()
+print LC.centroids
+print LC.flags
+#print "Finished loading centroid files"
+LC.makeLightCurve(photometryType='aper', interpolation='cubic')
+
+
 '''
 
 
-#####################################################
-#PSF Fitting using old gaussfitter code
-#####################################################
-'''
-paramsList = []
-errorsList = []
-fitImgList = []
-chisqList = []
-#plt.ion()
+LC.loadLightCurve(photometryFilename='',photometryType='aper')
+photometryDict=LC.photometry_dict
 
-for i in xrange(len(targetXs)):
-    print "\n------------------------------\n"
-    print "Performing PSF fitting photometry on target frame ", i
-    guessX = int(np.round(targetXs[i],0))
-    guessY = int(np.round(targetYs[i],0))
+#get timestamp of bin centers in UNIX time
+time = photometryDict['startTimes']
+expTime = photometryDict['intTimes']
+time+=expTime/2.0
 
-    apertureMask = aperture(guessX, guessY, targetApertureRadius)
-    frame = np.array(imageStacks[i])
+#Convert unix time to MJD
+JDtime = time/86400.+2440587.5
+MJD = JDtime-2400000.5
 
-    nanMask = np.isnan(frame)
-    
-    #err = np.ones(np.shape(frame))*1.0
-    err = np.sqrt(frame)
-    err[apertureMask==1] = np.inf #weight points closer to the expected psf higher
-    frame[nanMask]=0#set to finite value that will be ignored
-    err[nanMask] = np.inf#ignore these data points
-    nearDeadCutoff=0#100/15 cps for 4000-6000 angstroms
-    #err[frame<nearDeadCutoff] = np.inf
-    entireMask = (err==np.inf)
-    maFrame = np.ma.masked_array(frame,entireMask)
+#convert time to BJD using TEMPO2
+parFile = '/home/srmeeker/ARCONS-pipeline/examples/Pal2014_1SWASP_J0002/J0002.par'
+BJDdict = processTimestamps(MJD, parFile, workingDir=os.getcwd(), timingProgram='tempo2', bCleanTempDir=True, verbose=False, timingProgramLog='/dev/null')
+BJD = BJDdict['baryMjdTimestamps']+2400000.5
 
-    guessAmp = 50.
-    guessHeight = 5.
-    guessWidth = 1.3
-    guessParams = [guessHeight,guessAmp,guessX,guessY,guessWidth]
-    limitedmin = 5*[True]
-    limitedmax = 5*[True]
-    minpars = [0,0,0,0,0.1] #default min pars, usually work fine
-    #minpars = [0,0,27,27,1] #tighter constraint on PSF width to avoid fitting wrong peak if PSF is divided by dead pixels
-    maxpars = [40,2000,43,43,10]
-    usemoments=[True,True,True,True,True] #doesn't use our guess values, default
-    #usemoments=[False,False,False,False,False]
+#Grab flux arrays from photometry dict
+flux=photometryDict['flux']
+skyFlux = photometryDict['skyFlux']        
 
-    print "=========================="
-    print "jd ", times[i]
-    print "frame ", i
-    out = gaussfit(data=maFrame,err=err,params=guessParams,returnfitimage=True,quiet=True,limitedmin=limitedmin,limitedmax=limitedmax,minpars=minpars,maxpars=maxpars,circle=1,usemoments=usemoments,returnmp=True)
-    mp = out[0]
+#separate target and ref flux
+tar_flux = flux[:,0]
+ref_flux = flux[:,1]
+flags = photometryDict['flag']
 
-    outparams = mp.params
-    paramErrors = mp.perror
-    chisq = mp.fnorm
-    dof = mp.dof
-    reducedChisq = chisq/dof
-    print "reducedChisq =", reducedChisq
-    fitimg = out[1]
-    chisqList.append([chisq,dof])
+#separate sky fluxes for both
+tar_skyFlux = skyFlux[:,0]
+ref_skyFlux = skyFlux[:,1]
 
-    paramsList.append(outparams)
-    errorsList.append(paramErrors)
-    print "*** outparams = ", outparams
-    print "*** paramErrors = ", paramErrors
+#subtract sky flux
+tar_flux-=tar_skyFlux
+ref_flux-=ref_skyFlux
 
-    fitimg[nanMask]=0  
-    fitImgList.append(fitimg)
-    frame[nanMask]=np.nan
+#convert fluxes to counts/sec
+tar_flux/=expTime
+ref_flux/=expTime
 
-    amp = outparams[1]
-    width = outparams[4]
-    xpos = outparams[2]
-    ypos = outparams[3]
+#estimate error as percent std dev of reference star
+ref_mean = np.mean(ref_flux)
+ref_std = np.std(ref_flux)
+percentErr = ref_std/ref_mean
 
-    flux = 2*np.pi*amp*width*width
-    targetCounts.append(flux)    
-    
-    if (i%100==0):
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(times[i])
-        im = ax.matshow(imageStacks[i], cmap = cm.get_cmap('rainbow'), vmax = 500)
-        ax.plot(targetXs[i]+targetApertureRadius*np.cos(angleArray), targetYs[i]+targetApertureRadius*np.sin(angleArray), 'b')
-        fig.colorbar(im)
-        #plt.show()
+#scale errors to target intensity
+tar_errs = percentErr*np.mean(tar_flux)/np.sqrt(tar_flux/ref_mean)
+ref_errs = percentErr*ref_flux
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(times[i])
-        im = ax.matshow(fitimg, cmap = cm.get_cmap('rainbow'), vmax = 500)
-        fig.colorbar(im)
-        plt.show()
-    
+#find max and min fluxes with errors for converting to magnitude error bars later
+tar_highFlux = tar_flux+tar_errs
+tar_lowFlux = tar_flux-tar_errs
+ref_highFlux = ref_flux+ref_errs
+ref_lowFlux = ref_flux-ref_errs
 
-for i in xrange(len(refXs)):
-    print "\n------------------------------\n"
-    print "Performing PSF fitting photometry on reference frame ", i
-    guessX = int(np.round(refXs[i],0))
-    guessY = int(np.round(refYs[i],0))
-
-    apertureMask = aperture(guessX, guessY, refApertureRadius)
-    frame = np.array(imageStacks[i])
-
-    nanMask = np.isnan(frame)
-    
-    #err = np.ones(np.shape(frame))*1.0
-    err = np.sqrt(frame)
-    err[apertureMask==1] = np.inf #weight points closer to the expected psf higher
-    frame[nanMask]=0#set to finite value that will be ignored
-    err[nanMask] = np.inf#ignore these data points
-    nearDeadCutoff=0#100/15 cps for 4000-6000 angstroms
-    #err[frame<nearDeadCutoff] = np.inf
-    entireMask = (err==np.inf)
-    maFrame = np.ma.masked_array(frame,entireMask)
-
-    guessAmp = 50.
-    guessHeight = 5.
-    guessWidth = 1.3
-    guessParams = [guessHeight,guessAmp,guessX,guessY,guessWidth]
-    limitedmin = 5*[True]
-    limitedmax = 5*[True]
-    minpars = [0,0,0,0,0.1] #default min pars, usually work fine
-    #minpars = [0,0,27,27,1] #tighter constraint on PSF width to avoid fitting wrong peak if PSF is divided by dead pixels
-    maxpars = [40,2000,43,43,10]
-    usemoments=[True,True,True,True,True] #doesn't use our guess values, default
-    #usemoments=[False,False,False,False,False]
-
-    print "=========================="
-    print "jd ", times[i]
-    print "frame ", i
-    out = gaussfit(data=maFrame,err=err,params=guessParams,returnfitimage=True,quiet=True,limitedmin=limitedmin,limitedmax=limitedmax,minpars=minpars,maxpars=maxpars,circle=1,usemoments=usemoments,returnmp=True)
-    mp = out[0]
-
-    outparams = mp.params
-    paramErrors = mp.perror
-    chisq = mp.fnorm
-    dof = mp.dof
-    reducedChisq = chisq/dof
-    print "reducedChisq =", reducedChisq
-    fitimg = out[1]
-    chisqList.append([chisq,dof])
-
-    paramsList.append(outparams)
-    errorsList.append(paramErrors)
-    print "*** outparams = ", outparams
-    print "*** paramErrors = ", paramErrors
-
-    fitimg[nanMask]=0  
-    fitImgList.append(fitimg)
-    frame[nanMask]=np.nan
-
-    amp = outparams[1]
-    width = outparams[4]
-    xpos = outparams[2]
-    ypos = outparams[3]
-
-    flux = 2*np.pi*amp*width*width
-    referenceCounts.append(flux)    
-    
-    if (i%100==0):
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(times[i])
-        im = ax.matshow(imageStacks[i], cmap = cm.get_cmap('rainbow'), vmax = 500)
-        ax.plot(refXs[i]+refApertureRadius*np.cos(angleArray), refYs[i]+refApertureRadius*np.sin(angleArray), 'b')
-        fig.colorbar(im)
-        #plt.show()
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(times[i])
-        im = ax.matshow(fitimg, cmap = cm.get_cmap('rainbow'), vmax = 500)
-        fig.colorbar(im)
-        plt.show()
-    
-
-targetCounts = np.array(targetCounts, dtype=float)
-#targetSkyCounts = np.array(targetSkyCounts, dtype=float)
-referenceCounts = np.array(referenceCounts, dtype=float)
-#referenceSkyCounts = np.array(referenceSkyCounts, dtype=float)
-
-plt.plot(times,targetCounts, 'b')
-plt.plot(times,referenceCounts, 'r')
-plt.show()
-plt.plot(times,(targetCounts)/(referenceCounts), 'black')
-plt.show()
-'''
-
-
-#####################################################
-#Aperture Phot code
-#####################################################
-'''
-for i in xrange(len(targetXs)):
-    print "\n------------------------------\n"
-    print "Performing target aperture photometry on frame ", i
-    startpx = int(np.round(targetXs[i],0))
-    startpy = int(np.round(targetYs[i],0))
-
-    apertureMask = aperture(startpx, startpy, targetApertureRadius)
-
-    innerMask = aperture(startpx, startpy, annulusInner)
-    outerMask = aperture(startpx, startpy, annulusOuter)
-    annulusMask = outerMask-innerMask
-
-    currentImage = np.array(interpolatedStacks[i])
-    nanMask = np.isnan(currentImage)
-    currentImage[nanMask] = 0.0#set to finite value that will be ignored
-
-    aperturePixels = np.array(np.where(np.logical_and(apertureMask==1, nanMask==False)))
-    aperturePix = aperturePixels.shape[1]
-    apertureCountsPerPixel = np.sum(currentImage[aperturePixels[0],aperturePixels[1]])/aperturePix
-    targetCounts.append(apertureCountsPerPixel*aperturePix)
-
-    annulusPixels = np.array(np.where(np.logical_and(annulusMask==1, nanMask==False)))
-    annulusPix = annulusPixels.shape[1]
-    #annulusCountsPerPixel = np.sum(currentImage[annulusPixels[0],annulusPixels[1]])/annulusPix
-    annulusCountsPerPixel = nanmedian(currentImage[annulusPixels[0],annulusPixels[1]])
-    targetSkyCounts.append(annulusCountsPerPixel*aperturePix)
-    
-    if (i%900==0):
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(times[i])
-        im = ax.matshow(interpolatedStacks[i], cmap = cm.get_cmap('rainbow'), vmax = 200)
-        ax.plot(targetXs[i]+targetApertureRadius*np.cos(angleArray), targetYs[i]+targetApertureRadius*np.sin(angleArray), 'b')
-        ax.plot(targetXs[i]+annulusInner*np.cos(angleArray), targetYs[i]+annulusInner*np.sin(angleArray), 'r')
-        ax.plot(targetXs[i]+annulusOuter*np.cos(angleArray), targetYs[i]+annulusOuter*np.sin(angleArray), 'r')
-        fig.colorbar(im)
-        plt.show()
-    
-
-for i in xrange(len(refXs)):
-    print "\n------------------------------\n"
-    print "Performing reference aperture photometry on frame ", i
-    startpx = int(np.round(refXs[i],0))
-    startpy = int(np.round(refYs[i],0))
-
-    apertureMask = aperture(startpx, startpy, refApertureRadius)
-
-    innerMask = aperture(startpx, startpy, annulusInner)
-    outerMask = aperture(startpx, startpy, annulusOuter)
-    annulusMask = outerMask-innerMask
-
-    currentImage = np.array(interpolatedStacks[i])
-    nanMask = np.isnan(currentImage)
-    currentImage[nanMask] = 0.0#set to finite value that will be ignored
-
-    aperturePixels = np.array(np.where(np.logical_and(apertureMask==1, nanMask==False)))
-    aperturePix = aperturePixels.shape[1]
-    apertureCountsPerPixel = np.sum(currentImage[aperturePixels[0],aperturePixels[1]])/aperturePix
-    referenceCounts.append(apertureCountsPerPixel*aperturePix)
-
-    annulusPixels = np.array(np.where(np.logical_and(annulusMask==1, nanMask==False)))
-    annulusPix = annulusPixels.shape[1]
-    #annulusCountsPerPixel = np.sum(currentImage[annulusPixels[0],annulusPixels[1]])/annulusPix
-    annulusCountsPerPixel = nanmedian(currentImage[annulusPixels[0],annulusPixels[1]])
-    referenceSkyCounts.append(annulusCountsPerPixel*aperturePix)
-    
-    if (i%900==0):
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(times[i])
-        im = ax.matshow(interpolatedStacks[i], cmap = cm.get_cmap('rainbow'), vmax = 200)
-        ax.plot(refXs[i]+refApertureRadius*np.cos(angleArray), refYs[i]+refApertureRadius*np.sin(angleArray), 'b')
-        ax.plot(refXs[i]+annulusInner*np.cos(angleArray), refYs[i]+annulusInner*np.sin(angleArray), 'r')
-        ax.plot(refXs[i]+annulusOuter*np.cos(angleArray), refYs[i]+annulusOuter*np.sin(angleArray), 'r')
-        fig.colorbar(im)
-        plt.show()
-
-
-
-targetCounts = np.array(targetCounts, dtype=float)
-targetSkyCounts = np.array(targetSkyCounts, dtype=float)
-referenceCounts = np.array(referenceCounts, dtype=float)
-referenceSkyCounts = np.array(referenceSkyCounts, dtype=float)
-
-plt.plot(times,targetCounts,'.',color='blue')
-plt.plot(times,referenceCounts,'.',color='red')
-plt.title("Raw Lightcurves (no sky sub)")
-plt.savefig(scratchDir+"/%i-%i_rawLCs.png"%(startWvl,stopWvl))
+#plot fluxes in counts/s
+plt.errorbar(BJD, tar_flux, yerr = tar_errs, fmt='b.', label='target')
+plt.errorbar(BJD, ref_flux, yerr = ref_errs, fmt='g.', label = 'reference')
+plt.title(filt)
 plt.show()
 
-plt.plot(times, targetSkyCounts,'.',color='blue')
-plt.plot(times, referenceSkyCounts,'.',color='red')
-plt.title("Sky lightcurves")
-plt.savefig(scratchDir+"/%i-%i_skyLCs.png"%(startWvl,stopWvl))
+#convert fluxes to magnitudes
+tar_mags = utils.countsToApparentMag(cps=tar_flux,filterName=filt,telescope='Palomar')
+ref_mags = utils.countsToApparentMag(cps=ref_flux,filterName=filt,telescope='Palomar')
+
+#get magnitudes of error bars
+tar_lowMag = utils.countsToApparentMag(cps=tar_highFlux, filterName=filt,telescope='Palomar')
+tar_highMag = utils.countsToApparentMag(cps=tar_lowFlux, filterName=filt,telescope='Palomar')
+tar_lowErrs = tar_mags-tar_lowMag
+tar_highErrs = tar_highMag-tar_mags
+
+ref_lowMag = utils.countsToApparentMag(cps=ref_highFlux, filterName=filt,telescope='Palomar')
+ref_highMag = utils.countsToApparentMag(cps=ref_lowFlux, filterName=filt,telescope='Palomar')
+ref_lowErrs = ref_mags-ref_lowMag
+ref_highErrs = ref_highMag-ref_mags
+
+#plot light curves in magnitudes
+plt.errorbar(BJD,tar_mags,yerr=[tar_lowErrs, tar_highErrs], fmt='b.',label='target')
+plt.errorbar(BJD,ref_mags,yerr=[ref_lowErrs, ref_highErrs], fmt='g.',label='ref')
+plt.ylim(22,16)
+plt.title(filt)
 plt.show()
 
-plt.plot(times,targetCounts-targetSkyCounts,'.',color='blue')
-plt.plot(times,referenceCounts-referenceSkyCounts,'.',color='red')
-plt.title("Sky subtracted lightcurves")
-plt.savefig(scratchDir+"/%i-%i_skySubtractedLCs.png"%(startWvl,stopWvl))
-plt.show()
+#take out NANs because PHOEBE dies on them
+BJD = BJD[np.isnan(tar_mags)==False]
+tar_lowErrs = tar_lowErrs[np.isnan(tar_mags)==False]
+tar_mags = tar_mags[np.isnan(tar_mags)==False]
 
-plt.plot(times,(targetCounts)/(referenceCounts),'.',color='black')
-plt.title("Target/Reference NO sky sub")
-plt.savefig(scratchDir+"/%i-%i_dividedLC_NoSkySub.png"%(startWvl,stopWvl))
-plt.show()
+BJD = BJD[np.isinf(tar_mags)==False]
+tar_lowErrs = tar_lowErrs[np.isinf(tar_mags)==False]
+tar_mags = tar_mags[np.isinf(tar_mags)==False]
 
-plt.plot(times,(targetCounts-targetSkyCounts)/(referenceCounts-referenceSkyCounts),'.',color='black')
-plt.title("Target/Reference WITH sky sub")
-plt.savefig(scratchDir+"/%i-%i_dividedLC_WithSkySub.png"%(startWvl,stopWvl))
-plt.show()
-'''
+# output data to PHOEBE formatted txt file
+fname = 'PHOEBE_%s_%s.txt'%(objName, filt)
+writeToPHOEBEFile(fname, objName, filt, BJD, tar_mags, tar_lowErrs)
+
 

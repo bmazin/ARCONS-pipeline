@@ -17,7 +17,8 @@ usage:
 >>python syntheticFilterTest.py [filter]
 
 options:
-[filter] = an optional filter can be provided in command line. Default is Johnson V band filter.
+[filter] = an optional filter can be provided in command line if you want to play with all
+the available options. Default is Johnson V band filter.
 '''
 
 #  If you want to make the test plots with a specific filter, provide it in the command line

@@ -15,19 +15,29 @@ from util.popup import *
 from photometry.PSFphotometry import PSFphotometry
 from photometry.LightCurve import LightCurve
 
+if len(sys.argv)>1:
+    filt = sys.argv[1]
+else:
+    filt = None
+
 path = '/Scratch/DisplayStack/PAL2014/1SWASP_J0002' #J0002 for my object, J2210 for Alex's object
 verbose=True
 showPlot=True
 
-intTime=10
-startWl = 4000
-endWl = 5000
+intTime=30
+startWl = 3000
+endWl = 13000
 hp=True
 flat = True
+flux = True
 
-outputFN = 'ImageStack_%s_%s-%s'%(intTime,startWl, endWl)
+#outputFN = '%ss_%s-%s'%(intTime,startWl, endWl)
+outputFN = '%ss_%s'%(intTime,filt)
+
 if flat==True:
     outputFN+='_flat'
+if flux==True:
+    outputFN+='_flux'
 if hp==True:
     outputFN+='_hp'
 #outputFN+='.h5'
@@ -36,13 +46,13 @@ identifier=outputFN
 print outputFN
 
 LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=False)
-LC.makeImageStack(imageStackFilename='',dt=intTime,wvlStart=startWl,wvlStop=endWl,
-                           weighted=True, fluxWeighted=False, getRawCount=False, 
-                           scaleByEffInt=True, deadTime=100.e-6)
-LC.makeAllCentroidFiles(centroidFilenames=['',''])
-print LC.centroids
-print LC.flags
-LC.makeLightCurve(photometryType='aper')
+#LC.makeImageStack(imageStackFilename='',dt=intTime,wvlStart=startWl,wvlStop=endWl,
+#                           weighted=True, fluxWeighted=True, getRawCount=False, 
+#                           scaleByEffInt=True, deadTime=100.e-6, filterName=filt)
+#print "\n\n###########################\nFINISHED MAKING IMAGE STACKS\n#############################\n\n"
+
+#LC.makeAllCentroidFiles(centroidFilenames=['',''])
+
 
 
 '''
