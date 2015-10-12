@@ -33,7 +33,6 @@ Dec = 33.029175
 fd = ofs.getFrameDict()
 
 ofs.loadSpectralCubes()
-
 rmi = open('ObjectFinderDemoMosaic-cubes.pkl', 'rb')
 data = pickle.load(rmi)
 

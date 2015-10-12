@@ -15,31 +15,58 @@ from util.popup import *
 from photometry.PSFphotometry import PSFphotometry
 from photometry.LightCurve import LightCurve
 
-path = '/Scratch/DisplayStack/PAL2014/1SWASP_J0002'
+path = '/Scratch/DisplayStack/PAL2014/1SWASP_J0002' #J0002 for my object, J2210 for Alex's object
 verbose=True
 showPlot=True
 
+<<<<<<< HEAD
+=======
+intTime=10
+>>>>>>> 7edaa38518bd8e99dd76c9a379439a900670e4b2
 startWl = 4000
 endWl = 5000
 hp=True
 flat = True
 integrationTime=10
 
+<<<<<<< HEAD
 outputFN = '%s_%s-%s'%(integrationTime,startWl, endWl)
+=======
+outputFN = 'ImageStack_%s_%s-%s'%(intTime,startWl, endWl)
+>>>>>>> 7edaa38518bd8e99dd76c9a379439a900670e4b2
 if flat==True:
     outputFN+='_flat'
 if hp==True:
     outputFN+='_hp'
+<<<<<<< HEAD
 identifier=outputFN
+=======
+#outputFN+='.h5'
+>>>>>>> 7edaa38518bd8e99dd76c9a379439a900670e4b2
 
+identifier=outputFN
 print outputFN
 
+<<<<<<< HEAD
 LC=LightCurve(fileID=identifier,path=path,targetName='1SWASP_J0002',run='PAL2014',verbose=True,showPlot=False)
 LC.makeImageStack(imageStackFilename='',dt=integrationTime,wvlStart=startWl,wvlStop=endWl,weighted=flat, fluxWeighted=False, getRawCount=False,scaleByEffInt=hp, deadTime=100.e-6)
 LC.makeAllCentroidFiles(centroidFilenames=['',''])
 
 '''
 #replace everything below here with lightCurve.py example under __main()__
+=======
+LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=False)
+LC.makeImageStack(imageStackFilename='',dt=intTime,wvlStart=startWl,wvlStop=endWl,
+                           weighted=True, fluxWeighted=False, getRawCount=False, 
+                           scaleByEffInt=True, deadTime=100.e-6)
+LC.makeAllCentroidFiles(centroidFilenames=['',''])
+print LC.centroids
+print LC.flags
+LC.makeLightCurve(photometryType='aper')
+
+
+'''
+>>>>>>> 7edaa38518bd8e99dd76c9a379439a900670e4b2
 LC = LightCurve(path,verbose=verbose,showPlot=showPlot)
 obsFNs = LC.getFNs()
 #print 'obs[10]: ',obsFNs[10:11][0].obs()
