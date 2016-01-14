@@ -1,12 +1,16 @@
 ##Files and Dirs
 
+##G24-9 file from PAL2014, 5 files available, first is 5 mins in center. Then 90s in each corner for comparison. Last one is in big dead patch, so not included here. 033148 also not in a great spot.
 
-##G158-100 files from PAL2012
+run = 'PAL2014'
 
-run = 'PAL2012'
+fluxSunsetLocalDate = '20140924'
 
-fluxSunsetLocalDate = '20121211'
-fluxTimestamp = '20121212-021727'
+fluxTimestamp = '20140925-032543'
+#fluxTimestamp = '20140925-033148'
+#fluxTimestamp = '20140925-033333'
+#fluxTimestamp = '20140925-033609'
+
 skyTimestamp = ''
 
 wvlCalSunsetLocalDate = ''
@@ -15,12 +19,22 @@ flatCalFileName = ''
 startTime = 0
 integrationTime = -1
 method = 'absolute'
-object = 'G158-100'
+object = 'g24-9'
 energyResolution = 8
 deadtime = 0.0001
 
-centroidRow = 6
-centroidCol = 13
+centroidRow = 22
+centroidCol = 18
+
+#centroidRow = 12
+#centroidCol = 25
+
+#centroidRow = 32
+#centroidCol = 11
+
+#centroidRow = 29
+#centroidCol = 27
+
 apertureRad = 8
 collectingArea = 178420.70
 
@@ -28,29 +42,46 @@ photometry = 'aperture'
 annulusInner = 10
 annulusOuter = 20
 
+
+##G158-100 files from PAL2012
+#run = 'PAL2012'
+#fluxSunsetLocalDate = '20121211'
+#fluxTimestamp = '20121212-021727'
+#skyTimestamp = ''
+#wvlCalSunsetLocalDate = ''
+#flatCalFileName = ''
+#startTime = 0
+#integrationTime = -1
+#method = 'absolute'
+#object = 'G158-100'
+#energyResolution = 8
+#deadtime = 0.0001
+#centroidRow = 6
+#centroidCol = 13
+#apertureRad = 8
+#collectingArea = 178420.70
+#photometry = 'aperture'
+#annulusInner = 10
+#annulusOuter = 20
+
+
 ##HZ21 files from PAL2013 (there are 4 available)
-
 #run = 'PAL2013'
-
 #fluxSunsetLocalDate = '20131209'
 #fluxTimestamp = '20131209-122152'
 #skyTimestamp = ''
-
 #wvlCalSunsetLocalDate = ''
 #flatCalFileName = ''
-
 #startTime = 40
 #integrationTime = -1
 #method = 'absolute'
 #object = 'hz21'
 #energyResolution = 8
 #deadtime = 0.0001
-
 #centroidRow = 23
 #centroidCol = 14
 #apertureRad = 15
 #collectingArea = 178420.70
-
 #photometry = 'aperture'
 #annulusInner = 18
 #annulusOuter = 25

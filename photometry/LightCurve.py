@@ -254,7 +254,7 @@ class LightCurve():
 
     def makeImageStack(self,imageStackFilename='',dt=30,wvlStart=None,wvlStop=None,
                            weighted=True, fluxWeighted=False, getRawCount=False, 
-                           scaleByEffInt=True, deadTime=100.e-6):
+                           scaleByEffInt=True, deadTime=100.e-6, filterName = None):
         '''
         This function makes an image stack using the ObsFileSeq class
         
@@ -268,14 +268,33 @@ class LightCurve():
         for day_i in range(len(self.params['utcDates'])):
             for tstamp in self.params['obsTimes'][day_i]:
                 tsl.append(self.params['utcDates'][day_i]+'-'+tstamp)
-        #tsl=tsl[:2]        
+        #tsl=tsl[:1]        
         ofs = ObsFileSeq(name=self.targetName,run=self.run,date=self.params['sunsetDates'][0],timeStamps=tsl,dt=dt)
         if imageStackFilename is None or imageStackFilename is '': imageStackFilename = self.path+os.sep+'ImageStacks'+os.sep+'ImageStack_'+self.fileID+'.h5'
         self.im_params, self.im_dict = ofs.loadImageStack(imageStackFilename, wvlStart=wvlStart,wvlStop=wvlStop,
                                                            weighted=weighted, fluxWeighted=fluxWeighted, getRawCount=getRawCount, 
-                                                           scaleByEffInt=scaleByEffInt, deadTime=deadTime)
+                                                           scaleByEffInt=scaleByEffInt, deadTime=deadTime, filterName=filterName)
         self.imageStackFilename = imageStackFilename
         #return self.im_params, self.im_dict       
+    
+    def printImageStackInfo(self,dt=30):
+        tsl = []
+        for day_i in range(len(self.params['utcDates'])):
+            for tstamp in self.params['obsTimes'][day_i]:
+                tsl.append(self.params['utcDates'][day_i]+'-'+tstamp)
+        #tsl=tsl[:2]
+        ofs = ObsFileSeq(name=self.targetName,run=self.run,date=self.params['sunsetDates'][0],timeStamps=tsl,dt=dt)
+        for iframe in range(len(ofs.frameObsInfos)):
+            #if iframe < 300 or iframe > 310:
+            #    continue
+            frameNum = "%04.d" % (iframe,)
+            if len(ofs.frameObsInfos[iframe])<1:
+                print frameNum
+            for obsDesc in ofs.frameObsInfos[iframe]:
+                
+                print frameNum, 'obs:',obsDesc['iObs'], 'firstSec:',obsDesc['firstSec'], 'intTime:',obsDesc['integrationTime'],'fn:',obsDesc['obs'].fullFileName
+                
+        #ofs.getFrameList()
                             
     def loadImageStack(self,imageStackFilename=''):
         '''
@@ -290,6 +309,23 @@ class LightCurve():
         self.im_params, self.im_dict = readImageStack(imageStackFilename)
         self.imageStackFilename = imageStackFilename
         #return self.im_params, self.im_dict
+        
+    def removeMostlyHotPixels(self,maxTimeHot=0.80):
+        try:
+            num_images=len(self.im_dict['images'])
+            assert num_images>0
+        except:
+            print "Need to load image stack for this object"
+            return
+            
+        for i in range(num_images):
+            badPixels = np.where((self.im_dict['pixIntTimes'][i] < self.im_dict['intTimes'][i]*(1.-maxTimeHot)) * (self.im_dict['pixIntTimes'][i] > 0.))
+            nbad = np.sum((self.im_dict['pixIntTimes'][i] < self.im_dict['intTimes'][i]*(1.-maxTimeHot)) * (self.im_dict['pixIntTimes'][i] > 0.))
+            if nbad>0:
+                self.im_dict['pixIntTimes'][i][badPixels]=0.
+                self.im_dict['images'][i][badPixels]=0.
+                if self.verbose:
+                    print 'Removed',nbad,'bad pixels from image',i
 
     def makeAllCentroidFiles(self,centroidFilenames=[''],radiusOfSearch=[10],maxMove=[4],usePsfFit=[False]):
         centroidDir = 'CentroidLists'
@@ -343,13 +379,13 @@ class LightCurve():
             assert num_images>0
             self.centroidFilenames=[]
         except:
-            print "Need to make image stack before loading centroids"
+            print "Need to load image stack before loading centroids"
             return
             
         if centroidFilenames is None or len(centroidFilenames)<1:
             nStars=0
-            for file_i in os.listdir(path+os.sep+centroidDir):
-                nStars+=int(os.path.isdir(path+os.sep+centroidDir+os.sep+file_i))
+            for file_i in os.listdir(self.path+os.sep+centroidDir):
+                nStars+=int(os.path.isdir(self.path+os.sep+centroidDir+os.sep+file_i))
             centroidFilenames=['']*nStars
         if centroidFilenames[0] is '':
             try: centroidFilenames[0] = self.path+os.sep+centroidDir+os.sep+targetDir+os.sep+'Centroid_'+self.fileID+'.h5'
@@ -392,7 +428,9 @@ class LightCurve():
             print "Need to make image stack for this object"
             return
         
-        xPositionList,yPositionList,flagList=quickCentroid(images,radiusOfSearch=radiusOfSearch,maxMove = maxMove,usePsfFit=usePsfFit)
+        #reducedImages = images/self.im_dict['intTimes']
+        reducedImages = [images[i]/self.im_dict['intTimes'][i] for i in range(len(images))]
+        xPositionList,yPositionList,flagList=quickCentroid(reducedImages,radiusOfSearch=radiusOfSearch,maxMove = maxMove,usePsfFit=usePsfFit)
         
         if centroidFilename is None or centroidFilename is '':
             centroidFilename = self.path+os.sep+centroidDir+os.sep+targetDir+os.sep+'Centroid_'+self.fileID+'.h5'
@@ -427,21 +465,25 @@ class LightCurve():
                   
 if __name__ == '__main__':
     path = '/Scratch/DisplayStack/PAL2014/1SWASP_J2210'
-    identifier = 'manHotPix'
+    identifier = '15s_4000-9000A_flat_hp_V3'
+    #identifier = 'test3'
     #path = '/Scratch/DisplayStack/PAL2014/HAT_P1'
     #identifier = '4000-5000_flat'
     
     
     LC=LightCurve(fileID=identifier,path=path,targetName=None,run=None,verbose=True,showPlot=False)
-    #LC.makeImageStack(imageStackFilename='',dt=30,wvlStart=4000,wvlStop=9000,
+    #LC.printImageStackInfo(dt=15)
+    #LC.makeImageStack(imageStackFilename='',dt=15,wvlStart=4000,wvlStop=9000,
     #                       weighted=True, fluxWeighted=False, getRawCount=False, 
     #                       scaleByEffInt=True, deadTime=100.e-6)
-    #LC.makeAllCentroidFiles(centroidFilenames=['',''])
+    LC.removeMostlyHotPixels()
+    #LC.makeAllCentroidFiles(centroidFilenames=['',''],radiusOfSearch=20,maxMove=3,usePsfFit=True)
     #print LC.centroids
     #print LC.flags
-    #LC.makeLightCurve(photometryType='PSF')
-    LC.loadLightCurve(photometryType='aper')
-    photometryDict=LC.photometry_dict
+    #LC.makeLightCurve(photometryType='aper',aper_radius=7,annulus_outer=18)
+    LC.makeLightCurve(photometryType='PSF')
+    #LC.loadLightCurve(photometryType='aper')
+    #photometryDict=LC.photometry_dict
     
     
     #transit_mid = 2456953.81673
@@ -461,5 +503,5 @@ if __name__ == '__main__':
         #self.axes.plot(time[np.where(flags==1.)],ref_flux[np.where(flags==1.)],'ro',label='Failed Centroid')
         #self.axes.plot(time[np.where(flags>1.1)],ref_flux[np.where(flags>1.1)],'ro',label='Failed Fit')
         self.axes.legend()
-    pop(plotFunc=f,title='Flux')
+    #pop(plotFunc=f,title='Flux')
 

@@ -206,11 +206,16 @@ def populateFluxCals(runPath,lookupPath=None):
                 fn = FileName(obsFile=obsPath)
                 params = {}
                 params['obs_run'],params['obs_date'],params['obs_tstamp'] = fn.getComponents()
-                if params['obs_run'] == 'PAL2014':
+                if params['obs_run'] == 'PAL2012':
                     params['fluxSoln_run'] = 'PAL2012'
                     params['fluxSoln_date'] = '20121211'
-                    params['fluxSoln_tstamp'] = 'absolute_021727'
+                    params['fluxSoln_tstamp'] = '20121212_021727'
                 
+                if params['obs_run'] == 'PAL2014':
+                    params['fluxSoln_run'] = 'PAL2014'
+                    params['fluxSoln_date'] = '20140924'
+                    params['fluxSoln_tstamp'] = '20140925-032543'
+
                 print params
                 lookup.updateObs(newParams=params)
             except:

@@ -123,13 +123,14 @@ def print_guesses(parameter_guess, parameter_lowerlimit, parameter_upperlimit, p
 
 class PSFphotometry(Photometry):
 
-    def __init__(self,image,centroid,expTime=None, verbose=False,showPlot=False):
+    def __init__(self,image,centroid,expTime=None,maxTimeHot=.80,verbose=False,showPlot=False):
         '''
         Inputs:
             image - 2D array of data (0 for dead pixel, shouldn't be any nan's or infs)
                   - Should be fully calibrated, dead time corrected, and scaled up to the effective integration time
             centroid - list of (col,row) tuples. The first tuple is the target location. The next are reference stars in the field 
             expTime - 2d array of effective exposure times (same size as image)
+            maxTimeHot - If the exposure time for a pixel is less than this percentage of the max exposure then kill that pixel
             verbose - show error messages
             showPlot - show and pause after each PSF fit
         '''
@@ -137,8 +138,23 @@ class PSFphotometry(Photometry):
         self.showPlot=showPlot
         #self.model=model
         
-        super(PSFphotometry,self).__init__(image=image,centroid=centroid,expTime=expTime)
-
+        super(PSFphotometry,self).__init__(image=np.copy(image),centroid=centroid,expTime=np.copy(expTime))
+        self.image[np.invert(np.isfinite(self.image))]=0.
+        if expTime is None:
+            self.expTime = np.ones(self.image.shape)
+            self.expTime[np.where(self.image==0.)]=0.
+        else:
+            self.expTime[np.invert(np.isfinite(self.expTime))]=0.
+        
+        #Remove pixels that are hot more than maxTimeHot percent of the time
+        intTime = np.max(self.expTime)
+        badPixels = np.where((self.expTime < intTime*(1.-maxTimeHot)) * (self.expTime > 0.))
+        nbad = np.sum((self.expTime < intTime*(1.-maxTimeHot)) * (self.expTime > 0.))
+        if nbad>0:
+            self.expTime[badPixels]=0.
+            self.image[badPixels]=0.
+            if self.verbose:
+                print 'Removed',nbad,'bad pixels'
 
         
     def guess_parameters(self, model, aper_radius=9,tie_sigmas=True):
@@ -249,14 +265,19 @@ class PSFphotometry(Photometry):
             flag - flag indicating if fit failed. 0 means success
             model - model used to fit. Just returns the string you inputted
         '''
-        self.image[np.invert(np.isfinite(self.image))]=0.
-        errs = np.sqrt(self.image)
-        #errs[np.where(self.image==0.)]=1.
-        #errs[np.where(expTime==0.)]=np.inf
-        errs[np.where(self.image==0.)]=np.inf
-        #errs[0:25,:] = np.inf
-        #errs[:,11:] = np.inf
+
         
+        intTime = np.max(self.expTime)
+        if intTime>0:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore",'invalid value encountered in divide',RuntimeWarning)
+                warnings.filterwarnings("ignore",'divide by zero encountered in divide',RuntimeWarning)
+                errs = np.sqrt(self.image * intTime / self.expTime)
+            errs[np.where(self.image==0.)]=1.5
+            errs[np.where(self.expTime<=0.)]=np.inf
+        else:
+            errs = np.sqrt(self.image)
+            errs[np.where(self.image==0.)]=np.inf
         
         parameter_guess,parameter_lowerlimit,parameter_upperlimit,parameter_ties = self.guess_parameters(model,aper_radius=aper_radius,tie_sigmas=tie_sigmas)
         
