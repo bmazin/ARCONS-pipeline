@@ -423,6 +423,7 @@ class PlotWindow(QtGui.QDialog):
         self.selectSecondPoint = None
         self.selectedRange = None
         self.selecting = False
+        self.lastPlotType = None
 
         self.combobox_plotType = QtGui.QComboBox(self)
         self.plotTypeStrs = ['Light Curve','Time Mask','Spectrum','Phase Histogram']
@@ -619,7 +620,6 @@ class PlotWindow(QtGui.QDialog):
     def plotLightCurve(self,getRaw=False):
         paramsDict = self.parent.getObsParams()
         excludeBad = not (getRaw or paramsDict['getRawCount'])
-
         if self.checkbox_trackTimes.isChecked():
             startTime = float(self.parent.textbox_startTime.text())
             endTime = float(self.parent.textbox_endTime.text())
@@ -634,7 +634,10 @@ class PlotWindow(QtGui.QDialog):
         if histBinEdges[-1]+histIntTime == endTime:
             histBinEdges = np.append(histBinEdges,endTime)
         for col,row in self.selectedPixels:
-            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=excludeBad)
+            if excludeBad:
+                returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=excludeBad)
+            else:
+                returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             hist,_ = np.histogram(timestamps,bins=histBinEdges)
             hists.append(hist)
@@ -715,8 +718,9 @@ class PlotWindow(QtGui.QDialog):
             range = None
         pixCutOffPhases=[]
         for col,row in self.selectedPixels:
-            cutOffWvl = self.parent.obs.wvlRangeTable[row, col, 0]
-            pixCutOffPhases.append(self.parent.obs.convertWvlToPhase(cutOffWvl,row,col))
+            if not self.checkbox_keepRawPhase.isChecked():
+                cutOffWvl = self.parent.obs.wvlRangeTable[row, col, 0]
+                pixCutOffPhases.append(self.parent.obs.convertWvlToPhase(cutOffWvl,row,col))
             returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             peakHeights = returnDict['peakHeights']
