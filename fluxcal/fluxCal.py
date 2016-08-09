@@ -195,7 +195,7 @@ class FluxCal:
 
     def getDeadTimeCorrection(self, obs): #WRONG RIGHT NOW. NEEDS TO HAVE RAW COUNTS SUMMED, NOT CUBE WHICH EXCLUDES NOISE TAIL
         if self.verbose: print "Making raw cube to get dead time correction"
-        cubeDict = obs.getSpectralCube(firstSec=self.startTime, integrationTime=self.intTime, weighted=False)
+        cubeDict = obs.getSpectralCube(firstSec=self.startTime, integrationTime=self.intTime, weighted=False, fluxWeighted=False)
 
         cube= np.array(cubeDict['cube'], dtype=np.double)
         wvlBinEdges= cubeDict['wvlBinEdges']
@@ -328,7 +328,7 @@ class FluxCal:
             #create figure for plotting standard spectrum modifications      
             self.stdFig = plt.figure()
             self.stdAx = self.stdFig.add_subplot(111)
-            plt.xlim(4000,11000)
+            plt.xlim(3500,12000)
             plt.plot(self.stdWvls,self.stdFlux*1E15,linewidth=1,color='grey',alpha=0.75)
             
         convX_rev,convY_rev = self.cleanSpectrum(self.stdWvls,self.stdFlux)
@@ -345,7 +345,7 @@ class FluxCal:
             plt.legend(['%s Spectrum'%self.objectName,'Blackbody Fit','Gaussian Convolved Spectrum','Rebinned Spectrum'],'upper right', numpoints=1)
             plt.xlabel(ur"Wavelength (\r{A})")
             plt.ylabel(ur"Flux (10$^{-15}$ ergs s$^{-1}$ cm$^{-2}$ \r{A}$^{-1}$)")
-            plt.ylim(1,5)
+            plt.ylim(0.9*min(rebinnedFlux)*1E15, 1.1*max(rebinnedFlux)*1E15)
             plt.savefig(self.plotSavePath+'FluxCal_StdSpectrum_%s.eps'%self.objectName,format='eps')
         
         #convert standard spectrum back into counts/s/angstrom/cm^2
@@ -475,7 +475,7 @@ class FluxCal:
         plt.figure()
         ax6 = plt.subplot(111)
         ax6.set_title('Median Sensitivity Spectrum')
-        ax6.set_xlim((3000,13000))
+        ax6.set_xlim((3500,12000))
         #ax6.set_ylim((0,5))
         plt.plot(wvls,self.fluxFactors)
         pp.savefig()
@@ -483,7 +483,8 @@ class FluxCal:
         plt.figure()
         ax7 = plt.subplot(111)
         ax7.set_title('1/Sensitivity (Throughput)')
-        ax7.set_xlim((4000,11000))
+        ax7.set_xlim((3500,12000))
+        ax7.set_ylim((0,.04))
         plt.plot(wvls,1.0/self.fluxFactors)
         pp.savefig()
 
