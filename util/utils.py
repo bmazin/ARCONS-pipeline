@@ -17,7 +17,7 @@ from scipy.optimize.minpack import curve_fit
 import scipy.ndimage
 import scipy.stats
 import astropy.stats
-import ds9
+#import ds9
 from numpy import linalg
 from astropy import wcs
 

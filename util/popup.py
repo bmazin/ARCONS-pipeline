@@ -6,7 +6,7 @@ import sys
 from multiprocessing import Process
 from functools import partial
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+#from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib
 
@@ -40,10 +40,10 @@ class PopUp(QtGui.QMainWindow):
         #self.axes.set_title(title)
 
         # Create the navigation toolbar, tied to the canvas
-        self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
+        #self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.canvas)
-        vbox.addWidget(self.mpl_toolbar)
+        #vbox.addWidget(self.mpl_toolbar)
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
