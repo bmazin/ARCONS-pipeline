@@ -1037,8 +1037,8 @@ class ArrayImageWidget(QtGui.QWidget):
 
     def clickCanvas(self,event):
         if event.inaxes is self.axes:
-            col = round(event.xdata)
-            row = round(event.ydata)
+            col = int(round(event.xdata))
+            row = int(round(event.ydata))
             if self.selectPixelsMode == 'singlePixel':
                 self.selectedPixels = [(col,row)]
                 self.draw()
