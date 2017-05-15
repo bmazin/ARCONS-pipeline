@@ -45,7 +45,7 @@ class ObsFileViewer(QtGui.QMainWindow):
             try:
                 self.obs.loadAllCals()
             except IOError:
-                pass
+                'Error: a cal did not exist. Did not finish loading cals'
             if not self.obs.hotPixTimeMask is None:
                 self.enableTimeMaskParams()
 
@@ -328,13 +328,19 @@ class ObsFileViewer(QtGui.QMainWindow):
         LoadCalsDialog(parent=self,obsTstamp=self.fn.tstamp)
 
     def getTimeMaskReasons(self):
-        reasonEnum = self.obs.hotPixTimeMask.reasonEnum
-        reasons = [reasonPair[0] for reasonPair in reasonEnum]
-        selectedReasons = self.obs.hotPixTimeMask.enabledReasons
+        if not self.obs.hotPixTimeMask is None:
+            reasonEnum = self.obs.hotPixTimeMask.reasonEnum
+            reasons = [reasonPair[0] for reasonPair in reasonEnum]
+            selectedReasons = self.obs.hotPixTimeMask.enabledReasons
+        else:
+            reasons = []
+            selectedReasons = []
         return {'reasons':reasons,'selectedReasons':selectedReasons}
 
     def enableTimeMaskParams(self):
+        print 'obsFileViewer enableTimeMaskParams'
         if not self.obs.hotPixTimeMask is None:
+            print 'imageParamsWindow enableTimeMaksParams'
             reasonDict = self.getTimeMaskReasons()
             self.imageParamsWindow.enableTimeMaskParams(reasons=reasonDict['reasons'],selectedReasons=reasonDict['selectedReasons'])
 
@@ -417,6 +423,7 @@ class PlotWindow(QtGui.QDialog):
         self.selectSecondPoint = None
         self.selectedRange = None
         self.selecting = False
+        self.lastPlotType = None
 
         self.combobox_plotType = QtGui.QComboBox(self)
         self.plotTypeStrs = ['Light Curve','Time Mask','Spectrum','Phase Histogram']
@@ -613,7 +620,6 @@ class PlotWindow(QtGui.QDialog):
     def plotLightCurve(self,getRaw=False):
         paramsDict = self.parent.getObsParams()
         excludeBad = not (getRaw or paramsDict['getRawCount'])
-
         if self.checkbox_trackTimes.isChecked():
             startTime = float(self.parent.textbox_startTime.text())
             endTime = float(self.parent.textbox_endTime.text())
@@ -628,7 +634,10 @@ class PlotWindow(QtGui.QDialog):
         if histBinEdges[-1]+histIntTime == endTime:
             histBinEdges = np.append(histBinEdges,endTime)
         for col,row in self.selectedPixels:
-            returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=excludeBad)
+            if excludeBad:
+                returnDict = self.parent.obs.getPixelWvlList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration,excludeBad=excludeBad)
+            else:
+                returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             hist,_ = np.histogram(timestamps,bins=histBinEdges)
             hists.append(hist)
@@ -709,8 +718,9 @@ class PlotWindow(QtGui.QDialog):
             range = None
         pixCutOffPhases=[]
         for col,row in self.selectedPixels:
-            cutOffWvl = self.parent.obs.wvlRangeTable[row, col, 0]
-            pixCutOffPhases.append(self.parent.obs.convertWvlToPhase(cutOffWvl,row,col))
+            if not self.checkbox_keepRawPhase.isChecked():
+                cutOffWvl = self.parent.obs.wvlRangeTable[row, col, 0]
+                pixCutOffPhases.append(self.parent.obs.convertWvlToPhase(cutOffWvl,row,col))
             returnDict = self.parent.obs.getTimedPacketList(iRow=row,iCol=col,firstSec=firstSec,integrationTime=duration)
             timestamps = returnDict['timestamps']
             peakHeights = returnDict['peakHeights']
@@ -858,6 +868,7 @@ class ImageParamsWindow(ModelessWindow):
 
 
     def enableTimeMaskParams(self,reasons=[],selectedReasons=[]):
+        print 'imageParams enable'
         self.checkboxes_timeMaskReasons = {}
         vbox = QtGui.QVBoxLayout()
         if len(reasons) > 0:
@@ -1221,8 +1232,9 @@ class LoadCalsDialog(QtGui.QDialog):
         self.connect(self.button_loadWvl,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadWvlWidget,'loadWvlCalFile'))
         self.connect(self.button_loadFlat,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadFlatWidget,'loadFlatCalFile'))
         self.connect(self.button_loadFlux,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadFluxWidget,'loadFluxCalFile'))
-        self.connect(self.button_loadTimeMask,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeMaskWidget,'loadHotPixCalFile'))
-        self.connect(self.button_loadTimeAdjustment,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile'))
+        self.connect(self.button_loadTimeMask,QtCore.SIGNAL('clicked()'),self.loadTimeMask)
+        #self.connect(self.button_loadTimeAdjustment,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile'))
+        self.connect(self.button_loadTimeAdjustment,QtCore.SIGNAL('clicked()'),self.loadTimeAdjustmentFile)
         self.connect(self.button_loadCosmic,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadCosmicWidget,'loadCosmicMaskFile'))
         self.connect(self.button_loadBeammap,QtCore.SIGNAL('clicked()'),partial(self.loadCal,self.loadBeammapWidget,'loadBeammapFile'))
         self.connect(self.button_loadAll,QtCore.SIGNAL('clicked()'),self.loadAllCals)
@@ -1238,6 +1250,10 @@ class LoadCalsDialog(QtGui.QDialog):
         path = str(self.loadTimeMaskWidget.textbox_filename.text())
         self.parent.enableTimeMaskParams()
         
+    def loadTimeAdjustmentFile(self):
+        self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
+        print 'one sec delays: ',self.parent.obs.roachDelays
+
     def loadAllCals(self):
         try:
             self.loadCal(self.loadBeammapWidget,'loadBeammapFile')
@@ -1245,7 +1261,8 @@ class LoadCalsDialog(QtGui.QDialog):
             self.loadCal(self.loadFlatWidget,'loadFlatCalFile')
             self.loadCal(self.loadFluxWidget,'loadFluxCalFile')
             self.loadTimeMask()
-            self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
+            #self.loadCal(self.loadTimeAdjustmentWidget,'loadTimeAdjustmentFile')
+            self.loadTimeAdjustmentFile()
             self.loadCal(self.loadCosmicWidget,'loadCosmicMaskFile')
         except IOError:
             pass

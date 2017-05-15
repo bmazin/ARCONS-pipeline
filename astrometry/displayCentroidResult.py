@@ -1,5 +1,6 @@
 import numpy as np
-import pytables
+import tables
+import os
 from util import ObsFile, FileName, utils
 
 
@@ -32,14 +33,14 @@ def displayCentroidResult(obsFileIn, time):
 
     #Get the boundaries of the time slices used for centroiding
     #(in seconds from start of array.)    
-    sliceTimes = tables.root.centroidlist.times.read()
-    xPositions = tables.root.centroidlist.xPositions.read()
-    yPositions = tables.root.centroidlist.yPositions.read()    
-    iSliceEnd = np.searchsorted(ctrdtimes, time)
+    sliceTimes = ctrdFile.root.centroidlist.times.read()
+    xPositions = ctrdFile.root.centroidlist.xPositions.read()
+    yPositions = ctrdFile.root.centroidlist.yPositions.read()    
+    iSliceEnd = np.searchsorted(sliceTimes, time)
     iSliceStart = iSliceEnd-1
     sliceStartTime = sliceTimes[iSliceStart]
     sliceEndTime = sliceTimes[iSliceEnd]
-    sliceXpos,sliceYpos = xPositions[iSliceStart],ypositions[iSliceStart]
+    sliceXpos,sliceYpos = xPositions[iSliceStart],yPositions[iSliceStart]
     
     #Integrate to get the corresponding image
     im = obsFile.getPixelCountImage(sliceStartTime, sliceEndTime-sliceStartTime,

@@ -77,7 +77,7 @@ import pickle
 from math import *
 from interval import interval
 import tables
-import ds9
+#import ds9
 import numpy as np
 import numpy.ma as ma
 import scipy.ndimage.filters as spfilters
